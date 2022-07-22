@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "name": "Wintap.exe",
+    "location":  "wintap",
+    "version": "6.0.2.0"
+  },
+  {
+    "id": 2,
+    "name": "Harbinger.dll",
+    "location": "wintap/plugins",
+    "version": "6.0.3.9"
+  },
+  {
+    "id": 3,
+    "name": "WintapSvcMgr.exe",
+    "location": "wintap",
+    "version": "1.0.0.1"
+  }
+]
