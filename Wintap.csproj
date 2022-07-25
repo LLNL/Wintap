@@ -359,7 +359,6 @@
     <Compile Include="collect\misc\WebActivityCollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsBitLockerAPICollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsGroupPolicyCollector.cs" />
-    <Compile Include="collect\log\LANDeskCollector.cs" />
     <Compile Include="collect\sens\SensCollector.cs" />
     <Compile Include="collect\shared\BaseCollector.cs" />
     <Compile Include="collect\shared\EtwCollector.cs" />
