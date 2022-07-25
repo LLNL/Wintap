@@ -356,6 +356,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="collect\etw\GenericCollector.cs" />
+    <Compile Include="collect\log\WindowsEventLogCollector.cs" />
     <Compile Include="collect\misc\WebActivityCollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsBitLockerAPICollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsGroupPolicyCollector.cs" />
@@ -381,7 +382,6 @@
     <Compile Include="collect\etw\RegistryCollector.cs" />
     <Compile Include="collect\etw\TcpCollector.cs" />
     <Compile Include="collect\etw\UdpCollector.cs" />
-    <Compile Include="collect\log\WindowsEventlogCollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsWMIActivityCollector.cs" />
     <Compile Include="core\infrastructure\WintapLogger.cs" />
     <Compile Include="collect\shared\models\KernelRegistryEvent.cs" />
