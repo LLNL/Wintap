@@ -89,7 +89,8 @@ namespace gov.llnl.wintap.collect
                 log.Append("WARNING:   Parent PID not set on process start ETW event!   pid: " + processID + "  process name: " + name, LogLevel.Always);
             }
             WintapMessage msg = new WintapMessage(eventTime, processID, this.CollectorName) { ActivityType = activityType.ToString() };
-            msg.Process = new WintapMessage.ProcessObject() { Name = name.ToLower(), Path = path.ToLower(), ParentPID = parentID, CommandLine = commandLine.ToLower(), User = user, Arguments = arguments, UniqueProcessKey = uniqueProcessKey };
+            msg.Process = new WintapMessage.ProcessObject() { Name = name.ToLower(), Path = path.ToLower(), ParentPID = parentID, CommandLine = commandLine.ToLower(), User = user, Arguments = arguments, UniqueProcessKey = uniqueProcessKey.ToString() };
+            msg.ReceiveTime = receiveTime.ToFileTimeUtc();
             try
             {
                 System.Diagnostics.Process p = System.Diagnostics.Process.GetProcessById(processID);
