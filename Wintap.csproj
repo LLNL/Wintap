@@ -459,6 +459,7 @@
     <None Include="README.md" />
     <None Include="Wintap.exe.config" />
     <None Include="msi\WintapSetup.msi" />
+    <None Include="Wintap.nuspec" />
     <Resource Include="web\Workbench.zip" />
     <None Include="web\Workbench\css\style.css.map" />
     <None Include="web\Workbench\css\style.min.css.map" />
