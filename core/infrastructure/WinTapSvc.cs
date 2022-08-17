@@ -36,7 +36,8 @@ namespace gov.llnl.wintap
         {
             WintapLogger.Log.Append("Creating startup thread.", LogLevel.Always);
             BackgroundWorker startupWorker = new BackgroundWorker();
-            startupWorker.DoWork += startupWorker_DoWork;
+            //startupWorker.DoWork += startupWorker_DoWork;
+            startupWorker.DoWork += new DoWorkEventHandler(startupWorker_DoWork);
             startupWorker.RunWorkerAsync();
 
         }
