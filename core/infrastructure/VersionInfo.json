@@ -2,14 +2,14 @@
   {
     "id": 1,
     "name": "Wintap.exe",
-    "location":  "wintap",
+    "location": "wintap",
     "version": "6.0.2.1"
   },
   {
     "id": 2,
     "name": "Harbinger.dll",
     "location": "wintap/plugins",
-    "version": "6.0.4.2"
+    "version": "6.0.4.41"
   },
   {
     "id": 3,
