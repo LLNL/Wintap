@@ -89,7 +89,7 @@ namespace gov.llnl.wintap.collect.models
             public int HardFaultCount { get; set; }
             public int TokenElevationType { get; set; }
             public int PID { get; set; } 
-            public ulong UniqueProcessKey { get; set; }
+            public string UniqueProcessKey { get; set; }
             public string MD5 { get; set; }
             public string SHA2 { get; set; }
         }
