@@ -53,7 +53,7 @@ namespace gov.llnl.wintap
             appBuilder.UseWebApi(config);
             // Enable websockets
             appBuilder.MapSignalR();
-            //appBuilder.UseCors(CorsOptions.AllowAll);
+            appBuilder.UseCors(CorsOptions.AllowAll);
 
             //Make .App folder as the default root for the static files
             appBuilder.UseFileServer(new FileServerOptions
