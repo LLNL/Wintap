@@ -3,7 +3,7 @@
   <Import Project="packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\build\Microsoft.Diagnostics.Tracing.TraceEvent.props" Condition="Exists('packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\build\Microsoft.Diagnostics.Tracing.TraceEvent.props')" />
   <Import Project="packages\EntityFramework.6.4.4\build\EntityFramework.props" Condition="Exists('packages\EntityFramework.6.4.4\build\EntityFramework.props')" />
   <PropertyGroup>
-  	<ProduceOnlyReferenceAssembly>True</ProduceOnlyReferenceAssembly>
+  	<!-- <ProduceOnlyReferenceAssembly>True</ProduceOnlyReferenceAssembly> -->
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
