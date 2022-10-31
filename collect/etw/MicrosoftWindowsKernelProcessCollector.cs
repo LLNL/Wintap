@@ -40,7 +40,7 @@ namespace gov.llnl.wintap.collect
                     case "Microsoft-Windows-Kernel-Process":
                         if (obj.EventName.Trim() == "ProcessStart/Start")
                         {
-                            parseUserModeProcessStart(obj);
+                            //parseUserModeProcessStart(obj);
                         }
                         if (obj.EventName.Trim() == "ProcessStop/Stop")
                         {

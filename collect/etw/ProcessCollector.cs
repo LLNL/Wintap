@@ -101,26 +101,29 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex) { }
            
+            if(msg.ActivityType == "START")
+            {
+                WintapLogger.Log.Append("Attempting to collect md5/sha2 for file: " + msg.Process.Path, LogLevel.Debug);
+                try
+                {
+                    msg.Process.MD5 = getMD5(msg.Process.Path);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("ERROR collecting md5 for file: " + ex.Message, LogLevel.Always);
+                }
 
-            WintapLogger.Log.Append("Attempting to collect md5/sha2 for file: " + msg.Process.Path, LogLevel.Debug);
-            try
-            {
-                msg.Process.MD5 = getMD5(msg.Process.Path);
-            }
-            catch(Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR collecting md5 for file: " + ex.Message, LogLevel.Always);
+                try
+                {
+                    msg.Process.SHA2 = getSHA2(msg.Process.Path);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("ERROR collecting sha2 for file: " + ex.Message, LogLevel.Always);
+                }
+                WintapLogger.Log.Append("File hash collect complete.", LogLevel.Debug);
             }
 
-            try
-            {
-                msg.Process.SHA2 = getSHA2(msg.Process.Path);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR collecting sha2 for file: " + ex.Message, LogLevel.Always);
-            }
-            WintapLogger.Log.Append("File hash collect complete.", LogLevel.Debug);
 
 
             msg.Send();
