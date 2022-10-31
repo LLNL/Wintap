@@ -48,7 +48,7 @@ namespace gov.llnl.wintap
                 Logger.Log.Append("checking component: " + component.name);
                 Logger.Log.Append("    remote version: " + component.version);
                 string[] remoteVersionParts = component.version.Split('.');
-                FileInfo localComponentInfo = new FileInfo(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) + "\\LLNL\\" + component.location + "\\" + component.name);
+                FileInfo localComponentInfo = new FileInfo(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) + "\\" + component.location + "\\" + component.name);
                 if (localComponentInfo.Exists)
                 {
                     FileVersionInfo localVersionInfo = FileVersionInfo.GetVersionInfo(localComponentInfo.FullName);
@@ -114,7 +114,7 @@ namespace gov.llnl.wintap
 
         private static void selfUpdate(dynamic name, Uri rootUrl)
         {
-            File.WriteAllText(Environment.GetEnvironmentVariable("WINDIR") + "\\Temp\\wintap_selfupdate.cmd", "TIMEOUT /T 5 \n xcopy %WINDIR%\\temp\\wintapsvcmgr.exe \"%PROGRAMFILES%\\LLNL\\Wintap\\\" /y");
+            File.WriteAllText(Environment.GetEnvironmentVariable("WINDIR") + "\\Temp\\wintap_selfupdate.cmd", "TIMEOUT /T 5 \n xcopy %WINDIR%\\temp\\wintapsvcmgr.exe \"%PROGRAMFILES%\\Wintap\\\" /y");
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\system32\\cmd.exe";
             psi.Arguments = "/C " + Environment.GetEnvironmentVariable("WINDIR") + "\\temp\\wintap_selfupdate.cmd";
