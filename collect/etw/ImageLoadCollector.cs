@@ -10,6 +10,8 @@ using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using System;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace gov.llnl.wintap.collect
 {
@@ -18,6 +20,8 @@ namespace gov.llnl.wintap.collect
     /// </summary>
     internal class ImageLoadCollector : EtwProviderCollector
     {
+
+        private List<WintapMessage.ImageLoadObject> eventCache = new List<WintapMessage.ImageLoadObject>();
 
         public ImageLoadCollector() : base()
         {
@@ -57,13 +61,21 @@ namespace gov.llnl.wintap.collect
                 wintapBuilder.ImageLoad = new WintapMessage.ImageLoadObject();
                 wintapBuilder.ActivityType = obj.OpcodeName;
                 wintapBuilder.ImageLoad.BuildTime = obj.BuildTime.ToFileTimeUtc();
-                wintapBuilder.ImageLoad.FileName = obj.FileName;
+                wintapBuilder.ImageLoad.FileName = obj.FileName.ToLower();
                 wintapBuilder.ImageLoad.ImageChecksum = obj.ImageChecksum;
                 wintapBuilder.ImageLoad.ImageSize = obj.ImageSize;
                 wintapBuilder.ImageLoad.DefaultBase = obj.DefaultBase.ToString();
                 wintapBuilder.ImageLoad.ImageBase = obj.ImageBase.ToString();
+                if(eventCache.Where(e => e.FileName == wintapBuilder.ImageLoad.FileName && e.ImageSize == wintapBuilder.ImageLoad.ImageSize).Any())
+                {
+                    wintapBuilder.ImageLoad.MD5 = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault().MD5;
+                }
+                else
+                {
+                    wintapBuilder.ImageLoad.MD5 = gov.llnl.wintap.core.shared.Utilities.getMD5(obj.FileName);
+                    eventCache.Add(wintapBuilder.ImageLoad);
+                }
                 wintapBuilder.Send();
-
             }
             catch (Exception ex)
             {
