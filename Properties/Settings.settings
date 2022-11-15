@@ -64,19 +64,11 @@
     </Setting>
     <Setting Name="GenericProviders" Type="System.Collections.Specialized.StringCollection" Scope="User">
       <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
-&lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"&gt;
-  &lt;string&gt;Microsoft-Windows-DNS-Client&lt;/string&gt;
-  &lt;string&gt;Microsoft-Windows-GroupPolicy&lt;/string&gt;
-&lt;/ArrayOfString&gt;</Value>
+&lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
     </Setting>
     <Setting Name="ExemptPlugins" Type="System.Collections.Specialized.StringCollection" Scope="User">
       <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
-&lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"&gt;
-  &lt;string&gt;mfabypass.dll&lt;/string&gt;
-  &lt;string&gt;authlogger.dll&lt;/string&gt;
-  &lt;string&gt;ears.dll&lt;/string&gt;
-  &lt;string&gt;badgealarm.dll&lt;/string&gt;
-&lt;/ArrayOfString&gt;</Value>
+&lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
     </Setting>
     <Setting Name="MicrosoftWindowsGroupPolicyCollector" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>

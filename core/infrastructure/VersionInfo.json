@@ -2,19 +2,31 @@
   {
     "id": 1,
     "name": "Wintap.exe",
-    "location":  "wintap",
-    "version": "6.0.2.1"
+    "location": "wintap",
+    "version": "6.0.2.5"
   },
   {
     "id": 2,
-    "name": "Harbinger.dll",
+    "name": "WintapETL.dll",
     "location": "wintap/plugins",
-    "version": "6.0.3.9"
+    "version": "1.0.0.2"
   },
   {
     "id": 3,
     "name": "WintapSvcMgr.exe",
     "location": "wintap",
-    "version": "1.0.0.1"
+    "version": "1.0.0.3"
+  },
+  {
+    "id": 4,
+    "name": "WintapRecorder.exe",
+    "location": "wintap/recorder",
+    "version": "1.0.0.2"
+  },
+  {
+    "id": 5,
+    "name": "WintapRecorder.dll",
+    "location": "wintap/recorder",
+    "version": "1.0.0.2"
   }
 ]

@@ -1,8 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\build\Microsoft.Diagnostics.Tracing.TraceEvent.props" Condition="Exists('packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\build\Microsoft.Diagnostics.Tracing.TraceEvent.props')" />
   <Import Project="packages\EntityFramework.6.4.4\build\EntityFramework.props" Condition="Exists('packages\EntityFramework.6.4.4\build\EntityFramework.props')" />
-  <Import Project="packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\build\Microsoft.Diagnostics.Tracing.TraceEvent.props" Condition="Exists('packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\build\Microsoft.Diagnostics.Tracing.TraceEvent.props')" />
   <PropertyGroup>
+    <!-- <ProduceOnlyReferenceAssembly>True</ProduceOnlyReferenceAssembly> -->
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
@@ -106,22 +107,21 @@
     </DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Antlr4.Runtime, Version=4.5.0.0, Culture=neutral, PublicKeyToken=09abb75b9ed49849, processorArchitecture=MSIL">
-      <HintPath>packages\Antlr4.Runtime.4.5.3\lib\net45\Antlr4.Runtime.dll</HintPath>
+    <Reference Include="Antlr4.Runtime, Version=4.6.0.0, Culture=neutral, PublicKeyToken=09abb75b9ed49849, processorArchitecture=MSIL">
+      <HintPath>packages\Antlr4.Runtime.4.6.6\lib\net45\Antlr4.Runtime.dll</HintPath>
     </Reference>
-    <Reference Include="Castle.Core, Version=3.3.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
-      <HintPath>packages\Castle.Core.3.3.0\lib\net45\Castle.Core.dll</HintPath>
+    <Reference Include="Castle.Core, Version=5.0.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <HintPath>packages\Castle.Core.5.1.0\lib\net462\Castle.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Common.Logging, Version=3.3.0.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
-      <HintPath>packages\Common.Logging.3.3.0\lib\net40\Common.Logging.dll</HintPath>
+    <Reference Include="Common.Logging, Version=3.4.1.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <HintPath>packages\Common.Logging.3.4.1\lib\net40\Common.Logging.dll</HintPath>
     </Reference>
-    <Reference Include="Common.Logging.Core, Version=3.3.0.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
-      <HintPath>packages\Common.Logging.Core.3.3.0\lib\net40\Common.Logging.Core.dll</HintPath>
+    <Reference Include="Common.Logging.Core, Version=3.4.1.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <HintPath>packages\Common.Logging.Core.3.4.1\lib\net40\Common.Logging.Core.dll</HintPath>
     </Reference>
     <Reference Include="Dia2Lib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\lib\net45\Dia2Lib.dll</HintPath>
+      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\Dia2Lib.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
-      <Private>True</Private>
     </Reference>
     <Reference Include="EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
       <HintPath>packages\EntityFramework.6.4.4\lib\net45\EntityFramework.dll</HintPath>
@@ -133,8 +133,8 @@
       <HintPath>lib\Interop.SensEvents.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
-    <Reference Include="Microsoft.AspNet.SignalR.Core, Version=2.4.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNet.SignalR.Core.2.4.2\lib\net45\Microsoft.AspNet.SignalR.Core.dll</HintPath>
+    <Reference Include="Microsoft.AspNet.SignalR.Core, Version=2.4.3.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNet.SignalR.Core.2.4.3\lib\net45\Microsoft.AspNet.SignalR.Core.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.AspNetCore.Authentication.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Authentication.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Authentication.Abstractions.dll</HintPath>
@@ -142,8 +142,8 @@
     <Reference Include="Microsoft.AspNetCore.Authentication.Core, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Authentication.Core.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Authentication.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.AspNetCore.Authorization, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNetCore.Authorization.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Authorization.dll</HintPath>
+    <Reference Include="Microsoft.AspNetCore.Authorization, Version=6.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNetCore.Authorization.6.0.8\lib\net461\Microsoft.AspNetCore.Authorization.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.AspNetCore.Authorization.Policy, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Authorization.Policy.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Authorization.Policy.dll</HintPath>
@@ -154,8 +154,8 @@
     <Reference Include="Microsoft.AspNetCore.Hosting.Server.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Hosting.Server.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Hosting.Server.Abstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.AspNetCore.Http, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNetCore.Http.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Http.dll</HintPath>
+    <Reference Include="Microsoft.AspNetCore.Http, Version=2.2.2.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNetCore.Http.2.2.2\lib\netstandard2.0\Microsoft.AspNetCore.Http.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.AspNetCore.Http.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Http.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Http.Abstractions.dll</HintPath>
@@ -163,8 +163,11 @@
     <Reference Include="Microsoft.AspNetCore.Http.Extensions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Http.Extensions.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Http.Extensions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.AspNetCore.Http.Features, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNetCore.Http.Features.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Http.Features.dll</HintPath>
+    <Reference Include="Microsoft.AspNetCore.Http.Features, Version=5.0.17.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNetCore.Http.Features.5.0.17\lib\net461\Microsoft.AspNetCore.Http.Features.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.AspNetCore.Metadata, Version=6.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNetCore.Metadata.6.0.8\lib\net461\Microsoft.AspNetCore.Metadata.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.AspNetCore.Mvc.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Mvc.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Mvc.Abstractions.dll</HintPath>
@@ -172,8 +175,8 @@
     <Reference Include="Microsoft.AspNetCore.ResponseCaching.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.ResponseCaching.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.ResponseCaching.Abstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.AspNetCore.Routing, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNetCore.Routing.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Routing.dll</HintPath>
+    <Reference Include="Microsoft.AspNetCore.Routing, Version=2.2.2.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNetCore.Routing.2.2.2\lib\netstandard2.0\Microsoft.AspNetCore.Routing.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.AspNetCore.Routing.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.Routing.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.Routing.Abstractions.dll</HintPath>
@@ -181,72 +184,75 @@
     <Reference Include="Microsoft.AspNetCore.WebUtilities, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.AspNetCore.WebUtilities.2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.WebUtilities.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=6.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Bcl.AsyncInterfaces.6.0.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.Diagnostics.FastSerialization, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\lib\net45\Microsoft.Diagnostics.FastSerialization.dll</HintPath>
+    <Reference Include="Microsoft.Diagnostics.FastSerialization, Version=3.0.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\Microsoft.Diagnostics.FastSerialization.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Diagnostics.Tracing.TraceEvent, Version=2.0.69.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\lib\net45\Microsoft.Diagnostics.Tracing.TraceEvent.dll</HintPath>
+    <Reference Include="Microsoft.Diagnostics.Tracing.TraceEvent, Version=3.0.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\Microsoft.Diagnostics.Tracing.TraceEvent.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.DotNet.PlatformAbstractions, Version=2.1.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.DotNet.PlatformAbstractions.2.1.0\lib\net45\Microsoft.DotNet.PlatformAbstractions.dll</HintPath>
+    <Reference Include="Microsoft.DotNet.PlatformAbstractions, Version=3.1.6.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.DotNet.PlatformAbstractions.3.1.6\lib\net45\Microsoft.DotNet.PlatformAbstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Configuration.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.Configuration.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.Extensions.Configuration.Abstractions.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.Configuration.Abstractions, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.Configuration.Abstractions.6.0.0\lib\net461\Microsoft.Extensions.Configuration.Abstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.DependencyInjection, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.DependencyInjection.2.2.0\lib\net461\Microsoft.Extensions.DependencyInjection.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.DependencyInjection, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.DependencyInjection.6.0.0\lib\net461\Microsoft.Extensions.DependencyInjection.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.DependencyInjection.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.DependencyInjection.Abstractions.6.0.0\lib\net461\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.DependencyModel, Version=2.1.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.DependencyModel.2.1.0\lib\net451\Microsoft.Extensions.DependencyModel.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.DependencyModel, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.DependencyModel.6.0.0\lib\net461\Microsoft.Extensions.DependencyModel.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.FileProviders.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.FileProviders.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.Extensions.FileProviders.Abstractions.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.FileProviders.Abstractions, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.FileProviders.Abstractions.6.0.0\lib\net461\Microsoft.Extensions.FileProviders.Abstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Hosting.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.Hosting.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.Extensions.Hosting.Abstractions.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.Hosting.Abstractions, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.Hosting.Abstractions.6.0.0\lib\net461\Microsoft.Extensions.Hosting.Abstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Logging.Abstractions, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.Logging.Abstractions.2.2.0\lib\netstandard2.0\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.Logging.Abstractions, Version=6.0.0.1, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.Logging.Abstractions.6.0.1\lib\net461\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.ObjectPool, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.ObjectPool.2.2.0\lib\netstandard2.0\Microsoft.Extensions.ObjectPool.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.ObjectPool, Version=6.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.ObjectPool.6.0.8\lib\net461\Microsoft.Extensions.ObjectPool.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Options, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.Options.2.2.0\lib\netstandard2.0\Microsoft.Extensions.Options.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.Options, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.Options.6.0.0\lib\net461\Microsoft.Extensions.Options.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Primitives, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Extensions.Primitives.2.2.0\lib\netstandard2.0\Microsoft.Extensions.Primitives.dll</HintPath>
+    <Reference Include="Microsoft.Extensions.Primitives, Version=6.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Extensions.Primitives.6.0.0\lib\net461\Microsoft.Extensions.Primitives.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Net.Http.Headers, Version=2.2.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Net.Http.Headers.2.2.0\lib\netstandard2.0\Microsoft.Net.Http.Headers.dll</HintPath>
+    <Reference Include="Microsoft.Net.Http.Headers, Version=2.2.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Net.Http.Headers.2.2.8\lib\netstandard2.0\Microsoft.Net.Http.Headers.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.4.2.0\lib\net45\Microsoft.Owin.dll</HintPath>
+    <Reference Include="Microsoft.Owin, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.4.2.2\lib\net45\Microsoft.Owin.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin.Cors, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.Cors.4.2.0\lib\net45\Microsoft.Owin.Cors.dll</HintPath>
+    <Reference Include="Microsoft.Owin.Cors, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.Cors.4.2.2\lib\net45\Microsoft.Owin.Cors.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin.Diagnostics, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.Diagnostics.4.2.0\lib\net45\Microsoft.Owin.Diagnostics.dll</HintPath>
+    <Reference Include="Microsoft.Owin.Diagnostics, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.Diagnostics.4.2.2\lib\net45\Microsoft.Owin.Diagnostics.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin.FileSystems, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.FileSystems.4.2.0\lib\net45\Microsoft.Owin.FileSystems.dll</HintPath>
+    <Reference Include="Microsoft.Owin.FileSystems, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.FileSystems.4.2.2\lib\net45\Microsoft.Owin.FileSystems.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin.Host.HttpListener, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.Host.HttpListener.4.2.0\lib\net45\Microsoft.Owin.Host.HttpListener.dll</HintPath>
+    <Reference Include="Microsoft.Owin.Host.HttpListener, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.Host.HttpListener.4.2.2\lib\net45\Microsoft.Owin.Host.HttpListener.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin.Hosting, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.Hosting.4.2.0\lib\net45\Microsoft.Owin.Hosting.dll</HintPath>
+    <Reference Include="Microsoft.Owin.Hosting, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.Hosting.4.2.2\lib\net45\Microsoft.Owin.Hosting.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin.Security, Version=2.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.Security.2.1.0\lib\net45\Microsoft.Owin.Security.dll</HintPath>
+    <Reference Include="Microsoft.Owin.Security, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.Security.4.2.2\lib\net45\Microsoft.Owin.Security.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Owin.StaticFiles, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Owin.StaticFiles.4.2.0\lib\net45\Microsoft.Owin.StaticFiles.dll</HintPath>
+    <Reference Include="Microsoft.Owin.StaticFiles, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Owin.StaticFiles.4.2.2\lib\net45\Microsoft.Owin.StaticFiles.dll</HintPath>
     </Reference>
     <Reference Include="NEsper, Version=5.5.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\NEsper.5.5.1.1001\lib\net45\NEsper.dll</HintPath>
@@ -261,97 +267,107 @@
       <HintPath>packages\Nito.KitchenSink.CRC.1.1.0\lib\net40-Client\Nito.KitchenSink.CRC.dll</HintPath>
     </Reference>
     <Reference Include="OSExtensions, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\lib\net45\OSExtensions.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\OSExtensions.dll</HintPath>
     </Reference>
     <Reference Include="Owin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=f0ebd12fd5e55cc5, processorArchitecture=MSIL">
       <HintPath>packages\Owin.1.0\lib\net40\Owin.dll</HintPath>
+    </Reference>
+    <Reference Include="RestSharp, Version=108.0.1.0, Culture=neutral, PublicKeyToken=598062e77f915f75, processorArchitecture=MSIL">
+      <HintPath>packages\RestSharp.108.0.1\lib\netstandard2.0\RestSharp.dll</HintPath>
     </Reference>
     <Reference Include="Sharpen, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\Sharpen.1.0.0.3\lib\Sharpen.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>packages\System.Buffers.4.5.0\lib\netstandard2.0\System.Buffers.dll</HintPath>
+      <HintPath>packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
     </Reference>
     <Reference Include="System.ComponentModel.Annotations, Version=4.2.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\System.ComponentModel.Annotations.4.5.0\lib\net461\System.ComponentModel.Annotations.dll</HintPath>
+      <HintPath>packages\System.ComponentModel.Annotations.5.0.0\lib\net461\System.ComponentModel.Annotations.dll</HintPath>
     </Reference>
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Data.SQLite, Version=1.0.115.5, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
-      <HintPath>packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.115.5\lib\net46\System.Data.SQLite.dll</HintPath>
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data.SQLite, Version=1.0.116.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <HintPath>packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.116.0\lib\net46\System.Data.SQLite.dll</HintPath>
     </Reference>
-    <Reference Include="System.Data.SQLite.EF6, Version=1.0.115.5, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
-      <HintPath>packages\System.Data.SQLite.EF6.1.0.115.5\lib\net46\System.Data.SQLite.EF6.dll</HintPath>
+    <Reference Include="System.Data.SQLite.EF6, Version=1.0.116.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <HintPath>packages\System.Data.SQLite.EF6.1.0.116.0\lib\net46\System.Data.SQLite.EF6.dll</HintPath>
     </Reference>
-    <Reference Include="System.Data.SQLite.Linq, Version=1.0.115.5, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
-      <HintPath>packages\System.Data.SQLite.Linq.1.0.115.5\lib\net46\System.Data.SQLite.Linq.dll</HintPath>
+    <Reference Include="System.Data.SQLite.Linq, Version=1.0.116.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <HintPath>packages\System.Data.SQLite.Linq.1.0.116.0\lib\net46\System.Data.SQLite.Linq.dll</HintPath>
     </Reference>
-    <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>packages\System.Diagnostics.DiagnosticSource.4.5.0\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=6.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.Diagnostics.DiagnosticSource.6.0.0\lib\net461\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.IO.Pipelines, Version=6.0.0.3, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.IO.Pipelines.6.0.3\lib\net461\System.IO.Pipelines.dll</HintPath>
+    </Reference>
     <Reference Include="System.Management" />
     <Reference Include="System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\Program Files (x86)\Reference Assemblies\Microsoft\WindowsPowerShell\3.0\System.Management.Automation.dll</HintPath>
     </Reference>
-    <Reference Include="System.Memory, Version=4.0.1.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>packages\System.Memory.4.5.1\lib\netstandard2.0\System.Memory.dll</HintPath>
+    <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http" />
-    <Reference Include="System.Net.Http.Formatting, Version=5.2.7.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNet.WebApi.Client.5.2.7\lib\net45\System.Net.Http.Formatting.dll</HintPath>
+    <Reference Include="System.Net.Http.Formatting, Version=5.2.9.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNet.WebApi.Client.5.2.9\lib\net45\System.Net.Http.Formatting.dll</HintPath>
     </Reference>
     <Reference Include="System.Numerics" />
-    <Reference Include="System.Numerics.Vectors, Version=4.1.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\System.Numerics.Vectors.4.4.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
     </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\System.Runtime.CompilerServices.Unsafe.4.5.2\lib\netstandard1.0\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    <Reference Include="System.Runtime" />
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\System.Runtime.CompilerServices.Unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
     </Reference>
-    <Reference Include="System.Runtime.InteropServices.RuntimeInformation, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\System.Runtime.InteropServices.RuntimeInformation.4.0.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
+    <Reference Include="System.Runtime.InteropServices.RuntimeInformation, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
       <Private>True</Private>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Security" />
     <Reference Include="System.ServiceModel" />
-    <Reference Include="System.Text.Encodings.Web, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>packages\System.Text.Encodings.Web.4.5.0\lib\netstandard2.0\System.Text.Encodings.Web.dll</HintPath>
+    <Reference Include="System.Text.Encodings.Web, Version=6.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.Text.Encodings.Web.6.0.0\lib\net461\System.Text.Encodings.Web.dll</HintPath>
     </Reference>
-    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>packages\System.Threading.Tasks.Extensions.4.5.1\lib\netstandard2.0\System.Threading.Tasks.Extensions.dll</HintPath>
+    <Reference Include="System.Text.Json, Version=6.0.0.5, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.Text.Json.6.0.5\lib\net461\System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
     </Reference>
     <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>packages\System.ValueTuple.4.5.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
     </Reference>
     <Reference Include="System.Web" />
-    <Reference Include="System.Web.Cors, Version=5.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNet.Cors.5.0.0\lib\net45\System.Web.Cors.dll</HintPath>
+    <Reference Include="System.Web.Cors, Version=5.2.9.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNet.Cors.5.2.9\lib\net45\System.Web.Cors.dll</HintPath>
     </Reference>
-    <Reference Include="System.Web.Http, Version=5.2.7.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNet.WebApi.Core.5.2.7\lib\net45\System.Web.Http.dll</HintPath>
+    <Reference Include="System.Web.Http, Version=5.2.9.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNet.WebApi.Core.5.2.9\lib\net45\System.Web.Http.dll</HintPath>
     </Reference>
-    <Reference Include="System.Web.Http.Owin, Version=5.2.7.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNet.WebApi.Owin.5.2.7\lib\net45\System.Web.Http.Owin.dll</HintPath>
+    <Reference Include="System.Web.Http.Owin, Version=5.2.9.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNet.WebApi.Owin.5.2.9\lib\net45\System.Web.Http.Owin.dll</HintPath>
     </Reference>
-    <Reference Include="System.Web.Http.WebHost, Version=5.2.7.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.AspNet.WebApi.WebHost.5.2.7\lib\net45\System.Web.Http.WebHost.dll</HintPath>
+    <Reference Include="System.Web.Http.WebHost, Version=5.2.9.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.AspNet.WebApi.WebHost.5.2.9\lib\net45\System.Web.Http.WebHost.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Xml" />
     <Reference Include="TraceReloggerLib, Version=0.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\lib\net45\TraceReloggerLib.dll</HintPath>
+      <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\TraceReloggerLib.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
-      <Private>True</Private>
     </Reference>
-    <Reference Include="XLR8.CGLib, Version=1.0.1.4868, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\XLR8.CGLib.1.0.2\lib\net40\XLR8.CGLib.dll</HintPath>
+    <Reference Include="XLR8.CGLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\XLR8.CGLib.1.1.0\lib\net45\XLR8.CGLib.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -387,6 +403,7 @@
     <Compile Include="collect\shared\models\KernelRegistryEvent.cs" />
     <Compile Include="collect\etw\helpers\RegistryManager.cs" />
     <Compile Include="core\shared\StateManager.cs" />
+    <Compile Include="core\shared\Utilities.cs" />
     <Compile Include="core\shared\Winapi.cs" />
     <Compile Include="core\infrastructure\Interfaces.cs" />
     <Compile Include="collect\shared\models\FileTableObject.cs" />
@@ -443,15 +460,9 @@
     </None>
     <None Include="README.md" />
     <None Include="Wintap.exe.config" />
+    <None Include="msi\WintapSetup.msi" />
+    <None Include="Wintap.nuspec" />
     <Resource Include="web\Workbench.zip" />
-    <None Include="web\Workbench\css\style.css.map" />
-    <None Include="web\Workbench\css\style.min.css.map" />
-    <None Include="web\Workbench\js\charts.js.map" />
-    <None Include="web\Workbench\js\colors.js.map" />
-    <None Include="web\Workbench\js\main.js.map" />
-    <None Include="web\Workbench\js\popovers.js.map" />
-    <None Include="web\Workbench\js\tooltips.js.map" />
-    <None Include="web\Workbench\js\widgets.js.map" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Service References\" />
@@ -503,466 +514,19 @@
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </COMReference>
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="web\Workbench\base\breadcrumb.html" />
-    <Content Include="web\Workbench\base\cards.html" />
-    <Content Include="web\Workbench\base\carousel.html" />
-    <Content Include="web\Workbench\base\collapse.html" />
-    <Content Include="web\Workbench\base\forms.html" />
-    <Content Include="web\Workbench\base\jumbotron.html" />
-    <Content Include="web\Workbench\base\list-group.html" />
-    <Content Include="web\Workbench\base\navs.html" />
-    <Content Include="web\Workbench\base\pagination.html" />
-    <Content Include="web\Workbench\base\popovers.html" />
-    <Content Include="web\Workbench\base\progress.html" />
-    <Content Include="web\Workbench\base\scrollspy.html" />
-    <Content Include="web\Workbench\base\switches.html" />
-    <Content Include="web\Workbench\base\tables.html" />
-    <Content Include="web\Workbench\base\tabs.html" />
-    <Content Include="web\Workbench\base\tooltips.html" />
-    <Content Include="web\Workbench\buttons\brand-buttons.html" />
-    <Content Include="web\Workbench\buttons\button-group.html" />
-    <Content Include="web\Workbench\buttons\buttons.html" />
-    <Content Include="web\Workbench\buttons\dropdowns.html" />
-    <Content Include="web\Workbench\css\style.css" />
-    <Content Include="web\Workbench\css\style.min.css" />
-    <Content Include="web\Workbench\icons\coreui-icons.html" />
-    <Content Include="web\Workbench\icons\flags.html" />
-    <Content Include="web\Workbench\icons\font-awesome.html" />
-    <Content Include="web\Workbench\icons\simple-line-icons.html" />
-    <Content Include="web\Workbench\index.html" />
-    <Content Include="web\Workbench\js\charts.js" />
-    <Content Include="web\Workbench\js\colors.js" />
-    <Content Include="web\Workbench\js\main.js" />
-    <Content Include="web\Workbench\js\popovers.js" />
-    <Content Include="web\Workbench\js\src\charts.js" />
-    <Content Include="web\Workbench\js\src\colors.js" />
-    <Content Include="web\Workbench\js\src\main.js" />
-    <Content Include="web\Workbench\js\src\popovers.js" />
-    <Content Include="web\Workbench\js\src\tooltips.js" />
-    <Content Include="web\Workbench\js\src\widgets.js" />
-    <Content Include="web\Workbench\js\tooltips.js" />
-    <Content Include="web\Workbench\js\widgets.js" />
-    <Content Include="web\Workbench\notifications\alerts.html" />
-    <Content Include="web\Workbench\notifications\badge.html" />
-    <Content Include="web\Workbench\notifications\modals.html" />
-    <Content Include="web\Workbench\pages\conmap.html" />
-    <Content Include="web\Workbench\Scripts\ace.js" />
-    <Content Include="web\Workbench\Scripts\workbench\workbench.js" />
-    <Content Include="web\Workbench\Scripts\d3.v4.min.js" />
-    <Content Include="web\Workbench\Scripts\ext-beautify.js" />
-    <Content Include="web\Workbench\Scripts\ext-elastic_tabstops_lite.js" />
-    <Content Include="web\Workbench\Scripts\ext-emmet.js" />
-    <Content Include="web\Workbench\Scripts\ext-error_marker.js" />
-    <Content Include="web\Workbench\Scripts\ext-keybinding_menu.js" />
-    <Content Include="web\Workbench\Scripts\ext-language_tools.js" />
-    <Content Include="web\Workbench\Scripts\ext-linking.js" />
-    <Content Include="web\Workbench\Scripts\ext-modelist.js" />
-    <Content Include="web\Workbench\Scripts\ext-options.js" />
-    <Content Include="web\Workbench\Scripts\ext-rtl.js" />
-    <Content Include="web\Workbench\Scripts\ext-searchbox.js" />
-    <Content Include="web\Workbench\Scripts\ext-settings_menu.js" />
-    <Content Include="web\Workbench\Scripts\ext-spellcheck.js" />
-    <Content Include="web\Workbench\Scripts\ext-split.js" />
-    <Content Include="web\Workbench\Scripts\ext-static_highlight.js" />
-    <Content Include="web\Workbench\Scripts\ext-statusbar.js" />
-    <Content Include="web\Workbench\Scripts\ext-textarea.js" />
-    <Content Include="web\Workbench\Scripts\ext-themelist.js" />
-    <Content Include="web\Workbench\Scripts\ext-whitespace.js" />
-    <Content Include="web\Workbench\Scripts\jquery-1.6.4-vsdoc.js" />
-    <Content Include="web\Workbench\Scripts\jquery-1.6.4.js" />
-    <Content Include="web\Workbench\Scripts\jquery-1.6.4.min.js" />
-    <Content Include="web\Workbench\Scripts\jquery-3.3.1.js" />
-    <Content Include="web\Workbench\Scripts\jquery.signalR-2.4.0.js" />
-    <Content Include="web\Workbench\Scripts\jquery.signalR-2.4.0.min.js" />
-    <Content Include="web\Workbench\Scripts\keybinding-emacs.js" />
-    <Content Include="web\Workbench\Scripts\keybinding-sublime.js" />
-    <Content Include="web\Workbench\Scripts\keybinding-vim.js" />
-    <Content Include="web\Workbench\Scripts\mode-abap.js" />
-    <Content Include="web\Workbench\Scripts\mode-abc.js" />
-    <Content Include="web\Workbench\Scripts\mode-actionscript.js" />
-    <Content Include="web\Workbench\Scripts\mode-ada.js" />
-    <Content Include="web\Workbench\Scripts\mode-apache_conf.js" />
-    <Content Include="web\Workbench\Scripts\mode-apex.js" />
-    <Content Include="web\Workbench\Scripts\mode-applescript.js" />
-    <Content Include="web\Workbench\Scripts\mode-asciidoc.js" />
-    <Content Include="web\Workbench\Scripts\mode-asl.js" />
-    <Content Include="web\Workbench\Scripts\mode-assembly_x86.js" />
-    <Content Include="web\Workbench\Scripts\mode-autohotkey.js" />
-    <Content Include="web\Workbench\Scripts\mode-batchfile.js" />
-    <Content Include="web\Workbench\Scripts\mode-bro.js" />
-    <Content Include="web\Workbench\Scripts\mode-c9search.js" />
-    <Content Include="web\Workbench\Scripts\mode-cirru.js" />
-    <Content Include="web\Workbench\Scripts\mode-clojure.js" />
-    <Content Include="web\Workbench\Scripts\mode-cobol.js" />
-    <Content Include="web\Workbench\Scripts\mode-coffee.js" />
-    <Content Include="web\Workbench\Scripts\mode-coldfusion.js" />
-    <Content Include="web\Workbench\Scripts\mode-csharp.js" />
-    <Content Include="web\Workbench\Scripts\mode-csound_document.js" />
-    <Content Include="web\Workbench\Scripts\mode-csound_orchestra.js" />
-    <Content Include="web\Workbench\Scripts\mode-csound_score.js" />
-    <Content Include="web\Workbench\Scripts\mode-csp.js" />
-    <Content Include="web\Workbench\Scripts\mode-css.js" />
-    <Content Include="web\Workbench\Scripts\mode-curly.js" />
-    <Content Include="web\Workbench\Scripts\mode-c_cpp.js" />
-    <Content Include="web\Workbench\Scripts\mode-d.js" />
-    <Content Include="web\Workbench\Scripts\mode-dart.js" />
-    <Content Include="web\Workbench\Scripts\mode-diff.js" />
-    <Content Include="web\Workbench\Scripts\mode-django.js" />
-    <Content Include="web\Workbench\Scripts\mode-dockerfile.js" />
-    <Content Include="web\Workbench\Scripts\mode-dot.js" />
-    <Content Include="web\Workbench\Scripts\mode-drools.js" />
-    <Content Include="web\Workbench\Scripts\mode-edifact.js" />
-    <Content Include="web\Workbench\Scripts\mode-eiffel.js" />
-    <Content Include="web\Workbench\Scripts\mode-ejs.js" />
-    <Content Include="web\Workbench\Scripts\mode-elixir.js" />
-    <Content Include="web\Workbench\Scripts\mode-elm.js" />
-    <Content Include="web\Workbench\Scripts\mode-erlang.js" />
-    <Content Include="web\Workbench\Scripts\mode-forth.js" />
-    <Content Include="web\Workbench\Scripts\mode-fortran.js" />
-    <Content Include="web\Workbench\Scripts\mode-fsharp.js" />
-    <Content Include="web\Workbench\Scripts\mode-fsl.js" />
-    <Content Include="web\Workbench\Scripts\mode-ftl.js" />
-    <Content Include="web\Workbench\Scripts\mode-gcode.js" />
-    <Content Include="web\Workbench\Scripts\mode-gherkin.js" />
-    <Content Include="web\Workbench\Scripts\mode-gitignore.js" />
-    <Content Include="web\Workbench\Scripts\mode-glsl.js" />
-    <Content Include="web\Workbench\Scripts\mode-gobstones.js" />
-    <Content Include="web\Workbench\Scripts\mode-golang.js" />
-    <Content Include="web\Workbench\Scripts\mode-graphqlschema.js" />
-    <Content Include="web\Workbench\Scripts\mode-groovy.js" />
-    <Content Include="web\Workbench\Scripts\mode-haml.js" />
-    <Content Include="web\Workbench\Scripts\mode-handlebars.js" />
-    <Content Include="web\Workbench\Scripts\mode-haskell.js" />
-    <Content Include="web\Workbench\Scripts\mode-haskell_cabal.js" />
-    <Content Include="web\Workbench\Scripts\mode-haxe.js" />
-    <Content Include="web\Workbench\Scripts\mode-hjson.js" />
-    <Content Include="web\Workbench\Scripts\mode-html.js" />
-    <Content Include="web\Workbench\Scripts\mode-html_elixir.js" />
-    <Content Include="web\Workbench\Scripts\mode-html_ruby.js" />
-    <Content Include="web\Workbench\Scripts\mode-ini.js" />
-    <Content Include="web\Workbench\Scripts\mode-io.js" />
-    <Content Include="web\Workbench\Scripts\mode-jack.js" />
-    <Content Include="web\Workbench\Scripts\mode-jade.js" />
-    <Content Include="web\Workbench\Scripts\mode-java.js" />
-    <Content Include="web\Workbench\Scripts\mode-javascript.js" />
-    <Content Include="web\Workbench\Scripts\mode-json.js" />
-    <Content Include="web\Workbench\Scripts\mode-jsoniq.js" />
-    <Content Include="web\Workbench\Scripts\mode-jsp.js" />
-    <Content Include="web\Workbench\Scripts\mode-jssm.js" />
-    <Content Include="web\Workbench\Scripts\mode-jsx.js" />
-    <Content Include="web\Workbench\Scripts\mode-julia.js" />
-    <Content Include="web\Workbench\Scripts\mode-kotlin.js" />
-    <Content Include="web\Workbench\Scripts\mode-latex.js" />
-    <Content Include="web\Workbench\Scripts\mode-less.js" />
-    <Content Include="web\Workbench\Scripts\mode-liquid.js" />
-    <Content Include="web\Workbench\Scripts\mode-lisp.js" />
-    <Content Include="web\Workbench\Scripts\mode-livescript.js" />
-    <Content Include="web\Workbench\Scripts\mode-logiql.js" />
-    <Content Include="web\Workbench\Scripts\mode-logtalk.js" />
-    <Content Include="web\Workbench\Scripts\mode-lsl.js" />
-    <Content Include="web\Workbench\Scripts\mode-lua.js" />
-    <Content Include="web\Workbench\Scripts\mode-luapage.js" />
-    <Content Include="web\Workbench\Scripts\mode-lucene.js" />
-    <Content Include="web\Workbench\Scripts\mode-makefile.js" />
-    <Content Include="web\Workbench\Scripts\mode-markdown.js" />
-    <Content Include="web\Workbench\Scripts\mode-mask.js" />
-    <Content Include="web\Workbench\Scripts\mode-matlab.js" />
-    <Content Include="web\Workbench\Scripts\mode-maze.js" />
-    <Content Include="web\Workbench\Scripts\mode-mel.js" />
-    <Content Include="web\Workbench\Scripts\mode-mixal.js" />
-    <Content Include="web\Workbench\Scripts\mode-mushcode.js" />
-    <Content Include="web\Workbench\Scripts\mode-mysql.js" />
-    <Content Include="web\Workbench\Scripts\mode-nix.js" />
-    <Content Include="web\Workbench\Scripts\mode-nsis.js" />
-    <Content Include="web\Workbench\Scripts\mode-objectivec.js" />
-    <Content Include="web\Workbench\Scripts\mode-ocaml.js" />
-    <Content Include="web\Workbench\Scripts\mode-pascal.js" />
-    <Content Include="web\Workbench\Scripts\mode-perl.js" />
-    <Content Include="web\Workbench\Scripts\mode-perl6.js" />
-    <Content Include="web\Workbench\Scripts\mode-pgsql.js" />
-    <Content Include="web\Workbench\Scripts\mode-php.js" />
-    <Content Include="web\Workbench\Scripts\mode-php_laravel_blade.js" />
-    <Content Include="web\Workbench\Scripts\mode-pig.js" />
-    <Content Include="web\Workbench\Scripts\mode-plain_text.js" />
-    <Content Include="web\Workbench\Scripts\mode-powershell.js" />
-    <Content Include="web\Workbench\Scripts\mode-praat.js" />
-    <Content Include="web\Workbench\Scripts\mode-prolog.js" />
-    <Content Include="web\Workbench\Scripts\mode-properties.js" />
-    <Content Include="web\Workbench\Scripts\mode-protobuf.js" />
-    <Content Include="web\Workbench\Scripts\mode-puppet.js" />
-    <Content Include="web\Workbench\Scripts\mode-python.js" />
-    <Content Include="web\Workbench\Scripts\mode-r.js" />
-    <Content Include="web\Workbench\Scripts\mode-razor.js" />
-    <Content Include="web\Workbench\Scripts\mode-rdoc.js" />
-    <Content Include="web\Workbench\Scripts\mode-red.js" />
-    <Content Include="web\Workbench\Scripts\mode-redshift.js" />
-    <Content Include="web\Workbench\Scripts\mode-rhtml.js" />
-    <Content Include="web\Workbench\Scripts\mode-rst.js" />
-    <Content Include="web\Workbench\Scripts\mode-ruby.js" />
-    <Content Include="web\Workbench\Scripts\mode-rust.js" />
-    <Content Include="web\Workbench\Scripts\mode-sass.js" />
-    <Content Include="web\Workbench\Scripts\mode-scad.js" />
-    <Content Include="web\Workbench\Scripts\mode-scala.js" />
-    <Content Include="web\Workbench\Scripts\mode-scheme.js" />
-    <Content Include="web\Workbench\Scripts\mode-scss.js" />
-    <Content Include="web\Workbench\Scripts\mode-sh.js" />
-    <Content Include="web\Workbench\Scripts\mode-sjs.js" />
-    <Content Include="web\Workbench\Scripts\mode-slim.js" />
-    <Content Include="web\Workbench\Scripts\mode-smarty.js" />
-    <Content Include="web\Workbench\Scripts\mode-snippets.js" />
-    <Content Include="web\Workbench\Scripts\mode-soy_template.js" />
-    <Content Include="web\Workbench\Scripts\mode-space.js" />
-    <Content Include="web\Workbench\Scripts\mode-sparql.js" />
-    <Content Include="web\Workbench\Scripts\mode-sql.js" />
-    <Content Include="web\Workbench\Scripts\mode-sqlserver.js" />
-    <Content Include="web\Workbench\Scripts\mode-stylus.js" />
-    <Content Include="web\Workbench\Scripts\mode-svg.js" />
-    <Content Include="web\Workbench\Scripts\mode-swift.js" />
-    <Content Include="web\Workbench\Scripts\mode-tcl.js" />
-    <Content Include="web\Workbench\Scripts\mode-terraform.js" />
-    <Content Include="web\Workbench\Scripts\mode-tex.js" />
-    <Content Include="web\Workbench\Scripts\mode-text.js" />
-    <Content Include="web\Workbench\Scripts\mode-textile.js" />
-    <Content Include="web\Workbench\Scripts\mode-toml.js" />
-    <Content Include="web\Workbench\Scripts\mode-tsx.js" />
-    <Content Include="web\Workbench\Scripts\mode-turtle.js" />
-    <Content Include="web\Workbench\Scripts\mode-twig.js" />
-    <Content Include="web\Workbench\Scripts\mode-typescript.js" />
-    <Content Include="web\Workbench\Scripts\mode-vala.js" />
-    <Content Include="web\Workbench\Scripts\mode-vbscript.js" />
-    <Content Include="web\Workbench\Scripts\mode-velocity.js" />
-    <Content Include="web\Workbench\Scripts\mode-verilog.js" />
-    <Content Include="web\Workbench\Scripts\mode-vhdl.js" />
-    <Content Include="web\Workbench\Scripts\mode-visualforce.js" />
-    <Content Include="web\Workbench\Scripts\mode-wollok.js" />
-    <Content Include="web\Workbench\Scripts\mode-xml.js" />
-    <Content Include="web\Workbench\Scripts\mode-xquery.js" />
-    <Content Include="web\Workbench\Scripts\mode-yaml.js" />
-    <Content Include="web\Workbench\Scripts\origrealtimechart.js" />
-    <Content Include="web\Workbench\Scripts\workbench\wb-d3chart.js" />
-    <Content Include="web\Workbench\Scripts\snippets\abap.js" />
-    <Content Include="web\Workbench\Scripts\snippets\abc.js" />
-    <Content Include="web\Workbench\Scripts\snippets\actionscript.js" />
-    <Content Include="web\Workbench\Scripts\snippets\ada.js" />
-    <Content Include="web\Workbench\Scripts\snippets\apache_conf.js" />
-    <Content Include="web\Workbench\Scripts\snippets\apex.js" />
-    <Content Include="web\Workbench\Scripts\snippets\applescript.js" />
-    <Content Include="web\Workbench\Scripts\snippets\asciidoc.js" />
-    <Content Include="web\Workbench\Scripts\snippets\asl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\assembly_x86.js" />
-    <Content Include="web\Workbench\Scripts\snippets\autohotkey.js" />
-    <Content Include="web\Workbench\Scripts\snippets\batchfile.js" />
-    <Content Include="web\Workbench\Scripts\snippets\bro.js" />
-    <Content Include="web\Workbench\Scripts\snippets\c9search.js" />
-    <Content Include="web\Workbench\Scripts\snippets\cirru.js" />
-    <Content Include="web\Workbench\Scripts\snippets\clojure.js" />
-    <Content Include="web\Workbench\Scripts\snippets\cobol.js" />
-    <Content Include="web\Workbench\Scripts\snippets\coffee.js" />
-    <Content Include="web\Workbench\Scripts\snippets\coldfusion.js" />
-    <Content Include="web\Workbench\Scripts\snippets\csharp.js" />
-    <Content Include="web\Workbench\Scripts\snippets\csound_document.js" />
-    <Content Include="web\Workbench\Scripts\snippets\csound_orchestra.js" />
-    <Content Include="web\Workbench\Scripts\snippets\csound_score.js" />
-    <Content Include="web\Workbench\Scripts\snippets\csp.js" />
-    <Content Include="web\Workbench\Scripts\snippets\css.js" />
-    <Content Include="web\Workbench\Scripts\snippets\curly.js" />
-    <Content Include="web\Workbench\Scripts\snippets\c_cpp.js" />
-    <Content Include="web\Workbench\Scripts\snippets\d.js" />
-    <Content Include="web\Workbench\Scripts\snippets\dart.js" />
-    <Content Include="web\Workbench\Scripts\snippets\diff.js" />
-    <Content Include="web\Workbench\Scripts\snippets\django.js" />
-    <Content Include="web\Workbench\Scripts\snippets\dockerfile.js" />
-    <Content Include="web\Workbench\Scripts\snippets\dot.js" />
-    <Content Include="web\Workbench\Scripts\snippets\drools.js" />
-    <Content Include="web\Workbench\Scripts\snippets\edifact.js" />
-    <Content Include="web\Workbench\Scripts\snippets\eiffel.js" />
-    <Content Include="web\Workbench\Scripts\snippets\ejs.js" />
-    <Content Include="web\Workbench\Scripts\snippets\elixir.js" />
-    <Content Include="web\Workbench\Scripts\snippets\elm.js" />
-    <Content Include="web\Workbench\Scripts\snippets\erlang.js" />
-    <Content Include="web\Workbench\Scripts\snippets\forth.js" />
-    <Content Include="web\Workbench\Scripts\snippets\fortran.js" />
-    <Content Include="web\Workbench\Scripts\snippets\fsharp.js" />
-    <Content Include="web\Workbench\Scripts\snippets\fsl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\ftl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\gcode.js" />
-    <Content Include="web\Workbench\Scripts\snippets\gherkin.js" />
-    <Content Include="web\Workbench\Scripts\snippets\gitignore.js" />
-    <Content Include="web\Workbench\Scripts\snippets\glsl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\gobstones.js" />
-    <Content Include="web\Workbench\Scripts\snippets\golang.js" />
-    <Content Include="web\Workbench\Scripts\snippets\graphqlschema.js" />
-    <Content Include="web\Workbench\Scripts\snippets\groovy.js" />
-    <Content Include="web\Workbench\Scripts\snippets\haml.js" />
-    <Content Include="web\Workbench\Scripts\snippets\handlebars.js" />
-    <Content Include="web\Workbench\Scripts\snippets\haskell.js" />
-    <Content Include="web\Workbench\Scripts\snippets\haskell_cabal.js" />
-    <Content Include="web\Workbench\Scripts\snippets\haxe.js" />
-    <Content Include="web\Workbench\Scripts\snippets\hjson.js" />
-    <Content Include="web\Workbench\Scripts\snippets\html.js" />
-    <Content Include="web\Workbench\Scripts\snippets\html_elixir.js" />
-    <Content Include="web\Workbench\Scripts\snippets\html_ruby.js" />
-    <Content Include="web\Workbench\Scripts\snippets\ini.js" />
-    <Content Include="web\Workbench\Scripts\snippets\io.js" />
-    <Content Include="web\Workbench\Scripts\snippets\jack.js" />
-    <Content Include="web\Workbench\Scripts\snippets\jade.js" />
-    <Content Include="web\Workbench\Scripts\snippets\java.js" />
-    <Content Include="web\Workbench\Scripts\snippets\javascript.js" />
-    <Content Include="web\Workbench\Scripts\snippets\json.js" />
-    <Content Include="web\Workbench\Scripts\snippets\jsoniq.js" />
-    <Content Include="web\Workbench\Scripts\snippets\jsp.js" />
-    <Content Include="web\Workbench\Scripts\snippets\jssm.js" />
-    <Content Include="web\Workbench\Scripts\snippets\jsx.js" />
-    <Content Include="web\Workbench\Scripts\snippets\julia.js" />
-    <Content Include="web\Workbench\Scripts\snippets\kotlin.js" />
-    <Content Include="web\Workbench\Scripts\snippets\latex.js" />
-    <Content Include="web\Workbench\Scripts\snippets\less.js" />
-    <Content Include="web\Workbench\Scripts\snippets\liquid.js" />
-    <Content Include="web\Workbench\Scripts\snippets\lisp.js" />
-    <Content Include="web\Workbench\Scripts\snippets\livescript.js" />
-    <Content Include="web\Workbench\Scripts\snippets\logiql.js" />
-    <Content Include="web\Workbench\Scripts\snippets\logtalk.js" />
-    <Content Include="web\Workbench\Scripts\snippets\lsl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\lua.js" />
-    <Content Include="web\Workbench\Scripts\snippets\luapage.js" />
-    <Content Include="web\Workbench\Scripts\snippets\lucene.js" />
-    <Content Include="web\Workbench\Scripts\snippets\makefile.js" />
-    <Content Include="web\Workbench\Scripts\snippets\markdown.js" />
-    <Content Include="web\Workbench\Scripts\snippets\mask.js" />
-    <Content Include="web\Workbench\Scripts\snippets\matlab.js" />
-    <Content Include="web\Workbench\Scripts\snippets\maze.js" />
-    <Content Include="web\Workbench\Scripts\snippets\mel.js" />
-    <Content Include="web\Workbench\Scripts\snippets\mixal.js" />
-    <Content Include="web\Workbench\Scripts\snippets\mushcode.js" />
-    <Content Include="web\Workbench\Scripts\snippets\mysql.js" />
-    <Content Include="web\Workbench\Scripts\snippets\nix.js" />
-    <Content Include="web\Workbench\Scripts\snippets\nsis.js" />
-    <Content Include="web\Workbench\Scripts\snippets\objectivec.js" />
-    <Content Include="web\Workbench\Scripts\snippets\ocaml.js" />
-    <Content Include="web\Workbench\Scripts\snippets\pascal.js" />
-    <Content Include="web\Workbench\Scripts\snippets\perl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\perl6.js" />
-    <Content Include="web\Workbench\Scripts\snippets\pgsql.js" />
-    <Content Include="web\Workbench\Scripts\snippets\php.js" />
-    <Content Include="web\Workbench\Scripts\snippets\php_laravel_blade.js" />
-    <Content Include="web\Workbench\Scripts\snippets\pig.js" />
-    <Content Include="web\Workbench\Scripts\snippets\plain_text.js" />
-    <Content Include="web\Workbench\Scripts\snippets\powershell.js" />
-    <Content Include="web\Workbench\Scripts\snippets\praat.js" />
-    <Content Include="web\Workbench\Scripts\snippets\prolog.js" />
-    <Content Include="web\Workbench\Scripts\snippets\properties.js" />
-    <Content Include="web\Workbench\Scripts\snippets\protobuf.js" />
-    <Content Include="web\Workbench\Scripts\snippets\puppet.js" />
-    <Content Include="web\Workbench\Scripts\snippets\python.js" />
-    <Content Include="web\Workbench\Scripts\snippets\r.js" />
-    <Content Include="web\Workbench\Scripts\snippets\razor.js" />
-    <Content Include="web\Workbench\Scripts\snippets\rdoc.js" />
-    <Content Include="web\Workbench\Scripts\snippets\red.js" />
-    <Content Include="web\Workbench\Scripts\snippets\redshift.js" />
-    <Content Include="web\Workbench\Scripts\snippets\rhtml.js" />
-    <Content Include="web\Workbench\Scripts\snippets\rst.js" />
-    <Content Include="web\Workbench\Scripts\snippets\ruby.js" />
-    <Content Include="web\Workbench\Scripts\snippets\rust.js" />
-    <Content Include="web\Workbench\Scripts\snippets\sass.js" />
-    <Content Include="web\Workbench\Scripts\snippets\scad.js" />
-    <Content Include="web\Workbench\Scripts\snippets\scala.js" />
-    <Content Include="web\Workbench\Scripts\snippets\scheme.js" />
-    <Content Include="web\Workbench\Scripts\snippets\scss.js" />
-    <Content Include="web\Workbench\Scripts\snippets\sh.js" />
-    <Content Include="web\Workbench\Scripts\snippets\sjs.js" />
-    <Content Include="web\Workbench\Scripts\snippets\slim.js" />
-    <Content Include="web\Workbench\Scripts\snippets\smarty.js" />
-    <Content Include="web\Workbench\Scripts\snippets\snippets.js" />
-    <Content Include="web\Workbench\Scripts\snippets\soy_template.js" />
-    <Content Include="web\Workbench\Scripts\snippets\space.js" />
-    <Content Include="web\Workbench\Scripts\snippets\sparql.js" />
-    <Content Include="web\Workbench\Scripts\snippets\sql.js" />
-    <Content Include="web\Workbench\Scripts\snippets\sqlserver.js" />
-    <Content Include="web\Workbench\Scripts\snippets\stylus.js" />
-    <Content Include="web\Workbench\Scripts\snippets\svg.js" />
-    <Content Include="web\Workbench\Scripts\snippets\swift.js" />
-    <Content Include="web\Workbench\Scripts\snippets\tcl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\terraform.js" />
-    <Content Include="web\Workbench\Scripts\snippets\tex.js" />
-    <Content Include="web\Workbench\Scripts\snippets\text.js" />
-    <Content Include="web\Workbench\Scripts\snippets\textile.js" />
-    <Content Include="web\Workbench\Scripts\snippets\toml.js" />
-    <Content Include="web\Workbench\Scripts\snippets\tsx.js" />
-    <Content Include="web\Workbench\Scripts\snippets\turtle.js" />
-    <Content Include="web\Workbench\Scripts\snippets\twig.js" />
-    <Content Include="web\Workbench\Scripts\snippets\typescript.js" />
-    <Content Include="web\Workbench\Scripts\snippets\vala.js" />
-    <Content Include="web\Workbench\Scripts\snippets\vbscript.js" />
-    <Content Include="web\Workbench\Scripts\snippets\velocity.js" />
-    <Content Include="web\Workbench\Scripts\snippets\verilog.js" />
-    <Content Include="web\Workbench\Scripts\snippets\vhdl.js" />
-    <Content Include="web\Workbench\Scripts\snippets\visualforce.js" />
-    <Content Include="web\Workbench\Scripts\snippets\wollok.js" />
-    <Content Include="web\Workbench\Scripts\snippets\xml.js" />
-    <Content Include="web\Workbench\Scripts\snippets\xquery.js" />
-    <Content Include="web\Workbench\Scripts\snippets\yaml.js" />
-    <Content Include="web\Workbench\Scripts\theme-ambiance.js" />
-    <Content Include="web\Workbench\Scripts\theme-chaos.js" />
-    <Content Include="web\Workbench\Scripts\theme-chrome.js" />
-    <Content Include="web\Workbench\Scripts\theme-clouds.js" />
-    <Content Include="web\Workbench\Scripts\theme-clouds_midnight.js" />
-    <Content Include="web\Workbench\Scripts\theme-cobalt.js" />
-    <Content Include="web\Workbench\Scripts\theme-crimson_editor.js" />
-    <Content Include="web\Workbench\Scripts\theme-dawn.js" />
-    <Content Include="web\Workbench\Scripts\theme-dracula.js" />
-    <Content Include="web\Workbench\Scripts\theme-dreamweaver.js" />
-    <Content Include="web\Workbench\Scripts\theme-eclipse.js" />
-    <Content Include="web\Workbench\Scripts\theme-github.js" />
-    <Content Include="web\Workbench\Scripts\theme-gob.js" />
-    <Content Include="web\Workbench\Scripts\theme-gruvbox.js" />
-    <Content Include="web\Workbench\Scripts\theme-idle_fingers.js" />
-    <Content Include="web\Workbench\Scripts\theme-iplastic.js" />
-    <Content Include="web\Workbench\Scripts\theme-katzenmilch.js" />
-    <Content Include="web\Workbench\Scripts\theme-kr_theme.js" />
-    <Content Include="web\Workbench\Scripts\theme-kuroir.js" />
-    <Content Include="web\Workbench\Scripts\theme-merbivore.js" />
-    <Content Include="web\Workbench\Scripts\theme-merbivore_soft.js" />
-    <Content Include="web\Workbench\Scripts\theme-monokai.js" />
-    <Content Include="web\Workbench\Scripts\theme-mono_industrial.js" />
-    <Content Include="web\Workbench\Scripts\theme-pastel_on_dark.js" />
-    <Content Include="web\Workbench\Scripts\theme-solarized_dark.js" />
-    <Content Include="web\Workbench\Scripts\theme-solarized_light.js" />
-    <Content Include="web\Workbench\Scripts\theme-sqlserver.js" />
-    <Content Include="web\Workbench\Scripts\theme-terminal.js" />
-    <Content Include="web\Workbench\Scripts\theme-textmate.js" />
-    <Content Include="web\Workbench\Scripts\theme-tomorrow.js" />
-    <Content Include="web\Workbench\Scripts\theme-tomorrow_night.js" />
-    <Content Include="web\Workbench\Scripts\theme-tomorrow_night_blue.js" />
-    <Content Include="web\Workbench\Scripts\theme-tomorrow_night_bright.js" />
-    <Content Include="web\Workbench\Scripts\theme-tomorrow_night_eighties.js" />
-    <Content Include="web\Workbench\Scripts\theme-twilight.js" />
-    <Content Include="web\Workbench\Scripts\theme-vibrant_ink.js" />
-    <Content Include="web\Workbench\Scripts\theme-xcode.js" />
-    <Content Include="web\Workbench\Scripts\worker-coffee.js" />
-    <Content Include="web\Workbench\Scripts\worker-css.js" />
-    <Content Include="web\Workbench\Scripts\worker-html.js" />
-    <Content Include="web\Workbench\Scripts\worker-javascript.js" />
-    <Content Include="web\Workbench\Scripts\worker-json.js" />
-    <Content Include="web\Workbench\Scripts\worker-lua.js" />
-    <Content Include="web\Workbench\Scripts\worker-php.js" />
-    <Content Include="web\Workbench\Scripts\worker-xml.js" />
-    <Content Include="web\Workbench\Scripts\worker-xquery.js" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="web\Workbench\img\brand\" />
-    <Folder Include="web\Workbench\node_modules\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Microsoft.Diagnostics.Tracing.TraceEvent.1.0.21\build\Microsoft.Diagnostics.Tracing.TraceEvent.targets" Condition="Exists('..\packages\Microsoft.Diagnostics.Tracing.TraceEvent.1.0.21\build\Microsoft.Diagnostics.Tracing.TraceEvent.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\build\Microsoft.Diagnostics.Tracing.TraceEvent.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Diagnostics.Tracing.TraceEvent.2.0.69\build\Microsoft.Diagnostics.Tracing.TraceEvent.props'))" />
     <Error Condition="!Exists('packages\EntityFramework.6.4.4\build\EntityFramework.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\EntityFramework.6.4.4\build\EntityFramework.props'))" />
     <Error Condition="!Exists('packages\EntityFramework.6.4.4\build\EntityFramework.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\EntityFramework.6.4.4\build\EntityFramework.targets'))" />
-    <Error Condition="!Exists('packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.115.5\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.115.5\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets'))" />
+    <Error Condition="!Exists('packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.116.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.116.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets'))" />
+    <Error Condition="!Exists('packages\Microsoft.Extensions.Logging.Abstractions.6.0.1\build\Microsoft.Extensions.Logging.Abstractions.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Extensions.Logging.Abstractions.6.0.1\build\Microsoft.Extensions.Logging.Abstractions.targets'))" />
+    <Error Condition="!Exists('packages\System.Text.Json.6.0.5\build\System.Text.Json.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\System.Text.Json.6.0.5\build\System.Text.Json.targets'))" />
+    <Error Condition="!Exists('packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\build\Microsoft.Diagnostics.Tracing.TraceEvent.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\build\Microsoft.Diagnostics.Tracing.TraceEvent.props'))" />
   </Target>
   <PropertyGroup>
     <PreBuildEvent>reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy /v Enabled /t REG_DWORD /d 0 /f</PreBuildEvent>
@@ -971,7 +535,9 @@
     <PostBuildEvent>reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy /v Enabled /t REG_DWORD /d 1 /f</PostBuildEvent>
   </PropertyGroup>
   <Import Project="packages\EntityFramework.6.4.4\build\EntityFramework.targets" Condition="Exists('packages\EntityFramework.6.4.4\build\EntityFramework.targets')" />
-  <Import Project="packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.115.5\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets" Condition="Exists('packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.115.5\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets')" />
+  <Import Project="packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.116.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets" Condition="Exists('packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.116.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets')" />
+  <Import Project="packages\Microsoft.Extensions.Logging.Abstractions.6.0.1\build\Microsoft.Extensions.Logging.Abstractions.targets" Condition="Exists('packages\Microsoft.Extensions.Logging.Abstractions.6.0.1\build\Microsoft.Extensions.Logging.Abstractions.targets')" />
+  <Import Project="packages\System.Text.Json.6.0.5\build\System.Text.Json.targets" Condition="Exists('packages\System.Text.Json.6.0.5\build\System.Text.Json.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

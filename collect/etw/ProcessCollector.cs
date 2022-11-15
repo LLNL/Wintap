@@ -89,7 +89,8 @@ namespace gov.llnl.wintap.collect
                 log.Append("WARNING:   Parent PID not set on process start ETW event!   pid: " + processID + "  process name: " + name, LogLevel.Always);
             }
             WintapMessage msg = new WintapMessage(eventTime, processID, this.CollectorName) { ActivityType = activityType.ToString() };
-            msg.Process = new WintapMessage.ProcessObject() { Name = name.ToLower(), Path = path.ToLower(), ParentPID = parentID, CommandLine = commandLine.ToLower(), User = user, Arguments = arguments, UniqueProcessKey = uniqueProcessKey };
+            msg.Process = new WintapMessage.ProcessObject() { Name = name.ToLower(), Path = path.ToLower(), ParentPID = parentID, CommandLine = commandLine.ToLower(), User = user, Arguments = arguments, UniqueProcessKey = uniqueProcessKey.ToString() };
+            msg.ReceiveTime = receiveTime.ToFileTimeUtc();
             try
             {
                 System.Diagnostics.Process p = System.Diagnostics.Process.GetProcessById(processID);
@@ -100,26 +101,29 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex) { }
            
+            if(msg.ActivityType == "START")
+            {
+                WintapLogger.Log.Append("Attempting to collect md5/sha2 for file: " + msg.Process.Path, LogLevel.Debug);
+                try
+                {
+                    msg.Process.MD5 = gov.llnl.wintap.core.shared.Utilities.getMD5(msg.Process.Path);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("ERROR collecting md5 for file: " + ex.Message, LogLevel.Always);
+                }
 
-            WintapLogger.Log.Append("Attempting to collect md5/sha2 for file: " + msg.Process.Path, LogLevel.Debug);
-            try
-            {
-                msg.Process.MD5 = getMD5(msg.Process.Path);
-            }
-            catch(Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR collecting md5 for file: " + ex.Message, LogLevel.Always);
+                try
+                {
+                    msg.Process.SHA2 = gov.llnl.wintap.core.shared.Utilities.getSHA2(msg.Process.Path);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("ERROR collecting sha2 for file: " + ex.Message, LogLevel.Always);
+                }
+                WintapLogger.Log.Append("File hash collect complete.", LogLevel.Debug);
             }
 
-            try
-            {
-                msg.Process.SHA2 = getSHA2(msg.Process.Path);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR collecting sha2 for file: " + ex.Message, LogLevel.Always);
-            }
-            WintapLogger.Log.Append("File hash collect complete.", LogLevel.Debug);
 
 
             msg.Send();
@@ -128,54 +132,6 @@ namespace gov.llnl.wintap.collect
         public override void Process_Event(TraceEvent obj)
         {
 
-        }
-
-        private string getMD5(string processPath)
-        {
-            StringBuilder hashStr = new StringBuilder(9999);
-            if(!String.IsNullOrWhiteSpace(processPath))
-            {
-                FileInfo processPathInfo = new FileInfo(processPath);
-                if (processPathInfo.Exists)
-                {
-                    using (var md5 = MD5.Create())
-                    {
-                        using (var stream = File.OpenRead(processPath))
-                        {
-                            byte[] result = md5.ComputeHash(stream);
-                            for (int i = 0; i < result.Length; i++)
-                            {
-                                hashStr.Append(result[i].ToString("X2"));
-                            }
-                        }
-                    }
-                }
-            }       
-            return hashStr.ToString();
-        }
-
-        private string getSHA2(string processPath)
-        {
-            StringBuilder hashStr = new StringBuilder(9999);
-            if (!String.IsNullOrWhiteSpace(processPath))
-            {
-                FileInfo processPathInfo = new FileInfo(processPath);
-                if (processPathInfo.Exists)
-                {
-                    using (var md5 = SHA256.Create())
-                    {
-                        using (var stream = File.OpenRead(processPath))
-                        {
-                            byte[] result = md5.ComputeHash(stream);
-                            for (int i = 0; i < result.Length; i++)
-                            {
-                                hashStr.Append(result[i].ToString("X2"));
-                            }
-                        }
-                    }
-                }
-            }
-            return hashStr.ToString();
         }
     }
 }

@@ -89,7 +89,7 @@ namespace gov.llnl.wintap.collect.models
             public int HardFaultCount { get; set; }
             public int TokenElevationType { get; set; }
             public int PID { get; set; } 
-            public ulong UniqueProcessKey { get; set; }
+            public string UniqueProcessKey { get; set; }
             public string MD5 { get; set; }
             public string SHA2 { get; set; }
         }
@@ -137,6 +137,7 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
             public string DefaultBase { get; set; }  // Default base address.
             public string ImageBase { get; set; } // Base address of the application in which the image is loaded.
+            public string MD5 { get; set; }
         }
 
         public class FileActivityObject
