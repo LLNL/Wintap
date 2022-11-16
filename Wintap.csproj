@@ -366,9 +366,8 @@
       <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\TraceReloggerLib.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
-    <Reference Include="WintapAPI, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>WintapAPI\bin\Debug\WintapAPI.dll</HintPath>
+    <Reference Include="WintapAPI, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\WintapAPI.1.0.2-BETA\lib\net48\WintapAPI.dll</HintPath>
     </Reference>
     <Reference Include="XLR8.CGLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\XLR8.CGLib.1.1.0\lib\net45\XLR8.CGLib.dll</HintPath>

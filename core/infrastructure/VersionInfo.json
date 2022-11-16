@@ -3,13 +3,13 @@
     "id": 1,
     "name": "Wintap.exe",
     "location": "wintap",
-    "version": "6.0.2.5"
+    "version": "6.1.0.0"
   },
   {
     "id": 2,
     "name": "WintapETL.dll",
     "location": "wintap/plugins",
-    "version": "1.0.0.2"
+    "version": "1.0.1.0"
   },
   {
     "id": 3,
@@ -28,5 +28,11 @@
     "name": "WintapRecorder.dll",
     "location": "wintap/recorder",
     "version": "1.0.0.2"
+  }
+  {
+    "id": 6,
+    "name": "WintapAPI.dll",
+    "location": "wintap",
+    "version": "1.0.2.0"
   }
 ]
