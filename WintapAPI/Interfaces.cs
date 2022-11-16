@@ -4,7 +4,6 @@
  * All rights reserved.
  */
 
-using com.espertech.esper.client;
 using System;
 using System.Collections.Generic;
 using gov.llnl.wintap.collect.models;
@@ -47,21 +46,6 @@ namespace gov.llnl.wintap
         {
             string Name { get; }
 
-        }
-
-        /// <summary>
-        /// Plugins that provide new events.  New events are published into the esper runtime and become visible to the rest of the Wintap system.
-        /// </summary>
-        /// <typeparam name="EPServiceProvider"></typeparam>
-        public interface IPublish
-        {
-            void Publish(EPServiceProvider cepRuntime);
-            void Startup();
-            void Shutdown();
-        }
-        public interface IPublishData
-        {
-            string Name { get; }
         }
 
 

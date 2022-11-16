@@ -4,7 +4,6 @@
  * All rights reserved.
  */
 
-using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
@@ -12,6 +11,9 @@ using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using com.espertech.esper.client;
+using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.infrastructure;
 
 namespace gov.llnl.wintap.collect.models
 {
@@ -33,6 +35,7 @@ namespace gov.llnl.wintap.collect.models
         /// </summary>
         public void Send()
         {
+            // implemented by Wintap
             EventChannel.Esper.EPRuntime.SendEvent(this);
         }
 

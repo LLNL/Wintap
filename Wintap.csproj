@@ -366,6 +366,10 @@
       <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\TraceReloggerLib.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
+    <Reference Include="WintapAPI, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>WintapAPI\bin\Debug\WintapAPI.dll</HintPath>
+    </Reference>
     <Reference Include="XLR8.CGLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\XLR8.CGLib.1.1.0\lib\net45\XLR8.CGLib.dll</HintPath>
     </Reference>
@@ -383,7 +387,6 @@
     <Compile Include="core\shared\Strings.cs" />
     <Compile Include="core\api\EsperServiceController.cs" />
     <Compile Include="core\api\StreamsController.cs" />
-    <Compile Include="core\infrastructure\EventChannel.cs" />
     <Compile Include="collect\shared\models\MemInfo.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsKernelMemoryCollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsCpuTriggerCollector.cs" />
@@ -405,9 +408,7 @@
     <Compile Include="core\shared\StateManager.cs" />
     <Compile Include="core\shared\Utilities.cs" />
     <Compile Include="core\shared\Winapi.cs" />
-    <Compile Include="core\infrastructure\Interfaces.cs" />
     <Compile Include="collect\shared\models\FileTableObject.cs" />
-    <Compile Include="collect\shared\WintapMessage.cs" />
     <Compile Include="core\infrastructure\OwinStartup.cs" />
     <Compile Include="core\infrastructure\PluginManager.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
