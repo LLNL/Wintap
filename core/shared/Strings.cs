@@ -50,20 +50,24 @@ namespace gov.llnl.wintap.core.shared
             }
         }
 
+        /// <summary>
+        /// root of thed Wintap plugins folder
+        /// </summary>
         static internal string FilePluginPath
         {
             get
             {
-                //return Environment.GetEnvironmentVariable("PROGRAMFILES") + @"\LLNL\Wintap\Plugins";
                 return AppDomain.CurrentDomain.BaseDirectory + "\\Plugins";
             }
         }
 
+        /// <summary>
+        /// root of the Wintap program folder
+        /// </summary>
         static internal string FileRootPath
         {
             get
             {
-                //return Environment.GetEnvironmentVariable("PROGRAMFILES") + @"\LLNL\Wintap";
                 return AppDomain.CurrentDomain.BaseDirectory;
             }
         }

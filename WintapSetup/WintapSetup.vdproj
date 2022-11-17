@@ -135,6 +135,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_19F571AEE43C4D11A686BBE21DA74371"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_1DE731A85F3E4223B42B454082D78B26"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -701,6 +707,12 @@
         {
         "MsmKey" = "8:_44851C7E16C3965369F4201BCB7F7C39"
         "OwnerKey" = "8:_E4906CEB0CA148299FF30A1FD1FE5610"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_44851C7E16C3965369F4201BCB7F7C39"
+        "OwnerKey" = "8:_DE8D51F01323F90B97F8FEC73A51D6B7"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -1444,12 +1456,6 @@
         "Entry"
         {
         "MsmKey" = "8:_A2B9DAE617C10952B54CA46F1E8A5812"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_A2B9DAE617C10952B54CA46F1E8A5812"
         "OwnerKey" = "8:_E81EF66877374EAF88A510FCD63A860D"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -2115,6 +2121,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_DE8D51F01323F90B97F8FEC73A51D6B7"
+        "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_DFB87FADD4F9E7F1D85E9F36D0D0F1D1"
         "OwnerKey" = "8:_3AE1CE5A875B62409701E3AADE79356E"
         "MsmSig" = "8:_UNDEFINED"
@@ -2368,7 +2380,7 @@
         "Entry"
         {
         "MsmKey" = "8:_ECFB189C4BAD9946B192A2E49EF6ED55"
-        "OwnerKey" = "8:_ED3A560AB8444328821EF419A8DB1DE1"
+        "OwnerKey" = "8:_19F571AEE43C4D11A686BBE21DA74371"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -2405,12 +2417,6 @@
         {
         "MsmKey" = "8:_ECFB189C4BAD9946B192A2E49EF6ED55"
         "OwnerKey" = "8:_279B0CEE893A50458AFB4F2CC607F22A"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_ED3A560AB8444328821EF419A8DB1DE1"
-        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -2488,6 +2494,12 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_19F571AEE43C4D11A686BBE21DA74371"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_F8707925420E445694B4FE84E8B03D93"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -2495,12 +2507,6 @@
         {
         "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_F27328F7845F4C7B87DE18607DBD4458"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_ED3A560AB8444328821EF419A8DB1DE1"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -2801,6 +2807,12 @@
         {
         "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_DE8D51F01323F90B97F8FEC73A51D6B7"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -3760,6 +3772,37 @@
                     }
                 }
             "SourcePath" = "8:..\\bin\\Release\\System.Buffers.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_19F571AEE43C4D11A686BBE21DA74371"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:WintapSvcMgr, Version=1.0.1.3, Culture=neutral, processorArchitecture=AMD64"
+                "ScatterAssemblies"
+                {
+                    "_19F571AEE43C4D11A686BBE21DA74371"
+                    {
+                    "Name" = "8:WintapSvcMgr.exe"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:..\\WintapSvcMgr\\bin\\x64\\Debug\\WintapSvcMgr.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
@@ -5205,7 +5248,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.0.2.3, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.0.3.1, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_593314726DA64F9A8C5E3119A8B89960"
@@ -6720,32 +6763,6 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_A2B9DAE617C10952B54CA46F1E8A5812"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Microsoft.Owin, Version=4.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                }
-            "SourcePath" = "8:Microsoft.Owin.dll"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_A37DD4D1D6C54BB2B59B7A055C5B2C08"
             {
             "AssemblyRegister" = "3:1"
@@ -7820,6 +7837,37 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_DE8D51F01323F90B97F8FEC73A51D6B7"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:WintapAPI, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_DE8D51F01323F90B97F8FEC73A51D6B7"
+                    {
+                    "Name" = "8:WintapAPI.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:WintapAPI.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_DFB87FADD4F9E7F1D85E9F36D0D0F1D1"
             {
             "AssemblyRegister" = "3:1"
@@ -8055,37 +8103,6 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_ED3A560AB8444328821EF419A8DB1DE1"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:WintapSvcMgr, Version=1.0.0.2, Culture=neutral, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_ED3A560AB8444328821EF419A8DB1DE1"
-                    {
-                    "Name" = "8:WintapSvcMgr.exe"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:..\\WintapSvcMgr\\bin\\Release\\WintapSvcMgr.exe"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_F27328F7845F4C7B87DE18607DBD4458"
@@ -8395,7 +8412,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Wintap"
         "ProductCode" = "8:{3B7FC5A6-D0BD-44F3-B489-A0F77B7A68E3}"
-        "PackageCode" = "8:{6E172829-AEB3-43C5-8D7B-1D5A3F849801}"
+        "PackageCode" = "8:{18A772FB-81C7-4F97-A55E-DBE3C1B769C6}"
         "UpgradeCode" = "8:{E6E0395F-4F31-41B9-84F7-594E86488EF4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
