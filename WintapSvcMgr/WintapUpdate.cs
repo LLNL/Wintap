@@ -45,35 +45,45 @@ namespace gov.llnl.wintap
             Logger.Log.Append("Scanning for updates...");
             foreach (var component in versionInfo)
             {
-                Logger.Log.Append("checking component: " + component.name);
-                Logger.Log.Append("    remote version: " + component.version);
-                string[] remoteVersionParts = component.version.Split('.');
-                FileInfo localComponentInfo = new FileInfo(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) + "\\" + component.location + "\\" + component.name);
-                if (localComponentInfo.Exists)
+                try
                 {
-                    FileVersionInfo localVersionInfo = FileVersionInfo.GetVersionInfo(localComponentInfo.FullName);
-                    Version localVersion = new Version(localVersionInfo.FileMajorPart, localVersionInfo.FileMinorPart, localVersionInfo.FileBuildPart, localVersionInfo.FilePrivatePart);
-                    Version remoteVersion = new Version(Int32.Parse(remoteVersionParts[0]), Int32.Parse(remoteVersionParts[1]), Int32.Parse(remoteVersionParts[2]), Int32.Parse(remoteVersionParts[3]));
-                    Logger.Log.Append("    local version: " + FileVersionInfo.GetVersionInfo(localComponentInfo.FullName).FileVersion.ToString());
-                    if (remoteVersion > localVersion)
+                    Logger.Log.Append("checking component: " + component.name);
+                    Logger.Log.Append("    remote version: " + component.version);
+                    string[] remoteVersionParts = component.version.Split('.');
+                    FileInfo localComponentInfo = new FileInfo(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) + "\\" + component.location + "\\" + component.name);
+                    if (localComponentInfo.Exists)
                     {
-                        Logger.Log.Append("    Relevant update detected: " + component.name);
-                        Update update = new Update();
-                        update.Name = component.name;
-                        update.LocalPath = localComponentInfo.FullName;
-                        if (update.Name.ToLower() == "wintapsvcmgr.exe")
+                        FileVersionInfo localVersionInfo = FileVersionInfo.GetVersionInfo(localComponentInfo.FullName);
+                        Version localVersion = new Version(localVersionInfo.FileMajorPart, localVersionInfo.FileMinorPart, localVersionInfo.FileBuildPart, localVersionInfo.FilePrivatePart);
+                        Version remoteVersion = new Version(Int32.Parse(remoteVersionParts[0]), Int32.Parse(remoteVersionParts[1]), Int32.Parse(remoteVersionParts[2]), Int32.Parse(remoteVersionParts[3]));
+                        Logger.Log.Append("    local version: " + FileVersionInfo.GetVersionInfo(localComponentInfo.FullName).FileVersion.ToString());
+                        if (remoteVersion > localVersion)
                         {
-                            updateThis = true;
-                            update.LocalPath = Environment.GetEnvironmentVariable("WINDIR") + "\\Temp\\" + thisName;
+                            Logger.Log.Append("    Relevant update detected: " + component.name);
+                            Update update = new Update();
+                            update.Name = component.name;
+                            update.LocalPath = localComponentInfo.FullName;
+                            if (update.Name.ToLower() == "wintapsvcmgr.exe")
+                            {
+                                updateThis = true;
+                                update.LocalPath = Environment.GetEnvironmentVariable("WINDIR") + "\\Temp\\" + thisName;
+                            }
+                            updates.Add(update);
                         }
+                    }
+                    else
+                    {
+                        Logger.Log.Append("    Relevant new component detected:  " + component.name);
+                        //downloadComponent(component.name, localComponentInfo.FullName, rootUrl);
+                        Update update = new Update() { Name = component.name, LocalPath = localComponentInfo.FullName };
                         updates.Add(update);
                     }
                 }
-                else
+                catch(Exception ex)
                 {
-                    Logger.Log.Append("    Local component not found for: " + component.name);
-                    downloadComponent(component.name, localComponentInfo.FullName, rootUrl);
+                    Logger.Log.Append("Error applying update: " + ex.Message);
                 }
+                
             }
             Logger.Log.Append("Scan Complete.  Updates required: " + updates.Count);
 
