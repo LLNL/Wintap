@@ -70,7 +70,7 @@ namespace gov.llnl.wintap.collect.shared
                     alertMsg.WintapAlert = new WintapMessage.WintapAlertData();
                     alertMsg.WintapAlert.AlertName = "EVENT DROP";
                     alertMsg.WintapAlert.AlertDescription = "ETW Session is dropping events.  Session Name: " + this.EtwSessionName + " Total events dropped since sensor start: " + currentDropCount;
-                    alertMsg.Send();
+                    EventChannel.Send(alertMsg);
                     WintapLogger.Log.Append(alertMsg.WintapAlert.AlertDescription, LogLevel.Always);
                 }
                 WintapLogger.Log.Append("Dropped event count on provider: " + this.EtwSessionName + " is: " + EtwDroppedEventCount, LogLevel.Always);

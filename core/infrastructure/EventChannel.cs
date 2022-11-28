@@ -93,6 +93,15 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
+        /// <summary>
+        /// Places the event into the Wintap event processing pipeline (esper).  
+        /// </summary>
+        public static void Send(WintapMessage streamedEvent)
+        {
+            // implemented by Wintap
+            EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
+        }
+
         public static EPServiceProvider Esper
         {
             get

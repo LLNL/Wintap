@@ -258,7 +258,7 @@ namespace gov.llnl.wintap.collect
             msg.RegActivity.Data = data;
             msg.RegActivity.DataType = dataType;
             msg.ActivityType = activityType.ToUpper();
-            msg.Send();
+            EventChannel.Send(msg);
         }
     }
 }

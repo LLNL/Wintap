@@ -86,7 +86,7 @@ namespace gov.llnl.wintap.collect
                     msg.TcpConnection.DestinationAddress = obj.daddr.ToString();
                     msg.TcpConnection.DestinationPort = obj.dport;
                 }
-                msg.Send();
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {
@@ -142,7 +142,7 @@ namespace gov.llnl.wintap.collect
                     msg.TcpConnection.DestinationAddress = obj.saddr.ToString();
                     msg.TcpConnection.DestinationPort = obj.sport;
                 }
-                msg.Send();
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {
@@ -157,7 +157,7 @@ namespace gov.llnl.wintap.collect
                 WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
                 WintapMessage.FailureCodeType failEnum = (WintapMessage.FailureCodeType)Enum.Parse(msg.TcpConnection.FailureCode.GetType(), obj.FailureCode.ToString(), true);
                 msg.TcpConnection.FailureCode = failEnum;
-                msg.Send();
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {
@@ -179,7 +179,7 @@ namespace gov.llnl.wintap.collect
                 msg.TcpConnection.StartTime = obj.startime;
                 msg.TcpConnection.EndTime = obj.endtime;
                 msg.TcpConnection.SeqNo = obj.seqnum;
-                msg.Send();
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {

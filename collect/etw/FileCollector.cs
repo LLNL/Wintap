@@ -201,7 +201,7 @@ namespace gov.llnl.wintap.collect
             if (isRead) { wintapBuilder.ActivityType = "READ"; }
             wintapBuilder.FileActivity.Path = filePath.ToLower();
             wintapBuilder.FileActivity.BytesRequested = obj.IoSize;
-            wintapBuilder.Send();
+            EventChannel.Send(wintapBuilder);
         }
 
         void Kernel_FileIoDelete(FileIOInfoTraceData obj)
@@ -226,7 +226,7 @@ namespace gov.llnl.wintap.collect
                         wintapBuilder.FileActivity = new WintapMessage.FileActivityObject();
                         wintapBuilder.ActivityType = "Delete";
                         wintapBuilder.FileActivity.Path = obj.FileName.ToLower();
-                        wintapBuilder.Send();
+                        EventChannel.Send(wintapBuilder);
                     }
                 }
             }

@@ -33,7 +33,7 @@ namespace gov.llnl.wintap.collect
                 msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                 msg.MicrosoftWindowsGroupPolicy = new WintapMessage.MicrosoftWindowsGroupPolicyData();
                 msg.MicrosoftWindowsGroupPolicy.FormattedMessage = obj.FormattedMessage;
-                msg.Send();
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {

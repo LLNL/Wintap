@@ -75,7 +75,7 @@ namespace gov.llnl.wintap.collect
                     wintapBuilder.ImageLoad.MD5 = gov.llnl.wintap.core.shared.Utilities.getMD5(obj.FileName);
                     eventCache.Add(wintapBuilder.ImageLoad);
                 }
-                wintapBuilder.Send();
+                EventChannel.Send(wintapBuilder);
             }
             catch (Exception ex)
             {

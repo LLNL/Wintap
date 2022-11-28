@@ -46,7 +46,7 @@ namespace gov.llnl.wintap.collect.shared
                 wintapMsg.GenericMessage = genericEvent;
 
                 // 3.) Send your event into the Wintap event pipeline
-                wintapMsg.Send();
+                EventChannel.Send(wintapMsg);
             }
             catch (Exception ex)
             {

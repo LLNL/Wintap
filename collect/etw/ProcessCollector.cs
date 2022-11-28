@@ -123,10 +123,7 @@ namespace gov.llnl.wintap.collect
                 }
                 WintapLogger.Log.Append("File hash collect complete.", LogLevel.Debug);
             }
-
-
-
-            msg.Send();
+            EventChannel.Send(msg);
         }
 
         public override void Process_Event(TraceEvent obj)

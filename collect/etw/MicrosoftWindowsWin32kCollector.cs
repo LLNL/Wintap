@@ -70,7 +70,7 @@ namespace gov.llnl.wintap.collect
                 msg.FocusChange.FocusChangeSessionId = Convert.ToInt32(obj.PayloadByName("SessionId"));
                 msg.PID = Convert.ToInt32(obj.PayloadByName("NewProcessId"));
                 msg.EventTime = obj.TimeStamp.ToFileTimeUtc();
-                msg.Send();
+                EventChannel.Send(msg);
                 StateManager.PidFocus = msg.PID;
             }
             catch (Exception ex)
@@ -88,7 +88,7 @@ namespace gov.llnl.wintap.collect
                 wmBuilder.ActivityType = "WaitCursor";
                 wmBuilder.WaitCursor.SessionId = Convert.ToInt32(obj.PayloadByName("SessionId"));
                 wmBuilder.WaitCursor.DisplayTimeMS = Convert.ToInt32(obj.PayloadByName("DisplayTimeMs"));
-                wmBuilder.Send();
+                EventChannel.Send(wmBuilder);
             }
             catch (Exception ex)
             {

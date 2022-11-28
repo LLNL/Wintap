@@ -52,7 +52,7 @@ namespace gov.llnl.wintap.collect
                 wintapMsg.ActivityType = obj.EventName;
                 WintapMessage.FailureCodeType failEnum = (WintapMessage.FailureCodeType)Enum.Parse(wintapMsg.UdpPacket.FailureCode.GetType(), obj.FailureCode.ToString(), true);
                 wintapMsg.UdpPacket.FailureCode = failEnum;
-                wintapMsg.Send();
+                EventChannel.Send(wintapMsg);
             }
             catch (Exception ex)
             {

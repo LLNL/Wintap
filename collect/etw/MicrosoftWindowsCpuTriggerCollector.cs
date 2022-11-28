@@ -66,7 +66,7 @@ namespace gov.llnl.wintap.collect
                         wintapMsg.MicrosoftWindowsCpuTrigger = metric;
 
                         // 4.) Send your event into the Wintap event pipeline
-                        wintapMsg.Send();
+                        EventChannel.Send(wintapMsg);
                     }
                 }
             }

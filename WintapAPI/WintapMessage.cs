@@ -12,8 +12,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using com.espertech.esper.client;
-using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.core.infrastructure;
 
 namespace gov.llnl.wintap.collect.models
 {
@@ -28,15 +26,6 @@ namespace gov.llnl.wintap.collect.models
             this.MessageType = eventSourceName;
             this.ReceiveTime = DateTime.Now.ToFileTimeUtc();
             //this.EventTimeMS = eventTimeMS;
-        }
-
-        /// <summary>
-        /// Places the event into the Wintap event processing pipeline (esper).  
-        /// </summary>
-        public void Send()
-        {
-            // implemented by Wintap
-            EventChannel.Esper.EPRuntime.SendEvent(this);
         }
 
         public string MessageType { get; set; }

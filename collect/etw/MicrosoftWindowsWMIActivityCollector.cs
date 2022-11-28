@@ -79,7 +79,7 @@ namespace gov.llnl.wintap.collect
                     msg.WmiActivity.ProcessName = System.Diagnostics.Process.GetProcessById(msg.PID).ProcessName;
                 }
                 catch (Exception ex) { }
-                msg.Send();
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {

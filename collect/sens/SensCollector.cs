@@ -93,7 +93,7 @@ namespace gov.llnl.wintap.collect
             WintapMessage msg = new WintapMessage(DateTime.Now, 4, "SessionChange");
             msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
             msg.SessionChange = new WintapMessage.SessionChangeObject() { UserName = userName, Description = description };
-            msg.Send();
+            EventChannel.Send(msg);
             WintapLogger.Log.Append("    User: " + userName + "  description: " + description, LogLevel.Always);
         }
 
