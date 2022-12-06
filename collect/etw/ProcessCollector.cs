@@ -101,7 +101,7 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex) { }
            
-            if(msg.ActivityType == "START")
+            if(msg.ActivityType.ToUpper() == "START")
             {
                 WintapLogger.Log.Append("Attempting to collect md5/sha2 for file: " + msg.Process.Path, LogLevel.Debug);
                 try
