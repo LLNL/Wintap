@@ -26,6 +26,7 @@ namespace gov.llnl.wintap.collect
         {
             this.CollectorName = "Microsoft-Windows-Kernel-Process";
             this.EtwProviderId = "22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716";
+            this.TraceEventFlags = 16;
             processLookup = new Dictionary<int, string>();
         }
 
@@ -91,6 +92,7 @@ namespace gov.llnl.wintap.collect
                 uint cpuSpeed = StateManager.GetCPUSpeed(obj.ProcessorNumber);
                 int cpuCount = Environment.ProcessorCount;
                 double percentCpu = (Convert.ToInt64(cpuCycleCount / (cpuSpeed * totalSeconds) * 100) / cpuCount);
+                msg.Process.CPUCycleCount = cpuCycleCount;
                 msg.Process.ExitCode = exitCode;
                 msg.Process.CPUUtilization = Convert.ToInt32(percentCpu);
                 msg.Process.CommitCharge = Convert.ToInt64(obj.PayloadStringByName("CommitCharge").Replace(",", ""));
