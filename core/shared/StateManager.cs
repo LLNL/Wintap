@@ -60,6 +60,8 @@ namespace gov.llnl.wintap.core.shared
         /// </summary>
         public DateTime MachineBootTime { get; set; }
 
+        public static int WintapPID { get; set; }
+
 
         internal string FileTableCache;
 
@@ -69,6 +71,7 @@ namespace gov.llnl.wintap.core.shared
             ActiveUser = refreshActiveUser();
             OnBatteryPower = false;
             UserBusy = false;
+            WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
             stateRefresh.Interval = 1000;
             stateRefresh.Enabled = true;

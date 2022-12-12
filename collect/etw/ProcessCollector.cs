@@ -44,13 +44,7 @@ namespace gov.llnl.wintap.collect
         {
             enabled = true;   // disable throttling for Process
             KernelParser.Instance.EtwParser.ProcessStart += new Action<ProcessTraceData>(Kernel_ProcessStart);
-            KernelParser.Instance.EtwParser.ProcessStop += EtwParser_ProcessStop;
             return enabled;
-        }
-
-        private void EtwParser_ProcessStop(ProcessTraceData obj)
-        {
-            createWintapProcessEvent(obj.ProcessID, obj.TimeStamp, DateTime.UtcNow, obj.ProcessName, obj.ProcessName, obj.ParentID, obj.CommandLine, null, obj.TimeStampRelativeMSec, obj.CommandLine, ProcessActivityEnum.Stop, obj.UniqueProcessKey);
         }
 
         private void Kernel_ProcessStart(ProcessTraceData obj)
