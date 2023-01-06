@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace gov.llnl.wintap
 {
@@ -54,9 +55,21 @@ namespace gov.llnl.wintap
                     if (localComponentInfo.Exists)
                     {
                         FileVersionInfo localVersionInfo = FileVersionInfo.GetVersionInfo(localComponentInfo.FullName);
-                        Version localVersion = new Version(localVersionInfo.FileMajorPart, localVersionInfo.FileMinorPart, localVersionInfo.FileBuildPart, localVersionInfo.FilePrivatePart);
+                        Version localVersion;
+                        if (component.name.ToLower() == "wintap.exe.config")
+                        {
+                            localVersion = parseConfigVersion();
+                        }
+                        else
+                        {
+                            localVersion = new Version(localVersionInfo.FileMajorPart, localVersionInfo.FileMinorPart, localVersionInfo.FileBuildPart, localVersionInfo.FilePrivatePart);
+                        }
+                        
                         Version remoteVersion = new Version(Int32.Parse(remoteVersionParts[0]), Int32.Parse(remoteVersionParts[1]), Int32.Parse(remoteVersionParts[2]), Int32.Parse(remoteVersionParts[3]));
-                        Logger.Log.Append("    local version: " + FileVersionInfo.GetVersionInfo(localComponentInfo.FullName).FileVersion.ToString());
+                        if (component.name.ToLower() != "wintap.exe.config")
+                        {
+                            Logger.Log.Append("    local version: " + FileVersionInfo.GetVersionInfo(localComponentInfo.FullName).FileVersion.ToString());
+                        }
                         if (remoteVersion > localVersion)
                         {
                             Logger.Log.Append("    Relevant update detected: " + component.name);
@@ -81,7 +94,7 @@ namespace gov.llnl.wintap
                 }
                 catch(Exception ex)
                 {
-                    Logger.Log.Append("Error applying update: " + ex.Message);
+                    Logger.Log.Append("Error applying update on " + component.name + ",  msg: " + ex.Message);
                 }
                 
             }
@@ -120,6 +133,30 @@ namespace gov.llnl.wintap
             }
             Logger.Log.Append("Wintap Update complete.  Changes applied: " + changesApplied);
             return changesApplied;
+        }
+
+        private Version parseConfigVersion()
+        {
+            Logger.Log.Append("Starting config parser...");
+            Version configVersion = new Version(0, 0, 0, 0);
+            XmlDocument configDoc = new XmlDocument();
+            string configPath = AppDomain.CurrentDomain.BaseDirectory + "\\Wintap.exe.config";
+            Logger.Log.Append("config path: " + configPath);
+            FileInfo configInfo = new FileInfo(configPath);
+            if(configInfo.Exists)
+            {
+                configDoc.Load(configInfo.FullName);
+
+                if(File.ReadAllText(configInfo.FullName).Contains("setting name=\"ConfigVersion\""))
+                {
+                    string versionString = configDoc.SelectNodes("//setting[@name='ConfigVersion']")[0].FirstChild.InnerText;
+                    Logger.Log.Append("version string from config: " + versionString);
+                    string[] versionArray = versionString.Split(new char[] { '.' });
+                    configVersion = new Version(int.Parse(versionArray[0]), int.Parse(versionArray[1]), int.Parse(versionArray[2]), int.Parse(versionArray[3]));
+                }
+            }
+            Logger.Log.Append("config version parser returning: " + configVersion.ToString() + " as local version");
+            return configVersion;
         }
 
         private static void selfUpdate(dynamic name, Uri rootUrl)

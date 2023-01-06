@@ -124,6 +124,7 @@ namespace gov.llnl.wintap.collect
         void Kernel_FileIoRead(FileIOReadWriteTraceData obj)
         {
             this.Counter++; // since we can't selectively disable event activity subtypes, we accumulate read activity here even though we don't process them
+            if(obj.ProcessID == StateManager.WintapPID) { return; }
             if (Properties.Settings.Default.CollectFileRead)
             {
                 try
@@ -140,6 +141,7 @@ namespace gov.llnl.wintap.collect
         // TODO: Get AccessMask from etw object, get user subjectlogonid
         void Kernel_FileIoWrite(FileIOReadWriteTraceData obj)
         {
+            if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
                 buildFileIo(obj, obj.ProcessID, false);
