@@ -22,7 +22,7 @@ using System.Net.NetworkInformation;
 namespace gov.llnl.wintap.core.shared
 {
     /// <summary>
-    /// State cache for commonly needed system attributes
+    /// State cache for system attributes
     /// </summary>
     public sealed class StateManager
     {
