@@ -33,7 +33,7 @@ namespace gov.llnl.wintap.collect
                 msg.MicrosoftWindowsBitLockerAPI.VolumeName = "NA";
                 msg.MicrosoftWindowsBitLockerAPI.IdentificationGUID = "NA";
                 msg.MicrosoftWindowsBitLockerAPI.VolumeMountPoint = "NA";
-                msg.Send();
+                EventChannel.Send(msg);
             }
         }
 
@@ -73,7 +73,7 @@ namespace gov.llnl.wintap.collect
                 msg.MicrosoftWindowsBitLockerAPI.VolumeName = obj.PayloadStringByName("VolumeName");
                 msg.MicrosoftWindowsBitLockerAPI.IdentificationGUID = obj.PayloadStringByName("IdentificationGUID");
                 msg.MicrosoftWindowsBitLockerAPI.VolumeMountPoint = obj.PayloadStringByName("VolumeMountPoint");
-                msg.Send();
+                EventChannel.Send(msg);
 
                 string msgTxt = "All drives encrypted";
                 if (!allDrivesCurrentlyEncrypted())
@@ -87,7 +87,7 @@ namespace gov.llnl.wintap.collect
                 msg.MicrosoftWindowsBitLockerAPI.VolumeName = "NA";
                 msg.MicrosoftWindowsBitLockerAPI.IdentificationGUID = "NA";
                 msg.MicrosoftWindowsBitLockerAPI.VolumeMountPoint = "NA";
-                msg2.Send();
+                EventChannel.Send(msg2);
 
             }
             catch (Exception ex)

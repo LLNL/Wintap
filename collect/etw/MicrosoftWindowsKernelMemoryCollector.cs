@@ -56,7 +56,7 @@ namespace gov.llnl.wintap.collect
                                 mem.VirtualSizeInPages = memInfo.VirtualSizeInPages;
                                 mem.WorkingSetPageCount = memInfo.WorkingSetPageCount;
                                 wm.MemInfoWS = mem;
-                                wm.Send();
+                                EventChannel.Send(wm);
                             }
                         }
                         catch (Exception ex)

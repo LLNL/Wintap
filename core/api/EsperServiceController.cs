@@ -50,9 +50,9 @@ namespace gov.llnl.wintap.core.api
             return Ok(new
             {
                 eventsPerSecond = EventChannel.EventsPerSecond,
-                maxEventsPerSecond = EventChannel.MaxEventsPerSecond,
-                totalEvents = EventChannel.TotalEvents,
-                runtime = EventChannel.Runtime
+                //maxEventsPerSecond = EventChannel.MaxEventsPerSecond,
+                //totalEvents = EventChannel.TotalEvents,
+                //runtime = EventChannel.Runtime
             });
         }
     }

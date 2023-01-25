@@ -337,7 +337,7 @@ namespace gov.llnl.wintap.collect
             }
             wm.ActivityType = "VISIT";
             wm.WebActivity = browserEvent;
-            wm.Send();
+            EventChannel.Send(wm); 
         }
 
         private string resolvePhotonUser()

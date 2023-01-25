@@ -12,7 +12,7 @@ namespace gov.llnl.wintap.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.3.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.4.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -68,18 +68,6 @@ namespace gov.llnl.wintap.Properties {
             }
             set {
                 this["EnableWorkbench"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("Production")]
-        public string Profile {
-            get {
-                return ((string)(this["Profile"]));
-            }
-            set {
-                this["Profile"] = value;
             }
         }
         
@@ -253,18 +241,6 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool LANDeskCollector {
-            get {
-                return ((bool)(this["LANDeskCollector"]));
-            }
-            set {
-                this["LANDeskCollector"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("<?xml version=\"1.0\" encoding=\"utf-16\"?>\r\n<ArrayOfString xmlns:xsd=\"http://www.w3." +
             "org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" />")]
         public global::System.Collections.Specialized.StringCollection GenericProviders {
@@ -334,6 +310,30 @@ namespace gov.llnl.wintap.Properties {
             }
             set {
                 this["CollectRegistryRead"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute(" Production")]
+        public string Profile {
+            get {
+                return ((string)(this["Profile"]));
+            }
+            set {
+                this["Profile"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1.0.0.0")]
+        public string ConfigVersion {
+            get {
+                return ((string)(this["ConfigVersion"]));
+            }
+            set {
+                this["ConfigVersion"] = value;
             }
         }
     }

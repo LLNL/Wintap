@@ -3,30 +3,60 @@
     "id": 1,
     "name": "Wintap.exe",
     "location": "wintap",
-    "version": "6.0.2.5"
+    "version": "6.0.3.6"
   },
   {
     "id": 2,
     "name": "WintapETL.dll",
     "location": "wintap/plugins",
-    "version": "1.0.0.2"
+    "version": "1.0.3.0"
   },
   {
     "id": 3,
     "name": "WintapSvcMgr.exe",
     "location": "wintap",
-    "version": "1.0.0.3"
+    "version": "1.0.3.0"
   },
   {
     "id": 4,
     "name": "WintapRecorder.exe",
     "location": "wintap/recorder",
-    "version": "1.0.0.2"
+    "version": "1.0.1.1"
   },
   {
     "id": 5,
     "name": "WintapRecorder.dll",
     "location": "wintap/recorder",
-    "version": "1.0.0.2"
+    "version": "1.0.1.1"
+  },
+  {
+    "id": 6,
+    "name": "WintapAPI.dll",
+    "location": "wintap",
+    "version": "1.1.0.0"
+  },
+  {
+    "id": 7,
+    "name": "SecretServerAgent.dll",
+    "location": "wintap/plugins",
+    "version": "6.0.4.0"
+  },
+  {
+    "id": 8,
+    "name": "SEM.dll",
+    "location": "wintap/plugins",
+    "version": "6.4.0.1"
+  },
+  {
+    "id": 9,
+    "name": "MergeHelper.exe",
+    "location": "wintap/mergertool",
+    "version": "1.0.2.0"
+  },
+  {
+    "id": 10,
+    "name": "Wintap.exe.config",
+    "location": "wintap",
+    "version": "1.0.0.13"
   }
 ]

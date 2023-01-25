@@ -42,9 +42,12 @@ namespace gov.llnl.wintap.collect.shared
 
         private KernelSession()
         {
-            // hook kernel session here, also publish an event on event drop
+            //avoid a race condition on NT Kernel Logger
+            System.Threading.Thread.Sleep(2000);
             this.EtwSessionName = "NT Kernel Logger";
             EtwSession = new TraceEventSession(this.EtwSessionName, TraceEventSessionOptions.Create);
+
+            //EtwSession.StackCompression = true;  // enables stack walking???
             EtwSession.BufferSizeMB = 250;
             if(Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
             {

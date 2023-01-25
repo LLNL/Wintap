@@ -26,6 +26,7 @@ namespace gov.llnl.wintap.collect
         {
             this.CollectorName = "Microsoft-Windows-Kernel-Process";
             this.EtwProviderId = "22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716";
+            this.TraceEventFlags = 16;
             processLookup = new Dictionary<int, string>();
         }
 
@@ -87,12 +88,13 @@ namespace gov.llnl.wintap.collect
                 Int64 exitCode = Convert.ToInt64(obj.PayloadStringByName("ExitCode").Replace(",", ""));
                 Int64 cpuCycleCount = Convert.ToInt64(obj.PayloadStringByName("CPUCycleCount").Replace(",", ""));
                 DateTime createTime = convertProcessCreateTime(obj.PayloadStringByName("CreateTime"));
-                double totalSeconds = obj.TimeStamp.Subtract(createTime).TotalSeconds;
-                uint cpuSpeed = StateManager.GetCPUSpeed(obj.ProcessorNumber);
-                int cpuCount = Environment.ProcessorCount;
-                double percentCpu = (Convert.ToInt64(cpuCycleCount / (cpuSpeed * totalSeconds) * 100) / cpuCount);
+                //double totalSeconds = obj.TimeStamp.Subtract(createTime).TotalSeconds;
+                //uint cpuSpeed = StateManager.GetCPUSpeed(obj.ProcessorNumber);
+                //int cpuCount = Environment.ProcessorCount;
+                //double percentCpu = (Convert.ToInt64(cpuCycleCount / (cpuSpeed * totalSeconds) * 100) / cpuCount);
+                msg.Process.CPUCycleCount = cpuCycleCount;
                 msg.Process.ExitCode = exitCode;
-                msg.Process.CPUUtilization = Convert.ToInt32(percentCpu);
+                msg.Process.CPUUtilization = 0; 
                 msg.Process.CommitCharge = Convert.ToInt64(obj.PayloadStringByName("CommitCharge").Replace(",", ""));
                 msg.Process.CommitPeak = Convert.ToInt64(obj.PayloadStringByName("CommitPeak").Replace(",", ""));
                 msg.Process.HardFaultCount = Convert.ToInt32(obj.PayloadStringByName("HardFaultCount").Replace(",", ""));
@@ -101,7 +103,7 @@ namespace gov.llnl.wintap.collect
                 msg.Process.TokenElevationType = Convert.ToInt32(obj.PayloadStringByName("TokenElevationType").Replace(",", ""));
                 msg.Process.WriteOperationCount = Convert.ToInt64(obj.PayloadStringByName("WriteOperationCount").Replace(",", ""));
                 msg.Process.WriteTransferKiloBytes = Convert.ToInt64(obj.PayloadStringByName("WriteTransferKiloBytes").Replace(",", ""));
-                msg.Send();
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {

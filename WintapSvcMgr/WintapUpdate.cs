@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace gov.llnl.wintap
 {
@@ -45,35 +46,57 @@ namespace gov.llnl.wintap
             Logger.Log.Append("Scanning for updates...");
             foreach (var component in versionInfo)
             {
-                Logger.Log.Append("checking component: " + component.name);
-                Logger.Log.Append("    remote version: " + component.version);
-                string[] remoteVersionParts = component.version.Split('.');
-                FileInfo localComponentInfo = new FileInfo(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) + "\\" + component.location + "\\" + component.name);
-                if (localComponentInfo.Exists)
+                try
                 {
-                    FileVersionInfo localVersionInfo = FileVersionInfo.GetVersionInfo(localComponentInfo.FullName);
-                    Version localVersion = new Version(localVersionInfo.FileMajorPart, localVersionInfo.FileMinorPart, localVersionInfo.FileBuildPart, localVersionInfo.FilePrivatePart);
-                    Version remoteVersion = new Version(Int32.Parse(remoteVersionParts[0]), Int32.Parse(remoteVersionParts[1]), Int32.Parse(remoteVersionParts[2]), Int32.Parse(remoteVersionParts[3]));
-                    Logger.Log.Append("    local version: " + FileVersionInfo.GetVersionInfo(localComponentInfo.FullName).FileVersion.ToString());
-                    if (remoteVersion > localVersion)
+                    Logger.Log.Append("checking component: " + component.name);
+                    Logger.Log.Append("    remote version: " + component.version);
+                    string[] remoteVersionParts = component.version.Split('.');
+                    FileInfo localComponentInfo = new FileInfo(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) + "\\" + component.location + "\\" + component.name);
+                    if (localComponentInfo.Exists)
                     {
-                        Logger.Log.Append("    Relevant update detected: " + component.name);
-                        Update update = new Update();
-                        update.Name = component.name;
-                        update.LocalPath = localComponentInfo.FullName;
-                        if (update.Name.ToLower() == "wintapsvcmgr.exe")
+                        FileVersionInfo localVersionInfo = FileVersionInfo.GetVersionInfo(localComponentInfo.FullName);
+                        Version localVersion;
+                        if (component.name.ToLower() == "wintap.exe.config")
                         {
-                            updateThis = true;
-                            update.LocalPath = Environment.GetEnvironmentVariable("WINDIR") + "\\Temp\\" + thisName;
+                            localVersion = parseConfigVersion();
                         }
+                        else
+                        {
+                            localVersion = new Version(localVersionInfo.FileMajorPart, localVersionInfo.FileMinorPart, localVersionInfo.FileBuildPart, localVersionInfo.FilePrivatePart);
+                        }
+                        
+                        Version remoteVersion = new Version(Int32.Parse(remoteVersionParts[0]), Int32.Parse(remoteVersionParts[1]), Int32.Parse(remoteVersionParts[2]), Int32.Parse(remoteVersionParts[3]));
+                        if (component.name.ToLower() != "wintap.exe.config")
+                        {
+                            Logger.Log.Append("    local version: " + FileVersionInfo.GetVersionInfo(localComponentInfo.FullName).FileVersion.ToString());
+                        }
+                        if (remoteVersion > localVersion)
+                        {
+                            Logger.Log.Append("    Relevant update detected: " + component.name);
+                            Update update = new Update();
+                            update.Name = component.name;
+                            update.LocalPath = localComponentInfo.FullName;
+                            if (update.Name.ToLower() == "wintapsvcmgr.exe")
+                            {
+                                updateThis = true;
+                                update.LocalPath = Environment.GetEnvironmentVariable("WINDIR") + "\\Temp\\" + thisName;
+                            }
+                            updates.Add(update);
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log.Append("    Relevant new component detected:  " + component.name);
+                        //downloadComponent(component.name, localComponentInfo.FullName, rootUrl);
+                        Update update = new Update() { Name = component.name, LocalPath = localComponentInfo.FullName };
                         updates.Add(update);
                     }
                 }
-                else
+                catch(Exception ex)
                 {
-                    Logger.Log.Append("    Local component not found for: " + component.name);
-                    downloadComponent(component.name, localComponentInfo.FullName, rootUrl);
+                    Logger.Log.Append("Error applying update on " + component.name + ",  msg: " + ex.Message);
                 }
+                
             }
             Logger.Log.Append("Scan Complete.  Updates required: " + updates.Count);
 
@@ -110,6 +133,30 @@ namespace gov.llnl.wintap
             }
             Logger.Log.Append("Wintap Update complete.  Changes applied: " + changesApplied);
             return changesApplied;
+        }
+
+        private Version parseConfigVersion()
+        {
+            Logger.Log.Append("Starting config parser...");
+            Version configVersion = new Version(0, 0, 0, 0);
+            XmlDocument configDoc = new XmlDocument();
+            string configPath = AppDomain.CurrentDomain.BaseDirectory + "\\Wintap.exe.config";
+            Logger.Log.Append("config path: " + configPath);
+            FileInfo configInfo = new FileInfo(configPath);
+            if(configInfo.Exists)
+            {
+                configDoc.Load(configInfo.FullName);
+
+                if(File.ReadAllText(configInfo.FullName).Contains("setting name=\"ConfigVersion\""))
+                {
+                    string versionString = configDoc.SelectNodes("//setting[@name='ConfigVersion']")[0].FirstChild.InnerText;
+                    Logger.Log.Append("version string from config: " + versionString);
+                    string[] versionArray = versionString.Split(new char[] { '.' });
+                    configVersion = new Version(int.Parse(versionArray[0]), int.Parse(versionArray[1]), int.Parse(versionArray[2]), int.Parse(versionArray[3]));
+                }
+            }
+            Logger.Log.Append("config version parser returning: " + configVersion.ToString() + " as local version");
+            return configVersion;
         }
 
         private static void selfUpdate(dynamic name, Uri rootUrl)

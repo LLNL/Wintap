@@ -85,14 +85,14 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 ProcessStartInfo schTaskInfo = new ProcessStartInfo();
                 schTaskInfo.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\system32\\schtasks.exe";
-                schTaskInfo.Arguments = "/Create /SC DAILY /TN WintapUpdate /TR \"'" + Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\LLNL\\Wintap\\WintapSvcMgr.exe' UPDATE\" /ST 12:00 /RI 10 /F /RL HIGHEST /ru \"Builtin\\users\"";
+                schTaskInfo.Arguments = "/Create /SC DAILY /TN WintapUpdate /TR \"'" + Strings.FileRootPath + "\\WintapSvcMgr.exe' UPDATE\" /ST 12:00 /RI 10 /F /RL HIGHEST /ru \"Builtin\\users\"";
                 Process schTasks = new Process();
                 schTasks.StartInfo = schTaskInfo;
                 schTasks.Start();
             }
             ProcessStartInfo schTaskInfo2 = new ProcessStartInfo();
             schTaskInfo2.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\system32\\schtasks.exe";
-            schTaskInfo2.Arguments = "/Create /SC DAILY /TN WintapHealthCheck /TR \"'" + Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\LLNL\\Wintap\\WintapSvcMgr.exe' HEALTHCHECK\" /ST 12:00 /F /RL HIGHEST /ru \"Builtin\\users\"";
+            schTaskInfo2.Arguments = "/Create /SC DAILY /TN WintapHealthCheck /TR \"'" + Strings.FileRootPath + "\\WintapSvcMgr.exe' HEALTHCHECK\" /ST 12:00 /F /RL HIGHEST /ru \"Builtin\\users\"";
             Process schTasks2 = new Process();
             schTasks2.StartInfo = schTaskInfo2;
             schTasks2.Start();

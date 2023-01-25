@@ -98,7 +98,7 @@ namespace gov.llnl.wintap.collect
             msg.EventLogEvent.EventMessage = entry.Message;
             msg.EventLogEvent.LogName = logName;
             msg.EventLogEvent.LogSource = entry.Source;
-            msg.Send();
+            EventChannel.Send(msg);
         }
 
         private DateTime lastEventTimestamp;

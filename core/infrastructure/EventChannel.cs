@@ -6,7 +6,6 @@
 
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.models;
-using Microsoft.AspNet.SignalR;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -27,19 +26,19 @@ namespace gov.llnl.wintap.core.infrastructure
         private static long totalEvents;
         private static Stopwatch stopWatch;
 
-        internal static long EventsPerSecond
+        public static long EventsPerSecond
         {
             get { return eventsPerSecond; }
         }
-        internal static long MaxEventsPerSecond
+        public static long MaxEventsPerSecond
         {
             get { return maxEventsPerSecond; }
         }
-        internal static long TotalEvents
+        public static long TotalEvents
         {
             get { return totalEvents; }
         }
-        internal static string Runtime
+        public static string Runtime
         {
             get { return stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss"); }
         }
@@ -92,6 +91,15 @@ namespace gov.llnl.wintap.core.infrastructure
                 totalEvents = totalEvents + eventsPerSecond;
                 EventChannel.Esper.EPRuntime.ResetStats();
             }
+        }
+
+        /// <summary>
+        /// Places the event into the Wintap event processing pipeline (esper).  
+        /// </summary>
+        public static void Send(WintapMessage streamedEvent)
+        {
+            // implemented by Wintap
+            EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
         }
 
         public static EPServiceProvider Esper

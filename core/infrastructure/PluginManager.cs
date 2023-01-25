@@ -41,8 +41,6 @@ namespace gov.llnl.wintap.core.infrastructure
         [ImportMany]
         IEnumerable<Lazy<ISubscribeEtw, ISubscribeEtwData>> subscribersEtw;
         [ImportMany]
-        IEnumerable<Lazy<IPublish, IPublishData>> publishers;
-        [ImportMany]
         IEnumerable<Lazy<IRun, IRunData>> runners;
 
         internal PluginManager()
@@ -69,7 +67,7 @@ namespace gov.llnl.wintap.core.infrastructure
             catalog.Catalogs.Add(safeCatalog);
             mefContainer = new CompositionContainer(catalog);
             mefContainer.ComposeParts(catalog, this);
-            PluginCount = subscribers.Count() + subscribersEtw.Count() + publishers.Count() + runners.Count();
+            PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
             // SUBSCRIBERS
             foreach (Lazy<ISubscribe, ISubscribeData> subscriber in subscribers)
             {
@@ -96,21 +94,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 catch (Exception ex)
                 {
                     WintapLogger.Log.Append("Error loading ETW subsriber " + consumer.Metadata.Name + ": " + ex.Message, LogLevel.Always);
-                }
-            }
-            // PUBLISHERS
-            foreach (Lazy<IPublish, IPublishData> publisher in publishers)
-            {
-                WintapLogger.Log.Append("loading publisher: " + publisher.Metadata.Name, LogLevel.Always);
-                try
-                {
-
-                    publisher.Value.Startup();
-                    publisher.Value.Publish(epProvider);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("Error loading publisher " + publisher.Metadata.Name + ": " + ex.Message, LogLevel.Always);
                 }
             }
             // RUNNERS
@@ -233,11 +216,6 @@ namespace gov.llnl.wintap.core.infrastructure
             watchdog.Stop();
             try
             {
-                foreach (Lazy<IPublish, IPublishData> p in publishers)
-                {
-                    WintapLogger.Log.Append("Shutting down publisher: " + p.Metadata.Name, LogLevel.Always);
-                    p.Value.Shutdown();
-                }
                 foreach (Lazy<ISubscribeEtw, ISubscribeEtwData> c in subscribersEtw)
                 {
                     WintapLogger.Log.Append("Shutting down consumer: " + c.Metadata.Name, LogLevel.Always);

@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("WintapSvcMgr")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("HP Inc.")]
+[assembly: AssemblyCompany("LLNL")]
 [assembly: AssemblyProduct("WintapSvcMgr")]
-[assembly: AssemblyCopyright("Copyright © HP Inc. 2022")]
+[assembly: AssemblyCopyright("Copyright 2022")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -24,12 +24,12 @@ using System.Runtime.InteropServices;
 
 // Version information for an assembly consists of the following four values:
 //
+//      Breaking Version
 //      Major Version
 //      Minor Version
-//      Build Number
-//      Revision
+//      Bug fix
 //
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.0.3")]
+[assembly: AssemblyVersion("1.0.3.0")]
