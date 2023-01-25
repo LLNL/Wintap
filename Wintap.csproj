@@ -458,7 +458,6 @@
     </None>
     <None Include="README.md" />
     <None Include="Wintap.exe.config" />
-    <None Include="msi\WintapSetup.msi" />
     <None Include="Wintap.nuspec" />
     <Resource Include="web\Workbench.zip" />
   </ItemGroup>

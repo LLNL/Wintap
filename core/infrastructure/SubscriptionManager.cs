@@ -9,6 +9,7 @@ using gov.llnl.wintap.collect.shared;
 using gov.llnl.wintap.core.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
+using Microsoft.Diagnostics.Tracing.Session;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -137,10 +138,18 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 WintapLogger.Log.Append("starting kernel mode ETW event handler", LogLevel.Always);
+
+                //TraceEventSession  kernelSession = new TraceEventSession("NT Kernel Logger", TraceEventSessionOptions.Create);
+                //kernelSession.BufferSizeMB = 250;
+                //if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
+                //{
+                //    kernelSession.BufferSizeMB = 500;
+                //}
+
                 KernelSession.Instance.EtwSession.EnableKernelProvider(kernelFlags);
                 KernelSession.Instance.Start();
                 ETWTraceEventSource source = KernelSource.Instance.EtwSource;
-                source.Process();  // this is a blocking call!  an etw-ism
+                source.Process();  // this is a blocking call! 
                 WintapLogger.Log.Append("CRITICAL: Kernel mode etw listening thread has stopped", LogLevel.Always);
             }
             catch(Exception ex)
