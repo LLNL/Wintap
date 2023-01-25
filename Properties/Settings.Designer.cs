@@ -73,18 +73,6 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("Developer")]
-        public string Profile {
-            get {
-                return ((string)(this["Profile"]));
-            }
-            set {
-                this["Profile"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool ProcessCollector {
             get {
@@ -253,18 +241,6 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool LANDeskCollector {
-            get {
-                return ((bool)(this["LANDeskCollector"]));
-            }
-            set {
-                this["LANDeskCollector"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("<?xml version=\"1.0\" encoding=\"utf-16\"?>\r\n<ArrayOfString xmlns:xsd=\"http://www.w3." +
             "org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" />")]
         public global::System.Collections.Specialized.StringCollection GenericProviders {
@@ -334,6 +310,18 @@ namespace gov.llnl.wintap.Properties {
             }
             set {
                 this["CollectRegistryRead"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute(" Production")]
+        public string Profile {
+            get {
+                return ((string)(this["Profile"]));
+            }
+            set {
+                this["Profile"] = value;
             }
         }
         
