@@ -1,3 +1,6 @@
+<img width="200" src="https://user-images.githubusercontent.com/50601643/218871643-2d3af433-0923-4786-b5e5-24c6a72e803e.png">
+
+
 # Background
 In any large-scale Windows environment, there is likely a re-occurring need to collect, analyze, and react to host-based data whether it be for IT operations, cyber security response, or cyber research.  Typically, these needs are met through the development of one-off scripts, utilities, and single-purpose agents.  One problem with this approach is scalability.  As more data collection needs arise, more and more one-off scripts (and the like) are deployed to endpoints slowly increasing the combined resource load and associated “agent bloat”.  
 
