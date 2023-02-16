@@ -1,0 +1,2 @@
+﻿@Name("Every10Seconds Context DDL")
+create context Every10Seconds initiated @now and pattern [every timer:interval(10 seconds)] terminated after 10 seconds

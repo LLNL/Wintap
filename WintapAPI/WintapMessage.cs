@@ -24,13 +24,11 @@ namespace gov.llnl.wintap.collect.models
             this.PID = processId;
             this.MessageType = eventSourceName;
             this.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-            //this.EventTimeMS = eventTimeMS;
         }
 
         public string MessageType { get; set; }
         public long EventTime { get; set; }
         public long ReceiveTime { get; set; }
-        //public double EventTimeMS { get; set; }
         public int PID { get; set; }
         public string ActivityType { get; set; }
         public ProcessObject Process { get; set; }
@@ -49,7 +47,6 @@ namespace gov.llnl.wintap.collect.models
         public MicrosoftWindowsCpuTriggerData MicrosoftWindowsCpuTrigger { get; set; }
         public MemInfoWSData MemInfoWS { get; set; }
         public WebActivityData WebActivity { get; set; }
-        public LANDeskEventData LANDeskEvent { get; set; }
         public MicrosoftWindowsGroupPolicyData MicrosoftWindowsGroupPolicy { get; set; }
 
         public MicrosoftWindowsBitLockerAPIData MicrosoftWindowsBitLockerAPI { get; set; }
@@ -98,7 +95,7 @@ namespace gov.llnl.wintap.collect.models
             public int RcvWinScale { get; set; }
             public int SackOpt { get; set; }
             public int SeqNo { get; set; }
-            public int PacketSize { get; set; }
+            public long PacketSize { get; set; }
             public int SendWinScale { get; set; }
             public int TimestampOption { get; set; }
             public int WinScaleOption { get; set; }
@@ -114,7 +111,7 @@ namespace gov.llnl.wintap.collect.models
             public int SourcePort { get; set; }
             public string DestinationAddress { get; set; }
             public int DestinationPort { get; set; }
-            public int PacketSize { get; set; }
+            public long PacketSize { get; set; }
             public FailureCodeType FailureCode { get; set; }
             public int PID { get; set; }
         }
@@ -273,7 +270,6 @@ namespace gov.llnl.wintap.collect.models
             public int AppCpuPercentage { get; set; }
             public int TotalCpuPercentage { get; set; }
             public Boolean OnBatteryPower { get; set; }
-            // UserBusy is a stateful field maintained by Wintap from other ETW sources.
             public Boolean UserBusy { get; set; }
             public int TotalCpuPercentageAllCores { get; set; }
             public int TotalCpuPercentageOneCore { get; set; }
@@ -311,23 +307,6 @@ namespace gov.llnl.wintap.collect.models
             public string TabTitle { get; set; }
             public string Url { get; set; }
             public string UserName { get; set; }
-        }
-
-        /// <summary>
-        /// operationally relevant data pulled from the LANDesk client logs
-        ///     MessageType: LANDeskEvent, ActivityType: Vulscan, PID processid claimed in the log, EventTime timestamp in the log
-        /// </summary>
-        public class LANDeskEventData
-        {
-            /// <summary>
-            /// parsed result of the log line containing the total number of patches required
-            /// </summary>
-            public int NumPatchesRequired { get; set; }
-
-            /// <summary>
-            /// The raw log line containing the actual text for patches required
-            /// </summary>
-            public string ScanResult { get; set; }
         }
 
         public class MicrosoftWindowsGroupPolicyData

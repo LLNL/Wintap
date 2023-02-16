@@ -106,6 +106,9 @@
     <DocumentationFile>
     </DocumentationFile>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>fullcolor.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Antlr4.Runtime, Version=4.6.0.0, Culture=neutral, PublicKeyToken=09abb75b9ed49849, processorArchitecture=MSIL">
       <HintPath>packages\Antlr4.Runtime.4.6.6\lib\net45\Antlr4.Runtime.dll</HintPath>
@@ -363,8 +366,8 @@
       <HintPath>packages\Microsoft.Diagnostics.Tracing.TraceEvent.3.0.4\lib\net462\TraceReloggerLib.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
-    <Reference Include="WintapAPI, Version=1.1.0.1, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\WintapAPI.1.1.0.1\lib\net48\WintapAPI.dll</HintPath>
+    <Reference Include="WintapAPI, Version=1.1.0.3, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\WintapAPI.1.1.0.3\lib\net48\WintapAPI.dll</HintPath>
     </Reference>
     <Reference Include="XLR8.CGLib, Version=1.0.1.4868, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\XLR8.CGLib.1.0.2\lib\net40\XLR8.CGLib.dll</HintPath>
@@ -443,6 +446,7 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="fullcolor.ico" />
     <Content Include="NOTICE.txt" />
     <None Include="app.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

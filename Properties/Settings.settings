@@ -77,7 +77,7 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="Profile" Type="System.String" Scope="User">
-      <Value Profile="(Default)"> Production</Value>
+      <Value Profile="(Default)">Developer</Value>
     </Setting>
     <Setting Name="ConfigVersion" Type="System.String" Scope="User">
       <Value Profile="(Default)">1.0.0.0</Value>

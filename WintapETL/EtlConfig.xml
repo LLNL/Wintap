@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ETLConfig>
+	<AWS>
+		<Upload>True</Upload>
+		<S3Bucket>gov.llnl.wintap</S3Bucket>
+		<S3KeyPrefix>V2</S3KeyPrefix>
+	</AWS>
+	<ETW>
+		<GenericInfoProviders>
+		</GenericInfoProviders>
+	</ETW>
+	<Logging>
+		<!-- Normal or Debug -->
+		<Level>Normal</Level>
+	</Logging>
+	<Sensor>
+		<!-- This setting determines how the sensor will prioritize event collection. Three possible values: Quality, Balance, Performance.  Use Quality for highest fidelity. -->
+		<Profile>Quality</Profile>
+		<!-- How often the sensor flushes events from memory to disk -->
+		<SerializationIntervalSec>60</SerializationIntervalSec>
+		<!-- How often the sensor moves parquet files from local disk to S3 -->
+		<UploadIntervalSec>300</UploadIntervalSec>
+		<WriteToParquet>True</WriteToParquet>
+		<WriteToCSV>False</WriteToCSV>
+	</Sensor>
+</ETLConfig>
+
