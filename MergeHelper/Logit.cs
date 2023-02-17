@@ -34,7 +34,6 @@ namespace gov.llnl.wintap.etl.helpers.utils
 
     /// <summary>
     /// a simple text logger.
-    /// NOTE: this is a minor adaptation of the released Wintap text logger found here: https://github.com/LLNL/Wintap/blob/main/core/shared/SingleLogit.cs
     /// 
     /// </summary>
     public class Logit

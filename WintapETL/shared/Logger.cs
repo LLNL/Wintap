@@ -35,7 +35,6 @@ namespace gov.llnl.wintap.etl.shared
 
     /// <summary>
     /// a simple logging class  
-    /// NOTE: this is a minor adaptation of the released Wintap text logger found here: https://github.com/LLNL/Wintap/blob/main/core/shared/SingleLogit.cs
     /// </summary>
     internal sealed class Logger
     {
