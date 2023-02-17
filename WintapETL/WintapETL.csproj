@@ -51,7 +51,7 @@
     <ErrorReport>prompt</ErrorReport>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>fullcolor.ico</ApplicationIcon>
+    <ApplicationIcon>wintap.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Win32.Primitives, Version=4.0.2.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
@@ -227,7 +227,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
-    <None Include="CONTRIBUTIONS.md" />
     <EmbeddedResource Include="esper\esper-context.epl" />
     <EmbeddedResource Include="esper\file.epl" />
     <EmbeddedResource Include="esper\focuschange.epl" />
@@ -241,8 +240,7 @@
   <ItemGroup>
     <Content Include="EtlConfig.xml" />
     <Content Include="FodyWeavers.xml" />
-    <Content Include="fullcolor.ico" />
-    <Content Include="NOTICE.txt" />
+    <Content Include="wintap.ico" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime">
