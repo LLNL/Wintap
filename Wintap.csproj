@@ -107,7 +107,8 @@
     </DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>fullcolor.ico</ApplicationIcon>
+    <ApplicationIcon>
+    </ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Antlr4.Runtime, Version=4.6.0.0, Culture=neutral, PublicKeyToken=09abb75b9ed49849, processorArchitecture=MSIL">
@@ -446,7 +447,6 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="fullcolor.ico" />
     <Content Include="NOTICE.txt" />
     <None Include="app.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -463,6 +463,8 @@
     <None Include="README.md" />
     <None Include="Wintap.exe.config" />
     <None Include="Wintap.nuspec" />
+    <None Include="Installers\WintapETLSetup.msi" />
+    <None Include="Installers\WintapSetup.msi" />
     <Resource Include="web\Workbench.zip" />
   </ItemGroup>
   <ItemGroup>
