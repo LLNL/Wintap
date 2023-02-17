@@ -1,0 +1,25 @@
+﻿@Name('tcp-activity')
+@Description('Summarize send/receive activity in 10 second increments using contexts')
+@EventRepresentation(Array=True)
+context Every10Seconds select istream
+  "TCP" as protocol,
+  tcpConnection.sourceAddress as srcIp,
+  tcpConnection.sourcePort as srcPort,
+  tcpConnection.destinationAddress as destIp,
+  tcpConnection.destinationPort as destPort,
+  processIdFor(PID, receiveTime, 'TcpConnection') as processId,
+  PID,
+  activityType,
+  sum(tcpConnection.packetSize) as packetSize,
+  min(tcpConnection.packetSize) as minPacketSize,
+  max(tcpConnection.packetSize) as maxPacketSize,
+  sum(tcpConnection.packetSize * tcpConnection.packetSize) as packetSizeSquared,
+  min(receiveTime) as firstSeen,
+  max(receiveTime) as lastSeen,
+  min(tcpConnection.seqNo) as initialSeqNum,
+  count(*) as eventCount,
+  'TcpConnection' as MessageType
+from WintapMessage(messageType='TcpConnection') as msg
+group by tcpConnection.sourceAddress, tcpConnection.sourcePort, tcpConnection.destinationAddress, tcpConnection.destinationPort, processIdFor(PID, receiveTime, 'TcpConnection'), PID, activityType
+having count(*) > 0
+output snapshot when terminated

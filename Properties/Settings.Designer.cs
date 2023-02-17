@@ -315,7 +315,7 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute(" Production")]
+        [global::System.Configuration.DefaultSettingValueAttribute("Developer")]
         public string Profile {
             get {
                 return ((string)(this["Profile"]));

@@ -154,6 +154,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch(Exception ex)
             {
+                System.Diagnostics.Debugger.Launch();
                 WintapLogger.Log.Append("ERROR starting ETW kernel mode session: " + ex.Message, LogLevel.Always);
             }
            

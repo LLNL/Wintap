@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>$id$</id>
-    <version>1.1.0.1</version>
+    <version>1.1.0.3</version>
     <title>$title$</title>
     <authors>LLNL</authors>
     <owners>LLNL</owners>
@@ -11,6 +11,6 @@
     <releaseNotes></releaseNotes>
     <license type="expression">MIT</license>
     <projectUrl>https://github.com/LLNL/Wintap</projectUrl>
-    <copyright>Copyright 2022</copyright>
+    <copyright>Copyright 2023</copyright>
   </metadata>
 </package>
