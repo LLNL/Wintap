@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ETLConfig>
 	<AWS>
-		<Upload>True</Upload>
+		<Upload>False</Upload>
 		<S3Bucket></S3Bucket>
 		<S3KeyPrefix></S3KeyPrefix>
 	</AWS>
