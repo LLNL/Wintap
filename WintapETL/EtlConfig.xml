@@ -2,8 +2,8 @@
 <ETLConfig>
 	<AWS>
 		<Upload>True</Upload>
-		<S3Bucket>gov.llnl.wintap</S3Bucket>
-		<S3KeyPrefix>V2</S3KeyPrefix>
+		<S3Bucket></S3Bucket>
+		<S3KeyPrefix></S3KeyPrefix>
 	</AWS>
 	<ETW>
 		<GenericInfoProviders>
