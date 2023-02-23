@@ -255,6 +255,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_6C6A37466B66491D9FE349B21464B145"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_6E2B6BA568249553C0C597F7D265948E"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
         "MsmSig" = "8:_UNDEFINED"
@@ -1483,6 +1489,26 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_6C6A37466B66491D9FE349B21464B145"
+            {
+            "SourcePath" = "8:..\\WintapSvcMgr\\bin\\x64\\Release\\WintapSvcMgr.exe.config"
+            "TargetName" = "8:WintapSvcMgr.exe.config"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_6E2B6BA568249553C0C597F7D265948E"
             {
             "AssemblyRegister" = "3:1"
@@ -2129,7 +2155,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Wintap"
         "ProductCode" = "8:{3B7FC5A6-D0BD-44F3-B489-A0F77B7A68E3}"
-        "PackageCode" = "8:{6B65CF12-CA70-4A8C-AC18-4E41E5D28BAE}"
+        "PackageCode" = "8:{F472DE43-5C4D-4F79-BF28-9E21952F3D3A}"
         "UpgradeCode" = "8:{E6E0395F-4F31-41B9-84F7-594E86488EF4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"

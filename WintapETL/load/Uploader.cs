@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using ChoETL;
@@ -14,15 +15,18 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data.SqlTypes;
 using System.Diagnostics;
 using System.Dynamic;
 using System.IO;
 using System.Linq;
+using System.Xml.Serialization;
 
 namespace gov.llnl.wintap.etl.load
 {
     internal class Uploader
     {
+        internal ETLConfig etlConfig;
         internal static ConcurrentQueue<dynamic> SendQueue;
         private BackgroundWorker uploaderThread;
         private bool svcRunning;
@@ -35,6 +39,7 @@ namespace gov.llnl.wintap.etl.load
         {
             Logger.Log.Append("Uploader is starting up", LogLevel.Always);
             Logger.Log.Append("Upload interval (sec): " + gov.llnl.wintap.etl.shared.Utilities.GetUploadIntervalFromConfig(), LogLevel.Always);
+            etlConfig = readConfig();
             svcRunning = true;
             SendQueue = new ConcurrentQueue<dynamic>();
             cacheDir = new DirectoryInfo(Strings.ParquetDataPath);
@@ -335,6 +340,11 @@ namespace gov.llnl.wintap.etl.load
 
             // upload files using the 'upload-only' bucket ACL
             AmazonS3Client client = new AmazonS3Client("", "", Amazon.RegionEndpoint.USGovCloudWest1);
+            if(etlConfig.AWS.UseInstanceProfile.ToLower() == "true")
+            {
+                InstanceProfileAWSCredentials instanceProfileAWSCredentials = new InstanceProfileAWSCredentials();
+                client = new AmazonS3Client(instanceProfileAWSCredentials, Amazon.RegionEndpoint.USGovCloudWest1);
+            }
             PutObjectRequest req = new PutObjectRequest();
             req.BucketName = getBucket();
             if (req.BucketName != "NONE")
@@ -411,5 +421,55 @@ namespace gov.llnl.wintap.etl.load
             }
             return prefix;
         }
+
+        private ETLConfig readConfig()
+        {
+
+            XmlSerializer serializer = new XmlSerializer(typeof(ETLConfig));
+            using (TextReader reader = new StringReader(gov.llnl.wintap.etl.shared.Utilities.GetETLConfig().InnerXml))
+            {
+                return (ETLConfig)serializer.Deserialize(reader);
+            }
+        }
+    }
+
+    [XmlRoot("ETLConfig")]
+    public class ETLConfig
+    {
+        [XmlElement("AWS")]
+        public AWSConfig AWS { get; set; }
+        [XmlElement("ETW")]
+        public ETWConfig ETW { get; set; }
+        [XmlElement("Logging")]
+        public LoggingConfig Logging{ get; set; }
+        [XmlElement("Sensor")]
+        public SensorConfig Sensor { get; set; }
+    }
+
+    public class AWSConfig
+    {
+        public string Upload { get; set; }
+        public string Bucket { get; set; }
+        public string KeyPrefix { get; set; }
+        public string UseInstanceProfile { get; set; }
+    }
+
+    public class ETWConfig
+    {
+        public List<string> GenericInfoProviders { get; set; }
+    }
+
+    public class LoggingConfig
+    {
+        public string Level { get; set; }
+    }
+
+    public class SensorConfig
+    {
+        public string Profile { get; set; }
+        public int SerializationIntervalSec { get; set; }
+        public int UploadIntervalSec { get; set; }
+        public string WriteToParquet { get; set; }
+        public string WriteToCSV { get; set; }
     }
 }

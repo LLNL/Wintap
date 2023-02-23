@@ -461,8 +461,6 @@
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
     <None Include="README.md" />
-    <None Include="Wintap.exe.config" />
-    <None Include="Wintap.nuspec" />
     <None Include="Installers\WintapETLSetup.msi" />
     <None Include="Installers\WintapSetup.msi" />
     <Resource Include="web\Workbench.zip" />
