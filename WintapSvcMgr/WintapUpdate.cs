@@ -6,6 +6,7 @@ using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.Remoting.Channels;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
@@ -23,7 +24,12 @@ namespace gov.llnl.wintap
             string thisName = "WintapSvcMgr.exe";
             List<Update> updates = new List<Update>();  // the relevant update list
 
-            string urlString = "http://gov.llnl.wintap.update.s3-website-us-gov-west-1.amazonaws.com";
+            string urlString = WintapSvcMgr.Properties.Settings.Default.UpdatePath;
+            if(String.IsNullOrEmpty(urlString))
+            {
+                Logger.Log.Append("no update path defined in config. exiting");
+                return false;
+            }
 
             Logger.Log.Append("Wintap update check is starting...");
             Logger.Log.Append("   update path: " + urlString);
