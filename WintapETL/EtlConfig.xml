@@ -4,7 +4,7 @@
 		<Upload>False</Upload>
 		<S3Bucket></S3Bucket>
 		<S3KeyPrefix></S3KeyPrefix>
-		<UseInstanceProfileCredentials>False</UseInstanceProfileCredentials>
+		<UseInstanceProfile>False</UseInstanceProfile>
 	</AWS>
 	<ETW>
 		<GenericInfoProviders>
