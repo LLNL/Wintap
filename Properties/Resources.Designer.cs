@@ -59,15 +59,5 @@ namespace gov.llnl.wintap.Properties {
                 resourceCulture = value;
             }
         }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] Workbench {
-            get {
-                object obj = ResourceManager.GetObject("Workbench", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
     }
 }

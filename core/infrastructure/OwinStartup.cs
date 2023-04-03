@@ -6,18 +6,11 @@
 
 
 using Microsoft.Owin.Cors;
-using Microsoft.Owin.Diagnostics;
-using Owin;
-//using Swashbuckle.Application;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.Composition;
-using System.ComponentModel.Composition.Hosting;
-using System.Text;
-using System.Web.Http;
-using static gov.llnl.wintap.Interfaces;
 using Microsoft.Owin.FileSystems;
 using Microsoft.Owin.StaticFiles;
+using Owin;
+using Swashbuckle.Application;
+using System.Web.Http;
 
 namespace gov.llnl.wintap
 {
@@ -30,15 +23,10 @@ namespace gov.llnl.wintap
         /// </summary>
         public void Configuration(IAppBuilder appBuilder)
         {
-            //Set the Welcome page to test if Owin is hosted properly
-            //appBuilder.UseWelcomePage("/welcome.html");
-            //appBuilder.UseErrorPage(new ErrorPageOptions() { ShowExceptionDetails = true });
 
             // swagger at http://localhost:8099/swagger
             HttpConfiguration config = new HttpConfiguration();   
-            // decided to thin the dependencies and NOT include swagger.  Add
-            // back the nuget pkg and uncomment to bring it back.
-            //config.EnableSwagger(c => c.SingleApiVersion("v1", "Wintap API").Description("methods for interacting with Wintap's embedded Esper streaming event engine.")).EnableSwaggerUi();
+            config.EnableSwagger(c => c.SingleApiVersion("v1", "Wintap API").Description("methods for interacting with Wintap's embedded Esper streaming event engine.")).EnableSwaggerUi();
             
             config.Routes.MapHttpRoute(
                 name: "defaultApiRoute",

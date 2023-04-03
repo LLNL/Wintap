@@ -1,6 +1,6 @@
 ﻿@Name('tcp-activity')
 @Description('Summarize send/receive activity in 10 second increments using contexts')
-@EventRepresentation(Array=True)
+@EventRepresentation(map)
 context Every10Seconds select istream
   "TCP" as protocol,
   tcpConnection.sourceAddress as srcIp,

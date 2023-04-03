@@ -90,7 +90,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 GenericCollector gc = new GenericCollector() { CollectorName = etwCollectorName, EtwProviderId = genericProvider };
                 if (gc.Start())
                 {
-                    //TraceSession.Instance.Session.EnableProvider(genericProvider);
                     baseCollectors.Add((BaseCollector)gc);
                 }
             }
@@ -145,7 +144,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 //{
                 //    kernelSession.BufferSizeMB = 500;
                 //}
-
                 KernelSession.Instance.EtwSession.EnableKernelProvider(kernelFlags);
                 KernelSession.Instance.Start();
                 ETWTraceEventSource source = KernelSource.Instance.EtwSource;
@@ -154,7 +152,6 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch(Exception ex)
             {
-                System.Diagnostics.Debugger.Launch();
                 WintapLogger.Log.Append("ERROR starting ETW kernel mode session: " + ex.Message, LogLevel.Always);
             }
            
