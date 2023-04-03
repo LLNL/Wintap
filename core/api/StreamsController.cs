@@ -31,46 +31,190 @@ namespace gov.llnl.wintap.core.api
         [HttpPost]
         public IHttpActionResult Post(string name, string query, string state)
         {
-            // Apparently, there is no longer a DestoryOneStatement method in the .NET api - there is only DestroyAll.   So i have to do this non-sense...
-            if(state == "ACTIVE")
+            string responseMsg = "OK";
+            bool error = false;         
+            try
             {
-                List<EsperStatement> revisedEsperList = dropQuery(name);  // this removes the posted query if it already exists (otherwise esper generates an auto-incrementing name suffix and add the duplicate)
-                restartEsperProcessing(revisedEsperList);  // restore the esper processing state without the dropped statement.
-            }        
+                if(state == "ACTIVE")
+                {
+                    deactivateAll();   // only want 1 active query at a time
+                }
+                EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(name);
+                if(statement != null)
+                {
+                    EventChannel.Esper.EPAdministrator.GetStatement(name).Dispose(); ;  // we need to set ACTIVE in userObject for this query which can only happen on create (read-only), so destroy it here first.
+                }
+                if(state != "DELETE")
+                {
+                    WorkbenchQuery embeddedStatement = new WorkbenchQuery() { Name = name, Query = @query, State = state, CreateDate = DateTime.Now, StatementType = WorkbenchQuery.StatementTypeEnum.User };
+                    string jsonStatement = JsonConvert.SerializeObject(embeddedStatement);
+                    statement = EventChannel.Esper.EPAdministrator.CreateEPL(@query, name, jsonStatement);  // setting the userObject so we can serialize to disk on sensor shutdown
+                    if (state == "ACTIVE")
+                    {
+                        statement.Events += Eps_Events;
+                    }
+                    if (state == "STOP")
+                    {
+                        statement.Stop();
+                    }
+                }              
+            }
+            catch(Exception ex)
+            {
+                responseMsg = ex.Message;
+                error = true;
+            }
+
+            IHttpActionResult result = Ok(new
+            {
+                response = responseMsg
+            });
+            if (error)
+            {
+                result = BadRequest(responseMsg);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Gets all statements
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        public IHttpActionResult GetAllStatements()
+        {
+            List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
+            var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
+            foreach (var statementName in statementNames)
+            {
+                var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
+                if (statement.UserObject != null)
+                {
+                    WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                    if (embeddedStatement.State != "ACTIVE")
+                    {
+                        embeddedStatement.State = statement.State.ToString();
+                    }
+                    if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
+                    {
+                        allStatements.Add(embeddedStatement);
+                    }
+                }
+            }
+            IHttpActionResult result = Ok(new
+            {
+                response = allStatements
+            });
+            return result;
+        }
+
+        /// <summary>
+        /// Gets a specific esper query
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("api/Streams/{name}")]
+        public IHttpActionResult Get(string name)
+        {
+            bool error = false;
+            string responseMsg = "OK";
+            try
+            {
+                var statement = EventChannel.Esper.EPAdministrator.GetStatement(name);
+                responseMsg = statement.Text;
+            }
+            catch (Exception ex)
+            {
+                responseMsg = ex.Message;
+            }
+
+            IHttpActionResult result = Ok(new
+            {
+                response = responseMsg
+            });
+            if (error)
+            {
+                result = BadRequest(responseMsg);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Deletes all user queries
+        /// </summary>
+        /// <returns></returns>
+        [HttpDelete]
+        public IHttpActionResult Delete()
+        {
+            bool error = false;
+            string responseMsg = "OK";
+            try
+            {
+                var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
+                foreach (var statementName in statementNames)
+                {
+                    EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
+                    if(statement.UserObject != null)
+                    {
+                        WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                        if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
+                        {
+                            statement.Dispose();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                responseMsg = ex.Message;
+                error = true;
+            }
+
             IHttpActionResult result = Ok(new
             {
                 response = "OK"
             });
-            try
+            if (error)
             {
-                EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(name);
-                if(statement == null)
+                result = BadRequest(responseMsg);
+            }
+            return result;
+        }
+
+
+        private void deactivateAll()
+        {
+            var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
+            foreach (var statementName in statementNames)
+            {
+                //  loop thru destroy/recreate ALL user queries and map any ACTIVE workbenchStatment state to a STARTED EPL state
+                var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
+                if(statement.UserObject != null)
                 {
-                    EsperStatement embeddedStatement = new EsperStatement() { Name = name, Query = @query, State = "Started", CreateDate = DateTime.Now.ToFileTime(), StatementType = "INTERACTIVE" };
-                    string jsonStatement = JsonConvert.SerializeObject(embeddedStatement);
-                    statement = EventChannel.Esper.EPAdministrator.CreateEPL(@query, name, jsonStatement);  // setting the userObject so we can find the one statement that is returning results to the client
-                }
-                if(state == "ACTIVE")
-                {
-                    statement.Events += Eps_Events;
-                }
-                else
-                {
-                    statement.Start();
+                    WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                    if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
+                    {
+                        if (workbenchStatement.State == "ACTIVE")
+                        {
+                            workbenchStatement.State = EPStatementState.STARTED.ToString();
+                        }
+                        else
+                        {
+                            workbenchStatement.State = statement.State.ToString();
+                        }
+                        statement.Dispose();
+                        // recreate the esper statement - we do this because the userObject on an EPStatement is READ-ONLY
+                        string statementJson = JsonConvert.SerializeObject(workbenchStatement);
+                        var restoredStatement = EventChannel.Esper.EPAdministrator.CreateEPL(workbenchStatement.Query, workbenchStatement.Name, statementJson);
+                    }
                 }
             }
-            catch(Exception ex)
-            {
-                result = Ok(new
-                {
-                    response = ex.Message
-                });
-            }
-            return result;;
         }
 
         /// <summary>
-        /// super basic web sockets method for broadcasting query results
+        /// web sockets method for broadcasting query results
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -85,7 +229,18 @@ namespace gov.llnl.wintap.core.api
                 {
                     try
                     {
-                        sb.Append(prop.ToString() + "=" + esperObject[prop].ToString() + ", ");
+                        if(prop.ToString().Contains("EventTime"))
+                        {
+                            sb.Append(prop.ToString() + "=" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().ToLongTimeString() + " +" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().Millisecond + "ms, ");
+                        }
+                        else if (prop.ToString().Contains("ReceiveTime"))
+                        {
+                            sb.Append(prop.ToString() + "=" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().ToLongTimeString() + " +" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().Millisecond + "ms, ");
+                        }
+                        else
+                        {
+                            sb.Append(prop.ToString() + "=" + esperObject[prop].ToString() + ", ");
+                        }
                     }
                     catch { }
                 }
@@ -95,197 +250,6 @@ namespace gov.llnl.wintap.core.api
             }
         }
 
-      
-
-        /// <summary>
-        /// Gets a specific esper query
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        [HttpGet]
-        public IHttpActionResult Get(string id)
-        {
-            IHttpActionResult result = Ok(new
-            {
-                response = "OK"
-            });
-            try
-            {
-                var statement = EventChannel.Esper.EPAdministrator.GetStatement(id);
-                result = Ok(new
-                {
-                    response = statement.Text
-                });
-            }
-            catch (Exception ex)
-            {
-                result = Ok(new
-                {
-                    response = ex.Message
-                });
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Gets all statements
-        /// </summary>
-        /// <returns></returns>
-        [HttpGet]
-        public IHttpActionResult GetAllStatements()
-        {
-            List<EsperStatement> allStatements = new List<EsperStatement>();
-            var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
-            foreach(var statementName in statementNames)
-            {
-                var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                if(statement.UserObject != null)
-                {
-                    EsperStatement embeddedStatement = JsonConvert.DeserializeObject<EsperStatement>((string)statement.UserObject);
-                    if(embeddedStatement.StatementType == "INTERACTIVE")
-                    {
-                        allStatements.Add(new EsperStatement { Name = statement.Name, Query = statement.Text });
-                    }
-                }
-            }
-            IHttpActionResult result = Ok(new
-            {
-                response = allStatements
-            });
-            return result;
-        }
-
-        /// <summary>
-        /// Stops an Esper query
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        [HttpPut]
-        public IHttpActionResult Put(string id)
-        {
-            IHttpActionResult result = Ok(new
-            {
-                response = "OK"
-            });
-            try
-            {
-                var currentStatement = EventChannel.Esper.EPAdministrator.GetStatement(id);
-                if (currentStatement != null && currentStatement.IsStarted)
-                {
-                    currentStatement.Stop();
-                }
-            }
-            catch (Exception ex)
-            {
-                result = Ok(new
-                {
-                    response = ex.Message
-                });
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Deletes a query
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        [HttpDelete]
-        public IHttpActionResult Delete(string id)
-        {
-
-            IHttpActionResult result = Ok(new
-            {
-                response = "OK"
-            });
-            try
-            {
-                List<EsperStatement> revisedEsperList = dropQuery(id);  // this removes the posted query if it already exists (otherwise esper generates an auto-incrementing name suffix and add the duplicate)
-                restartEsperProcessing(revisedEsperList);  // restore the esper processing state without the dropped statement.
-            }
-            catch(Exception ex)
-            {
-                result = Ok(new
-                {
-                    response = ex.Message
-                });
-            }
-            return result;
-        }
-
-
-        /// <summary>
-        /// stops the listener from sending results.
-        /// </summary>
-        private void stopInteractiveQuery()
-        {
-            foreach (var statementName in EventChannel.Esper.EPAdministrator.StatementNames)
-            {
-                var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                if(statement.UserObject != null)
-                {
-                    if((string)statement.UserObject == "INTERACTIVE" && statement.IsStarted)
-                    {
-                        statement.Stop();
-                        statement.RemoveAllEventHandlers();
-                    }
-                }
-            }
-        }
-
-        private List<EsperStatement> dropQuery(string name)
-        {
-            List<EsperStatement> allStatements = new List<EsperStatement>();
-            IList<string> registeredStatements = EventChannel.Esper.EPAdministrator.StatementNames;
-            foreach (var statementName in registeredStatements)
-            {
-                var rawStatement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                EsperStatement statement = new EsperStatement { Name = rawStatement.Name, Query = @rawStatement.Text, State = rawStatement.State.ToString().ToUpper(), CreateDate=rawStatement.TimeLastStateChange };
-                string embeddedJson = (string)rawStatement.UserObject;
-                if(embeddedJson != null)
-                {
-                    EsperStatement embeddedStatement = JsonConvert.DeserializeObject<EsperStatement>(embeddedJson);
-                    if (embeddedStatement.StatementType != null)
-                    {
-                        if (embeddedStatement.StatementType == "INTERACTIVE")
-                        {
-                            statement.StatementType = "INTERACTIVE";
-                            statement.CreateDate = embeddedStatement.CreateDate;
-                        }
-                        else
-                        {
-                            statement.StatementType = "BACKGROUND";
-                        }
-                    }
-                }
-                else
-                {
-                    statement.StatementType = "BACKGROUND";
-                }
-                if (statement.Name != name)  // leave out the passed-in query 
-                {
-                    allStatements.Add(statement);
-                }
-            }
-            return allStatements;
-        }
-
-        private void restartEsperProcessing(List<EsperStatement> revisedEsperList)
-        {
-            EventChannel.Esper.EPAdministrator.DestroyAllStatements();
-            foreach (EsperStatement statement in revisedEsperList)
-            {
-                if(statement.StatementType == null) { statement.StatementType = "BACKGROUND"; }
-                string statementJson = JsonConvert.SerializeObject(statement);
-                var restoredStatement = EventChannel.Esper.EPAdministrator.CreateEPL(statement.Query, statement.Name, statementJson);
-                if(statement.State.ToUpper() == "STARTED")
-                {
-                    restoredStatement.Start();
-                }
-            }
-        }
-
-
         internal static void LoadInteractiveQueries()
         {
             try
@@ -294,12 +258,12 @@ namespace gov.llnl.wintap.core.api
                 if (esperQueryFile.Exists)
                 {
                     string json = File.ReadAllText(Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Esper.json");
-                    List<EsperStatement> statements = JsonConvert.DeserializeObject<List<EsperStatement>>(json);
+                    List<WorkbenchQuery> statements = JsonConvert.DeserializeObject<List<WorkbenchQuery>>(json);
                     foreach (var statement in statements.OrderBy(s => s.CreateDate))
                     {
                         string jsonStatement = JsonConvert.SerializeObject(statement);
                         var eps = EventChannel.Esper.EPAdministrator.CreateEPL(statement.Query, statement.Name, jsonStatement);
-                        if (statement.State == "STARTED")
+                        if (statement.State == "STARTED" && !statement.Name.Contains("--"))
                         {
                             eps.Start();
                         }
@@ -315,18 +279,17 @@ namespace gov.llnl.wintap.core.api
 
         internal static void Stop()
         {
-            List<EsperStatement> allStatements = new List<EsperStatement>();
+            List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
             foreach (var statementName in statementNames)
             {
                 var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                // embedd the original esper query creation time into a an EsperStatement and store inside UserData as json - this way we can maintain ordering.
                 if (statement.UserObject != null)
                 {
-                    EsperStatement embeddedStatement = JsonConvert.DeserializeObject<EsperStatement>((string)statement.UserObject);
-                    if (embeddedStatement.StatementType == "INTERACTIVE")
+                    WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                    if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
                     {
-                        allStatements.Add(new EsperStatement { Name = statement.Name, Query = statement.Text, State = statement.State.ToString().ToUpper(), StatementType = "INTERACTIVE", CreateDate=embeddedStatement.CreateDate });
+                        allStatements.Add(new WorkbenchQuery { Name = statement.Name, Query = statement.Text, State = statement.State.ToString().ToUpper(), StatementType = WorkbenchQuery.StatementTypeEnum.User, CreateDate=embeddedStatement.CreateDate });
 
                     }
                 }
@@ -343,14 +306,14 @@ namespace gov.llnl.wintap.core.api
         }
     }
 
-    public class EsperStatement
+    public class WorkbenchQuery
     {
-        public enum UserDataEnum { Interactive, Background }
+        public enum StatementTypeEnum { User, Sensor }
 
         public string Name { get; set; }
         public string Query { get; set; }
-        public string StatementType { get; set; }
+        public StatementTypeEnum StatementType { get; set; }
         public string State { get; set; }
-        public long CreateDate { get; set; }
+        public DateTime CreateDate { get; set; }
     }
 }

@@ -111,11 +111,6 @@ namespace gov.llnl.wintap
 
             WintapLogger.Log.Append("Startup complete.", LogLevel.Always);
         }
-
-        /// <summary>
-        /// being a web app, the workbench is a subdirectory with a gazillion files.  I zip up the directory and embedded the single file as a resource which this method unzips to .\Wintap\Workbench
-        ///     modifications to the web app require a two step process to make deployable: 1.) rezip and replace Workbench.zip in the root directory  2.) recompile wintap
-        /// </summary>
         private void startWorkbench()
         {
             WintapLogger.Log.Append("extracting workbench", LogLevel.Always);
@@ -124,14 +119,6 @@ namespace gov.llnl.wintap
 
                 string wintapDir = Strings.FileRootPath + "\\";
                 DirectoryInfo workbenchInfo = new DirectoryInfo(wintapDir + "\\Workbench");
-                if(!workbenchInfo.Exists)
-                {
-                    workbenchInfo.Create();
-                }
-                Directory.Delete(wintapDir + "\\Workbench", true);
-                WintapLogger.Log.Append("extraction path: " + wintapDir, LogLevel.Always);
-                File.WriteAllBytes(wintapDir + "workbench.zip", global::gov.llnl.wintap.Properties.Resources.Workbench);
-                System.IO.Compression.ZipFile.ExtractToDirectory(wintapDir + "workbench.zip", wintapDir);
             }
             catch(Exception ex)
             {

@@ -16,7 +16,7 @@
         "Entry"
         {
         "MsmKey" = "8:_013ABF2295F6CFB08F43D3F04EC217D1"
-        "OwnerKey" = "8:_FD5BEC82E441F5C6D126DF681018F170"
+        "OwnerKey" = "8:_BC625444138587F4BCF7987A64902DC5"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -27,8 +27,26 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_013ABF2295F6CFB08F43D3F04EC217D1"
+        "OwnerKey" = "8:_FD5BEC82E441F5C6D126DF681018F170"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_0868C4CADBDEA7355227EDA34BE93FFF"
         "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_0E4DF3CB8ED64A5C87E7622CB052725F"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_14F7F50ACAE24675A420AF957F575645"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -45,8 +63,20 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_1D1D0C6E801D401899BFFF4567AA66A5"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_1D42A974CC751299DA22938AE8CD5C78"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_1EA46AD4AAC248F1979D70968B08DDCB"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -63,8 +93,14 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_219D545650F536F2D1073AECE6586E0C"
-        "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
+        "MsmKey" = "8:_205CDD9FABA5ED92D91128BABB51EC75"
+        "OwnerKey" = "8:_B1436564BED8074CFFFBFB83468E8328"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_227C6FF7E4276BE1207542C1CC768F9B"
+        "OwnerKey" = "8:_B1436564BED8074CFFFBFB83468E8328"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -82,12 +118,6 @@
         "Entry"
         {
         "MsmKey" = "8:_24631701A494094FAA901A07DCCDC32D"
-        "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_24631701A494094FAA901A07DCCDC32D"
         "OwnerKey" = "8:_BCC9311F17D21846CB18C81CA1D00611"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -99,8 +129,62 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_2CAFB55CBF3E4968B7C94FF83EF56A29"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_2D266B808C9B722F17AE63A264EF9230"
+        "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_2FAECBC622AFF7B95694ED978298F116"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_307D4C0B47FE4ABD8076E3D024681B5F"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_30B438C85C43411AA23A3A3F908B0DE6"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_310F0E255D0C41D783063ED07CED13DB"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_378FD25A4EF34FE7863E2286DDED3316"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_398F5CC85EAC47F8AAF1C93E4C235694"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_39E7EEC02A27F3C825CD2126D0F0E761"
+        "OwnerKey" = "8:_BCC9311F17D21846CB18C81CA1D00611"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_39E7EEC02A27F3C825CD2126D0F0E761"
+        "OwnerKey" = "8:_E491B52007B4F976EE966D4929D80143"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -113,6 +197,18 @@
         {
         "MsmKey" = "8:_3CB2B1CD991C48A6102CF5BA440E8750"
         "OwnerKey" = "8:_0868C4CADBDEA7355227EDA34BE93FFF"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_3D46C4A99F4B4AF3B876C11A6C015608"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_3EC17D20AE6441568B75B308C28F3A25"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -159,6 +255,30 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_45DA2B8AF83C4A88850BDFDF9E2AB7A6"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_47859DD093644A4AB5FDA8BA694F7066"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_49F52EDEE20F492BA974451E5563E21E"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_4A5E5535CB3946FD93678036F625DA26"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_4E2FFC41CE2983A46244A8A2066F6C08"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
         "MsmSig" = "8:_UNDEFINED"
@@ -171,7 +291,37 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_51732BCD067E48C9A61BC777A9294200"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_548C2EFDB47F4883B9EF6886DE31389D"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_54A1D856189E416B908C1ECCB173B5C0"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_5515F1D4F622434B84D090B8DBDB4A17"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_56F63FA9CB79426DA8242D9FFF7F9495"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_5739AB397A0A47B281C09B8D9805F5E3"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -189,20 +339,20 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_59E42D68BA9AEAE8D5021ACFA07A0AA3"
-        "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
+        "MsmKey" = "8:_59F668E5A7164C76A62CC63957A3032B"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_5F2BB2AED64543069CD8DF8F2027D5CC"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_627658A93103A1CE73030D0F9BBC1AEE"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_63AEC398119B3F5671785D76967E2531"
-        "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -255,8 +405,32 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_640D7B6B7964C4727F0FC538D2A39ECF"
+        "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_64FE0369FC0C4ED4AF3F30BEA2F8E59F"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_6C6A37466B66491D9FE349B21464B145"
         "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_6CC4DB3E8F854C698D26CCB841B1C84C"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_6E0CAC9BFE52A3843C6FD12A8184B258"
+        "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -267,8 +441,32 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_73E723E3B32C4F01B6F4CB0C6C9E9F80"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_74069B5D55444A69B779EC19461DE756"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_79796EF70FA142BA94ED1E225BE8C9C9"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_7C1721B01F0BB07821F96A6B9723C03B"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_8567837F5C9642BE9E386F8338D1A3C7"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -279,7 +477,31 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_8907DC53B8414B839DE5A1C3DE0B78D2"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_9A77EAF7B5FB4B0188C04C67A218A072"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_9BE918F4F1294BEDBD5DCD54A276D69A"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_9CFB7134CDB942059E17A8E7A85888FD"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_9F07B6381E45498D85E2C52591DF55CE"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -291,13 +513,13 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_A20515FE292E30E09BE7A4E09A6D688A"
-        "OwnerKey" = "8:_239126067073F9FC01007F136E64A7AF"
+        "MsmKey" = "8:_A01999D8F7A24542949A7D1EB80D0E16"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
-        "MsmKey" = "8:_A426F4F976094DE096D7D7D119E33B16"
+        "MsmKey" = "8:_AF517D23E2C74AB5A615EB970DBB1478"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -315,7 +537,19 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_B1436564BED8074CFFFBFB83468E8328"
+        "OwnerKey" = "8:_39E7EEC02A27F3C825CD2126D0F0E761"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_B4AA16DEA0FA40AEAE539EC75DDAA824"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_B5A22C832222475BB2296F640CB52BCA"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -333,8 +567,26 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_BC2361578914438D96F58705D26F3909"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_BC625444138587F4BCF7987A64902DC5"
+        "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_BCC9311F17D21846CB18C81CA1D00611"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_BDABB1048D3641E39F9925A692A0B4D0"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -351,6 +603,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_C5E0B1B6109445EF81036A4178F41094"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_C5EA6FBD3D05093CE73C709B6BE8D11C"
         "OwnerKey" = "8:_19F571AEE43C4D11A686BBE21DA74371"
         "MsmSig" = "8:_UNDEFINED"
@@ -359,6 +617,12 @@
         {
         "MsmKey" = "8:_C5EA6FBD3D05093CE73C709B6BE8D11C"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_C5EA6FBD3D05093CE73C709B6BE8D11C"
+        "OwnerKey" = "8:_BC625444138587F4BCF7987A64902DC5"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -381,14 +645,74 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_C6E0CD928A2D4591AAA9EAC0EB4358D8"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_C84DAE134CEE4907B8E557107635286B"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_CB6740DB5588474C9481212A0788C0E2"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_D3BA2CF5437DD339E920833F621D882C"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
+        "MsmKey" = "8:_D7960AF3B42C4353891588D5ABC69CF7"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_DAA045CD0FBB485B8201D02FAD1BBC48"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_DABB61BC3B153399B6110EE5F33F22B0"
         "OwnerKey" = "8:_BCC9311F17D21846CB18C81CA1D00611"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_DD62648C600541FAA45D6200B68E88E0"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_E34F64061A044490A92BBF06E7EBCE39"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_E491B52007B4F976EE966D4929D80143"
+        "OwnerKey" = "8:_BCC9311F17D21846CB18C81CA1D00611"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_E5960EC183914C3FB517FA3B960E420C"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_E6DB0BBB70394C27891C9DECDB32CBE5"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -417,20 +741,56 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_EA305D25B91E402698892F764DD7E444"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_EAF35BE3E0559F3FA8EED2397F177266"
+        "OwnerKey" = "8:_B1436564BED8074CFFFBFB83468E8328"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_ECC173BBF744DEE0A341C82C0C6E4181"
         "OwnerKey" = "8:_627658A93103A1CE73030D0F9BBC1AEE"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
+        "MsmKey" = "8:_F32C108583DB4A7BA473FDEBDD435EBF"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F7841808239C4E26868EB4F7CD695EBE"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F9835DA6B17E4F6993760B399AFA2222"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_FD5BEC82E441F5C6D126DF681018F170"
-        "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
+        "OwnerKey" = "8:_BC625444138587F4BCF7987A64902DC5"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_FD5BEC82E441F5C6D126DF681018F170"
         "OwnerKey" = "8:_6E2B6BA568249553C0C597F7D265948E"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_FD5BEC82E441F5C6D126DF681018F170"
+        "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -466,6 +826,18 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_4E2FFC41CE2983A46244A8A2066F6C08"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_BC625444138587F4BCF7987A64902DC5"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_FD5BEC82E441F5C6D126DF681018F170"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -473,12 +845,6 @@
         {
         "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_013ABF2295F6CFB08F43D3F04EC217D1"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_4E2FFC41CE2983A46244A8A2066F6C08"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -496,13 +862,7 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_59E42D68BA9AEAE8D5021ACFA07A0AA3"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_219D545650F536F2D1073AECE6586E0C"
+        "OwnerKey" = "8:_640D7B6B7964C4727F0FC538D2A39ECF"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -520,13 +880,13 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_A20515FE292E30E09BE7A4E09A6D688A"
+        "OwnerKey" = "8:_2D266B808C9B722F17AE63A264EF9230"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_63AEC398119B3F5671785D76967E2531"
+        "OwnerKey" = "8:_6E0CAC9BFE52A3843C6FD12A8184B258"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -580,7 +940,31 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_E491B52007B4F976EE966D4929D80143"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_39E7EEC02A27F3C825CD2126D0F0E761"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_B1436564BED8074CFFFBFB83468E8328"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_227C6FF7E4276BE1207542C1CC768F9B"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_EAF35BE3E0559F3FA8EED2397F177266"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -818,11 +1202,51 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_0E4DF3CB8ED64A5C87E7622CB052725F"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_typography.scss"
+            "TargetName" = "8:_typography.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_14F7F50ACAE24675A420AF957F575645"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\styles\\code.scss"
+            "TargetName" = "8:code.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_761C5415AB5C4CFDA603BA6D9C78D893"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_157BC81490C2434C5E16EA76162543E9"
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:XLR8.CGLib, Version=1.0.1.4868, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:XLR8.CGLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_157BC81490C2434C5E16EA76162543E9"
@@ -880,6 +1304,26 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_1D1D0C6E801D401899BFFF4567AA66A5"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\283.18c802dac59ea005.js"
+            "TargetName" = "8:283.18c802dac59ea005.js"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_1D42A974CC751299DA22938AE8CD5C78"
             {
             "AssemblyRegister" = "3:1"
@@ -909,6 +1353,26 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_1EA46AD4AAC248F1979D70968B08DDCB"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-dark-indigo\\fonts\\roboto-v20-latin-ext_latin-500.woff2"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-500.woff2"
+            "Tag" = "8:"
+            "Folder" = "8:_C2BF87124B9D4FA98414BA1D473718A8"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_1F93B25161864BA89CCE0C64CCEA0222"
@@ -973,37 +1437,6 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_219D545650F536F2D1073AECE6586E0C"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Nito.KitchenSink.CRC, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_219D545650F536F2D1073AECE6586E0C"
-                    {
-                    "Name" = "8:Nito.KitchenSink.CRC.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:Nito.KitchenSink.CRC.dll"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_227C6FF7E4276BE1207542C1CC768F9B"
             {
             "AssemblyRegister" = "3:1"
@@ -1039,7 +1472,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:NEsper, Version=5.5.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:NEsper, Version=6.1.1.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_239126067073F9FC01007F136E64A7AF"
@@ -1128,6 +1561,57 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_2CAFB55CBF3E4968B7C94FF83EF56A29"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_content.scss"
+            "TargetName" = "8:_content.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_2D266B808C9B722F17AE63A264EF9230"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:Castle.Windsor, Version=4.0.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_2D266B808C9B722F17AE63A264EF9230"
+                    {
+                    "Name" = "8:Castle.Windsor.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:Castle.Windsor.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_2FAECBC622AFF7B95694ED978298F116"
             {
             "AssemblyRegister" = "3:1"
@@ -1142,6 +1626,137 @@
                     }
                 }
             "SourcePath" = "8:Microsoft.Owin.StaticFiles.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_307D4C0B47FE4ABD8076E3D024681B5F"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_config.scss"
+            "TargetName" = "8:_config.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_30B438C85C43411AA23A3A3F908B0DE6"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\wintap.svg"
+            "TargetName" = "8:wintap.svg"
+            "Tag" = "8:"
+            "Folder" = "8:_06D409839AA64EDFBC657732DAE24E24"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_310F0E255D0C41D783063ED07CED13DB"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\primeicons.f8b9e8a4e401b603.woff"
+            "TargetName" = "8:primeicons.f8b9e8a4e401b603.woff"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_378FD25A4EF34FE7863E2286DDED3316"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\images\\banner-primeblocks.png"
+            "TargetName" = "8:banner-primeblocks.png"
+            "Tag" = "8:"
+            "Folder" = "8:_CB04A80A9B19413085D04E81A46A445C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_398F5CC85EAC47F8AAF1C93E4C235694"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-dark-indigo\\theme.css"
+            "TargetName" = "8:theme.css"
+            "Tag" = "8:"
+            "Folder" = "8:_E12DE76BD75247079CA97E3B37984E1E"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_39E7EEC02A27F3C825CD2126D0F0E761"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:System.Collections.Immutable, Version=1.2.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_39E7EEC02A27F3C825CD2126D0F0E761"
+                    {
+                    "Name" = "8:System.Collections.Immutable.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:System.Collections.Immutable.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
@@ -1190,6 +1805,46 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_3D46C4A99F4B4AF3B876C11A6C015608"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-dark-indigo\\fonts\\roboto-v20-latin-ext_latin-regular.woff"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-regular.woff"
+            "Tag" = "8:"
+            "Folder" = "8:_C2BF87124B9D4FA98414BA1D473718A8"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_3EC17D20AE6441568B75B308C28F3A25"
+            {
+            "SourcePath" = "8:..\\bin\\Release\\Wintap.exe.config"
+            "TargetName" = "8:Wintap.exe.config"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_3FDA21F1BC749C4A3F987DDDDBFA945A"
             {
             "AssemblyRegister" = "3:1"
@@ -1219,6 +1874,86 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_45DA2B8AF83C4A88850BDFDF9E2AB7A6"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-dark-indigo\\fonts\\roboto-v20-latin-ext_latin-regular.woff2"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-regular.woff2"
+            "Tag" = "8:"
+            "Folder" = "8:_C2BF87124B9D4FA98414BA1D473718A8"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_47859DD093644A4AB5FDA8BA694F7066"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\images\\logo-dark.svg"
+            "TargetName" = "8:logo-dark.svg"
+            "Tag" = "8:"
+            "Folder" = "8:_CB04A80A9B19413085D04E81A46A445C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_49F52EDEE20F492BA974451E5563E21E"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-light-indigo\\fonts\\roboto-v20-latin-ext_latin-500.woff"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-500.woff"
+            "Tag" = "8:"
+            "Folder" = "8:_A4DC8D68C47E4E2D96C9F0CE3B7A4957"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_4A5E5535CB3946FD93678036F625DA26"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\images\\notfound\\logo-blue.svg"
+            "TargetName" = "8:logo-blue.svg"
+            "Tag" = "8:"
+            "Folder" = "8:_B0C9BFD30F90479FA37EC939A8FB7691"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_4E2FFC41CE2983A46244A8A2066F6C08"
@@ -1283,6 +2018,66 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_51732BCD067E48C9A61BC777A9294200"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_responsive.scss"
+            "TargetName" = "8:_responsive.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_548C2EFDB47F4883B9EF6886DE31389D"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_mixins.scss"
+            "TargetName" = "8:_mixins.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_54A1D856189E416B908C1ECCB173B5C0"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_topbar.scss"
+            "TargetName" = "8:_topbar.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_5515F1D4F622434B84D090B8DBDB4A17"
             {
             "AssemblyRegister" = "3:1"
@@ -1314,12 +2109,52 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_56F63FA9CB79426DA8242D9FFF7F9495"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\index.html"
+            "TargetName" = "8:index.html"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_5739AB397A0A47B281C09B8D9805F5E3"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\layout.scss"
+            "TargetName" = "8:layout.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_58ED532A3BB83A8ABDC3013B0219FCF3"
             {
             "SourcePath" = "8:comadmin.dll"
             "TargetName" = "8:comadmin.dll"
             "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -1338,7 +2173,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.0.4.1, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.0.5.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_593314726DA64F9A8C5E3119A8B89960"
@@ -1365,23 +2200,12 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_59E42D68BA9AEAE8D5021ACFA07A0AA3"
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_59F668E5A7164C76A62CC63957A3032B"
             {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Sharpen, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_59E42D68BA9AEAE8D5021ACFA07A0AA3"
-                    {
-                    "Name" = "8:Sharpen.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:Sharpen.dll"
-            "TargetName" = "8:"
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\polyfills.dd9165c52da4cbe9.js"
+            "TargetName" = "8:polyfills.dd9165c52da4cbe9.js"
             "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -1393,7 +2217,27 @@
             "PackageAs" = "3:1"
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_5F2BB2AED64543069CD8DF8F2027D5CC"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\scripts.5afe9eb00629226a.js"
+            "TargetName" = "8:scripts.5afe9eb00629226a.js"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_627658A93103A1CE73030D0F9BBC1AEE"
@@ -1410,37 +2254,6 @@
                     }
                 }
             "SourcePath" = "8:Microsoft.Owin.Cors.dll"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_63AEC398119B3F5671785D76967E2531"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Antlr4.Runtime, Version=4.6.0.0, Culture=neutral, PublicKeyToken=09abb75b9ed49849, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_63AEC398119B3F5671785D76967E2531"
-                    {
-                    "Name" = "8:Antlr4.Runtime.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:Antlr4.Runtime.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
@@ -1489,6 +2302,57 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_640D7B6B7964C4727F0FC538D2A39ECF"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:Crc32.NET, Version=1.0.0.0, Culture=neutral, PublicKeyToken=dc0b95cf99bf4e99, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_640D7B6B7964C4727F0FC538D2A39ECF"
+                    {
+                    "Name" = "8:Crc32.NET.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:Crc32.NET.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_64FE0369FC0C4ED4AF3F30BEA2F8E59F"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\main.bcdd113117d7d0f1.js"
+            "TargetName" = "8:main.bcdd113117d7d0f1.js"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_6C6A37466B66491D9FE349B21464B145"
             {
             "SourcePath" = "8:..\\WintapSvcMgr\\bin\\x64\\Release\\WintapSvcMgr.exe.config"
@@ -1507,6 +2371,57 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_6CC4DB3E8F854C698D26CCB841B1C84C"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_menu.scss"
+            "TargetName" = "8:_menu.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_6E0CAC9BFE52A3843C6FD12A8184B258"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:Antlr4.Runtime.Standard, Version=4.7.1.0, Culture=neutral, PublicKeyToken=e78b2c5abd1fcb3f, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_6E0CAC9BFE52A3843C6FD12A8184B258"
+                    {
+                    "Name" = "8:Antlr4.Runtime.Standard.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:Antlr4.Runtime.Standard.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_6E2B6BA568249553C0C597F7D265948E"
@@ -1540,6 +2455,66 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_73E723E3B32C4F01B6F4CB0C6C9E9F80"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\943.20432b1d9c9bf0a5.js"
+            "TargetName" = "8:943.20432b1d9c9bf0a5.js"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_74069B5D55444A69B779EC19461DE756"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-light-indigo\\fonts\\roboto-v20-latin-ext_latin-regular.woff2"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-regular.woff2"
+            "Tag" = "8:"
+            "Folder" = "8:_A4DC8D68C47E4E2D96C9F0CE3B7A4957"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_79796EF70FA142BA94ED1E225BE8C9C9"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_preloading.scss"
+            "TargetName" = "8:_preloading.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_7C1721B01F0BB07821F96A6B9723C03B"
             {
             "AssemblyRegister" = "3:1"
@@ -1569,6 +2544,26 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_8567837F5C9642BE9E386F8338D1A3C7"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-light-indigo\\fonts\\roboto-v20-latin-ext_latin-700.woff"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-700.woff"
+            "Tag" = "8:"
+            "Folder" = "8:_A4DC8D68C47E4E2D96C9F0CE3B7A4957"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_85A4493D19D26BD61DB2C0DC85F1D717"
@@ -1602,12 +2597,92 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_8907DC53B8414B839DE5A1C3DE0B78D2"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\primeicons.ba3f916dfb64be8c.woff2"
+            "TargetName" = "8:primeicons.ba3f916dfb64be8c.woff2"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_9A77EAF7B5FB4B0188C04C67A218A072"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_footer.scss"
+            "TargetName" = "8:_footer.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_9BE918F4F1294BEDBD5DCD54A276D69A"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-light-indigo\\fonts\\roboto-v20-latin-ext_latin-regular.woff"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-regular.woff"
+            "Tag" = "8:"
+            "Folder" = "8:_A4DC8D68C47E4E2D96C9F0CE3B7A4957"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_9CFB7134CDB942059E17A8E7A85888FD"
             {
             "SourcePath" = "8:Support\\msdia140.dll"
             "TargetName" = "8:msdia140.dll"
             "Tag" = "8:"
             "Folder" = "8:_CFD33C4A04464790885D6DE6E56DD6AF"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_9F07B6381E45498D85E2C52591DF55CE"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\primeicons.ffecb2549ad1765a.eot"
+            "TargetName" = "8:primeicons.ffecb2549ad1765a.eot"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -1653,23 +2728,12 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_A20515FE292E30E09BE7A4E09A6D688A"
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_A01999D8F7A24542949A7D1EB80D0E16"
             {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Castle.Core, Version=5.0.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_A20515FE292E30E09BE7A4E09A6D688A"
-                    {
-                    "Name" = "8:Castle.Core.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:Castle.Core.dll"
-            "TargetName" = "8:"
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\runtime.7d7dbbc7df37e713.js"
+            "TargetName" = "8:runtime.7d7dbbc7df37e713.js"
             "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -1681,15 +2745,15 @@
             "PackageAs" = "3:1"
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_A426F4F976094DE096D7D7D119E33B16"
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_AF517D23E2C74AB5A615EB970DBB1478"
             {
-            "SourcePath" = "8:..\\bin\\Debug\\Wintap.exe.config"
-            "TargetName" = "8:Wintap.exe.config"
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\primeicons.943ab24c43224d29.svg"
+            "TargetName" = "8:primeicons.943ab24c43224d29.svg"
             "Tag" = "8:"
-            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -1735,12 +2799,63 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_B1436564BED8074CFFFBFB83468E8328"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_B1436564BED8074CFFFBFB83468E8328"
+                    {
+                    "Name" = "8:System.Memory.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:System.Memory.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_B4AA16DEA0FA40AEAE539EC75DDAA824"
             {
             "SourcePath" = "8:..\\wintap.ico"
             "TargetName" = "8:wintap.ico"
             "Tag" = "8:"
             "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_B5A22C832222475BB2296F640CB52BCA"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-dark-indigo\\fonts\\roboto-v20-latin-ext_latin-500.woff"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-500.woff"
+            "Tag" = "8:"
+            "Folder" = "8:_C2BF87124B9D4FA98414BA1D473718A8"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -1769,6 +2884,57 @@
                     }
                 }
             "SourcePath" = "8:System.IO.Compression.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_BC2361578914438D96F58705D26F3909"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\color.dae87a04d07ca92b.png"
+            "TargetName" = "8:color.dae87a04d07ca92b.png"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_BC625444138587F4BCF7987A64902DC5"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:Swashbuckle.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cd1bb07a5ac7c7bc, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_BC625444138587F4BCF7987A64902DC5"
+                    {
+                    "Name" = "8:Swashbuckle.Core.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:Swashbuckle.Core.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
@@ -1815,6 +2981,26 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_BDABB1048D3641E39F9925A692A0B4D0"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-dark-indigo\\fonts\\roboto-v20-latin-ext_latin-700.woff2"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-700.woff2"
+            "Tag" = "8:"
+            "Folder" = "8:_C2BF87124B9D4FA98414BA1D473718A8"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_BE56B77FA17B9D2BA47E2603CB1D3779"
@@ -1868,6 +3054,26 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C5E0B1B6109445EF81036A4178F41094"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_main.scss"
+            "TargetName" = "8:_main.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_C5EA6FBD3D05093CE73C709B6BE8D11C"
             {
             "AssemblyRegister" = "3:1"
@@ -1897,6 +3103,66 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C6E0CD928A2D4591AAA9EAC0EB4358D8"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-light-indigo\\fonts\\roboto-v20-latin-ext_latin-700.woff2"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-700.woff2"
+            "Tag" = "8:"
+            "Folder" = "8:_A4DC8D68C47E4E2D96C9F0CE3B7A4957"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C84DAE134CEE4907B8E557107635286B"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\primeicons.0112589c5695a9ed.ttf"
+            "TargetName" = "8:primeicons.0112589c5695a9ed.ttf"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_CB6740DB5588474C9481212A0788C0E2"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\images\\banner-primeblocks-dark.png"
+            "TargetName" = "8:banner-primeblocks-dark.png"
+            "Tag" = "8:"
+            "Folder" = "8:_CB04A80A9B19413085D04E81A46A445C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_D3BA2CF5437DD339E920833F621D882C"
@@ -1930,6 +3196,46 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_D7960AF3B42C4353891588D5ABC69CF7"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\styles.7194eb2b601efe8c.css"
+            "TargetName" = "8:styles.7194eb2b601efe8c.css"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_DAA045CD0FBB485B8201D02FAD1BBC48"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-light-indigo\\fonts\\roboto-v20-latin-ext_latin-500.woff2"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-500.woff2"
+            "Tag" = "8:"
+            "Folder" = "8:_A4DC8D68C47E4E2D96C9F0CE3B7A4957"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_DABB61BC3B153399B6110EE5F33F22B0"
             {
             "AssemblyRegister" = "3:1"
@@ -1961,6 +3267,117 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_DD62648C600541FAA45D6200B68E88E0"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\hue.8b1818380241e6ac.png"
+            "TargetName" = "8:hue.8b1818380241e6ac.png"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_E34F64061A044490A92BBF06E7EBCE39"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\images\\logo-white.svg"
+            "TargetName" = "8:logo-white.svg"
+            "Tag" = "8:"
+            "Folder" = "8:_CB04A80A9B19413085D04E81A46A445C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_E491B52007B4F976EE966D4929D80143"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:System.Reflection.Metadata, Version=1.4.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_E491B52007B4F976EE966D4929D80143"
+                    {
+                    "Name" = "8:System.Reflection.Metadata.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:System.Reflection.Metadata.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_E5960EC183914C3FB517FA3B960E420C"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_utils.scss"
+            "TargetName" = "8:_utils.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_E6DB0BBB70394C27891C9DECDB32CBE5"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-light-indigo\\theme.css"
+            "TargetName" = "8:theme.css"
+            "Tag" = "8:"
+            "Folder" = "8:_446686B3E47F4526AF775BB186AC0D28"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_E7B9525D8BE5AAF021A35E1532A9DC0E"
             {
             "AssemblyRegister" = "3:1"
@@ -1975,6 +3392,57 @@
                     }
                 }
             "SourcePath" = "8:System.Net.Http.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_EA305D25B91E402698892F764DD7E444"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\md-dark-indigo\\fonts\\roboto-v20-latin-ext_latin-700.woff"
+            "TargetName" = "8:roboto-v20-latin-ext_latin-700.woff"
+            "Tag" = "8:"
+            "Folder" = "8:_C2BF87124B9D4FA98414BA1D473718A8"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_EAF35BE3E0559F3FA8EED2397F177266"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_EAF35BE3E0559F3FA8EED2397F177266"
+                    {
+                    "Name" = "8:System.Numerics.Vectors.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:System.Numerics.Vectors.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_BCD75BED3A294AC5ABAD3CC5F0F43D5C"
@@ -2021,6 +3489,66 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F32C108583DB4A7BA473FDEBDD435EBF"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\layout\\_variables.scss"
+            "TargetName" = "8:_variables.scss"
+            "Tag" = "8:"
+            "Folder" = "8:_4B253F0B5267451E9F4406F4A098F95B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F7841808239C4E26868EB4F7CD695EBE"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\favicon.ico"
+            "TargetName" = "8:favicon.ico"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F9835DA6B17E4F6993760B399AFA2222"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\3rdpartylicenses.txt"
+            "TargetName" = "8:3rdpartylicenses.txt"
+            "Tag" = "8:"
+            "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_FD5BEC82E441F5C6D126DF681018F170"
@@ -2101,6 +3629,160 @@
                     "Property" = "8:_A58F3EE2951F44B5B4ACB03F1BE60853"
                         "Folders"
                         {
+                        }
+                    }
+                    "{9EF0B969-E518-4E46-987F-47570745A589}:_7A0023DA31014C2DB9382A2B9F91515F"
+                    {
+                    "Name" = "8:workbench"
+                    "AlwaysCreate" = "11:FALSE"
+                    "Condition" = "8:"
+                    "Transitive" = "11:FALSE"
+                    "Property" = "8:_250BCC81310A4840816883D6F4151A8B"
+                        "Folders"
+                        {
+                            "{9EF0B969-E518-4E46-987F-47570745A589}:_06D409839AA64EDFBC657732DAE24E24"
+                            {
+                            "Name" = "8:assets"
+                            "AlwaysCreate" = "11:FALSE"
+                            "Condition" = "8:"
+                            "Transitive" = "11:FALSE"
+                            "Property" = "8:_9814F2AEC8454F12A6AD7F5A09239824"
+                                "Folders"
+                                {
+                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_761C5415AB5C4CFDA603BA6D9C78D893"
+                                    {
+                                    "Name" = "8:styles"
+                                    "AlwaysCreate" = "11:FALSE"
+                                    "Condition" = "8:"
+                                    "Transitive" = "11:FALSE"
+                                    "Property" = "8:_8147A4C37AC3472A92006F9F11C3F0DF"
+                                        "Folders"
+                                        {
+                                        }
+                                    }
+                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_9C5B200DAB8D42F88B9116CB72493145"
+                                    {
+                                    "Name" = "8:images"
+                                    "AlwaysCreate" = "11:FALSE"
+                                    "Condition" = "8:"
+                                    "Transitive" = "11:FALSE"
+                                    "Property" = "8:_03A8315DCEED4EC8ABB69A9DF72DC7E2"
+                                        "Folders"
+                                        {
+                                            "{9EF0B969-E518-4E46-987F-47570745A589}:_B0C9BFD30F90479FA37EC939A8FB7691"
+                                            {
+                                            "Name" = "8:notfound"
+                                            "AlwaysCreate" = "11:FALSE"
+                                            "Condition" = "8:"
+                                            "Transitive" = "11:FALSE"
+                                            "Property" = "8:_7170B6253CDE4FBAB2282065DAC093B1"
+                                                "Folders"
+                                                {
+                                                }
+                                            }
+                                        }
+                                    }
+                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_F7ECE88949E64BEAAD0E739FE12DD682"
+                                    {
+                                    "Name" = "8:layout"
+                                    "AlwaysCreate" = "11:FALSE"
+                                    "Condition" = "8:"
+                                    "Transitive" = "11:FALSE"
+                                    "Property" = "8:_273B3CFB117B49DC91D13CA3DA04BA5E"
+                                        "Folders"
+                                        {
+                                            "{9EF0B969-E518-4E46-987F-47570745A589}:_BD4679A5B05F47C19F426386943EE6A3"
+                                            {
+                                            "Name" = "8:styles"
+                                            "AlwaysCreate" = "11:FALSE"
+                                            "Condition" = "8:"
+                                            "Transitive" = "11:FALSE"
+                                            "Property" = "8:_AD1ED0F3155843F992F85FD8E9140AA4"
+                                                "Folders"
+                                                {
+                                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_4B253F0B5267451E9F4406F4A098F95B"
+                                                    {
+                                                    "Name" = "8:layout"
+                                                    "AlwaysCreate" = "11:FALSE"
+                                                    "Condition" = "8:"
+                                                    "Transitive" = "11:FALSE"
+                                                    "Property" = "8:_E16BA7FD985C4063971E04343C3852D3"
+                                                        "Folders"
+                                                        {
+                                                        }
+                                                    }
+                                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_78C46B0426684BAB88CF2DA3DCF42ADA"
+                                                    {
+                                                    "Name" = "8:theme"
+                                                    "AlwaysCreate" = "11:FALSE"
+                                                    "Condition" = "8:"
+                                                    "Transitive" = "11:FALSE"
+                                                    "Property" = "8:_786BEA3DEFBA42599730CFDEE21C4633"
+                                                        "Folders"
+                                                        {
+                                                            "{9EF0B969-E518-4E46-987F-47570745A589}:_446686B3E47F4526AF775BB186AC0D28"
+                                                            {
+                                                            "Name" = "8:md-light-indigo"
+                                                            "AlwaysCreate" = "11:FALSE"
+                                                            "Condition" = "8:"
+                                                            "Transitive" = "11:FALSE"
+                                                            "Property" = "8:_F54187B6862F4881B2887D090529EB8D"
+                                                                "Folders"
+                                                                {
+                                                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_A4DC8D68C47E4E2D96C9F0CE3B7A4957"
+                                                                    {
+                                                                    "Name" = "8:fonts"
+                                                                    "AlwaysCreate" = "11:FALSE"
+                                                                    "Condition" = "8:"
+                                                                    "Transitive" = "11:FALSE"
+                                                                    "Property" = "8:_856F76E6C7D348ACA1D286C75565098E"
+                                                                        "Folders"
+                                                                        {
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                            "{9EF0B969-E518-4E46-987F-47570745A589}:_E12DE76BD75247079CA97E3B37984E1E"
+                                                            {
+                                                            "Name" = "8:md-dark-indigo"
+                                                            "AlwaysCreate" = "11:FALSE"
+                                                            "Condition" = "8:"
+                                                            "Transitive" = "11:FALSE"
+                                                            "Property" = "8:_A8BAED875D3D4A158E98E6CFC457D31A"
+                                                                "Folders"
+                                                                {
+                                                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_C2BF87124B9D4FA98414BA1D473718A8"
+                                                                    {
+                                                                    "Name" = "8:fonts"
+                                                                    "AlwaysCreate" = "11:FALSE"
+                                                                    "Condition" = "8:"
+                                                                    "Transitive" = "11:FALSE"
+                                                                    "Property" = "8:_69C206AE7A2C4BBCA998ACE8FFC40559"
+                                                                        "Folders"
+                                                                        {
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            "{9EF0B969-E518-4E46-987F-47570745A589}:_CB04A80A9B19413085D04E81A46A445C"
+                                            {
+                                            "Name" = "8:images"
+                                            "AlwaysCreate" = "11:FALSE"
+                                            "Condition" = "8:"
+                                            "Transitive" = "11:FALSE"
+                                            "Property" = "8:_7927884717F548F3AC4F71A6EF54AB1D"
+                                                "Folders"
+                                                {
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     "{9EF0B969-E518-4E46-987F-47570745A589}:_CFD33C4A04464790885D6DE6E56DD6AF"

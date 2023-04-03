@@ -1,6 +1,6 @@
 ﻿@Name('file-activity')
 @Description('Summarize file activity in 10 second increments using contexts')
-@EventRepresentation(Array=True)
+@EventRepresentation(map)
 context Every10Seconds select istream
   "File" as protocol,
   fileActivity.path as path,

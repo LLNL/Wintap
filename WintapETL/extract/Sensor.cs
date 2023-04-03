@@ -232,8 +232,8 @@ namespace gov.llnl.wintap.etl.extract
             backoffTimer.Elapsed += BackoffTimer_Elapsed;
             esperQueries = new List<string>();
             hwConfig = new com.espertech.esper.client.Configuration();
-            hwConfig.EngineDefaults.EventMetaConfig.ClassPropertyResolutionStyle = PropertyResolutionStyle.CASE_INSENSITIVE;
-            hwConfig.EngineDefaults.MetricsReportingConfig.EngineInterval = 1000;
+            hwConfig.EngineDefaults.EventMeta.ClassPropertyResolutionStyle = PropertyResolutionStyle.CASE_INSENSITIVE;
+            hwConfig.EngineDefaults.MetricsReporting.EngineInterval = 1000;
             hwConfig.SetMetricsReportingEnabled();
             hwConfig.AddEventType("WintapMessage", typeof(WintapMessage).FullName);
 
@@ -359,7 +359,7 @@ namespace gov.llnl.wintap.etl.extract
             if (this.GetType().Name == "ProcessSensor")
             {
                 Logger.Log.Append("event cap: " + maxEventsPerSec, LogLevel.Always);
-                Logger.Log.Append("metrics enabled: " + hwConfig.EngineDefaults.MetricsReportingConfig.IsEnableMetricsReporting, LogLevel.Always);
+                Logger.Log.Append("metrics enabled: " + hwConfig.EngineDefaults.MetricsReporting.IsEnableMetricsReporting, LogLevel.Always);
             }
         }
 

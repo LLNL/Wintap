@@ -71,5 +71,16 @@ namespace gov.llnl.wintap.core.shared
                 return AppDomain.CurrentDomain.BaseDirectory;
             }
         }
+
+        /// <summary>
+        /// root of the Wintap data path (e.g. for Logs, parquet, etc)
+        /// </summary>
+        static internal string FileDataRoot
+        {
+            get
+            {
+                return Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap";
+            }
+        }
     }
 }
