@@ -75,6 +75,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_1D695BAEABB142EC9800B9784A08631B"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_1EA46AD4AAC248F1979D70968B08DDCB"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -357,6 +363,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_5F5CA28AF8D44EC7AAE4E51E188631CC"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_627658A93103A1CE73030D0F9BBC1AEE"
         "OwnerKey" = "8:_593314726DA64F9A8C5E3119A8B89960"
         "MsmSig" = "8:_UNDEFINED"
@@ -484,6 +496,12 @@
         "Entry"
         {
         "MsmKey" = "8:_8907DC53B8414B839DE5A1C3DE0B78D2"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_8BA1C499463D4295A14B9F2468ECE9F8"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -1383,6 +1401,26 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_1D695BAEABB142EC9800B9784A08631B"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\styles\\theme\\lara-light-indigo\\theme.css"
+            "TargetName" = "8:theme.css"
+            "Tag" = "8:"
+            "Folder" = "8:_AD5160890F1B4494B11B7381D43CBD13"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_1EA46AD4AAC248F1979D70968B08DDCB"
@@ -2301,6 +2339,26 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_5F5CA28AF8D44EC7AAE4E51E188631CC"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\images\\themes\\md-dark-indigo.svg"
+            "TargetName" = "8:md-dark-indigo.svg"
+            "Tag" = "8:"
+            "Folder" = "8:_8067C34F93704AFAB5F37E1EEE4792EB"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_627658A93103A1CE73030D0F9BBC1AEE"
             {
             "AssemblyRegister" = "3:1"
@@ -2664,6 +2722,26 @@
             "TargetName" = "8:primeicons.ba3f916dfb64be8c.woff2"
             "Tag" = "8:"
             "Folder" = "8:_7A0023DA31014C2DB9382A2B9F91515F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_8BA1C499463D4295A14B9F2468ECE9F8"
+            {
+            "SourcePath" = "8:D:\\Repos\\WintapWorkbench\\dist\\workbench\\assets\\layout\\images\\themes\\md-light-indigo.svg"
+            "TargetName" = "8:md-light-indigo.svg"
+            "Tag" = "8:"
+            "Folder" = "8:_8067C34F93704AFAB5F37E1EEE4792EB"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -3834,6 +3912,17 @@
                                                                     }
                                                                 }
                                                             }
+                                                            "{9EF0B969-E518-4E46-987F-47570745A589}:_AD5160890F1B4494B11B7381D43CBD13"
+                                                            {
+                                                            "Name" = "8:lara-light-indigo"
+                                                            "AlwaysCreate" = "11:FALSE"
+                                                            "Condition" = "8:"
+                                                            "Transitive" = "11:FALSE"
+                                                            "Property" = "8:_582A900DC90F4F57A5DACDCCF4F5D903"
+                                                                "Folders"
+                                                                {
+                                                                }
+                                                            }
                                                             "{9EF0B969-E518-4E46-987F-47570745A589}:_E12DE76BD75247079CA97E3B37984E1E"
                                                             {
                                                             "Name" = "8:md-dark-indigo"
@@ -3869,6 +3958,17 @@
                                             "Property" = "8:_7927884717F548F3AC4F71A6EF54AB1D"
                                                 "Folders"
                                                 {
+                                                    "{9EF0B969-E518-4E46-987F-47570745A589}:_8067C34F93704AFAB5F37E1EEE4792EB"
+                                                    {
+                                                    "Name" = "8:themes"
+                                                    "AlwaysCreate" = "11:FALSE"
+                                                    "Condition" = "8:"
+                                                    "Transitive" = "11:FALSE"
+                                                    "Property" = "8:_D42CBA33DE1A4A259C8C637867D4FDF3"
+                                                        "Folders"
+                                                        {
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -3929,7 +4029,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Wintap"
         "ProductCode" = "8:{3B7FC5A6-D0BD-44F3-B489-A0F77B7A68E3}"
-        "PackageCode" = "8:{F472DE43-5C4D-4F79-BF28-9E21952F3D3A}"
+        "PackageCode" = "8:{8E2460FB-0FB9-40FE-9D08-F4E396F22049}"
         "UpgradeCode" = "8:{E6E0395F-4F31-41B9-84F7-594E86488EF4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
