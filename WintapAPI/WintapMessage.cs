@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Dynamic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -48,8 +50,8 @@ namespace gov.llnl.wintap.collect.models
         public MemInfoWSData MemInfoWS { get; set; }
         public WebActivityData WebActivity { get; set; }
         public MicrosoftWindowsGroupPolicyData MicrosoftWindowsGroupPolicy { get; set; }
-
         public MicrosoftWindowsBitLockerAPIData MicrosoftWindowsBitLockerAPI { get; set; }
+        public KernelApiCallData KernelApiCall { get; set; }
 
         /// <summary>
         /// General purpose error reporting for Wintap
@@ -332,5 +334,50 @@ namespace gov.llnl.wintap.collect.models
 
             public string AlertDescription { get; set; }
         }
+
+        /// <summary>
+        /// collector for the Microsoft-Windows-Kernel-Audit-API-Calls ETW provider
+        /// </summary>
+        public class KernelApiCallData
+        {
+            private string providerName;
+            private uint? targetPid;
+            private uint? desiredAccess;
+            private uint returnCode;
+            private string linkSourceName;
+            private string linkTargetName;
+            private long? notifyRoutineAddress;
+            private uint? targetThreatId;
+            public KernelApiCallData(string _providerName, uint? _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId) 
+            {
+                providerName = _providerName;
+                targetPid = _targetPid;
+                desiredAccess = _desiredAccess;
+                returnCode = _returnCode;
+                linkSourceName = _linkSourceName;
+                linkTargetName = _linkTargetName;
+                notifyRoutineAddress = _notifyRoutineAddress;
+                targetThreatId = _targetThreatId;
+            }
+            public string ProviderName
+            {
+                get { return providerName; }
+            }
+            public uint? TargetPid
+            { get { return targetPid; } }
+            public uint? DesiredAccess
+            { get { return desiredAccess; } }
+            public uint ReturnCode
+            { get { return  returnCode; } }
+            public string LinkSourceName
+            { get { return linkSourceName; } }
+            public string LinkTargetName
+            { get {  return linkTargetName; } }
+            public long? NotifyRoutineAddress
+            { get { return notifyRoutineAddress; } }
+            public uint? TargetThreatId
+            { get { return targetThreatId; } }
+        }
+
     }
 }
