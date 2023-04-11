@@ -336,7 +336,7 @@ namespace gov.llnl.wintap.collect.models
         }
 
         /// <summary>
-        /// 
+        /// collector for the Microsoft-Windows-Kernel-Audit-API-Calls ETW provider
         /// </summary>
         public class KernelApiCallData
         {
@@ -359,31 +359,20 @@ namespace gov.llnl.wintap.collect.models
                 notifyRoutineAddress = _notifyRoutineAddress;
                 targetThreatId = _targetThreatId;
             }
-
-            /// <summary>
-            /// Source of this data, for ETW this should be the provider name.
-            /// </summary>
             public string ProviderName
             {
                 get { return providerName; }
             }
-            /// <summary>
-            /// For APIs which act on another process, this stores the target process id.
-            /// </summary>
             public uint? TargetPid
             { get { return targetPid; } }
             public uint? DesiredAccess
             { get { return desiredAccess; } }
             public uint ReturnCode
             { get { return  returnCode; } }
-
             public string LinkSourceName
             { get { return linkSourceName; } }
             public string LinkTargetName
             { get {  return linkTargetName; } }
-            /// <summary>
-            /// pointer 
-            /// </summary>
             public long? NotifyRoutineAddress
             { get { return notifyRoutineAddress; } }
             public uint? TargetThreatId
