@@ -42,7 +42,8 @@ namespace gov.llnl.wintap.collect.shared
                 genericEvent.Provider = obj.ProviderGuid.ToString();
 
                 // 2.) Create a WintapMessage and attach your event to it
-                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, this.CollectorName);
+                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "GenericMessage");
+                wintapMsg.ActivityType = obj.ProviderName;
                 wintapMsg.GenericMessage = genericEvent;
 
                 // 3.) Send your event into the Wintap event pipeline
