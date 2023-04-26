@@ -369,7 +369,12 @@ namespace gov.llnl.wintap.core.infrastructure
                     WintapLogger.Log.Append("Run Plug-in Scheduler is awake and looking for work", LogLevel.Always);
                     Runnable runnable;
                     runQueue.TryDequeue(out runnable);
-                    WintapLogger.Log.Append("Plugin manager is checking conditions for: " + runnable.RunPlugin.Metadata.Name + " last ran: " + runnable.LastRan + "  interval: " + runnable.RunInterval, LogLevel.Always);
+                    RegistryKey pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name);
+                    runnable.PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
+                    WintapLogger.Log.Append("Plugin manager is checking conditions for: " + runnable.RunPlugin.Metadata.Name + " last ran: " + runnable.LastRan + "  interval: " +
+                        ((runnable.PollRunIntervalRegistry.TotalMilliseconds == 0 || runnable.RunInterval.TotalMilliseconds < runnable.PollRunIntervalRegistry.TotalMilliseconds) &&
+                         runnable.RunInterval.TotalMilliseconds > 0 ?
+                         runnable.RunInterval : runnable.PollRunIntervalRegistry), LogLevel.Always);
                     if (checkConditions(runnable))
                     {
                         try
@@ -394,8 +399,25 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private bool checkConditions(Runnable runnable)
         {
+            bool timeCondtionToRun = false;
             bool clearToRun = false;
-            if (DateTime.Now - runnable.LastRan >= runnable.RunInterval)
+            if ((runnable.PollRunIntervalRegistry.TotalMilliseconds == 0 || runnable.RunInterval.TotalMilliseconds < runnable.PollRunIntervalRegistry.TotalMilliseconds)
+                && runnable.RunInterval.TotalMilliseconds > 0)
+            {
+                if (DateTime.Now - runnable.LastRan >= runnable.RunInterval)
+                {
+                    timeCondtionToRun = true;
+
+                }
+            }
+            else
+            {
+                if (runnable.PollRunIntervalRegistry.TotalMilliseconds > 0 && DateTime.Now - runnable.LastRan >= runnable.PollRunIntervalRegistry)
+                {
+                    timeCondtionToRun = true;
+                }
+            }
+            if (timeCondtionToRun)
             {
                 if (runnable.RequiredHost == "NONE")
                 {
@@ -473,6 +495,7 @@ namespace gov.llnl.wintap.core.infrastructure
         public string RequiredHost { get; set; }
         public bool IsRunning { get; set; }
         public TimeSpan MaxTTL { get; set; }
+        public TimeSpan PollRunIntervalRegistry { get; set; }
 
         public Runnable(Lazy<IRun, IRunData> runnable, RunManifest runManifest)
         {
@@ -489,6 +512,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 RegistryKey pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + this.RunPlugin.Metadata.Name);
                 LastRan = DateTime.Parse(pluginKey.GetValue("LastRan").ToString());
+                PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
                 pluginKey.Close();
                 pluginKey.Dispose();
             }
