@@ -12,7 +12,7 @@ context Every10Seconds select istream
   max(receiveTime) as lastSeen,
   count(*) as eventCount,
   'File' as MessageType
-from WintapMessage(messageType='File') as msg
+from WintapMessage(messageType='File' AND (ActivityType='WRITE' OR ActivityType='READ')) as msg
 group by fileActivity.path, processIdFor(PID, receiveTime, 'FileActivity'), PID, activityType
 having count(*) > 0
 output snapshot when terminated

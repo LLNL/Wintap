@@ -55,9 +55,9 @@ namespace gov.llnl.wintap.core.infrastructure
             WintapLogger.Log.Append("Setting up Wintap Service Manager...", LogLevel.Always);
             setupSvcMgr();
             WintapLogger.Log.Append("Wintap profile: " + WintapProfile.Name, LogLevel.Always);
+            WintapLogger.Log.Append("Max Memory: " + WintapProfile.MaxMem, LogLevel.Always);
             if (WintapProfile.Name != WintapProfile.ProfileEnum.Developer)
             {
-                WintapLogger.Log.Append("Max Memory: " + WintapProfile.MaxMem, LogLevel.Always);
                 WintapLogger.Log.Append("Max CPU: " + WintapProfile.MaxCPU, LogLevel.Always);
             }
 
@@ -156,24 +156,38 @@ namespace gov.llnl.wintap.core.infrastructure
                 float cpu = getCpu();
                 long mem = getMem();
                 WintapLogger.Log.Append("Wintap usage stats.  CPU: " + cpu + " MEM: " + mem, LogLevel.Always);
-                if (WintapProfile.Name != WintapProfile.ProfileEnum.Developer)
+                if (WintapProfile.Name == WintapProfile.ProfileEnum.Production && (cpu > WintapProfile.MaxCPU || mem > WintapProfile.MaxMem))
                 {
-                    if (cpu > WintapProfile.MaxCPU || mem > WintapProfile.MaxMem)
-                    {
-                        WintapProfile.BreachCount++;
-                        WintapLogger.Log.Append("wintap is exceeding defined performance thresholds. cpu: " + cpu + "  memory: " + mem + "  hitcount: " + WintapProfile.BreachCount, LogLevel.Always);
-                    }
-                    else { WintapProfile.BreachCount = 0; }
-                    if (WintapProfile.BreachCount >= WintapProfile.MaxBreachCount)
-                    {
-                        restartWintap();
-                    }               
+                    WintapProfile.BreachCount++;
+                }
+                else if (WintapProfile.Name == WintapProfile.ProfileEnum.Developer && mem > WintapProfile.MaxMem)
+                {
+                    WintapProfile.BreachCount++;
+                }
+                else { WintapProfile.BreachCount = 0; }
+                if (WintapProfile.BreachCount >= WintapProfile.MaxBreachCount)
+                {
+                    string alertMsg = "wintap has exceeded maximum performance thresholds. cpu: " + cpu + "  memory: " + mem + "  hitcount: " + WintapProfile.BreachCount;
+                    WintapLogger.Log.Append(alertMsg, LogLevel.Always);
+                    sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.SYSTEM_UTILIZATION, alertMsg);
+                    restartWintap();
                 }
             }
             catch (Exception ex)
             {
                 logEvent(103, "Top level error in watchdog: " + ex.Message + "  Performance protection is NOT running.");
             }
+        }
+
+        private void sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum alertType, string description)
+        {
+            StateManager.DroppedEventsDetected = true;
+            WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, System.Diagnostics.Process.GetCurrentProcess().Id, "WintapAlert");
+            alertMsg.WintapAlert = new WintapMessage.WintapAlertData();
+            alertMsg.WintapAlert.AlertName = alertType;
+            alertMsg.WintapAlert.AlertDescription = description;
+            EventChannel.Send(alertMsg);
+            WintapLogger.Log.Append(alertMsg.WintapAlert.AlertDescription, LogLevel.Always);
         }
 
         private long getMem()
@@ -289,7 +303,7 @@ namespace gov.llnl.wintap.core.infrastructure
         static WintapProfile()
         {
             BreachCount = 0;
-            MaxMem = 250000000;
+            MaxMem = 700000000;
             MaxCPU = 10;
             MaxBreachCount = 2;
             MaxEventCount = 1000;
@@ -305,6 +319,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             else if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
             {
+                MaxMem = 950000000;
                 Name = ProfileEnum.Developer;
             }
         }

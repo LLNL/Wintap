@@ -137,7 +137,6 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 WintapLogger.Log.Append("starting kernel mode ETW event handler", LogLevel.Always);
-
                 //TraceEventSession  kernelSession = new TraceEventSession("NT Kernel Logger", TraceEventSessionOptions.Create);
                 //kernelSession.BufferSizeMB = 250;
                 //if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
@@ -148,7 +147,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 KernelSession.Instance.Start();
                 ETWTraceEventSource source = KernelSource.Instance.EtwSource;
                 source.Process();  // this is a blocking call! 
-                WintapLogger.Log.Append("CRITICAL: Kernel mode etw listening thread has stopped", LogLevel.Always);
+                WintapLogger.Log.Append("CRITICAL ERROR: Kernel mode etw listening thread has stopped", LogLevel.Always);
             }
             catch(Exception ex)
             {

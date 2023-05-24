@@ -18,6 +18,7 @@ using System.ComponentModel.Composition.Hosting;
 using static gov.llnl.wintap.Interfaces;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
+using com.espertech.esper.epl.generated;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -42,6 +43,10 @@ namespace gov.llnl.wintap.core.infrastructure
         IEnumerable<Lazy<ISubscribeEtw, ISubscribeEtwData>> subscribersEtw;
         [ImportMany]
         IEnumerable<Lazy<IRun, IRunData>> runners;
+        [ImportMany]
+        IEnumerable<Lazy<IQuery, IQueryData>> queryPlugins;
+        [ImportMany]
+        IEnumerable<Lazy<IProvide, IProvideData>> providers;
 
         internal PluginManager()
         {
@@ -51,7 +56,7 @@ namespace gov.llnl.wintap.core.infrastructure
         }
 
         /// <summary>
-        /// Lazy loads DLLs from the Plugins directory calling thier initialization methods and hooks up esper event handlers
+        /// Lazy loads DLLs from the Plugins directory 
         /// </summary>
         /// <param name="config"></param>
         /// <param name="epProvider"></param>
@@ -111,23 +116,42 @@ namespace gov.llnl.wintap.core.infrastructure
                     WintapLogger.Log.Append("Error loading RUnner " + runner.Metadata.Name + ": " + ex.Message, LogLevel.Always);
                 }
             }
+            // QUERIES: Esper Query Plugins
+            foreach (Lazy<IQuery, IQueryData> queryPlugin in queryPlugins)
+            {
+                WintapLogger.Log.Append("loading query plugin: " + queryPlugin.Metadata.Name, LogLevel.Always);
+                try
+                {
+                    List<EventQuery> queries = queryPlugin.Value.Startup();
+                    registerQueries(queries, queryPlugin.Metadata.Name);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("Error loading Query plugin " + queryPlugin.Metadata.Name + ": " + ex.Message, LogLevel.Always);
+                }
+            }
+            // PROVIDERS: data generating plugins
+            foreach (Lazy<IProvide, IProvideData> provider in providers)
+            {
+                WintapLogger.Log.Append("loading provider plugin: " + provider.Metadata.Name, LogLevel.Always);
+                try
+                {
+                    provider.Value.Startup();
+                    provider.Value.Events += Plugin_Events;
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("Error loading provider plugin " + provider.Metadata.Name + ": " + ex.Message, LogLevel.Always);
+                }
+            }
             // Hook up event delivery from Esper to Subscribers
             if (subscribers.Count() > 0)
             {
                 try
                 {
-                    // using a batch query here to help ensure events are delivered to subscribers in the same order as received by ETW
-                    // EventTimeMS is TraceEvent's TimeStampRelativeMSec value (number of milliseconds since the start of the trace session).
-                    // Since EventTimeMS is a double, it's esper-friendly (EventTime is a long and will not work in this sort of query)
-
                     EPStatement allWintapMsgs = epProvider.EPAdministrator.CreateEPL("SELECT RSTREAM * FROM WintapMessage.win:time_batch(5 sec) ORDER BY EventTime");
+                    //EPStatement allWintapMsgs = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage.win:time_batch(5 sec) ORDER BY EventTime");
                     allWintapMsgs.Events += AllWintapMsgs_Events;
-
-                    //EPStatement processActivityMsgs = epProvider.EPAdministrator.CreateEPL("SELECT Process, Activity FROM pattern[every Process=WintapMessage(MessageType=\"Process\" AND ActivityType=\"Start\") ->every Activity=WintapMessage(PID=Process.PID AND MessageType != \"Process\") WHILE(Activity.ActivityType != \"Stop\")]");              
-                    //processActivityMsgs.Events += AllProcessActivity_Events;
-                    
-                    //EPStatement processMsgs = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType=\"Process\"");
-                    //processMsgs.Events += ProcessMsgs_Events;
                 }
                 catch (Exception ex)
                 {
@@ -138,7 +162,8 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 try
                 {
-                    EPStatement allWintapMsgs = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType = 'GENERIC'");               
+                    // do not route plugin provided GenericMessages to ISubscribeEtw plugins
+                    EPStatement allWintapMsgs = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType = 'GenericMessage' AND GenericMessage.Provider != 'Plugin'");               
                     allWintapMsgs.Events += AllGeneric_Events;
                 }
                 catch (Exception ex)
@@ -156,6 +181,63 @@ namespace gov.llnl.wintap.core.infrastructure
             }
 
             WintapLogger.Log.Append("PluginManager: done registering plugins.  total plugin count: " + PluginCount, LogLevel.Always);
+        }
+
+        private void Plugin_Events(object sender, ProviderEventArgs e)
+        {
+            try
+            {
+                WintapMessage pluginEventData = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, "GenericMessage");
+                pluginEventData.GenericMessage = e.GenericEvent;
+                pluginEventData.ActivityType = e.Name; 
+                EventChannel.Esper.EPRuntime.SendEvent(pluginEventData);
+            }
+            catch(Exception ex) 
+            {
+                WintapLogger.Log.Append("Error on plugin event: " + ex.Message, LogLevel.Debug);
+            }
+        }
+
+        private void registerQueries(List<EventQuery> queries, string pluginName)
+        {
+            foreach(EventQuery query in queries)
+            {
+                try
+                {
+                    EPStatement statement = EventChannel.Esper.EPAdministrator.CreateEPL(query.Query, query.Name, pluginName);
+                    statement.Events += pluginEventHandler;
+                }
+                catch(Exception ex)
+                {
+                    WintapLogger.Log.Append("Error registering IQuery query: " +  query, LogLevel.Always);  
+                }
+            }
+        }
+
+        private void pluginEventHandler(object sender, UpdateEventArgs e)
+        {
+            string pluginHandler = e.Statement.UserObject as string;
+            string queryName = e.Statement.Name;
+            foreach (Lazy<IQuery, IQueryData> queryPlugin in queryPlugins)
+            {
+                if(queryPlugin.Metadata.Name == pluginHandler)
+                {
+                    foreach(EventBean eb in e.NewEvents)
+                    {
+                        QueryResult qr = new QueryResult();
+                        qr.Result = new List<KeyValuePair<string, string>>();
+                        qr.Name = queryName;
+                        foreach (string prop in eb.EventType.PropertyNames)
+                        {
+                            if(eb[prop] != null && !String.IsNullOrEmpty(eb[prop].ToString()))
+                            {
+                                qr.Result.Add(new KeyValuePair<string, string>(prop, eb[prop].ToString()));
+                            }
+                        }
+                        queryPlugin.Value.Process(qr);
+                    }
+                }
+            }
         }
 
         private void enableDynamicEtwProviders(List<string> etwProviders)
@@ -452,15 +534,6 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             return lastRan;
         }
-
-        /// <summary>
-        /// Sends the result event to the ETW channel.  User mode agent can pick it up and complete user-side processing.
-        /// </summary>
-        /// <param name="systemRequest"></param>
-        //internal void sendResultEvent(Result result)
-        //{
-        //    WintapEvents.EventProvider.Response(result.RequestId, result.Success, result.Detail);
-        //}
 
 
         // attribution: https://msdn.microsoft.com/en-us/library/system.net.networkinformation.ping%28v=vs.110%29.aspx?f=255&MSPPError=-2147217396

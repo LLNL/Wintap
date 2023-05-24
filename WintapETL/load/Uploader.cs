@@ -7,6 +7,7 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Castle.Components.DictionaryAdapter.Xml;
 using ChoETL;
 using gov.llnl.wintap.etl.extract;
 using gov.llnl.wintap.etl.models;
@@ -20,6 +21,7 @@ using System.Diagnostics;
 using System.Dynamic;
 using System.IO;
 using System.Linq;
+using System.Timers;
 using System.Xml.Serialization;
 
 namespace gov.llnl.wintap.etl.load
@@ -34,6 +36,7 @@ namespace gov.llnl.wintap.etl.load
         private DirectoryInfo mergeDir;  // temporary location for merged parquet files.
         private long bytesOnDisk;
         private bool shouldAttemptUpload; // patch for local implementations where attempting to upload to S3 is undesirable.
+        private int mergeHelperPid;
 
         internal Uploader()
         {
@@ -212,10 +215,58 @@ namespace gov.llnl.wintap.etl.load
             helperExe.StartInfo = psi;
             Logger.Log.Append("Attempting to run parquet merger: " + psi.FileName + " " + psi.Arguments, LogLevel.Always);
             helperExe.Start();
+            mergeHelperPid = helperExe.Id;
+            Timer hangDetector = new Timer();
+            hangDetector.Interval = 30000;
+            hangDetector.Elapsed += HangDetector_Elapsed;
+            hangDetector.Start();
             helperExe.WaitForExit();
+            hangDetector.Stop();
         }
 
-        private void upload()
+        private void HangDetector_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            Logger.Log.Append("MergeHelper process hang detected", LogLevel.Always);
+            Process hungHelper = Process.GetProcessById(mergeHelperPid);
+            if(hungHelper.ProcessName.ToLower().StartsWith("mergehelper"))
+            {
+                hungHelper.Kill();
+                Logger.Log.Append("MergeHelper killed, clearing parquet", LogLevel.Always);
+
+                DirectoryInfo parquetDir = new DirectoryInfo(Strings.ParquetDataPath);
+                long totalParquetRemoved = deleteParquetFiles(parquetDir.FullName, 0);
+                Logger.Log.Append("Total parquet cleared: " +  totalParquetRemoved, LogLevel.Always);
+            }
+        }
+
+        // todo:  convert MergeHelper to use EnumerateFiles to avoid hangs on large parquet cache.
+        private long deleteParquetFiles(string directoryPath, long fileCount)
+        {
+            // Delete .parquet files in the current directory.
+            var files = Directory.EnumerateFiles(directoryPath, "*.parquet");
+            foreach (var file in files)
+            {
+                try
+                {
+                    File.Delete(file);
+                    fileCount++;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Error while deleting file {file}. Error: {e.Message}");
+                }
+            }
+
+            // Recursively call this method for each subdirectory.
+            var subdirectories = Directory.GetDirectories(directoryPath);
+            foreach (var subdir in subdirectories)
+            {
+                fileCount = deleteParquetFiles(subdir, fileCount);
+            }
+            return fileCount;
+        }
+
+            private void upload()
         {
             foreach (FileInfo dataFile in mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories))
             {

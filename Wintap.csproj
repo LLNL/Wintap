@@ -515,7 +515,6 @@
     </None>
     <None Include="CONTRIBUTIONS.md" />
     <None Include="core\infrastructure\packages.config" />
-    <None Include="core\infrastructure\VersionInfo.json" />
     <None Include="LICENSE.md" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
