@@ -73,7 +73,7 @@ namespace gov.llnl.wintap.core.shared
             UserBusy = false;
             WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
-            stateRefresh.Interval = 1000;
+            stateRefresh.Interval = 60000;
             stateRefresh.Enabled = true;
             stateRefresh.AutoReset = true;
             stateRefresh.Elapsed += StateRefresh_Elapsed;
@@ -156,40 +156,6 @@ namespace gov.llnl.wintap.core.shared
             return lastBoot;
         }
 
-        //private Settings getConfig()
-        //{
-        //    Properties.Settings config = new Settings();
-        //    config.FileCollector = false;
-        //    config.ImageLoadCollector = false;
-        //    config.ProcessCollector = false;
-        //    config.MicrosoftWindowsKernelRegistryCollector = false;
-        //    config.SensCollector = false;
-        //    config.TcpCollector = false;
-        //    config.MicrosoftWindowsKernelProcessCollector = false;
-        //    config.UdpCollector = false;
-        //    config.MicrosoftWindowsWin32kCollector = false;
-        //    config.LoggingLevel = "Critical";
-        //    try
-        //    {
-        //        FileInfo configFile = new FileInfo(System.Reflection.Assembly.GetExecutingAssembly().Location + ".config");
-        //        if (configFile.Exists)
-        //        {
-        //            Properties.Settings.Default.Reload();
-        //            config = Properties.Settings.Default;
-        //            WintapLogger.Log.Append("Wintap configuration file loaded from disk", LogLevel.Always);
-        //        }
-        //        else
-        //        {
-        //            WintapLogger.Log.Append("Wintap configuration file not found. Using default settings", LogLevel.Always);
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        WintapLogger.Log.Append("Error reading default configuration from file. Using default configuration", LogLevel.Always);
-        //    }
-        //    return config;
-        //}
-
         private List<DiskVolume> refreshDriveMap()
         {
             List<DiskVolume> driveMap = new List<DiskVolume>();
@@ -220,61 +186,6 @@ namespace gov.llnl.wintap.core.shared
             }
             return driveMap;
         }
-
-        // FILE KEY PERSISTENCE MANAGEMENT
-        //  File path resolution in ETW depends on key references.  Until we figure out how to get proper rundown events for File on startup, we have to build and persist our mapping.  THIS NEEDS FIXING!
-        internal void InvalidateFileTableCache()
-        {
-            try
-            {
-                File.Create(FileTableCache, 1, FileOptions.WriteThrough);
-            }
-            catch (Exception ex) { }
-        }
-
-        internal string[] DeserializeFileTableCache()
-        {
-            string[] cache = new string[0];
-            FileInfo cacheFile = new FileInfo(FileTableCache);
-            if (cacheFile.Exists)
-            {
-                if (cacheFile.Length > 100000000)  // delete and start over if file is over 100MB
-                {
-                    InvalidateFileTableCache();
-                }
-                try
-                {
-                    cache = File.ReadAllLines(FileTableCache);
-                }
-                catch (Exception ex)
-                {
-                    InvalidateFileTableCache();
-                }
-            }
-            return cache;
-        }
-
-        // pipe delimited text file
-        internal int SerializeFileTableCache(ConcurrentDictionary<ulong, FileTableObject> cache)
-        {
-            int linesWritten = 0;
-            if (cache.Keys.Count < 20000)
-            {
-                List<string> csv = new List<string>();
-                foreach (var entry in cache)
-                {
-                    try
-                    {
-                        csv.Add(entry.Key + "|" + entry.Value.FilePath + "|" + entry.Value.LastAccess.ToFileTime());
-                        linesWritten++;
-                    }
-                    catch (Exception ex) { }
-                }
-                File.AppendAllLines(FileTableCache, csv);
-            }
-            return linesWritten;
-        }
-        // END FILE KEY PERSISTENCE MANAGEMENT
 
         private void StateRefresh_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {

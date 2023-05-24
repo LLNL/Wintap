@@ -19,6 +19,8 @@ using Microsoft.Diagnostics.Tracing.Parsers;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using Sharpen;
+using System.IO;
 
 namespace gov.llnl.wintap.collect
 {
@@ -28,22 +30,18 @@ namespace gov.llnl.wintap.collect
     /// </summary>
     internal class FileCollector : EtwProviderCollector
     {
-        private enum LastActionEnum { Create, Read, Write, Delete }
-        private LastActionEnum lastFileAction;
-        private Timer fileEventTimer; // prevents esper processing of duplicate file events within a short time window.
-        private int lastFilePath;
+        private enum FileOperationEnum { READ, WRITE, CLOSE, DELETE };
         private ConcurrentDictionary<ulong, string> fileKeyToPath;
-        private int rundownCount;
-        private int fileIoName;
         private ETWTraceEventSource rundownSource;
 
 
         public FileCollector() : base()
         {
-            rundownCount = 0;
-            fileIoName = 0;
             this.CollectorName = "File";
             this.EtwProviderId = "SystemTraceControlGuid";
+            // TODO: use this flag set to correlate and append NtStatus, need to wire up FileIOOperationEnd and route through an intermediate esper query
+            // this.KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIOInit | Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIO;
+            // without status
             this.KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIOInit;
             fileKeyToPath = new ConcurrentDictionary<ulong, string>();
             // start DiskIO session for 2 seconds, collect Rundowns and populate fileTable.
@@ -61,7 +59,6 @@ namespace gov.llnl.wintap.collect
             System.Threading.Thread.Sleep(2000);
             try
             {
-                //rundownSource.StopProcessing();  // attempting shell command as this seems to preempt rundown event flow.
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = "C:\\Windows\\System32\\logman.exe";
                 psi.Arguments = "stop \"NT Kernel Logger\" -ets";
@@ -70,6 +67,7 @@ namespace gov.llnl.wintap.collect
                 logman.StartInfo = psi;
                 logman.Start();
                 logman.WaitForExit();
+                System.Threading.Thread.Sleep(2000);
             }
             catch (Exception ex) 
             {
@@ -106,15 +104,15 @@ namespace gov.llnl.wintap.collect
                 KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
                 KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
                 KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
-                KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
+                if (Properties.Settings.Default.CollectFileRead)
+                {
+                    KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
+                }
             }
             else
             {
                 WintapLogger.Log.Append(this.CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
             }
-            fileEventTimer = new Timer();
-            fileEventTimer.Start();
-            lastFilePath = 0;
             return enabled;
         }
 
@@ -123,10 +121,21 @@ namespace gov.llnl.wintap.collect
             this.Counter++;
             try
             {
-                string closedFile = "";
-                fileKeyToPath.TryRemove(obj.FileKey, out closedFile);
+                string path = "";
+                fileKeyToPath.TryGetValue(obj.FileKey, out path);
+                if (path != null)
+                {
+                    if (String.IsNullOrEmpty(path))
+                    {
+                        fileKeyToPath.TryGetValue(obj.FileObject, out path);
+                    }
+                    sendFileEvent(path, obj.ProcessID, obj.TimeStamp, FileOperationEnum.CLOSE, 0);
+                }
             }
-            catch (Exception ex) { }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("CLOSE handler error: " + ex.Message, LogLevel.Always);
+            }
         }
 
         internal void Stop()
@@ -151,7 +160,6 @@ namespace gov.llnl.wintap.collect
             try
             {
                 fileKeyToPath.TryAdd(obj.FileKey, obj.FileName); 
-                fileIoName++;
             }
             catch (Exception ex)
             { }
@@ -159,18 +167,16 @@ namespace gov.llnl.wintap.collect
 
         void Kernel_FileIoRead(FileIOReadWriteTraceData obj)
         {
-            this.Counter++; // since we can't selectively disable event activity subtypes, we accumulate read activity here even though we don't process them
+            this.Counter++; 
             if(obj.ProcessID == StateManager.WintapPID) { return; }
-            if (Properties.Settings.Default.CollectFileRead)
+            try
             {
-                try
-                {
-                    buildFileIo(obj, obj.ProcessID, true);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("Error handing Kernel_FileIoRead event: " + ex.Message, LogLevel.Always);
-                }
+                string filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
+                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, FileOperationEnum.READ, obj.IoSize);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error handing Kernel_FileIoRead event: " + ex.Message, LogLevel.Always);
             }
         }
 
@@ -180,7 +186,8 @@ namespace gov.llnl.wintap.collect
             if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
-                buildFileIo(obj, obj.ProcessID, false);
+                string filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
+                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, FileOperationEnum.WRITE, obj.IoSize);
             }
             catch (Exception ex)
             {
@@ -188,15 +195,15 @@ namespace gov.llnl.wintap.collect
             }
         }
 
-        private string resolveIoFilePath(FileIOReadWriteTraceData obj)
+        private string resolveIoFilePath(string existingPath, ulong fileObj, ulong fileKey)
         {
-            string filePath = obj.FileName;
+            string filePath = existingPath;
             if (String.IsNullOrEmpty(filePath))
             {
-                fileKeyToPath.TryGetValue(obj.FileObject, out filePath);
+                fileKeyToPath.TryGetValue(fileObj, out filePath);
                 if (filePath == null)
                 {
-                    fileKeyToPath.TryGetValue(obj.FileKey, out filePath);
+                    fileKeyToPath.TryGetValue(fileKey, out filePath);
                 }
                 else if (!String.IsNullOrEmpty(filePath))
                 {
@@ -206,9 +213,8 @@ namespace gov.llnl.wintap.collect
             return filePath;
         }
 
-        private void buildFileIo(FileIOReadWriteTraceData obj, int pid, bool isRead)
+        private void sendFileEvent(string filePath, int pid, DateTime eventTime, FileOperationEnum opName, int bytesRequested)
         {
-            string filePath = resolveIoFilePath(obj);
             if (String.IsNullOrEmpty(filePath))
             {
                 return;
@@ -221,13 +227,12 @@ namespace gov.llnl.wintap.collect
             {
                 return;
             }
-            WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, pid, this.CollectorName);
+            WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, this.CollectorName);
             wintapBuilder.FileActivity = new WintapMessage.FileActivityObject();
             wintapBuilder.MessageType = this.CollectorName;
-            wintapBuilder.ActivityType = "WRITE";
-            if (isRead) { wintapBuilder.ActivityType = "READ"; }
+            wintapBuilder.ActivityType = opName.ToString();
             wintapBuilder.FileActivity.Path = filePath.ToLower();
-            wintapBuilder.FileActivity.BytesRequested = obj.IoSize;
+            wintapBuilder.FileActivity.BytesRequested = bytesRequested;
             EventChannel.Send(wintapBuilder);
         }
 
@@ -253,11 +258,7 @@ namespace gov.llnl.wintap.collect
 
                 if (!String.IsNullOrEmpty(filePath))
                 {
-                    WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, pid, CollectorName);
-                    wintapBuilder.FileActivity = new WintapMessage.FileActivityObject();
-                    wintapBuilder.ActivityType = "Delete";
-                    wintapBuilder.FileActivity.Path = filePath.ToLower();
-                    EventChannel.Send(wintapBuilder);
+                    sendFileEvent(filePath.ToLower(), pid, obj.TimeStamp, FileOperationEnum.DELETE, 0);
                 }
 
                 fileKeyToPath.TryRemove(obj.FileKey, out filePath);

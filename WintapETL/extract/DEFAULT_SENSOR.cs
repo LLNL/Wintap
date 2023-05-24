@@ -32,7 +32,7 @@ namespace gov.llnl.wintap.etl.extract
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
                 // get the nested object as a dynamic so we can append the parent object fields
                 string msgType = wintapMessage.MessageType;
-                if (wintapMessage.PID < 4) { return; }
+                //if (wintapMessage.PID < 4) { return; }
                 //  dynamic resolution detail: wintapmessage MessageType MUST match the underlying class name
                 dynamic flatMsg = (ExpandoObject)wintapMessage.GetType().GetProperty(msgType).GetValue(wintapMessage).ToDynamic();
                 ProcessStartData owningProcess = ProcessTree.FindMostRecentProcessByPID(wintapMessage.PID);

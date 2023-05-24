@@ -13,7 +13,7 @@ namespace gov.llnl.wintap
     public class Interfaces
     {
         [Flags]
-        public enum EventFlags {  Process = 1, FileActivity = 2, RegistryActivity = 4, UdpPacket = 8, TcpConnection = 16, SessionChange = 32, FocusChange = 64, ImageLoad = 128, WaitCursor = 256 }
+        public enum EventFlags { Process = 1, FileActivity = 2, RegistryActivity = 4, UdpPacket = 8, TcpConnection = 16, SessionChange = 32, FocusChange = 64, ImageLoad = 128, WaitCursor = 256 }
 
         /// <summary>
         /// Event subscription of raw, unmodelled ETW providers.  For use when a plugin wants ETW data from a provider that is not defined in EventFlags (e.g. Process, TcpConnection, UdpPacket, FileActivity, etc.)
@@ -48,7 +48,6 @@ namespace gov.llnl.wintap
 
         }
 
-
         /// <summary>
         /// Simple, repeated task execution.  
         /// </summary>
@@ -73,6 +72,51 @@ namespace gov.llnl.wintap
         {
             string Name { get; }
         }
+
+        /// <summary>
+        /// Esper query submission and result delivery
+        /// </summary>
+        public interface IQuery
+        {
+            /// <summary>
+            /// A list of the esper queries to register
+            /// </summary>
+            /// <returns></returns>
+            List<EventQuery> Startup();
+
+            /// <summary>
+            /// Called for each result from each query defined by this plugin
+            /// </summary>
+            void Process(QueryResult result);
+
+            void Shutdown();
+        }
+        public interface IQueryData
+        {
+            string Name { get; }
+        }
+
+        public interface IProvide
+        {
+            void Startup();
+
+            event EventHandler<ProviderEventArgs> Events;
+            void RaiseEvent();
+
+            void Shutdown();
+        }
+
+        public interface IProvideData
+        {
+            string Name { get; }
+        }
+
+    }
+
+    public class ProviderEventArgs
+    {
+        public string Name { get; set; }
+        public WintapMessage.GenericMessageObject GenericEvent { get; set; }
     }
 
     /// <summary>
@@ -101,4 +145,38 @@ namespace gov.llnl.wintap
             MaxRuntime = new TimeSpan(0, 2, 0);
         }
     }
+
+    /// <summary>
+    /// Defines the configuration and holds results for Wintap event queries.
+    /// </summary>
+    public class EventQuery
+    {
+        /// <summary>
+        /// Name for this query
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// Name of the plugin that generates this query and to which results will be delivered
+        /// </summary>
+        public string Source { get; set; }  
+
+        /// <summary>
+        /// EPStatement query
+        /// </summary>
+        public string Query { get; set; }
+    }
+
+    public class QueryResult
+    {
+        /// <summary>
+        /// Name for this query
+        /// </summary>
+        public string Name { get; set; }
+
+
+        public List<KeyValuePair<string, string>> Result { get; set; }
+    }
+
+
 }

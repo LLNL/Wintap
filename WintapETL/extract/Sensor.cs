@@ -110,7 +110,6 @@ namespace gov.llnl.wintap.etl.extract
             //pass event into the sensor's dedicated esper engine
             try
             {
-                wintapMessage.EventTime = wintapMessage.EventTime;
                 esper.EPRuntime.SendEvent(wintapMessage);
             }
             catch (Exception ex)

@@ -68,7 +68,7 @@ namespace gov.llnl.wintap.collect.shared
                     StateManager.DroppedEventsDetected = true;
                     WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, System.Diagnostics.Process.GetCurrentProcess().Id, "WintapAlert");
                     alertMsg.WintapAlert = new WintapMessage.WintapAlertData();
-                    alertMsg.WintapAlert.AlertName = "EVENT DROP";
+                    alertMsg.WintapAlert.AlertName = WintapMessage.WintapAlertData.AlertNameEnum.EVENT_DROP;
                     alertMsg.WintapAlert.AlertDescription = "ETW Session is dropping events.  Session Name: " + this.EtwSessionName + " Total events dropped since sensor start: " + currentDropCount;
                     EventChannel.Send(alertMsg);
                     WintapLogger.Log.Append(alertMsg.WintapAlert.AlertDescription, LogLevel.Always);

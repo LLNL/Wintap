@@ -329,8 +329,8 @@ namespace gov.llnl.wintap.collect.models
         /// </summary>
         public class WintapAlertData
         {
-
-            public string AlertName { get; set; }
+            public enum AlertNameEnum { EVENT_DROP, SYSTEM_UTILIZATION, PROCESS_TREE, OTHER }
+            public AlertNameEnum AlertName { get; set; }
 
             public string AlertDescription { get; set; }
         }

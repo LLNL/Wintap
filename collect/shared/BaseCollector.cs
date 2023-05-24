@@ -67,7 +67,7 @@ namespace gov.llnl.wintap.collect.shared
         /// <summary>
         /// Number of events received
         /// </summary>
-        public int Counter { get; set; }
+        public long Counter { get; set; }
 
         public virtual bool Start()
         {
