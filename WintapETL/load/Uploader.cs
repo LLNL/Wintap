@@ -375,6 +375,12 @@ namespace gov.llnl.wintap.etl.load
             string[] disgardedSuffix = new string[1];
             disgardedSuffix[0] = "_sensor";
             dataFileEventType = dataFileEventType.Split(disgardedSuffix, StringSplitOptions.None)[0];
+
+            // rename older event providers for legacy support
+            if (dataFileEventType == "raw_processstop") { dataFileEventType = "raw_process_stop"; }
+            if (dataFileEventType == "raw_file") { dataFileEventType = "raw_process_file"; }
+            if(dataFileEventType == "raw_registry") { dataFileEventType = "raw_process_registry"; }
+
             long dataFileMergeTime = Int64.Parse(timeSegment);
             DateTime mergeTimeUtc = DateTime.FromFileTimeUtc(dataFileMergeTime);
             long collectTimeAsUnix = ((System.DateTimeOffset)mergeTimeUtc).ToUnixTimeSeconds();
