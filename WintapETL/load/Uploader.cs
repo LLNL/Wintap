@@ -372,11 +372,10 @@ namespace gov.llnl.wintap.etl.load
             string uploadHPK = DateTime.UtcNow.ToString("HH");
             string timeSegment = dataFile.Name.Split("+")[2].Split(new char[] { '.' })[0];
             string dataFileEventType = dataFile.Name.Split("+")[1];
-            Logger.Log.Append("time segment: " + timeSegment, LogLevel.Always);
+            string[] disgardedSuffix = new string[1];
+            disgardedSuffix[0] = "_sensor";
+            dataFileEventType = dataFileEventType.Split(disgardedSuffix, StringSplitOptions.None)[0];
             long dataFileMergeTime = Int64.Parse(timeSegment);
-
-            Logger.Log.Append("merge time stamp from file: " + dataFileMergeTime, LogLevel.Always);
-
             DateTime mergeTimeUtc = DateTime.FromFileTimeUtc(dataFileMergeTime);
             long collectTimeAsUnix = ((System.DateTimeOffset)mergeTimeUtc).ToUnixTimeSeconds();
             string objectKey = "/raw_sensor/" + dataFileEventType + "/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/" + Environment.MachineName.ToLower() + "+" + dataFileEventType + "+" + collectTimeAsUnix + ".parquet";

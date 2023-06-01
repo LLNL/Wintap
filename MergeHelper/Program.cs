@@ -156,7 +156,7 @@ namespace gov.llnl.wintap.etl.helpers
             try
             {
                 mergeTime = DateTime.FromFileTimeUtc(Convert.ToInt64(args[1])).ToUniversalTime();
-                if (!(DateTime.Now.Subtract(mergeTime) > new TimeSpan(0, 0, 0) && DateTime.Now.Subtract(mergeTime) < new TimeSpan(0, 1, 0, 0)))
+                if (!(DateTime.UtcNow.Subtract(mergeTime) > new TimeSpan(0, 0, 0) && DateTime.UtcNow.Subtract(mergeTime) < new TimeSpan(0, 1, 0, 0)))
                 {
                     throw new Exception("Invalid merge time.  Received: " + mergeTime + ".   Value must be within 1 hour of now");
                 }
