@@ -365,28 +365,28 @@ namespace gov.llnl.wintap.etl.load
         private bool sendToS3(FileInfo dataFile)
         {
             // S3 folder hierarchy setup
-            // FORMAT:  raw/EventType/uploadedDPK=YYYYMMDD/uploadedHPK=HH/hostname=eventType-timestamp.parquet
+            // FORMAT:  raw/EventType/uploadedDPK=YYYYMMDD/uploadedHPK=HH/hostname+eventType+timestamp.parquet
             //   unless tcp/udp, then add one additional layer for efficient filtering
             bool fileSent = false;
             string uploadDPK = DateTime.UtcNow.Year + DateTime.UtcNow.ToString("MM") + DateTime.UtcNow.ToString("dd");
             string uploadHPK = DateTime.UtcNow.ToString("HH");
-
-            string typeAndTimeSegment = dataFile.Name.Split("=" )[1];
-            string dataFileEventType = typeAndTimeSegment.Split("-")[0];
-            long dataFileMergeTime = Int64.Parse(typeAndTimeSegment.Split("-")[1].Split(".")[0]);
+            string timeSegment = dataFile.Name.Split("+")[2].Split(new char[] { '.' })[0];
+            string dataFileEventType = dataFile.Name.Split("+")[1];
+            Logger.Log.Append("time segment: " + timeSegment, LogLevel.Always);
+            long dataFileMergeTime = Int64.Parse(timeSegment);
 
             Logger.Log.Append("merge time stamp from file: " + dataFileMergeTime, LogLevel.Always);
 
             DateTime mergeTimeUtc = DateTime.FromFileTimeUtc(dataFileMergeTime);
             long collectTimeAsUnix = ((System.DateTimeOffset)mergeTimeUtc).ToUnixTimeSeconds();
-            string objectKey = "/raw_sensor/" + dataFileEventType + "/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/" + Environment.MachineName.ToLower() + "=" + dataFileEventType + "-" + collectTimeAsUnix + ".parquet";
-            if(dataFileEventType == "tcp_process_conn_incr")
+            string objectKey = "/raw_sensor/" + dataFileEventType + "/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/" + Environment.MachineName.ToLower() + "+" + dataFileEventType + "+" + collectTimeAsUnix + ".parquet";
+            if(dataFileEventType == "raw_tcp_process_conn_incr")
             {
-                objectKey = "/raw_sensor/process_conn_incr/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/proto=TCP/" + Environment.MachineName.ToLower() + "=" + dataFileEventType + "-" + collectTimeAsUnix + ".parquet";
+                objectKey = "/raw_sensor/raw_process_conn_incr/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/protoPK=TCP/" + Environment.MachineName.ToLower() + "+" + dataFileEventType + "+" + collectTimeAsUnix + ".parquet";
             }
-            else if(dataFileEventType == "udp_process_conn_incr")
+            else if(dataFileEventType == "raw_udp_process_conn_incr")
             {
-                objectKey = "/raw_sensor/process_conn_incr/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/proto=UDP/" + Environment.MachineName.ToLower() + "=" + dataFileEventType + "-" + collectTimeAsUnix + ".parquet";
+                objectKey = "/raw_sensor/raw_process_conn_incr/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/protoPK=UDP/" + Environment.MachineName.ToLower() + "+" + dataFileEventType + "+" + collectTimeAsUnix + ".parquet";
             }
 
             // upload files using the 'upload-only' bucket ACL

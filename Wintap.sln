@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.2.32516.85
@@ -11,7 +11,7 @@ Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "WintapSetup\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapAPI", "WintapAPI\WintapAPI.csproj", "{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MergeHelper", "MergeHelper\MergeHelper.csproj", "{D8516370-E5E4-4002-915D-3245F5B259D6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MergeHelper", "MergeHelper\MergeHelper.csproj", "{D8516370-E5E4-4002-915D-3245F5B259D6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapETL", "WintapETL\WintapETL.csproj", "{CC904063-6532-44B4-8FB3-73FBA4012CB4}"
 EndProject
