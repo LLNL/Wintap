@@ -11,7 +11,6 @@ using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using System;
 using System.Dynamic;
-using static gov.llnl.wintap.etl.models.ProcessObjectModel;
 
 namespace gov.llnl.wintap.etl.extract
 {
@@ -19,7 +18,7 @@ namespace gov.llnl.wintap.etl.extract
     {
 
 
-        internal FOCUSCHANGE_SENSOR(string query, ProcessObjectModel pom) : base(query, pom)
+        internal FOCUSCHANGE_SENSOR(string query) : base(query)
         {
         }
 
@@ -31,10 +30,11 @@ namespace gov.llnl.wintap.etl.extract
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
                 dynamic wd = (ExpandoObject)wintapMessage.GetType().GetProperty(wintapMessage.MessageType).GetValue(wintapMessage).ToDynamic();
                 wd.EventTime = wintapMessage.EventTime;
-                ProcessStartData oldProcess = ProcessTree.FindMostRecentProcessByPID(wintapMessage.FocusChange.OldProcessId);
-                ProcessStartData newProcess = ProcessTree.FindMostRecentProcessByPID(wintapMessage.PID);
-                wd.Old_Pid_Hash = oldProcess.PidHash;
-                wd.PidHash = newProcess.PidHash;
+                //ProcessStartData oldProcess = ProcessTree.FindMostRecentProcessByPID(wintapMessage.FocusChange.OldProcessId);
+                //ProcessStartData newProcess = ProcessTree.FindMostRecentProcessByPID(wintapMessage.PID);
+                //wd.Old_Pid_Hash = oldProcess.PidHash;
+                wd.ProcessName = sensorEvent["ProcessName"].ToString();
+                wd.PidHash = wintapMessage.PidHash;
                 wd.SessionId = wintapMessage.FocusChange.FocusChangeSessionId;
                 wd.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
                 wd.MessageType = "FOCUS_CHANGE";

@@ -1,8 +1,11 @@
-﻿using System;
+﻿using Microsoft.Diagnostics.Tracing.Parsers;
+using Microsoft.Diagnostics.Tracing.Session;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -15,6 +18,8 @@ namespace gov.llnl.wintap
             //  MODES:
             //  UPDATE
             //  HEALTHCHECK
+            //  RESTART
+            //  RUNDOWN
 
             if(args.Length == 0)
             {
@@ -75,6 +80,10 @@ namespace gov.llnl.wintap
                 WintapController.StartWintap();
                 Logger.Log.Append("Restart complete.");
             }
+            else if (args[0].ToUpper() == "RUNDOWN")
+            {
+                invokeEtwRundown();
+            }
             else
             {
                 Logger.Log.Append("Unknown parameter specified.");
@@ -87,6 +96,24 @@ namespace gov.llnl.wintap
                 Logger.Log.Close();
             }
             catch (Exception ex) { }
+        }
+
+        private static void invokeEtwRundown()
+        {
+            Logger.Log.Append("Starting ETW file event rundown");
+            string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap\\etl\\kernelrundown.etl";
+            using (var session = new TraceEventSession("NT Kernel Logger", etlFilePath))
+            {
+                session.EnableKernelProvider(KernelTraceEventParser.Keywords.DiskIO |
+                                             KernelTraceEventParser.Keywords.DiskFileIO |
+                                             KernelTraceEventParser.Keywords.DiskIOInit |
+                                             KernelTraceEventParser.Keywords.FileIO |
+                                             KernelTraceEventParser.Keywords.FileIOInit);
+
+                // ETW emits rundown events at session stop, so we only need a brief duration
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+            }
+            Logger.Log.Append("Rundown complete.  ETL File Path: " + etlFilePath);
         }
 
         private static bool isDeveloper()

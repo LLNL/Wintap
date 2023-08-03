@@ -14,6 +14,10 @@ using System.Text;
 using Newtonsoft.Json;
 using System.IO;
 using gov.llnl.wintap.core.infrastructure;
+using static gov.llnl.wintap.collect.ProcessCollector;
+using gov.llnl.wintap.collect.etw.helpers;
+using gov.llnl.wintap.core.shared;
+using RestSharp;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -29,6 +33,7 @@ namespace gov.llnl.wintap.core.api
         }
 
         [HttpPost]
+        [Route("api/Streams")]
         public IHttpActionResult Post(string name, string query, string state)
         {
             string responseMsg = "OK";
@@ -81,6 +86,7 @@ namespace gov.llnl.wintap.core.api
         /// </summary>
         /// <returns></returns>
         [HttpGet]
+        [Route("api/Streams")]
         public IHttpActionResult GetAllStatements()
         {
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
@@ -102,10 +108,10 @@ namespace gov.llnl.wintap.core.api
                             allStatements.Add(embeddedStatement);
                         }
                     }
-                    catch(JsonException ex)
+                    catch (JsonException ex)
                     {
-                        // IQuery plugins will set the name of its assembly as  UserObject to route results.  JSONExceptions are expected for plugins, Non-jsonExceptions should bubble up.
-                    }          
+                        // JSONExceptions are expected for plugins, Non-jsonExceptions should bubble up.
+                    }
                 }
             }
             IHttpActionResult result = Ok(new
@@ -175,7 +181,7 @@ namespace gov.llnl.wintap.core.api
                         }
                         catch (JsonException ex)
                         {
-                         // for IQuery plugins, this exception is expected as they user UserObject for non-JSON data.   
+                            // JSONExceptions are expected for plugins, Non-jsonExceptions should bubble up.
                         }
                     }
                 }
@@ -196,7 +202,6 @@ namespace gov.llnl.wintap.core.api
             }
             return result;
         }
-
 
         private void deactivateAll()
         {

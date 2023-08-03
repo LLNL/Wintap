@@ -54,7 +54,6 @@ namespace gov.llnl.wintap.collect.shared
             enabled = false;
             eventsPerSecond = 0;
             lastAveraged = DateTime.Now;
-            invalidAge = new TimeSpan(0, 30, 0);  // invalidate the last computed eventsPerSecond when recovering from an event throttle
             averager = new Timer(10000);
             averager.Elapsed += Averager_Elapsed;
             averager.Start();
@@ -88,7 +87,7 @@ namespace gov.llnl.wintap.collect.shared
         }
 
         /// <summary>
-        /// The name of the thing that generates the events this instance collects.  This is arbitrary but needs to uniquely identify an event stream so that downstream processing can work with it.
+        /// The name of the thing that generates the events this instance collects. 
         /// For ETW sources, you may want to use the ProviderName or the EventName fields.
         /// </summary>
         internal string CollectorName { get; set; }
@@ -108,7 +107,7 @@ namespace gov.llnl.wintap.collect.shared
         internal int MaxEventsPerSecond;
 
         /// <summary>
-        /// provider specific events per second are written to registry.  If this startup is Watchdog initiated, restore these persisted stats so Providers can be conditionally enabled/throttled.
+        /// get provider specific metrics from last wintap session from the registry.  
         /// </summary>
         internal void UpdateStatistics()
         {
@@ -149,7 +148,6 @@ namespace gov.llnl.wintap.collect.shared
         private Timer averager;
         private int eventsPerSecond;
         private DateTime lastAveraged;
-        private TimeSpan invalidAge;
 
         private void Averager_Elapsed(object sender, ElapsedEventArgs e)
         {
@@ -189,7 +187,7 @@ namespace gov.llnl.wintap.collect.shared
         /// <returns></returns>
         internal string TranslateFilePath(string filePath)
         {
-             return TranslateProcessPath(filePath, filePath).ProcessPath;  // this will return a standard formatted windows path to the file
+             return TranslateProcessPath(filePath, filePath).ProcessPath;  
         }
 
         /// <summary>
@@ -200,7 +198,7 @@ namespace gov.llnl.wintap.collect.shared
         /// <returns></returns>
         internal (string ProcessPath, string CommandLine) TranslateProcessPath(string processName, string commandLine)
         {
-            // path normalization support
+            // path normalization support 
             string[] exeDelim = new string[1];
             string[] exeDelim2 = new string[1];     
             string rawPath = "";  
@@ -219,7 +217,7 @@ namespace gov.llnl.wintap.collect.shared
                 {
                     rawPath = parsePath(processName, commandLine);
                 }
-                if (!rawPath.Split(new char[] { '.' })[0].Contains("\\") && !rawPath.Split(new char[] { '.' })[0].Contains("/")) // does the path component left of the first dot contain a path delimiter? if not, it must be from the PATH environment variable
+                if (!rawPath.Split(new char[] { '.' })[0].Contains("\\") && !rawPath.Split(new char[] { '.' })[0].Contains("/")) // checks if the path is from PATH environment variable
                 {
                     OriginalPathType = PathTypeEnum.Relative;
                     windowsPath = fromEnvironment(processName);
@@ -254,10 +252,10 @@ namespace gov.llnl.wintap.collect.shared
                     OriginalPathType = PathTypeEnum.Unix;
                     windowsPath = fromUnix(rawPath);
                 }
-                else if (rawPath.Contains(nativePrefix))
+                else if (rawPath.ToLower().Contains(nativePrefix))
                 {
                     OriginalPathType = PathTypeEnum.Native;
-                    windowsPath = fromNative(rawPath, StateManager.State.DriveMap);
+                    windowsPath = fromNative(rawPath, StateManager.State.DriveMap).ToLower();
                 }
                 else if (rawPath.StartsWith(@"\??\"))
                 {
@@ -289,31 +287,6 @@ namespace gov.llnl.wintap.collect.shared
             return (windowsPath, Arguments);
         }
 
-        internal string GetProcessOwnerByPID(int pid)
-        {
-            string user = "NA";
-            try
-            {
-                string query = "Select handle From Win32_Process Where ProcessID = " + pid;
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
-                ManagementObjectCollection processList = searcher.Get();
-                foreach (ManagementObject obj in processList)
-                {
-                    string[] argList = new string[] { string.Empty, string.Empty };
-                    int returnVal = Convert.ToInt32(obj.InvokeMethod("GetOwner", argList));
-                    if (returnVal == 0)
-                    {
-                        // return DOMAIN\user
-                        user = argList[1] + "\\" + argList[0];
-                    }
-                }
-                searcher.Dispose();
-                processList.Dispose();
-            }
-            catch (Exception ex) { }
-            return user;
-        }
-
         internal string GetProcessPathFromPID(int pid)
         {
             string path = "NA";
@@ -325,42 +298,12 @@ namespace gov.llnl.wintap.collect.shared
             return path;
         }
 
-        internal string GetProcessUser(Process process)
-        {
-            IntPtr processHandle = IntPtr.Zero;
-            try
-            {
-                //8 represents an access mask of READ_ONLY_EA
-                Winapi.OpenProcessToken(process.Handle, 8, out processHandle);
-                WindowsIdentity wi = new WindowsIdentity(processHandle);
-                string user = wi.Name;
-                return user;
-            }
-            catch (Win32Exception ex)
-            {
-                //This occurs, when there is an access denied error...
-                //Attempt to get the information via WMI
-                return GetProcessOwnerByPID(process.Id);
-            }
-            catch (Exception ex)
-            {
-                return "NA";
-            }
-            finally
-            {
-                if (processHandle != IntPtr.Zero)
-                {
-                    Winapi.CloseHandle(processHandle);
-                }
-            }
-        }
-
         /// <summary>
-        /// Parses a string blob of space delimited key value pairs that use = as the assignment operator into a string dictionary.  Loads of ETW events use this structure.
+        /// Parses a string blob of space delimited key value pairs that use = as the assignment operator into a string dictionary.
         /// </summary>
         /// <param name="payload"></param>
         /// <returns></returns>
-        internal Dictionary<string, string> parseEvent(string payload)
+        internal Dictionary<string, string> ParseEvent(string payload)
         {
             Dictionary<string, string> parsedEvent = new Dictionary<string, string>();
             string[] delim = new string[1];
@@ -382,10 +325,6 @@ namespace gov.llnl.wintap.collect.shared
         }
 
         // Parses the first path from a commandline string that might contain arguments.  
-        // split commandline on first occurance of FileName (with extention)
-        //      on index out of bounds, check if processName without extension matches
-        //      take 0 element and append file Name, trim  spaces, then quotations, then slashes from end.  this is originalPath
-        //      if fileName == commandLine caller should set orignalPath = commandLine before calling.
         private string parsePath(string fileName, string commandLine)
         {
             string filePath = fileName;
@@ -457,33 +396,39 @@ namespace gov.llnl.wintap.collect.shared
         private string fromNative(string originalPath, List<DiskVolume> diskVolumes)
         {
             string newPath = "";
+            originalPath = originalPath.Replace("\"", "");
+            int volumeNumber = Convert.ToInt32(originalPath.Replace(nativePrefix, "").Split(new char[] { '\\' })[0]);
             try
             {
-                originalPath = originalPath.Replace("\"", "");
-                int volumeNumber = Convert.ToInt32(originalPath.Replace(nativePrefix, "").Split(new char[] { '\\' })[0]);
-                if(volumeNumber <= diskVolumes.Count)
-                {
+
+                if (volumeNumber <= diskVolumes.Count)
+                {   
                     var diskInfo = from disk in diskVolumes where disk.VolumeNumber == volumeNumber select disk;
                     DiskVolume dv = diskInfo.FirstOrDefault();
+                    if (diskVolumes.Count() == 1 && originalPath.StartsWith("\\device\\harddiskvolume1"))
+                    {
+                        dv.VolumeNumber = 1;
+                    }
                     newPath = originalPath.Replace(nativePrefix + dv.VolumeNumber, dv.VolumeLetter + ":");
                 }
                 else
                 {
-                    //newPath = TranslateTransientPath(originalPath);
+                    // is a volume number outside the range of DiskVolume always c: ?  -  we assume so here
+                    newPath = originalPath.Replace(nativePrefix + volumeNumber, "c:");
                 }
             }
             catch(Exception ex)
             {
                 try
                 {
-                    //newPath = TranslateTransientPath(originalPath);
+                    newPath = originalPath.Replace("\\device\\harddiskvolume1", "c:");  
+
                 }
-                catch(Exception ex2)
+                catch (Exception ex2)
                 {
-                    WintapLogger.Log.Append("Error translating path from WMI, path: " + originalPath + "   error: " + ex2.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("Error translating, path: " + originalPath + "   error: " + ex2.Message, LogLevel.Always);
                 }
             }
-            
             return newPath;
         }
 
@@ -519,7 +464,7 @@ namespace gov.llnl.wintap.collect.shared
 
         /// <summary>
         /// Physical to logical path transformation.  
-        /// This method is expensive compared to the caching strategy implemented in the constructor, use this one if you expect paths referencing transient drives
+        /// This method is expensive compared to the caching strategy implemented in the constructor, use this one if you expect paths are referencing transient drives (e.g. removable)
         /// </summary>
         /// <param name="physicalPath"></param>
         /// <returns></returns>

@@ -4,21 +4,21 @@
  * All rights reserved.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using com.espertech.esper.client;
-using System.ComponentModel;
-using System.Collections.Concurrent;
-using Microsoft.Win32;
-using System.Net.NetworkInformation;
-using System.ComponentModel.Composition;
-using System.ComponentModel.Composition.Hosting;
-using static gov.llnl.wintap.Interfaces;
+using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
-using com.espertech.esper.epl.generated;
+using Microsoft.Win32;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.ComponentModel.Composition;
+using System.ComponentModel.Composition.Hosting;
+using System.Linq;
+using System.Net.NetworkInformation;
+using System.Text;
+using static gov.llnl.wintap.Interfaces;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -30,6 +30,10 @@ namespace gov.llnl.wintap.core.infrastructure
     {
         public static int PluginCount = 0;
         internal static List<string> DynamicEtwProviderList = new List<string>();
+        //debug
+        private int activityEventCounter;
+        private int processEventCounter;
+        // end debug
 
         private WintapLogger log;
         private Watchdog watchdog;
@@ -149,9 +153,9 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 try
                 {
-                    EPStatement allWintapMsgs = epProvider.EPAdministrator.CreateEPL("SELECT RSTREAM * FROM WintapMessage.win:time_batch(5 sec) ORDER BY EventTime");
-                    //EPStatement allWintapMsgs = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage.win:time_batch(5 sec) ORDER BY EventTime");
-                    allWintapMsgs.Events += AllWintapMsgs_Events;
+                    WintapLogger.Log.Append("Creating Subscriber EPL", LogLevel.Always);
+                    EPStatement processEvents = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'");
+                    processEvents.Events += All_Events;
                 }
                 catch (Exception ex)
                 {
@@ -181,6 +185,38 @@ namespace gov.llnl.wintap.core.infrastructure
             }
 
             WintapLogger.Log.Append("PluginManager: done registering plugins.  total plugin count: " + PluginCount, LogLevel.Always);
+        }
+
+        private void All_Events(object sender, UpdateEventArgs e)
+        {
+            EventBean[] newEvents = e.NewEvents;
+            try
+            {
+                WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
+                for (int i = 0; i < newEvents.Count(); i++)
+                {
+                    wmArray[i] = (WintapMessage)newEvents[i].Underlying;
+                }
+                foreach (Lazy<ISubscribe, ISubscribeData> consumer in subscribers)
+                {
+                    foreach (WintapMessage msg in wmArray)
+                    {
+                        try
+                        {
+                            processEventCounter++;
+                            consumer.Value.Subscribe(msg);
+                        }
+                        catch (Exception ex)
+                        {
+                            WintapLogger.Log.Append("could not deliver PROCESS event to subscriber because: " + ex.Message, LogLevel.Debug);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("ERROR passing PROCESS event to etw subscriber: " + ex.Message + "  " + ex.InnerException, LogLevel.Debug);
+            }
         }
 
         private void Plugin_Events(object sender, ProviderEventArgs e)
@@ -317,86 +353,6 @@ namespace gov.llnl.wintap.core.infrastructure
             catch
             {
                 WintapLogger.Log.Append("error shutting down one or more plugins", LogLevel.Always);
-            }
-        }
-
-        private void ProcessMsgs_Events(object sender, UpdateEventArgs e)
-        {
-            EventBean[] newEvents = e.NewEvents;
-            try
-            {
-                WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
-                for (int i = 0; i < newEvents.Count(); i++)
-                {
-                    wmArray[i] = (WintapMessage)newEvents[i].Underlying;
-                }
-                foreach (Lazy<ISubscribe, ISubscribeData> subscriber in subscribers)
-                {
-                    foreach (WintapMessage msg in wmArray)
-                    {
-                        subscriber.Value.Subscribe(msg);
-                    }
-                }
-
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR passing wintap event to subscriber/consumer: " + ex.Message + "  " + ex.InnerException, LogLevel.Debug);
-            }
-        }
-
-        /// <summary>
-        /// Esper event handler for modelled WintapMessage events, passes events to all ISubscribers
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void AllProcessActivity_Events(object sender, UpdateEventArgs e)
-        {
-            EventBean[] newEvents = e.NewEvents;
-            try
-            {
-                WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
-                for (int i = 0; i < newEvents.Count(); i++)
-                {
-                    wmArray[i] = (WintapMessage)newEvents[i].Underlying;
-                }
-                foreach (Lazy<ISubscribe, ISubscribeData> subscriber in subscribers)
-                {
-                    foreach (WintapMessage msg in wmArray)
-                    {
-                        subscriber.Value.Subscribe(msg);
-                    }
-                }
-
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR passing wintap event to subscriber/consumer: " + ex.Message + "  " + ex.InnerException, LogLevel.Debug);
-            }
-        }
-
-        private void AllWintapMsgs_Events(object sender, UpdateEventArgs e)
-        {
-            EventBean[] newEvents = e.NewEvents;
-            try
-            {
-                WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
-                for (int i = 0; i < newEvents.Count(); i++)
-                {
-                    wmArray[i] = (WintapMessage)newEvents[i].Underlying;
-                }
-                foreach (Lazy<ISubscribe, ISubscribeData> subscriber in subscribers)
-                {
-                    foreach (WintapMessage msg in wmArray)
-                    {
-                        subscriber.Value.Subscribe(msg);
-                    }
-                }
-
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR passing wintap event to subscriber/consumer: " + ex.Message + "  " + ex.InnerException, LogLevel.Debug);
             }
         }
 

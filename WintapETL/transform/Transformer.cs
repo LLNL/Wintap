@@ -62,39 +62,6 @@ namespace gov.llnl.wintap.etl.transform
             return pci;
         }
 
-        internal static ProcessId CreateProcessID(EventBean newEvent)
-        {
-
-            return CreateProcessID(HOST_SENSOR.Instance.HostId.Hostname, Convert.ToInt32(newEvent["PID"].ToString()), (long)Int64.Parse(newEvent["firstSeen"].ToString()), newEvent["MessageType"].ToString());
-        }
-
-        internal static ProcessId CreateProcessID(String hostId, int pid, long firstEventFileTime, string msgType)
-        {
-            IdGenerator idgen = new IdGenerator();
-            long firstEventTime = getFirstEventTime(firstEventFileTime, pid, msgType);
-            string hash = idgen.GenKeyForProcess(context, hostId, pid, firstEventTime, msgType);
-            ProcessId procId = new ProcessId();
-            procId.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
-            procId.OsPid = pid;
-            procId.FirstEventTime = firstEventTime;
-            procId.Hash = hash;
-            return procId;
-        }
-
-        internal static long getFirstEventTime(long firstEventFileTime, int pid, string messageType)
-        {
-            long firstEventTime = firstEventFileTime;
-            if (ProcessIdDictionary.FindProcessKey(pid, firstEventTime, messageType) != null)
-            {
-                firstEventTime = ProcessIdDictionary.FindProcessKey(pid, firstEventTime, messageType).FirstEventTime;
-            }
-            else
-            {
-                Logger.Log.Append("Creating new ProcessID for event from : " + messageType, LogLevel.Always);
-            }
-            return firstEventTime;
-        }
-
         internal static IpV4Addr createIpAddr(string ip, uint ipLong, string gw)
         {
             IdGenerator idgen = new IdGenerator();

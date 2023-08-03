@@ -1,18 +1,15 @@
-﻿@Name('file-activity')
-@Description('Summarize file activity in 10 second increments using contexts')
-@EventRepresentation(map)
-context Every10Seconds select istream
+﻿select istream
   "File" as protocol,
   fileActivity.path as path,
   sum(fileActivity.bytesRequested) as bytesRequested,
-  processIdFor(PID, receiveTime, 'FileActivity') as processId,
   PID,
+  PidHash,
+  ProcessName,
   activityType,
   min(receiveTime) as firstSeen,
   max(receiveTime) as lastSeen,
   count(*) as eventCount,
   'File' as MessageType
-from WintapMessage(messageType='File' AND (ActivityType='WRITE' OR ActivityType='READ')) as msg
-group by fileActivity.path, processIdFor(PID, receiveTime, 'FileActivity'), PID, activityType
+from WintapMessage(messageType='File' AND (ActivityType='WRITE' OR ActivityType='READ')).win:time_batch(10 sec) as msg
+group by fileActivity.path, PidHash, PID, activityType, ProcessName
 having count(*) > 0
-output snapshot when terminated

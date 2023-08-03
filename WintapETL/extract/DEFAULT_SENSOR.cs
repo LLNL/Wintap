@@ -11,7 +11,6 @@ using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using System;
 using System.Dynamic;
-using static gov.llnl.wintap.etl.models.ProcessObjectModel;
 
 namespace gov.llnl.wintap.etl.extract
 {
@@ -20,7 +19,7 @@ namespace gov.llnl.wintap.etl.extract
     /// </summary>
     internal class DEFAULT_SENSOR : Sensor
     {
-        internal DEFAULT_SENSOR(string query, ProcessObjectModel pom) : base(query, pom)
+        internal DEFAULT_SENSOR(string query) : base(query)
         {
         }
 
@@ -34,8 +33,8 @@ namespace gov.llnl.wintap.etl.extract
                 string msgType = wintapMessage.MessageType;
                 //  dynamic resolution detail: wintapmessage MessageType MUST match the underlying class name
                 dynamic flatMsg = (ExpandoObject)wintapMessage.GetType().GetProperty(msgType).GetValue(wintapMessage).ToDynamic();
-                ProcessStartData owningProcess = ProcessTree.FindMostRecentProcessByPID(wintapMessage.PID);
-                flatMsg.PidHash = owningProcess.PidHash;
+                flatMsg.PidHash = wintapMessage.PidHash;
+                flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.PID = wintapMessage.PID;
                 flatMsg.MessageType = wintapMessage.MessageType;
                 flatMsg.ActivityType = wintapMessage.ActivityType;

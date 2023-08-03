@@ -4,27 +4,25 @@
  * All rights reserved.
  */
 
+using com.espertech.esper.client;
+using gov.llnl.wintap.collect.etw.helpers;
+using gov.llnl.wintap.collect.models;
+using gov.llnl.wintap.collect.shared;
+using gov.llnl.wintap.core.infrastructure;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using System;
-using System.Security.Principal;
-using gov.llnl.wintap.collect.shared;
-using Microsoft.Diagnostics.Tracing;
-using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.core.infrastructure;
-using System.Runtime.InteropServices;
-using System.IO;
-using System.Security.Cryptography;
-using System.Text;
+using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
 
 namespace gov.llnl.wintap.collect
 {
     /// <summary>
-    /// Process events from the 'nt kernel logger'
-    /// we only handle Start events from the kernel logger as it providers the command line.  we handle Stop events out of the user mode kernel logger as it provides summary usage stats which are awesome.
+    /// Generates Wintap Process events from the 'nt kernel logger' (realtime) and ETL boot trace files
     /// </summary>
     internal class ProcessCollector : EtwProviderCollector
     {
-        public enum ProcessActivityEnum { Start, Stop };
+        private ProcessTree processTree;
+
+        public enum ProcessActivityEnum { start, stop, refresh };
 
         public ProcessCollector() : base()
         {
@@ -33,41 +31,44 @@ namespace gov.llnl.wintap.collect
             this.KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.Process;
         }
 
-        private static string GetUserAccountFromSid(byte[] sid)
-        {
-            SecurityIdentifier si = new SecurityIdentifier(sid, 0);
-            NTAccount acc = (NTAccount)si.Translate(typeof(NTAccount));
-            return acc.Value;
-        }
-
         public override bool Start()
         {
             enabled = true;   // disable throttling for Process
+            //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
+            EPStatement etlToEsperPattern = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name FROM pattern[every PartA=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ProcessStart/Start') -> PartB=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ImageLoad' AND PID=PartA.PID) where timer:within(3 sec)]");
+            etlToEsperPattern.Events += etlToEsperPattern_Events;
+
+            processTree = new ProcessTree();
+            processTree.GenProcessTree();
+
+            WintapLogger.Log.Append("Enabling real-time ETW process handling", LogLevel.Always);
             KernelParser.Instance.EtwParser.ProcessStart += new Action<ProcessTraceData>(Kernel_ProcessStart);
+
+            WintapLogger.Log.Append("Process collection startup complete.", LogLevel.Always);
             return enabled;
         }
 
+        /// <summary>
+        /// Event handler for real-time Process events from ETW.
+        /// </summary>
+        /// <param name="obj"></param>
         private void Kernel_ProcessStart(ProcessTraceData obj)
         {
             this.Counter++;
             try
             {
-                string user = "NA";
-                try
-                {
-                    //user = GetUserAccountFromSid(obj.UserSID);
-                }
-                catch(Exception ex)
-                {
-                    WintapLogger.Log.Append("Error getting username from user SID: " + ex.Message, LogLevel.Always);
-                }
-                DateTime recvTime = DateTime.Now;                
+                DateTime recvTime = DateTime.Now;
                 (string path, string arguments) = this.TranslateProcessPath(obj.ImageFileName, obj.CommandLine);
                 if (path == "NA") { path = this.GetProcessPathFromPID(obj.ProcessID); }
                 if (String.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Always); }
                 if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Always); }
-                createWintapProcessEvent(obj.ProcessID, obj.TimeStamp, recvTime, obj.PayloadByName("ImageFileName").ToString().ToLower(), path, obj.ParentID, obj.CommandLine, user, obj.TimeStampRelativeMSec, arguments, ProcessActivityEnum.Start, obj.UniqueProcessKey);
-                obj = null;
+
+                WintapMessage msg = new WintapMessage(obj.TimeStamp.ToUniversalTime(), obj.ProcessID, "Process") { ActivityType = "start" };
+                msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments, UniqueProcessKey = obj.UniqueProcessKey.ToString() };
+                msg.ReceiveTime = msg.EventTime;
+                msg.ProcessName = msg.Process.Name;
+
+                processTree.PublishProcess(msg);
             }
             catch (Exception ex)
             {
@@ -75,54 +76,30 @@ namespace gov.llnl.wintap.collect
             }
         }
 
-        private void createWintapProcessEvent(int processID, DateTime eventTime, DateTime receiveTime, string name, string path, int parentID, string commandLine, string user, double eventTimeMS, string arguments, ProcessActivityEnum activityType, ulong uniqueProcessKey)
+        /// <summary>
+        /// Esper listener that assembles the parts (ProcessPartial) of the ETL boot trace pattern query 
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void etlToEsperPattern_Events(object sender, UpdateEventArgs e)
         {
-            //  Could ParentPID be missing?
-            if(String.IsNullOrEmpty(parentID.ToString()))
+            EventBean[] partials = e.NewEvents;
+            foreach (com.espertech.esper.events.map.MapEventBean partial in partials)
             {
-                log.Append("WARNING:   Parent PID not set on process start ETW event!   pid: " + processID + "  process name: " + name, LogLevel.Always);
-            }
-            WintapMessage msg = new WintapMessage(eventTime, processID, this.CollectorName) { ActivityType = activityType.ToString() };
-            msg.Process = new WintapMessage.ProcessObject() { Name = name.ToLower(), Path = path.ToLower(), ParentPID = parentID, CommandLine = commandLine.ToLower(), User = user, Arguments = arguments, UniqueProcessKey = uniqueProcessKey.ToString() };
-            msg.ReceiveTime = receiveTime.ToFileTimeUtc();
-            try
-            {
-                System.Diagnostics.Process p = System.Diagnostics.Process.GetProcessById(processID);
-                if (p.ProcessName.ToLower() + ".exe" == name)
-                {
-                    msg.Process.User = this.GetProcessUser(p);
-                }
-            }
-            catch (Exception ex) { }
-           
-            if(msg.ActivityType.ToUpper() == "START")
-            {
-                WintapLogger.Log.Append("Attempting to collect md5/sha2 for file: " + msg.Process.Path, LogLevel.Debug);
-                try
-                {
-                    msg.Process.MD5 = gov.llnl.wintap.core.shared.Utilities.getMD5(msg.Process.Path);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("ERROR collecting md5 for file: " + ex.Message, LogLevel.Always);
-                }
+                int pid = Convert.ToInt32(partial.Get("PartA.PID").ToString());
+                long eventTime = Convert.ToInt64(partial.Get("PartA.EventTime").ToString());
+                int parentPid = Convert.ToInt32(partial.Get("PartA.Process.ParentPID").ToString());
+                string pname = partial.Get("PartB.Process.Name").ToString();
+                string ppath = partial.Get("PartB.Process.Path").ToString();
 
-                try
-                {
-                    msg.Process.SHA2 = gov.llnl.wintap.core.shared.Utilities.getSHA2(msg.Process.Path);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("ERROR collecting sha2 for file: " + ex.Message, LogLevel.Always);
-                }
-                WintapLogger.Log.Append("File hash collect complete.", LogLevel.Debug);
+                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(eventTime), pid, "Process") { ActivityType =  "refresh" };
+                msg.Process = new WintapMessage.ProcessObject() { Name = pname.ToLower(), Path = ppath.ToLower(), ParentPID = parentPid, CommandLine = ppath, User = "na", Arguments = "", UniqueProcessKey = "0" };
+                msg.ReceiveTime = msg.EventTime;
+                msg.ProcessName = msg.Process.Name;
+
+                processTree.PublishProcess(msg);
             }
-            EventChannel.Send(msg);
-        }
-
-        public override void Process_Event(TraceEvent obj)
-        {
-
         }
     }
+
 }

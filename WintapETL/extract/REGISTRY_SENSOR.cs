@@ -7,18 +7,16 @@
 using ChoETL;
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using gov.llnl.wintap.etl.transform;
 using System;
 using System.Dynamic;
-using static gov.llnl.wintap.etl.models.ProcessObjectModel;
 
 namespace gov.llnl.wintap.etl.extract
 {
     internal class REGISTRY_SENSOR : Sensor
     {
-        internal REGISTRY_SENSOR(string query, ProcessObjectModel pom) : base(query, pom)
+        internal REGISTRY_SENSOR(string query) : base(query)
         {
         }
 
@@ -33,16 +31,16 @@ namespace gov.llnl.wintap.etl.extract
             {
                 base.HandleSensorEvent(sensorEvent);
                 IdGenerator idGen = new IdGenerator();
-                ProcessStartData po = this.ProcessTree.FindMostRecentProcessByPID(Convert.ToInt32(sensorEvent["PID"].ToString()));
                 DateTime eventTime = DateTime.FromFileTimeUtc((long)sensorEvent["firstSeen"]);
                 dynamic flatMsg = (ExpandoObject)new WintapMessage.RegActivityObject().ToDynamic();
                 flatMsg.ActivityType = sensorEvent["activityType"].ToString();
+                flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.Reg_Data = sensorEvent["data"].ToString();
                 flatMsg.EventCount = Int32.Parse(sensorEvent["eventCount"].ToString());
                 flatMsg.FirstSeenMs = (long)sensorEvent["firstSeen"];
                 flatMsg.LastSeenMs = (long)sensorEvent["lastSeen"];
-                flatMsg.PID = po.PID;
-                flatMsg.PidHash = po.PidHash;
+                flatMsg.PID = Int32.Parse(sensorEvent["PID"].ToString());
+                flatMsg.PidHash = sensorEvent["PidHash"].ToString();
                 flatMsg.HostHame = HOST_SENSOR.Instance.HostId.Hostname;
                 flatMsg.Reg_Path = sensorEvent["path"].ToString().ToLower();
                 flatMsg.Reg_Value = sensorEvent["valueName"].ToString();

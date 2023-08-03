@@ -40,6 +40,8 @@ namespace gov.llnl.wintap.core.shared
         public static DateTime LastUserActivity { get; set; }
         public readonly TimeSpan MaxUserInactivity = new TimeSpan(0, 0, 5, 0, 0);
 
+        public static string ProcessTreeJSON { get; set; }
+
         /// <summary>
         /// True is Windows Performance Monitor reports any dropped events for the NT Kernel Logger since wintap last started.
         /// </summary>
@@ -58,12 +60,15 @@ namespace gov.llnl.wintap.core.shared
         /// <summary>
         /// Last boot time as reported by WMI
         /// </summary>
-        public DateTime MachineBootTime { get; set; }
+        public static DateTime MachineBootTime { get; set; }
 
         public static int WintapPID { get; set; }
 
 
         internal string FileTableCache;
+
+        //  debug for missing process events
+        public static ConcurrentBag<string> SentProcessList = new ConcurrentBag<string>();
 
         private StateManager()
         {
@@ -168,8 +173,10 @@ namespace gov.llnl.wintap.core.shared
             psi.UseShellExecute = false;
             psi.RedirectStandardOutput = true;
             diskPart.StartInfo = psi;
+            WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, LogLevel.Always);
             diskPart.Start();
             string diskConfig = diskPart.StandardOutput.ReadToEnd();
+            WintapLogger.Log.Append("drive volumes: " + diskConfig, LogLevel.Always);
             string[] configLines = diskConfig.Split(new char[] { '\r' });
             diskPart.WaitForExit();
             foreach (string line in configLines)
@@ -179,10 +186,15 @@ namespace gov.llnl.wintap.core.shared
                 {
                     DiskVolume dv = new DiskVolume();
                     dv.VolumeNumber = Convert.ToInt32(lineArray[3].ToString());
-                    dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString());
+                    dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString().ToLower());
                     driveMap.Add(dv);
+                    WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, LogLevel.Always);
                 }
                 catch (Exception ex) { }
+            }
+            if(driveMap.Count == 0)
+            {
+                WintapLogger.Log.Append("ERROR:  No drive map found! ", LogLevel.Always);
             }
             return driveMap;
         }

@@ -35,23 +35,21 @@ namespace gov.llnl.wintap.etl.extract
         private bool fileBusy;  // prevents file IO contention when snapshot is being rotated.
         private Timer flushToDiskTimer;
 
-        protected Sensor(string[] queries, ProcessObjectModel _pom)
+        protected Sensor(string[] queries)
         {
             initSensor();
             foreach (string query in queries)
             {
                 registerQuery(query);
                 esperQueries.Add(query);
-            }
-            ProcessTree = _pom;
+            };
         }
 
-        protected Sensor(string query, ProcessObjectModel _pom)
+        protected Sensor(string query)
         {
             initSensor();
             registerQuery(query);
             esperQueries.Add(query);
-            ProcessTree = _pom;
         }
 
         #region internal
@@ -99,7 +97,6 @@ namespace gov.llnl.wintap.etl.extract
         internal bool IsEnabled { get; set; }
         internal string SensorName { get; set; }
 
-        internal ProcessObjectModel ProcessTree;
 
         /// <summary>
         /// Receives the original WintapMessage from Subscribe

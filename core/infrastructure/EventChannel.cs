@@ -5,10 +5,12 @@
  */
 
 using com.espertech.esper.client;
+using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.collect.models;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace gov.llnl.wintap.core.infrastructure
@@ -74,10 +76,16 @@ namespace gov.llnl.wintap.core.infrastructure
         }
 
         /// <summary>
-        /// Places the event into the Wintap event processing pipeline (esper).  
+        /// Prepares and sends the event into the Wintap event processing stream.  
         /// </summary>
         public static void Send(WintapMessage streamedEvent)
         {
+            if(streamedEvent.MessageType != "ProcessPartial")
+            {
+                WintapMessage owningProcess = ProcessTree.GetByPid(streamedEvent.PID);
+                streamedEvent.ProcessName = owningProcess.ProcessName;
+                streamedEvent.PidHash = owningProcess.PidHash;
+            }
             EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
         }
 
@@ -92,11 +100,17 @@ namespace gov.llnl.wintap.core.infrastructure
                     hwConfig.EngineDefaults.MetricsReporting.EngineInterval = 1000;
                     hwConfig.SetMetricsReportingEnabled();
                     hwConfig.AddEventType("WintapMessage", typeof(WintapMessage).FullName);
+                    hwConfig.AddEventType("ProcessTreeEvent", typeof(ProcessTreeEvent).FullName);
+                    
                     epService = EPServiceProviderManager.GetDefaultProvider(hwConfig);
                 }
                 return epService;
             }
         }
+    }
 
+    public class ProcessTreeEvent
+    {
+        public string Data { get; set; }
     }
 }

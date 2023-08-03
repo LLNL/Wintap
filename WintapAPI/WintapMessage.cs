@@ -32,6 +32,8 @@ namespace gov.llnl.wintap.collect.models
         public long EventTime { get; set; }
         public long ReceiveTime { get; set; }
         public int PID { get; set; }
+        public string PidHash { get; set; }
+        public string ProcessName { get; set; }
         public string ActivityType { get; set; }
         public ProcessObject Process { get; set; }
         public TcpConnectionObject TcpConnection { get; set; }
@@ -62,6 +64,8 @@ namespace gov.llnl.wintap.collect.models
         public class ProcessObject
         {
             public int ParentPID { get; set; }
+            public string ParentPidHash { get; set; }
+            public string ParentProcessName { get; set; }
             public string Name { get; set; }
             public string Path { get; set; }
             public string CommandLine { get; set; }

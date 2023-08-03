@@ -1,1 +1,1 @@
-﻿SELECT * FROM WintapMessage WHERE MessageType = "Process" AND ActivityType = "Stop"
+﻿SELECT * FROM WintapMessage WHERE MessageType = "Process" AND ActivityType = "stop"
