@@ -19,6 +19,10 @@ using gov.llnl.wintap.etl.extract;
 using gov.llnl.wintap.etl.load;
 using System.Diagnostics.Tracing;
 using System.IO;
+using System.Xml.Serialization;
+using gov.llnl.wintap.etl.load.interfaces;
+using gov.llnl.wintap.etl.model;
+using Newtonsoft.Json;
 
 namespace gov.llnl.wintap.etl
 {
@@ -37,11 +41,12 @@ namespace gov.llnl.wintap.etl
         private REGISTRY_SENSOR regSensor;
         private FOCUSCHANGE_SENSOR fcSensor;
         private DEFAULT_SENSOR defaultSensor;
-        private Uploader dataSender;
+        private CacheManager cacheMgr;
         private List<Sensor> sensors;
         private DateTime lastNetChange;
         private readonly string esperNameSpacePrefix = "gov.llnl.wintap.etl.esper.";
         private long totalMessageCount;
+        ETLConfig etlConfig;
         // debug
         private List<string> processPidHash;
         #endregion
@@ -57,6 +62,8 @@ namespace gov.llnl.wintap.etl
 
         public EventFlags Startup()
         {
+            etlConfig = readConfig();
+
             lastNetChange = DateTime.Now;
             BackgroundWorker processObjectModelWorker = new BackgroundWorker();
             processObjectModelWorker.DoWork += ProcessObjectModelWorker_DoWork;
@@ -153,7 +160,7 @@ namespace gov.llnl.wintap.etl
 
         public void Shutdown()
         {
-            dataSender.Stop();
+            cacheMgr.Stop();
             processSensor.Stop();
             Logger.Log.Append("shutdown complete", LogLevel.Always);
             Logger.Log.Close();
@@ -204,22 +211,19 @@ namespace gov.llnl.wintap.etl
 
         private void WorkerThread_DoWork(object sender, DoWorkEventArgs e)
         {
-            Logger.Log.Append("creating data sender", LogLevel.Always);
+            Logger.Log.Append("creating wintap data cache manager", LogLevel.Always);
+            List<IUpload> uploaders = new List<IUpload>();
+            cacheMgr = new CacheManager(etlConfig);
+            cacheMgr.Start();
+            Logger.Log.Append("File uploader is running", LogLevel.Always);
             try
             {
-                DirectoryInfo parquetDir = new DirectoryInfo(Strings.ParquetDataPath);
-                if(!parquetDir.Exists ) 
-                {
-                    parquetDir.Create();
-                }
-                dataSender = new Uploader();
-                dataSender.Start();
-                Logger.Log.Append("File uploader is running", LogLevel.Always);
+
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error initializing sender: " + ex.Message + ", startup will NOT complete", LogLevel.Always);
-                throw new Exception("Sender not initialized");
+                Logger.Log.Append("Error initializing cache manager: " + ex.Message + ", startup will NOT complete", LogLevel.Always);
+                throw new Exception("CacheManager not initialized");
             }
 
             Logger.Log.Append("init complete", LogLevel.Always);
@@ -237,5 +241,9 @@ namespace gov.llnl.wintap.etl
 
         #endregion
 
+        private ETLConfig readConfig()
+        {
+            return JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(Strings.ETLPluginPath + "\\support\\ETLConfig.json"));    
+        }
     }
 }

@@ -199,10 +199,15 @@
     <Compile Include="extract\Sensor.cs" />
     <Compile Include="extract\TCPCONNECTION_SENSOR.cs" />
     <Compile Include="extract\UDPPACKET_SENSOR.cs" />
+    <Compile Include="load\adapters\base\Uploader.cs" />
+    <Compile Include="load\adapters\S3Uploader.cs" />
+    <Compile Include="load\adapters\SMBFileShareUploader.cs" />
+    <Compile Include="load\CacheManager.cs" />
     <Compile Include="load\CsvWriter.cs" />
     <Compile Include="load\FileWriter.cs" />
+    <Compile Include="load\interfaces\IUpload.cs" />
     <Compile Include="load\ParquetWriter.cs" />
-    <Compile Include="load\Uploader.cs" />
+    <Compile Include="model\ETLConfig.cs" />
     <Compile Include="model\GenericData.cs" />
     <Compile Include="model\Host.cs" />
     <Compile Include="model\HostId.cs" />
@@ -237,7 +242,6 @@
     <EmbeddedResource Include="esper\process-stop.epl" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="EtlConfig.xml" />
     <Content Include="FodyWeavers.xml" />
     <Content Include="wintap.ico" />
   </ItemGroup>
