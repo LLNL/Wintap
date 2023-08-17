@@ -15,10 +15,10 @@ namespace gov.llnl.wintap.etl.model
         public int UploadIntervalSec { get; set; }
         public bool WriteToParquet { get; set; }
         public bool WriteToCsv { get; set; }
-        public List<Uploader> Uploaders = new List<Uploader>();
-        public class Uploader
+        public List<Adapter> Adapters = new List<Adapter>();
+        public class Adapter
         {
-            public Uploader()
+            public Adapter()
             {
                 Properties = new Dictionary<string, string>();
             }

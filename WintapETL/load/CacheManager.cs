@@ -54,7 +54,7 @@ namespace gov.llnl.wintap.etl.load
             bytesOnDisk = getCurrentCacheDirSize();
 
             Logger.Log.Append("Loading data uploaders...", LogLevel.Always);
-            foreach (ETLConfig.Uploader u in etlConfig.Uploaders)
+            foreach (ETLConfig.Adapter u in etlConfig.Adapters)
             {
                 try
                 {
@@ -64,6 +64,7 @@ namespace gov.llnl.wintap.etl.load
                     if (u.Enabled)
                     {
                         uploaders.Add(uploader);
+                        uploader.UploadCompleted += Uploader_UploadCompleted;
                         Logger.Log.Append("Loaded uploader: " + u.Name, LogLevel.Always);
                     }
                 }
@@ -72,10 +73,26 @@ namespace gov.llnl.wintap.etl.load
                     Logger.Log.Append("ERROR:  No assembly matching the name " + u.Name + " was found.  This uploader will not run.  Check the spelling or remove this config entry.", LogLevel.Always);
                 }            
             }
+            createMetaRecords();
             Logger.Log.Append("Total uploaders: " + uploaders.Count, LogLevel.Always);
-
             workerThread = new BackgroundWorker();
             workerThread.DoWork += WorkerThread_DoWork;
+        }
+
+        private void Uploader_UploadCompleted(object sender, string e)
+        {
+            if(e.EndsWith("parquet"))
+            {
+                try
+                {
+                    FileInfo fileInfo = new FileInfo(e);
+                    fileInfo.Delete();
+                }
+                catch(Exception ex)
+                {
+
+                }
+            }
         }
 
         internal void Start()
@@ -106,7 +123,6 @@ namespace gov.llnl.wintap.etl.load
             {
                 if (uploadTimer.Elapsed.TotalSeconds > etlConfig.UploadIntervalSec)
                 {
-                    createMetaRecords();
                     shellMerge();
                     if (mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories).Count() > 0)
                     {
@@ -121,7 +137,7 @@ namespace gov.llnl.wintap.etl.load
                         }
                         foreach (IUpload uploader in uploaders)
                         {
-                            uploader.PreUpload(etlConfig.Uploaders.Where(u => u.Name == uploader.Name).First().Properties);
+                            uploader.PreUpload(etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties);
                         }
                         upload();
                         foreach (IUpload uploader in uploaders)
@@ -130,6 +146,10 @@ namespace gov.llnl.wintap.etl.load
                         }
                     }
                     uploadTimer.Restart();
+                }
+                if (DateTime.Now.Minute == 0 && DateTime.Now.Second < 2)  // only once at the top of the hour
+                {
+                    createMetaRecords();  // host, macip
                 }
                 System.Threading.Thread.Sleep(1000);
             }
@@ -142,29 +162,23 @@ namespace gov.llnl.wintap.etl.load
                 if (dataFile.Length > 0)
                 {
                     bool successfulUpload = false;
-                    foreach(IUpload uploader in uploaders)
+                    foreach (IUpload uploader in uploaders)
                     {
-                        if(uploader.Upload(dataFile.FullName))
+                        try
                         {
-                            successfulUpload = true; // any success = all success, for now.
+                            if (uploader.Upload(dataFile.FullName, etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties))
+                            {
+                                successfulUpload = true; // any success = all success, for now.
+                            }
                         }
-                    }
-                    if(successfulUpload)
-                    {
-                        deleteFile(dataFile);
+                        catch (Exception ex)
+                        {
+                            Logger.Log.Append("Upload failed with error: " + ex.Message, LogLevel.Always);
+                        }
                     }
                 }
                 System.Threading.Thread.Sleep(250);  // throttle the upload to prevent CPU/IO spike
             }
-        }
-
-        private void saveHost(HostData hd)
-        {
-            ParquetWriter pw = new ParquetWriter("host_sensor");
-            dynamic obj = hd.ToDynamic();
-            List<ExpandoObject> objList = new List<ExpandoObject>();
-            objList.Add(obj);
-            pw.Write(objList);
         }
 
         private void cleanup()
@@ -236,12 +250,12 @@ namespace gov.llnl.wintap.etl.load
                         foreach (DirectoryInfo defaultSensor in sensorDir.GetDirectories())
                         {
 
-                            runCmdLine(defaultSensor.FullName, mergeTime.ToFileTimeUtc());
+                            runMerger(defaultSensor.FullName, mergeTime.ToFileTimeUtc());
                         }
                     }
                     else
                     {
-                        runCmdLine(sensorDir.FullName, mergeTime.ToFileTimeUtc());
+                        runMerger(sensorDir.FullName, mergeTime.ToFileTimeUtc());
                     }
 
                 }
@@ -252,7 +266,7 @@ namespace gov.llnl.wintap.etl.load
             }
         }
 
-        private void runCmdLine(string path, long eventTime)
+        private void runMerger(string path, long eventTime)
         {
             Logger.Log.Append("Shelling out for parquet merge for sensor: " + path, LogLevel.Always);
             ProcessStartInfo psi = new ProcessStartInfo();
@@ -269,6 +283,28 @@ namespace gov.llnl.wintap.etl.load
             hangDetector.Start();
             helperExe.WaitForExit();
             hangDetector.Stop();
+            cleanupUnmergedParquet(path);
+        }
+
+        private void cleanupUnmergedParquet(string path)
+        {
+            if(path.EndsWith("\\merged")) { return; }
+            DirectoryInfo directoryInfo = new DirectoryInfo(path);
+            foreach(FileInfo file in directoryInfo.GetFiles())
+            {
+                try
+                {
+                    if(file.FullName.EndsWith("parquet"))
+                    {
+                        file.Delete();
+                        Logger.Log.Append("Deleted file: " + file.FullName, LogLevel.Always);
+                    }
+                }
+                catch(Exception ex)
+                {
+                    Logger.Log.Append("ERROR deleting merged parquet: " + ex.Message, LogLevel.Debug);
+                }
+            }
         }
 
         private void HangDetector_Elapsed(object sender, ElapsedEventArgs e)

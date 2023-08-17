@@ -62,7 +62,7 @@ namespace gov.llnl.wintap.etl
 
         public EventFlags Startup()
         {
-            etlConfig = readConfig();
+            etlConfig = Utilities.GetETLConfig();
 
             lastNetChange = DateTime.Now;
             BackgroundWorker processObjectModelWorker = new BackgroundWorker();
@@ -84,10 +84,6 @@ namespace gov.llnl.wintap.etl
 
             string wintapVersion = System.Reflection.Assembly.GetEntryAssembly().GetName().Version.ToString();
             string etlVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-
-            Logger.Log.Append("Creating initial host and macip records...", LogLevel.Always);
-            HOST_SENSOR.Instance.WriteHostRecord();
-            HOST_SENSOR.Instance.WriteMacIPRecords();
 
             Logger.Log.Append("startup complete.  Wintap version: " + wintapVersion + "  WintapEtl version: " + etlVersion, LogLevel.Always);
 
@@ -188,7 +184,7 @@ namespace gov.llnl.wintap.etl
             sensors.Add(udpSensor);
             sensors.Add(regSensor);
             sensors.Add(fcSensor);
-            Logger.Log.Append("All sensors created.  Sensor serialization interval (msec): " + gov.llnl.wintap.etl.shared.Utilities.GetSerializationIntervalFromConfig(), LogLevel.Always);
+            Logger.Log.Append("All sensors created.  Sensor serialization interval (msec): " + etlConfig.SerializationIntervalSec, LogLevel.Always);
         }
 
         private void ProcessObjectModelWorker_DoWork(object sender, DoWorkEventArgs e)
@@ -240,10 +236,5 @@ namespace gov.llnl.wintap.etl
         }
 
         #endregion
-
-        private ETLConfig readConfig()
-        {
-            return JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(Strings.ETLPluginPath + "\\support\\ETLConfig.json"));    
-        }
     }
 }

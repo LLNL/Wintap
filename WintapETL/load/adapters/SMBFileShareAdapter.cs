@@ -12,9 +12,11 @@ using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.etl.load.adapters
 {
-    internal class SMBFileShareUploader : Uploader, IUpload
+    internal class SMBFileShareAdapter : Uploader, IUpload
     {
         private Uri uncPath;
+
+        public event EventHandler<string> UploadCompleted;
 
         public bool PostUpload()
         {
@@ -42,7 +44,7 @@ namespace gov.llnl.wintap.etl.load.adapters
             return preUploadSuccess;
         }
 
-        public bool Upload(string localFile)
+        public bool Upload(string localFile, Dictionary<string, string> parameters)
         {
             bool uploadSuccess = true;
             try

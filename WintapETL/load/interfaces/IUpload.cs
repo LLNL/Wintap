@@ -8,6 +8,9 @@ namespace gov.llnl.wintap.etl.load.interfaces
 {
     public interface IUpload
     {
+        // string value of the event holds the path to the uploaded file.
+        event EventHandler<string> UploadCompleted;
+
         string Name { get; set; }
 
         /// <summary>
@@ -21,7 +24,7 @@ namespace gov.llnl.wintap.etl.load.interfaces
         /// </summary>
         /// <param name="localFile"></param>
         /// <returns></returns>
-        bool Upload(string localFile);
+        bool Upload(string localFile, Dictionary<string, string> parameters);
         /// <summary>
         /// Post upload tasks, if any
         /// </summary>

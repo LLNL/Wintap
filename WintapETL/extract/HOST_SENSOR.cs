@@ -65,13 +65,6 @@ namespace gov.llnl.wintap.etl.extract
             hostContainer = getHost();
         }
 
-        private void HostRefreshTimer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            Logger.Log.Append("24 hours since last Host/MacIp update, sending up refresh records", LogLevel.Always);
-            WriteHostRecord();
-            WriteMacIPRecords();
-        }
-
         /// <summary>
         /// Send up any host-level changes and check-in with a current "EventTime"
         /// </summary>

@@ -13,6 +13,9 @@ using System.Management;
 using System.Net.NetworkInformation;
 using System.Xml;
 using gov.llnl.wintap.etl.models;
+using gov.llnl.wintap.etl.model;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace gov.llnl.wintap.etl.shared
 {
@@ -59,39 +62,9 @@ namespace gov.llnl.wintap.etl.shared
             return dateTime;
         }
 
-        internal static int GetSerializationIntervalFromConfig()
+        internal static ETLConfig GetETLConfig()
         {
-            int interval = 30000;
-            try
-            {
-                interval = Convert.ToInt32(GetETLConfig().GetElementsByTagName("SerializationIntervalSec")[0].InnerText) * 1000;
-            }
-            catch (Exception ex)
-            {
-
-            }
-            return interval;
-        }
-
-        internal static int GetUploadIntervalFromConfig()
-        {
-            int interval = 60;
-            try
-            {
-                interval = Convert.ToInt32(GetETLConfig().GetElementsByTagName("UploadIntervalSec")[0].InnerText);
-            }
-            catch (Exception ex)
-            {
-
-            }
-            return interval;
-        }
-
-        internal static XmlDocument GetETLConfig()
-        {
-            XmlDocument configDoc = new XmlDocument();
-            configDoc.Load(Strings.ETLSupportPath + "ETLConfig.xml");
-            return configDoc;
+            return JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(Strings.ETLPluginPath + "\\support\\ETLConfig.json"));
         }
 
         internal static List<NIC> GetActiveNICs()
