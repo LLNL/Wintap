@@ -26,7 +26,7 @@ namespace gov.llnl.wintap.etl.shared
         /// <param name="_storeName"></param>
         /// <param name="certificateNameSuffix"></param>
         /// <exception cref="Exception"></exception>
-        internal CertificateManager(string _storeName, string _certificateNameSuffix, string _rootCertificateName) 
+        internal CertificateManager(string _storeName, string _certificateNameSuffix) 
         {
             // we support certificates installed to the personal folder of the local machine store or PFX files on disk
             this.storeName = _storeName;
@@ -34,7 +34,7 @@ namespace gov.llnl.wintap.etl.shared
             DirectoryInfo directoryInfo = new DirectoryInfo(this.storeName);
             if(directoryInfo.Exists)
             {
-                resolvePfxCert(_certificateNameSuffix, _rootCertificateName);
+                resolvePfxCert(_certificateNameSuffix);
             }
             else
             {
@@ -48,7 +48,7 @@ namespace gov.llnl.wintap.etl.shared
         }
 
         // resolves the FIRST .pfx certificate file found at the 'storeName' matching the given suffix
-        private void resolvePfxCert(string certificateNameSuffix, string rootCertName)
+        private void resolvePfxCert(string certificateNameSuffix)
         {
             if (!certificateNameSuffix.EndsWith(".pfx"))
             {
@@ -59,10 +59,9 @@ namespace gov.llnl.wintap.etl.shared
             {
                 if(storeDir.GetFileSystemInfos(certificateNameSuffix).Length > 0)
                 {
-                    deviceCertificate = new X509Certificate2(storeDir.GetFileSystemInfos(certificateNameSuffix).First().FullName, "myPassword");
+                    deviceCertificate = new X509Certificate2(storeDir.GetFileSystemInfos(certificateNameSuffix).First().FullName, "");
                     certificateType = CertificateTypeEnum.File;
                 }
-                rootCertificate = new X509Certificate2(Path.Combine(storeDir.FullName, rootCertName));
             }
         }
 
@@ -83,6 +82,5 @@ namespace gov.llnl.wintap.etl.shared
             store.Close();
             return cert;
         }
-
     }
 }

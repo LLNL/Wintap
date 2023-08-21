@@ -36,11 +36,11 @@ namespace gov.llnl.wintap.etl.load.adapters
         public bool PreUpload(Dictionary<string, string> parameters)
         {
             Logger.Log.Append("PreUpload method called on SignedS3UrlUploader", LogLevel.Always);
-            certificateManager = new CertificateManager(parameters["CertificateStore"], parameters["DeviceCertificateName"], parameters["RootCertificateName"]);
+            certificateManager = new CertificateManager(parameters["CertificateStore"], parameters["DeviceCertificateName"]);
             Logger.Log.Append("Got certs: " + certificateManager.deviceCertificate.SubjectName.ToString(), LogLevel.Always);
 
             // Create a new MQTT client.
-            client = new MqttClient(parameters["EndPoint"], Convert.ToInt32(parameters["Port"]), true, certificateManager.rootCertificate, certificateManager.deviceCertificate, MqttSslProtocols.TLSv1_2);
+            client = new MqttClient(parameters["EndPoint"], Convert.ToInt32(parameters["Port"]), true, null, certificateManager.deviceCertificate, MqttSslProtocols.TLSv1_2);
             
             //Event Handler Wiring
             client.MqttMsgPublishReceived += Client_MqttMsgPublishReceived;
@@ -105,7 +105,6 @@ namespace gov.llnl.wintap.etl.load.adapters
         private string getS3ObjectNameForFile(string dataFile)
         {
             // S3 folder hierarchy setup
-            // FORMAT:  raw/EventType/uploadedDPK=YYYYMMDD/uploadedHPK=HH/hostname+eventType+timestamp.parquet
             //   unless tcp/udp, then add one additional layer for efficient filtering
             string objectPrefix = "v3";
             string uploadDPK = DateTime.UtcNow.Year + DateTime.UtcNow.ToString("MM") + DateTime.UtcNow.ToString("dd");
@@ -161,7 +160,6 @@ namespace gov.llnl.wintap.etl.load.adapters
     {
         public string s3objectpath { get; set; }
         public string filename { get; set; }
-
         public string url { get; set; }
     }
 }
