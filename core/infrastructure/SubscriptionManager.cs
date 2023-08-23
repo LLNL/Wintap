@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+using gov.llnl.wintap.collect;
 using gov.llnl.wintap.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
@@ -30,13 +31,22 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal void Start()
         {
+            // start process collector first for process attribution
+            ProcessCollector pc = new ProcessCollector();
+            pc.Start();
+            kernelFlags = KernelTraceEventParser.Keywords.Process;
+
             // start modelled collectors
             string nameSpace = "gov.llnl.wintap.collect";
             foreach (SettingsProperty sp in Properties.Settings.Default.Properties)
             {
                 if (sp.Name.EndsWith("Collector") && Properties.Settings.Default[sp.Name].ToString() == "True")
                 {
-                    System.Threading.Thread.Sleep(500);  // without this you will sometimes get an exception from TraceEventSession - race condition? 
+                    System.Threading.Thread.Sleep(500);  // without this you will sometimes get an exception from TraceEventSession
+                    if(sp.Name == "ProcessCollector") 
+                    { 
+                        continue; 
+                    } 
                     string collectorName = nameSpace + "." + sp.Name;
                     WintapLogger.Log.Append("Attempting to load collector with name: " + collectorName, LogLevel.Always);
                     try
