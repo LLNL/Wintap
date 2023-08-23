@@ -261,7 +261,18 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         internal static WintapMessage GetByPid(int pid)
         {
-            return processStack.Where(p => p.PID == pid).OrderBy(p => p.EventTime).Last();
+            // create instance off of the tree root
+            WintapMessage owningProcess = processStack.Where(p => p.PID == 4).OrderBy(p => p.EventTime).Last();
+            try
+            {
+                owningProcess = processStack.Where(p => p.PID == pid).OrderBy(p => p.EventTime).Last();
+            }
+            catch(Exception ex)
+            {
+                // assign to unknown if target process is not found
+                owningProcess = processStack.Where(p => p.PID == 1).OrderBy(p => p.EventTime).Last();
+            }
+            return owningProcess;
         }
 
         internal WintapMessage GetKernel()

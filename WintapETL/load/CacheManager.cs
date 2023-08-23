@@ -245,7 +245,7 @@ namespace gov.llnl.wintap.etl.load
 
                 try
                 {
-                    if (sensorDir.Name.ToLower() == "gov.llnl.wintap.etl.extract.default_sensor")
+                    if (sensorDir.Name.ToLower() == "default_sensor")
                     {
                         foreach (DirectoryInfo defaultSensor in sensorDir.GetDirectories())
                         {

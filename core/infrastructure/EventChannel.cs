@@ -7,6 +7,7 @@
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.collect.models;
+using Microsoft.Extensions.Logging;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -82,9 +83,16 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             if(streamedEvent.MessageType != "ProcessPartial")
             {
-                WintapMessage owningProcess = ProcessTree.GetByPid(streamedEvent.PID);
-                streamedEvent.ProcessName = owningProcess.ProcessName;
-                streamedEvent.PidHash = owningProcess.PidHash;
+                try
+                {
+                    WintapMessage owningProcess = ProcessTree.GetByPid(streamedEvent.PID);
+                    streamedEvent.ProcessName = owningProcess.ProcessName;
+                    streamedEvent.PidHash = owningProcess.PidHash;
+                }
+                catch(Exception ex)
+                {
+                    WintapLogger.Log.Append("ERROR sending event for MessageType: " + streamedEvent.MessageType + ", pid: " + streamedEvent.PID + ": " + ex.Message, LogLevel.Always);
+                }
             }
             EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
         }
