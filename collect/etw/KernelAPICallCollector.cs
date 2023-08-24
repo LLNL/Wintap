@@ -6,6 +6,7 @@ using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftAntimalwareEngine;
 using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
+using System.Data.Entity.Migrations.Sql;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -77,7 +78,7 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error parsing event for " + this.CollectorName + ", msg: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("Error parsing event for " + this.CollectorName + " event: " + obj.ToString() + ", msg: " + ex.Message, LogLevel.Debug);
             }
         }
     }

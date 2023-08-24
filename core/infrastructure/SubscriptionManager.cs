@@ -35,6 +35,7 @@ namespace gov.llnl.wintap.core.infrastructure
             ProcessCollector pc = new ProcessCollector();
             pc.Start();
             kernelFlags = KernelTraceEventParser.Keywords.Process;
+            baseCollectors.Add(pc);
 
             // start modelled collectors
             string nameSpace = "gov.llnl.wintap.collect";

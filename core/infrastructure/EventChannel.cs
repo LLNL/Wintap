@@ -81,7 +81,7 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         public static void Send(WintapMessage streamedEvent)
         {
-            if(streamedEvent.MessageType != "ProcessPartial")
+            if(streamedEvent.MessageType != "ProcessPartial" && streamedEvent.PID > 0)
             {
                 try
                 {
@@ -91,7 +91,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 catch(Exception ex)
                 {
-                    WintapLogger.Log.Append("ERROR sending event for MessageType: " + streamedEvent.MessageType + ", pid: " + streamedEvent.PID + ": " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("ERROR sending event for MessageType: " + streamedEvent.MessageType + ", ActivityType: " + streamedEvent.ActivityType + ", pid: " + streamedEvent.PID + ": " + ex.Message, LogLevel.Always);
                 }
             }
             EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
