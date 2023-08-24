@@ -213,7 +213,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             Add(msg);
             StateManager.SentProcessList.Add(msg.PidHash);
             EventChannel.Send(msg);
-            WintapLogger.Log.Append("process sent to subscribers : " + msg.ProcessName + " " + msg.PidHash, LogLevel.Always);
+            WintapLogger.Log.Append("process sent to subscribers : " + msg.ProcessName + " " + msg.PID + " " + msg.PidHash, LogLevel.Always);
         }
 
         private void serializeProcessTree(object sender, ElapsedEventArgs e)
