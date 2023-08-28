@@ -134,6 +134,12 @@ namespace gov.llnl.wintap
 
                 string wintapDir = Strings.FileRootPath + "\\";
                 DirectoryInfo workbenchInfo = new DirectoryInfo(wintapDir + "\\Workbench");
+                if (!workbenchInfo.Exists)
+                {
+                    workbenchInfo.Create();
+                    WintapLogger.Log.Append("extraction path: " + wintapDir, LogLevel.Always);
+                    System.IO.Compression.ZipFile.ExtractToDirectory(wintapDir + "workbench.zip", wintapDir);
+                }
             }
             catch(Exception ex)
             {
