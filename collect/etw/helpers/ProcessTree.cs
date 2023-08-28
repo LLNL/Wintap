@@ -276,13 +276,13 @@ namespace gov.llnl.wintap.collect.etw.helpers
             }
         }  
 
-        internal static WintapMessage GetByPid(int pid)
+        internal static WintapMessage GetByPid(int pid, long eventTime)
         {
             // create instance off of the tree root
             WintapMessage owningProcess = processStack.Where(p => p.PID == 4).OrderBy(p => p.EventTime).Last();
             try
             {
-                owningProcess = processStack.Where(p => p.PID == pid).OrderBy(p => p.EventTime).Last();
+                owningProcess = processStack.Where(p => p.PID == pid && p.EventTime <= eventTime).OrderBy(p => p.EventTime).Last();
             }
             catch(Exception ex)
             {

@@ -9,10 +9,12 @@ using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.collect.models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Web.UI.WebControls;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -29,6 +31,10 @@ namespace gov.llnl.wintap.core.infrastructure
         private static DateTime maxEventTime;
         private static long totalEvents;
         private static Stopwatch stopWatch;
+        // event buffering members
+        private static ConcurrentQueue<WintapMessage> eventBuffer;
+        private static Stopwatch bufferProcessingInterval;
+        private static int droppedEventCount;
 
         public static long EventsPerSecond
         {
@@ -55,6 +61,9 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             stopWatch = new Stopwatch();
             stopWatch.Start();
+            eventBuffer = new ConcurrentQueue<WintapMessage>();
+            bufferProcessingInterval = new Stopwatch();
+            bufferProcessingInterval.Start();
             BackgroundWorker statsWorker = new BackgroundWorker();
             statsWorker.DoWork += StatsWorker_DoWork;
             statsWorker.RunWorkerAsync();
@@ -73,6 +82,32 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 totalEvents = totalEvents + eventsPerSecond;
                 EventChannel.Esper.EPRuntime.ResetStats();
+
+                while(eventBuffer.Count > 0)
+                {
+                    WintapMessage bufferedEvent;
+                    DateTime processingScope = DateTime.Now.AddSeconds(-3);
+                    eventBuffer.TryDequeue(out bufferedEvent);
+                    if(bufferedEvent != null)
+                    {
+                        if(bufferedEvent.EventTime > processingScope.ToFileTimeUtc())
+                        {
+                            break;
+                        }
+                        try
+                        {
+                            WintapMessage owningProcess = ProcessTree.GetByPid(bufferedEvent.PID, bufferedEvent.EventTime);
+                            bufferedEvent.ProcessName = owningProcess.ProcessName;
+                            bufferedEvent.PidHash = owningProcess.PidHash;
+                            EventChannel.Esper.EPRuntime.SendEvent(bufferedEvent);
+                        }
+                        catch (Exception ex)
+                        {
+                            droppedEventCount++;
+                            WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message +  ",  total dropped event count: " + droppedEventCount, LogLevel.Always);
+                        }
+                    }
+                }
             }
         }
 
@@ -85,13 +120,20 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 try
                 {
-                    WintapMessage owningProcess = ProcessTree.GetByPid(streamedEvent.PID);
+                    WintapMessage owningProcess = ProcessTree.GetByPid(streamedEvent.PID, streamedEvent.EventTime);
                     streamedEvent.ProcessName = owningProcess.ProcessName;
                     streamedEvent.PidHash = owningProcess.PidHash;
+                }
+                catch(InvalidOperationException)
+                {
+                    eventBuffer.Enqueue(streamedEvent);
+                    WintapLogger.Log.Append("PidHash not found for PID: " + streamedEvent.PID + "  buffering...", LogLevel.Always);
+                    return;
                 }
                 catch(Exception ex)
                 {
                     WintapLogger.Log.Append("ERROR sending event for MessageType: " + streamedEvent.MessageType + ", ActivityType: " + streamedEvent.ActivityType + ", pid: " + streamedEvent.PID + ": " + ex.Message, LogLevel.Always);
+                    return;
                 }
             }
             EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);

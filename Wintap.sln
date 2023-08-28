@@ -1,4 +1,3 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.2.32516.85
@@ -6,8 +5,6 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wintap", "Wintap.csproj", "{225F7EEB-8D75-4921-922F-AA0354EC8289}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapSvcMgr", "WintapSvcMgr\WintapSvcMgr.csproj", "{E307F7BE-A7AF-4818-91C7-E4A3EFE9E520}"
-EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "WintapSetup\WintapSetup.vdproj", "{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapAPI", "WintapAPI\WintapAPI.csproj", "{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}"
 EndProject
@@ -18,6 +15,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapRecorder", "WintapRecorder\WintapRecorder.csproj", "{4FE36182-60AA-4483-982F-821F67D4CEB5}"
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapETLSetup", "WintapETLSetup\WintapETLSetup.vdproj", "{656E8892-0B25-412D-AA11-7E0602E3BD7B}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "WintapSetup\WintapSetup.vdproj", "{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -53,18 +52,6 @@ Global
 		{E307F7BE-A7AF-4818-91C7-E4A3EFE9E520}.Release|x64.Build.0 = Release|Any CPU
 		{E307F7BE-A7AF-4818-91C7-E4A3EFE9E520}.Release|x86.ActiveCfg = Release|Any CPU
 		{E307F7BE-A7AF-4818-91C7-E4A3EFE9E520}.Release|x86.Build.0 = Release|Any CPU
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Debug|Any CPU.ActiveCfg = Debug
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Debug|Any CPU.Build.0 = Debug
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Debug|x64.ActiveCfg = Debug
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Debug|x64.Build.0 = Debug
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Debug|x86.ActiveCfg = Debug
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Debug|x86.Build.0 = Debug
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Release|Any CPU.ActiveCfg = Release
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Release|Any CPU.Build.0 = Release
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Release|x64.ActiveCfg = Release
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Release|x64.Build.0 = Release
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Release|x86.ActiveCfg = Release
-		{2EDFA2D5-2B8D-43EF-907A-91A41B4DDFB4}.Release|x86.Build.0 = Release
 		{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -125,6 +112,18 @@ Global
 		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|x64.Build.0 = Release
 		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|x86.ActiveCfg = Release
 		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|x86.Build.0 = Release
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Debug|Any CPU.ActiveCfg = Debug
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Debug|Any CPU.Build.0 = Debug
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Debug|x64.ActiveCfg = Debug
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Debug|x64.Build.0 = Debug
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Debug|x86.ActiveCfg = Debug
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Debug|x86.Build.0 = Debug
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Release|Any CPU.ActiveCfg = Release
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Release|Any CPU.Build.0 = Release
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Release|x64.ActiveCfg = Release
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Release|x64.Build.0 = Release
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Release|x86.ActiveCfg = Release
+		{EC9AA472-A57C-4FDD-AA4F-D5A8F1366B31}.Release|x86.Build.0 = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
