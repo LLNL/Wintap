@@ -241,6 +241,7 @@
     <EmbeddedResource Include="esper\udp.epl" />
     <EmbeddedResource Include="esper\default.epl" />
     <EmbeddedResource Include="esper\process-stop.epl" />
+    <None Include="ETLConfig.json" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />

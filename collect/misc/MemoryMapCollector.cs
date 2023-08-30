@@ -172,7 +172,7 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR in memory map collection: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("WARN problem collecting memory map: " + ex.Message, LogLevel.Always);
             }
         }
 

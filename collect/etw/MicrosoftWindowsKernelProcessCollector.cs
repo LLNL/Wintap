@@ -59,39 +59,17 @@ namespace gov.llnl.wintap.collect
             }
         }
 
-        private void parseUserModeProcessStart(TraceEvent obj)
-        {
-            string processName = "NA_FROM_PROCESS_START";
-            try
-            {
-                processName = System.Diagnostics.Process.GetProcessById(obj.ProcessID).ProcessName;
-            }
-            catch (Exception ex) { }
-            if(processLookup.Keys.Contains(obj.ProcessID))
-            {
-                processLookup[obj.ProcessID] = processName;
-            }
-            else
-            {
-                processLookup.Add(obj.ProcessID, processName);
-            }
-        }
-
         private void parseUserModeProcessStop(TraceEvent obj)
         {
             try
             {
                 int pid = Convert.ToInt32(obj.PayloadStringByName("ProcessID").Replace(",", ""));
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, this.CollectorName) { MessageType = "Process", ActivityType = "Stop"};
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, this.CollectorName) { MessageType = "Process", ActivityType = "stop"};
                 msg.Process = new WintapMessage.ProcessObject();
                 msg.Process.Name = obj.PayloadStringByName("ImageName");
                 Int64 exitCode = Convert.ToInt64(obj.PayloadStringByName("ExitCode").Replace(",", ""));
                 Int64 cpuCycleCount = Convert.ToInt64(obj.PayloadStringByName("CPUCycleCount").Replace(",", ""));
                 DateTime createTime = convertProcessCreateTime(obj.PayloadStringByName("CreateTime"));
-                //double totalSeconds = obj.TimeStamp.Subtract(createTime).TotalSeconds;
-                //uint cpuSpeed = StateManager.GetCPUSpeed(obj.ProcessorNumber);
-                //int cpuCount = Environment.ProcessorCount;
-                //double percentCpu = (Convert.ToInt64(cpuCycleCount / (cpuSpeed * totalSeconds) * 100) / cpuCount);
                 msg.Process.CPUCycleCount = cpuCycleCount;
                 msg.Process.ExitCode = exitCode;
                 msg.Process.CPUUtilization = 0; 

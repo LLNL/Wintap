@@ -321,9 +321,6 @@
     <Reference Include="RestSharp, Version=108.0.1.0, Culture=neutral, PublicKeyToken=598062e77f915f75, processorArchitecture=MSIL">
       <HintPath>packages\RestSharp.108.0.1\lib\netstandard2.0\RestSharp.dll</HintPath>
     </Reference>
-    <Reference Include="Sharpen, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\Sharpen.1.0.0.3\lib\Sharpen.dll</HintPath>
-    </Reference>
     <Reference Include="Swashbuckle.AspNetCore.Swagger, Version=6.5.0.0, Culture=neutral, PublicKeyToken=62657d7474907593, processorArchitecture=MSIL">
       <HintPath>packages\Swashbuckle.AspNetCore.Swagger.6.5.0\lib\netstandard2.0\Swashbuckle.AspNetCore.Swagger.dll</HintPath>
     </Reference>

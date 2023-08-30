@@ -35,7 +35,6 @@ namespace gov.llnl.wintap
 
         protected override void OnStart(string[] args)
         {
-            //System.Diagnostics.Debugger.Launch();
             WintapLogger.Log.Append("Creating startup thread.", LogLevel.Always);
             BackgroundWorker startupWorker = new BackgroundWorker();
             startupWorker.DoWork += startupWorker_DoWork;
@@ -115,9 +114,10 @@ namespace gov.llnl.wintap
             System.Threading.Thread.Sleep(5000);  // allow plugins to init
             WintapLogger.Log.Append("Starting Wintap collectors", LogLevel.Always);
             subscriptionMgr = new SubscriptionManager();
+            subscriptionMgr.Start();
             try
             {
-                subscriptionMgr.Start();
+
             }
             catch (Exception ex)
             {

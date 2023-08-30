@@ -42,12 +42,13 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         internal void GenProcessTree()
         {
+            //System.Diagnostics.Debugger.Launch();
             WintapLogger.Log.Append("Generating process tree.", LogLevel.Always);
 
             // PROCESS TREE GEN
             DateTime lastProcessEventTime = DateTime.Now;
             publishUntracedProcesses();
-            if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
+            if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(5, 5, 0))
             {
                 // get ground truth from boot trace
                 WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Always);
@@ -91,6 +92,14 @@ namespace gov.llnl.wintap.collect.etw.helpers
             kernelProcess.ProcessName = "ntoskrnl.exe";
             kernelProcess.Process = new WintapMessage.ProcessObject() { CommandLine = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", Name = kernelProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", User = "system" };
             PublishProcess(kernelProcess);
+
+            // idle not captured through the etw boot trace.
+            WintapMessage idleProcess = new WintapMessage(StateManager.MachineBootTime, 0, "Process");
+            idleProcess.ActivityType = "refresh";
+            idleProcess.PidHash = idGen.GenPidHash(0, StateManager.MachineBootTime.ToFileTimeUtc());
+            idleProcess.ProcessName = "idle";
+            idleProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "idle", Name = idleProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "idle", User = "system" };
+            PublishProcess(idleProcess);
 
             //  UNKOWN process as the faux root for processes with no available parent.  
             WintapMessage unknownProcess = new WintapMessage(StateManager.MachineBootTime, 1, "Process");
@@ -187,6 +196,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         private void publishTree(TreeNode rootNode)
         {
+            WintapLogger.Log.Append("BEGIN:  process tree refresh", LogLevel.Always);
             List<TreeNode> allNodes = rootNode.GetDescendantNodes(rootNode);
             allNodes.Add(rootNode);
             foreach (TreeNode node in allNodes)
@@ -204,6 +214,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 msg.Process = new WintapMessage.ProcessObject() { CommandLine = node.Data.ProcessPath, Name = node.Data.ProcessName, ParentPID = node.Data.ParentPid, ParentPidHash = node.Data.ParentPidHash, Path = node.Data.ProcessPath };
                 PublishProcess(msg);
             }
+            WintapLogger.Log.Append("END:  process tree refresh", LogLevel.Always);
         }
 
         internal void PublishProcess(WintapMessage msg)
@@ -213,7 +224,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             Add(msg);
             StateManager.SentProcessList.Add(msg.PidHash);
             EventChannel.Send(msg);
-            WintapLogger.Log.Append("process sent to subscribers : " + msg.ProcessName + " " + msg.PID + " " + msg.PidHash, LogLevel.Always);
+            WintapLogger.Log.Append("process sent to subscribers : " + msg.ProcessName + " " + msg.PID + " " + msg.PidHash, LogLevel.Debug);
         }
 
         private void serializeProcessTree(object sender, ElapsedEventArgs e)

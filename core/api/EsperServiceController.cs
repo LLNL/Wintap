@@ -4,17 +4,13 @@
  * All rights reserved.
  */
 
-//using System.Web.Http;
-using Microsoft.AspNet.SignalR;
 using gov.llnl.wintap.core.infrastructure;
-using Microsoft.AspNet.SignalR.Hubs;
-using System.Web.Http;
-using System;
 using gov.llnl.wintap.core.shared;
+using Microsoft.AspNet.SignalR;
+using System;
 using System.IO;
 using System.Text;
-using Sharpen;
-using System.Linq;
+using System.Web.Http;
 
 namespace gov.llnl.wintap.core.api
 {

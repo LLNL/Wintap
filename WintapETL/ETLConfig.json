@@ -1,0 +1,28 @@
+{
+  "Adapters": [
+    {
+      "Properties": {
+        "EndPoint": "",
+	"Port": "",
+        "CertificateStore": "",
+	"DeviceCertificateName": ""
+      },
+      "Name": "SignedS3UrlAdapter",
+      "Enabled": false
+    },
+    {
+      "Properties": {
+        "UNCPath": ""
+      },
+      "Name": "SMBFileShareAdapter",
+      "Enabled": false
+    }
+  ],
+  "LogLevel": "Normal",
+  "SensorProfile": "Quality",
+  "SerializationIntervalSec": 30,
+  "UploadIntervalSec": 300,
+  "WriteToParquet": true,
+  "WriteToCsv": false
+}
+

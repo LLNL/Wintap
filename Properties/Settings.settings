@@ -60,10 +60,6 @@
       <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
 &lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
     </Setting>
-    <Setting Name="ExemptPlugins" Type="System.Collections.Specialized.StringCollection" Scope="User">
-      <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
-&lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
-    </Setting>
     <Setting Name="MicrosoftWindowsGroupPolicyCollector" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
@@ -77,7 +73,7 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="Profile" Type="System.String" Scope="User">
-      <Value Profile="(Default)">Developer</Value>
+      <Value Profile="(Default)">Production</Value>
     </Setting>
     <Setting Name="ConfigVersion" Type="System.String" Scope="User">
       <Value Profile="(Default)">1.0.0.0</Value>

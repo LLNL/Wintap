@@ -46,14 +46,6 @@ namespace gov.llnl.wintap.etl.extract
                 if (wintapMessage.MessageType == "Process" && (wintapMessage.ActivityType == "start" || wintapMessage.ActivityType == "refresh"))
                 {
                     handleStartEvent(wintapMessage);
-                    if(wintapMessage.PID == 4)
-                    {
-                        Logger.Log.Append("Got SYSTEM Process: " + wintapMessage.PidHash, LogLevel.Always);
-                    }
-                    if(wintapMessage.Process.ParentProcessName == "smss.exe")
-                    {
-                        Logger.Log.Append("Got SMSS Process: " + wintapMessage.PidHash, LogLevel.Always);
-                    }
                 }
             }
             catch (Exception ex)

@@ -11,6 +11,8 @@ using System.Net.Http;
 using Newtonsoft.Json;
 using gov.llnl.wintap.etl.models;
 using System.Web.UI.WebControls;
+using System.ComponentModel;
+using System.Diagnostics;
 
 namespace gov.llnl.wintap.etl.load.adapters
 {
@@ -20,6 +22,7 @@ namespace gov.llnl.wintap.etl.load.adapters
         private MqttClient client;
         private string clientId;
         private CertificateManager certificateManager;
+        private int pendingUploadCounter;
 
         public event EventHandler<string> UploadCompleted;
         protected virtual void OnUploadCompleted(string message)
@@ -35,68 +38,109 @@ namespace gov.llnl.wintap.etl.load.adapters
 
         public bool PreUpload(Dictionary<string, string> parameters)
         {
-            Logger.Log.Append("PreUpload method called on SignedS3UrlUploader", LogLevel.Always);
-            certificateManager = new CertificateManager(parameters["CertificateStore"], parameters["DeviceCertificateName"]);
-            Logger.Log.Append("Got certs: " + certificateManager.deviceCertificate.SubjectName.ToString(), LogLevel.Always);
+            Logger.Log.Append("Initiating MQTT session", LogLevel.Always);
+            bool preUploadSuccess = false;
+            try
+            {
+                pendingUploadCounter = 0;
+                certificateManager = new CertificateManager(parameters["CertificateStore"], parameters["DeviceCertificateName"]);
+                Logger.Log.Append("Connecting with subject: " + certificateManager.deviceCertificate.Subject, LogLevel.Always);
 
-            // Create a new MQTT client.
-            client = new MqttClient(parameters["EndPoint"], Convert.ToInt32(parameters["Port"]), true, null, certificateManager.deviceCertificate, MqttSslProtocols.TLSv1_2);
-            
-            //Event Handler Wiring
-            client.MqttMsgPublishReceived += Client_MqttMsgPublishReceived;
-            client.MqttMsgSubscribed += Client_MqttMsgSubscribed;
+                client = new MqttClient(parameters["EndPoint"], Convert.ToInt32(parameters["Port"]), true, null, certificateManager.deviceCertificate, MqttSslProtocols.TLSv1_2);
 
-            clientId = Environment.MachineName.ToLower();
+                client.MqttMsgPublishReceived += Client_MqttMsgPublishReceived;
+                client.MqttMsgSubscribed += Client_MqttMsgSubscribed;
 
-            //Connect
-            client.Connect(clientId);
-            Logger.Log.Append($"Connected to AWS IoT with client id: " + clientId, LogLevel.Always);
+                clientId = Environment.MachineName.ToLower();
 
-            //subscribe to response
-            string topic = "wintap/" + clientId + "/response";
-            client.Subscribe(new string[] { topic }, new byte[] { MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE });
-            Logger.Log.Append("IoT subscription set", LogLevel.Always);
+                Logger.Log.Append("Attempting MQTT client connect with clientId: " + clientId, LogLevel.Always);
+                client.Connect(clientId);
+                Logger.Log.Append("   Connected.  creating topic subscription.", LogLevel.Always);
 
-
-            return true;
+                string topic = "wintap/" + clientId + "/response";
+                client.Subscribe(new string[] { topic }, new byte[] { MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE });
+                preUploadSuccess = true;
+                Logger.Log.Append("MQTT session created.", LogLevel.Always);
+            }
+            catch(Exception ex)
+            {
+                Logger.Log.Append("ERROR in PreUpload: " + ex.Message, LogLevel.Always);
+            }
+            return preUploadSuccess;
         }
 
         public bool Upload(string localFile, Dictionary<string,string> parameters)
         {
             processing = true;
+            bool uploadSuccess = false;
             try
             {
-                // convert local path to s3 object path
+                Logger.Log.Append("starting upload on file: " + localFile, LogLevel.Always);
                 string s3Path = getS3ObjectNameForFile(localFile);
-
+                Logger.Log.Append("  converted s3 path: " + s3Path, LogLevel.Debug);
                 //send url request
                 var message = JsonConvert.SerializeObject(new IotMessage() { filename = localFile, s3objectpath = s3Path });
                 client.Publish("wintap/" + clientId + "/request", Encoding.UTF8.GetBytes($"{message}"));
-                Logger.Log.Append("published signed url request to topic: " + "wintap/" + clientId + "/request", LogLevel.Always);
+                uploadSuccess = true;
+                pendingUploadCounter++;
+                Logger.Log.Append("signed s3 upload url requested for " + localFile, LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("MQTT error: " + ex.Message, LogLevel.Always);
+                Logger.Log.Append("Upload error: " + ex.Message, LogLevel.Always);
             }
-            return true;
+            return uploadSuccess;
         }
 
         public bool PostUpload()
         {
             Logger.Log.Append("PostUpload method called on SignedS3UrlUploader", LogLevel.Always);
-            client.Disconnect();
+            BackgroundWorker uploadWaitWorker = new BackgroundWorker();
+            uploadWaitWorker.WorkerSupportsCancellation = true;
+            uploadWaitWorker.DoWork += UploadWaitWorker_DoWork;
+            uploadWaitWorker.RunWorkerCompleted += UploadWaitWorker_RunWorkerCompleted;
+            uploadWaitWorker.RunWorkerAsync();
             return true;
+        }
+
+        private void UploadWaitWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            
+        }
+
+        private void UploadWaitWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            Stopwatch uploadTimer = Stopwatch.StartNew();
+            try
+            {
+                while(pendingUploadCounter > 0)
+                {
+                    Logger.Log.Append("Awaiting async upload to complete. Files pending upload: " + pendingUploadCounter, LogLevel.Always);
+                    System.Threading.Thread.Sleep(1000);
+                    if(uploadTimer.Elapsed.TotalMinutes > 1)
+                    {
+                        Logger.Log.Append("Timeout execeeded on upload worker.  Files dropped " + pendingUploadCounter, LogLevel.Always);
+                        break;
+                    }
+                }
+                Logger.Log.Append("Disconnecting MQTT client.  Total files NOT uploaded: " + pendingUploadCounter, LogLevel.Always);
+                client.Disconnect();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Append("ERROR in postUpload: " + ex.Message, LogLevel.Always);
+            }
         }
 
         private void Client_MqttMsgSubscribed(object sender, MqttMsgSubscribedEventArgs e)
         {
-            Logger.Log.Append("Subscribed to topic", LogLevel.Always);
+            Logger.Log.Append("MQTT topic subscription established.", LogLevel.Always);
         }
 
         private void Client_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
         {
             IotMessage iotMsg = JsonConvert.DeserializeObject<IotMessage>(Encoding.UTF8.GetString(e.Message));
-            Logger.Log.Append("Filename: " + iotMsg.filename + "   URL: " + iotMsg.url, LogLevel.Always);
+            Logger.Log.Append("signed url received for file: " + iotMsg.filename, LogLevel.Debug);
             sendToS3(iotMsg.filename, iotMsg.url);
             // notify cacheManager that this file is ready for pruning.
             OnUploadCompleted(iotMsg.filename);
@@ -139,20 +183,14 @@ namespace gov.llnl.wintap.etl.load.adapters
                 {
                     Logger.Log.Append("attempting to send: " + localPath + " to : " + signedUrl, LogLevel.Always);
                     var response = await httpClient.PutAsync(signedUrl, contentToUpload);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        Logger.Log.Append("    response: " + response.StatusCode.ToString(), LogLevel.Always);
-                    }
-                    else
-                    {
-                        Logger.Log.Append("    FAIL: " + response.StatusCode.ToString(), LogLevel.Always);
-                    }
+                    Logger.Log.Append("    HTTP PUT response: " + response.StatusCode.ToString() + " on file: " + localPath, LogLevel.Always);
                 }
             }
             catch(Exception ex)
             {
-                Logger.Log.Append("ERROR in upload: " + ex.Message, LogLevel.Always);
+                Logger.Log.Append("ERROR in upload of file: " + localPath + "  msg: " + ex.Message, LogLevel.Always);
             }
+            pendingUploadCounter--;
         }
     }
 

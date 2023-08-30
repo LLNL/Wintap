@@ -268,13 +268,12 @@ namespace gov.llnl.wintap.etl.load
 
         private void runMerger(string path, long eventTime)
         {
-            Logger.Log.Append("Shelling out for parquet merge for sensor: " + path, LogLevel.Always);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = Strings.WintapPath + @"mergertool\MergeHelper.exe";
             psi.Arguments = path + " " + eventTime;
             Process helperExe = new Process();
             helperExe.StartInfo = psi;
-            Logger.Log.Append("Attempting to run parquet merger: " + psi.FileName + " " + psi.Arguments, LogLevel.Always);
+            Logger.Log.Append("Requesting parquet merge: " + psi.FileName + " " + psi.Arguments, LogLevel.Always);
             helperExe.Start();
             mergeHelperPid = helperExe.Id;
             Timer hangDetector = new Timer();
@@ -297,7 +296,6 @@ namespace gov.llnl.wintap.etl.load
                     if(file.FullName.EndsWith("parquet"))
                     {
                         file.Delete();
-                        Logger.Log.Append("Deleted file: " + file.FullName, LogLevel.Always);
                     }
                 }
                 catch(Exception ex)

@@ -66,7 +66,8 @@ namespace gov.llnl.wintap.collect
         private void sendEvent(EventRecord entry)
         {
             this.Counter++;
-            WintapMessage msg = new WintapMessage(entry.TimeCreated.Value, entry.ProcessId.Value, "EventLogEvent");
+            int pid = entry.ProcessId.Value;
+            WintapMessage msg = new WintapMessage(entry.TimeCreated.Value, pid, "EventLogEvent");
             msg.ActivityType = "EntryWritten";
             msg.EventLogEvent = new WintapMessage.EventlogEventObject();
             msg.EventLogEvent.EventId = entry.Id;

@@ -116,7 +116,7 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         public static void Send(WintapMessage streamedEvent)
         {
-            if(streamedEvent.MessageType != "ProcessPartial" && streamedEvent.PID > 0)
+            if(streamedEvent.MessageType != "ProcessPartial")
             {
                 try
                 {
@@ -127,7 +127,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 catch(InvalidOperationException)
                 {
                     eventBuffer.Enqueue(streamedEvent);
-                    WintapLogger.Log.Append("PidHash not found for PID: " + streamedEvent.PID + "  buffering...", LogLevel.Always);
+                    WintapLogger.Log.Append("PidHash not found for PID: " + streamedEvent.PID + ".  queued for retry", LogLevel.Debug);
                     return;
                 }
                 catch(Exception ex)

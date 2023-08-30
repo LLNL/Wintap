@@ -44,7 +44,7 @@ namespace gov.llnl.wintap.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("WARN creating default sensor data object for pid: " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Always);
+                Logger.Log.Append("WARN creating default sensor data object for pid: " + sensorEvent["PID"] + " message type: " + sensorEvent["MessageType"] + ", exception: " + ex.Message, LogLevel.Always);
             }
         }
     }

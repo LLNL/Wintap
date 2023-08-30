@@ -52,6 +52,11 @@ namespace gov.llnl.wintap.collect
 
                         metric.AppName = obj.PayloadStringByName("ProcessInfo" + i);
                         if (metric.AppName.Contains("|")) { metric.AppName = metric.AppName.Split(new char[] { '|' })[0]; }  // windows store apps have a pipe delimited long name containing extra metadata we don't want
+                        if (metric.PID == 0)
+                        {
+                            metric.AppName = "idle";  // this provider assigns 'Unknown' as the appname when pid 0 is always the idle process, this is a fix?
+                        }
+
                         metric.AppPath = obj.PayloadStringByName("ImagePath" + i);
 
                         metric.Timestamp = obj.TimeStamp;

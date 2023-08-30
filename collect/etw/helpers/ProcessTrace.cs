@@ -69,7 +69,8 @@ namespace gov.llnl.wintap.collect.etw.helpers
                                 }
                                 if (data.EventName == "ImageLoad")
                                 {
-                                    int processId = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
+                                    //int processId = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
+                                    int processId = data.ProcessID;
                                     string processName = this.TranslateFilePath(data.PayloadByName("ImageName").ToString().ToLower()).ToLower();
                                     WintapMessage processPartial = new WintapMessage(DateTime.UtcNow, processId, "ProcessPartial") { ActivityType = data.EventName };
                                     processPartial.Process = new WintapMessage.ProcessObject() { Path = processName.ToLower() };
@@ -82,7 +83,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
                         }
                         catch (Exception ex)
                         {
-                            WintapLogger.Log.Append("Could not process event: " + data.ToString() + "  msg: " + ex.Message, LogLevel.Always);
+                            WintapLogger.Log.Append("ERROR in boot trace.  Could not parse event: " + ex.Message, LogLevel.Always);
                         }                       
                     }
                 };
