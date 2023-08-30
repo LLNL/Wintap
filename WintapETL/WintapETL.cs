@@ -19,6 +19,10 @@ using gov.llnl.wintap.etl.extract;
 using gov.llnl.wintap.etl.load;
 using System.Diagnostics.Tracing;
 using System.IO;
+using System.Xml.Serialization;
+using gov.llnl.wintap.etl.load.interfaces;
+using gov.llnl.wintap.etl.model;
+using Newtonsoft.Json;
 
 namespace gov.llnl.wintap.etl
 {
@@ -37,24 +41,29 @@ namespace gov.llnl.wintap.etl
         private REGISTRY_SENSOR regSensor;
         private FOCUSCHANGE_SENSOR fcSensor;
         private DEFAULT_SENSOR defaultSensor;
-        private Uploader dataSender;
+        private CacheManager cacheMgr;
         private List<Sensor> sensors;
         private DateTime lastNetChange;
         private readonly string esperNameSpacePrefix = "gov.llnl.wintap.etl.esper.";
         private long totalMessageCount;
-        private ProcessObjectModel pom;
+        ETLConfig etlConfig;
+        // debug
+        private List<string> processPidHash;
         #endregion
 
         #region public methods
 
         List<string> ISubscribeEtw.Startup()
         {
+            processPidHash = new List<string>();
             List<string> providers = new List<string>() { "Microsoft-Windows-NetworkProfile" };
             return providers;
         }
 
         public EventFlags Startup()
         {
+            etlConfig = Utilities.GetETLConfig();
+
             lastNetChange = DateTime.Now;
             BackgroundWorker processObjectModelWorker = new BackgroundWorker();
             processObjectModelWorker.DoWork += ProcessObjectModelWorker_DoWork;
@@ -62,18 +71,10 @@ namespace gov.llnl.wintap.etl
             processObjectModelWorker.RunWorkerAsync();
 
 
-
-            if (gov.llnl.wintap.etl.shared.Utilities.GetActiveNICs().Count > 0)
-            {
-                BackgroundWorker workerThread = new BackgroundWorker();
-                workerThread.DoWork += WorkerThread_DoWork;
-                workerThread.RunWorkerCompleted += WorkerThread_RunWorkerCompleted;
-                workerThread.RunWorkerAsync();
-            }
-            else
-            {
-                Logger.Log.Append("No network detected.  WintapETL is running but will not process event data until it restarts again with network", LogLevel.Always);
-            }
+            BackgroundWorker workerThread = new BackgroundWorker();
+            workerThread.DoWork += WorkerThread_DoWork;
+            workerThread.RunWorkerCompleted += WorkerThread_RunWorkerCompleted;
+            workerThread.RunWorkerAsync();
 
             Timer statsUpdateTimer = new Timer();
             statsUpdateTimer.Interval = 5000;
@@ -84,15 +85,11 @@ namespace gov.llnl.wintap.etl
             string wintapVersion = System.Reflection.Assembly.GetEntryAssembly().GetName().Version.ToString();
             string etlVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
-            Logger.Log.Append("Creating initial host and macip records...", LogLevel.Always);
-            HOST_SENSOR.Instance.WriteHostRecord();
-            HOST_SENSOR.Instance.WriteMacIPRecords();
-
             Logger.Log.Append("startup complete.  Wintap version: " + wintapVersion + "  WintapEtl version: " + etlVersion, LogLevel.Always);
 
 
             // default config defined here activates Process and Network events.  Additional providers are opt-in via Wintap config (i.e. File, Registry)
-            return EventFlags.Process | EventFlags.UdpPacket | EventFlags.TcpConnection;
+            return EventFlags.Process;
         }
 
         /// <summary>
@@ -159,7 +156,7 @@ namespace gov.llnl.wintap.etl
 
         public void Shutdown()
         {
-            dataSender.Stop();
+            cacheMgr.Stop();
             processSensor.Stop();
             Logger.Log.Append("shutdown complete", LogLevel.Always);
             Logger.Log.Close();
@@ -172,12 +169,12 @@ namespace gov.llnl.wintap.etl
         private void ProcessObjectModelWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             Logger.Log.Append("Creating sensors", LogLevel.Always);
-            defaultSensor = new DEFAULT_SENSOR(esperNameSpacePrefix + "default.epl", pom);
-            fileSensor = new FILE_SENSOR(esperNameSpacePrefix + "file.epl", pom);
-            fcSensor = new FOCUSCHANGE_SENSOR(esperNameSpacePrefix + "focuschange.epl", pom);
-            regSensor = new REGISTRY_SENSOR(esperNameSpacePrefix + "registry.epl", pom);
-            tcpSensor = new TCPCONNECTION_SENSOR(new string[] { esperNameSpacePrefix + "tcp.epl" }, pom);
-            udpSensor = new UDPPACKET_SENSOR(new string[] { esperNameSpacePrefix + "udp.epl" }, pom);
+            defaultSensor = new DEFAULT_SENSOR(esperNameSpacePrefix + "default.epl");
+            fileSensor = new FILE_SENSOR(esperNameSpacePrefix + "file.epl");
+            fcSensor = new FOCUSCHANGE_SENSOR(esperNameSpacePrefix + "focuschange.epl");
+            regSensor = new REGISTRY_SENSOR(esperNameSpacePrefix + "registry.epl");
+            tcpSensor = new TCPCONNECTION_SENSOR(new string[] { esperNameSpacePrefix + "tcp.epl" });
+            udpSensor = new UDPPACKET_SENSOR(new string[] { esperNameSpacePrefix + "udp.epl" });
             sensors = new List<Sensor>();
             sensors.Add(defaultSensor);
             sensors.Add(processSensor);
@@ -187,16 +184,14 @@ namespace gov.llnl.wintap.etl
             sensors.Add(udpSensor);
             sensors.Add(regSensor);
             sensors.Add(fcSensor);
-            Logger.Log.Append("All sensors created.  Sensor serialization interval (msec): " + gov.llnl.wintap.etl.shared.Utilities.GetSerializationIntervalFromConfig(), LogLevel.Always);
+            Logger.Log.Append("All sensors created.  Sensor serialization interval (msec): " + etlConfig.SerializationIntervalSec, LogLevel.Always);
         }
 
         private void ProcessObjectModelWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            pom = new ProcessObjectModel();
-            Logger.Log.Append("Process Object Model created.  Total process events in tree: " + pom.ProcessObjects.Count, LogLevel.Always);
             Logger.Log.Append("Creating process sensors", LogLevel.Always);
-            processSensor = new PROCESS_SENSOR(esperNameSpacePrefix + "process.epl", pom);
-            processStopSensor = new PROCESSSTOP_SENSOR(esperNameSpacePrefix + "process-stop.epl", pom);
+            processSensor = new PROCESS_SENSOR(esperNameSpacePrefix + "process.epl");
+            processStopSensor = new PROCESSSTOP_SENSOR(esperNameSpacePrefix + "process-stop.epl");
             Logger.Log.Append("Process context created.", LogLevel.Always);
         }
 
@@ -212,22 +207,19 @@ namespace gov.llnl.wintap.etl
 
         private void WorkerThread_DoWork(object sender, DoWorkEventArgs e)
         {
-            Logger.Log.Append("creating data sender", LogLevel.Always);
+            Logger.Log.Append("creating wintap data cache manager", LogLevel.Always);
+            List<IUpload> uploaders = new List<IUpload>();
+            cacheMgr = new CacheManager(etlConfig);
+            cacheMgr.Start();
+            Logger.Log.Append("File uploader is running", LogLevel.Always);
             try
             {
-                DirectoryInfo parquetDir = new DirectoryInfo(Strings.ParquetDataPath);
-                if(!parquetDir.Exists ) 
-                {
-                    parquetDir.Create();
-                }
-                dataSender = new Uploader();
-                dataSender.Start();
-                Logger.Log.Append("File uploader is running", LogLevel.Always);
+
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error initializing sender: " + ex.Message + ", startup will NOT complete", LogLevel.Always);
-                throw new Exception("Sender not initialized");
+                Logger.Log.Append("Error initializing cache manager: " + ex.Message + ", startup will NOT complete", LogLevel.Always);
+                throw new Exception("CacheManager not initialized");
             }
 
             Logger.Log.Append("init complete", LogLevel.Always);
@@ -235,15 +227,14 @@ namespace gov.llnl.wintap.etl
 
         private void FileWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            fileSensor = new FILE_SENSOR(esperNameSpacePrefix + "file-activity.epl", pom);
+            fileSensor = new FILE_SENSOR(esperNameSpacePrefix + "file-activity.epl");
         }
 
         private void RegWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            regSensor = new REGISTRY_SENSOR(esperNameSpacePrefix + "reg-activity.epl", pom);
+            regSensor = new REGISTRY_SENSOR(esperNameSpacePrefix + "reg-activity.epl");
         }
 
         #endregion
-
     }
 }

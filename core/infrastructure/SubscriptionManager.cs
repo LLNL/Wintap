@@ -4,12 +4,10 @@
  * All rights reserved.
  */
 
+using gov.llnl.wintap.collect;
 using gov.llnl.wintap.collect.shared;
-using gov.llnl.wintap.collect.shared;
-using gov.llnl.wintap.core.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
-using Microsoft.Diagnostics.Tracing.Session;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -33,13 +31,23 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal void Start()
         {
+            // start process collector first for process attribution
+            ProcessCollector pc = new ProcessCollector();
+            pc.Start();
+            kernelFlags = KernelTraceEventParser.Keywords.Process;
+            baseCollectors.Add(pc);
+
             // start modelled collectors
             string nameSpace = "gov.llnl.wintap.collect";
             foreach (SettingsProperty sp in Properties.Settings.Default.Properties)
             {
                 if (sp.Name.EndsWith("Collector") && Properties.Settings.Default[sp.Name].ToString() == "True")
                 {
-                    System.Threading.Thread.Sleep(500);  // without this you will sometimes get an exception from TraceEventSession - race condition? 
+                    System.Threading.Thread.Sleep(500);  // without this you will sometimes get an exception from TraceEventSession
+                    if(sp.Name == "ProcessCollector") 
+                    { 
+                        continue; 
+                    } 
                     string collectorName = nameSpace + "." + sp.Name;
                     WintapLogger.Log.Append("Attempting to load collector with name: " + collectorName, LogLevel.Always);
                     try
@@ -137,7 +145,6 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 WintapLogger.Log.Append("starting kernel mode ETW event handler", LogLevel.Always);
-
                 //TraceEventSession  kernelSession = new TraceEventSession("NT Kernel Logger", TraceEventSessionOptions.Create);
                 //kernelSession.BufferSizeMB = 250;
                 //if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
@@ -148,7 +155,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 KernelSession.Instance.Start();
                 ETWTraceEventSource source = KernelSource.Instance.EtwSource;
                 source.Process();  // this is a blocking call! 
-                WintapLogger.Log.Append("CRITICAL: Kernel mode etw listening thread has stopped", LogLevel.Always);
+                WintapLogger.Log.Append("CRITICAL ERROR: Kernel mode etw listening thread has stopped", LogLevel.Always);
             }
             catch(Exception ex)
             {

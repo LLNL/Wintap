@@ -15,6 +15,7 @@ using Microsoft.Owin.Hosting;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.shared;
+using System.Diagnostics;
 
 namespace gov.llnl.wintap
 {
@@ -36,8 +37,9 @@ namespace gov.llnl.wintap
         {
             WintapLogger.Log.Append("Creating startup thread.", LogLevel.Always);
             BackgroundWorker startupWorker = new BackgroundWorker();
-            startupWorker.DoWork += new DoWorkEventHandler(startupWorker_DoWork);
+            startupWorker.DoWork += startupWorker_DoWork;
             startupWorker.RunWorkerAsync();
+            WintapLogger.Log.Append("Startup method complete.", LogLevel.Always);
 
         }
         protected override void OnStop()
@@ -76,6 +78,21 @@ namespace gov.llnl.wintap
             WintapLogger.Log.Append("Getting sensor configuration...", LogLevel.Always);
             
 
+            WintapLogger.Log.Append("loading plugin manager...", LogLevel.Always);
+            pluginMgr = new PluginManager();
+
+            WintapLogger.Log.Append("Creating performance monitor", LogLevel.Always);
+            Watchdog watchdog = new Watchdog();
+            try
+            {
+                WintapLogger.Log.Append("attempting to register plugins...", LogLevel.Always);
+                pluginMgr.RegisterPlugins(watchdog);
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append("Error loading plugins: " + ex.Message, LogLevel.Always);
+            }
+
             WintapLogger.Log.Append("workbench config value: " + Properties.Settings.Default.EnableWorkbench, LogLevel.Always);
             if (Properties.Settings.Default.EnableWorkbench)
             {
@@ -83,30 +100,28 @@ namespace gov.llnl.wintap
                 startWorkbench();
             }
 
-            WintapLogger.Log.Append("loading plugin manager...", LogLevel.Always);
-            pluginMgr = new PluginManager();
-            WintapLogger.Log.Append("attempting to register plugins...", LogLevel.Always);
-            subscriptionMgr = new SubscriptionManager();
+            // ETW rundown to resolve file paths.  TODO:  only do if FILE events are enabled.
+            WintapLogger.Log.Append("Doing ETW File path rundown", LogLevel.Always);
+            ProcessStartInfo rundownPsi = new ProcessStartInfo();
+            rundownPsi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
+            rundownPsi.Arguments = "RUNDOWN";
+            System.Diagnostics.Process rundown = new Process();
+            rundown.StartInfo = rundownPsi;
+            rundown.Start();
+            rundown.WaitForExit();
 
+
+            System.Threading.Thread.Sleep(5000);  // allow plugins to init
+            WintapLogger.Log.Append("Starting Wintap collectors", LogLevel.Always);
+            subscriptionMgr = new SubscriptionManager();
+            subscriptionMgr.Start();
             try
             {
-                subscriptionMgr.Start();
+
             }
             catch (Exception ex)
             {
                 WintapLogger.Log.Append("ERROR starting event subscription manager: " + ex.Message, LogLevel.Always);
-            }
-
-            WintapLogger.Log.Append("Creating performance monitor", LogLevel.Always);
-
-            Watchdog watchdog = new Watchdog();
-            try
-            {
-                pluginMgr.RegisterPlugins(watchdog);
-            }
-            catch(Exception ex)
-            {
-                WintapLogger.Log.Append("Error loading plugins: " + ex.Message, LogLevel.Always);
             }
 
             WintapLogger.Log.Append("Startup complete.", LogLevel.Always);
@@ -119,6 +134,12 @@ namespace gov.llnl.wintap
 
                 string wintapDir = Strings.FileRootPath + "\\";
                 DirectoryInfo workbenchInfo = new DirectoryInfo(wintapDir + "\\Workbench");
+                if (!workbenchInfo.Exists)
+                {
+                    workbenchInfo.Create();
+                    WintapLogger.Log.Append("extraction path: " + wintapDir, LogLevel.Always);
+                    System.IO.Compression.ZipFile.ExtractToDirectory(wintapDir + "workbench.zip", wintapDir);
+                }
             }
             catch(Exception ex)
             {

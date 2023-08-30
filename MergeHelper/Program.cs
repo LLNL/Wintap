@@ -3,19 +3,19 @@
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
  */
-
-using ChoETL;
 using gov.llnl.wintap.etl.load;
 using gov.llnl.wintap.etl.helpers.utils;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using DuckDB.NET.Data;
+using System.Diagnostics;
 
 namespace gov.llnl.wintap.etl.helpers
 {
     /// <summary>
     /// Shell program for merging multiple parquets into a single parquet by type.
+    /// program takes a root path containing the individual parquets, and an event time (merge time)
     /// </summary>
     class Program
     {
@@ -27,202 +27,145 @@ namespace gov.llnl.wintap.etl.helpers
 
         static void Main(string[] args)
         {
+            // INIT LOGGING
             log = new Logit("frye3", LogType.Append, LogVerboseLevel.Normal);
             log.LogDir = Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Logs";
             log.Init();
             log.Append(log.ProgramName + " is starting", LogVerboseLevel.Normal);
 
-            log.Append("Parsing command line argument for root search path", LogVerboseLevel.Normal);
+            // CHECK AND PROCESS INPUTS
             try
             {
-                parquetSearchRoot = args[0];
-                DirectoryInfo parquetSearchInfo = new DirectoryInfo(parquetSearchRoot);
-                wintapDataRoot = parquetSearchInfo.Parent.FullName;
-                sensorName = parquetSearchInfo.Name;
+                processInputs(args);
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
-                log.Append("Error obtaining parquet search root (merge will exit): " + ex.Message, LogVerboseLevel.Normal);
-                return;
-            }
-           
-            log.Append("Search root: " + parquetSearchRoot, LogVerboseLevel.Normal);
-            if(parquetSearchRoot.ToLower().Contains("merged"))
-            {
-                log.Append("skipping merge folder.", LogVerboseLevel.Normal);
+                log.Append("Error processing inputs: " + ex.Message, LogVerboseLevel.Normal);
                 log.Close();
                 return;
             }
 
-            log.Append("Parsing Merge time from command line args (all merged parquets in an upload batch share this value)", LogVerboseLevel.Normal);
+            // MERGE PARQUET
             try
             {
-                mergeTime = DateTime.FromFileTimeUtc(Convert.ToInt64(args[1])).ToUniversalTime();
-            }
-            catch (Exception ex)
-            {
-                log.Append("Error obtaining merge time from command line args (merge will exit), error: " + ex.Message, LogVerboseLevel.Normal);
-                return;
-            }
-            log.Append("Merge time: " + mergeTime, LogVerboseLevel.Normal);
-
-            log.Append("Searching root for all parquet files...", LogVerboseLevel.Normal);
-            List<FileInfo> allParquets;
-            try
-            {
-                allParquets = searchForParquetFiles();
-            }
-            catch (Exception ex)
-            {
-                log.Append("Error in parquet search (merge will exit): " + ex.Message, LogVerboseLevel.Normal);
-                return;
-            }
-
-            log.Append("Total parquet files found: " + allParquets.Count() + ",  organizing by type...", LogVerboseLevel.Normal);
-            Dictionary<string, List<FileInfo>> taggedList = new Dictionary<string, List<FileInfo>>();
-            try
-            {
-                taggedList = groupByType(allParquets);
-                log.Append("Totals by MessageType for this merge: ", LogVerboseLevel.Normal);
-                foreach (string tag in taggedList.Keys)
+                if (parquetSearchRoot.EndsWith("default_sensor"))
                 {
-                    log.Append("  " + tag + ":  " + taggedList[tag].Count, LogVerboseLevel.Normal);
+                    callMergeOnDefaultTypes(parquetSearchRoot, mergeTime.ToFileTimeUtc());
+                }
+                else
+                {
+                    log.Append("Attempting to query parquets at root: " + parquetSearchRoot, LogVerboseLevel.Normal);
+                    sensorName = renameSensor(sensorName);  // e.g. tcp/udp
+                    using (var duckDBConnection = new DuckDBConnection("Data Source=:memory:"))
+                    {
+                        duckDBConnection.Open();
+                        var command = duckDBConnection.CreateCommand();
+                        string parquetDir = Environment.GetEnvironmentVariable("PROGRAMDATA").Replace("\\", "/") + "/wintap/parquet/merged";
+                        string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("_sensor","") + "+" + mergeTime.ToFileTimeUtc().ToString();
+                        string tempFileName = sensorName;
+                        command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";
+                        log.Append("Attempting sql: " + command.CommandText, LogVerboseLevel.Normal);
+                        var executeNonQuery = command.ExecuteNonQuery();
+                        command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
+                        executeNonQuery = command.ExecuteNonQuery();
+                        // duckdb is doing character substitution in the file name during export, so working around this for now
+                        FileInfo tempFile = new FileInfo(parquetDir + "\\" + tempFileName + ".parquet");
+                        FileInfo mergeFile = new FileInfo(parquetDir + "\\" + mergeFileName + ".parquet");
+                        tempFile.MoveTo(mergeFile.FullName);
+                        // WintapRecorder support
+                        if (RecordingSession.NowRecording(log))
+                        {
+                            log.Append("Mirroring merged parquet to recording directory: " + mergeFile, LogVerboseLevel.Normal);
+                            RecordingSession.Record(mergeFile.FullName, sensorName, log);
+                        }
+
+                    }
                 }
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
-                log.Append("Error organizing parquet files (merge will exit) : " + ex.Message, LogVerboseLevel.Normal);
-                return;
+                log.Append("Error in duckdb merge for: " + sensorName + " msg: " + ex.Message, LogVerboseLevel.Normal);
             }
-            log.Append("Files organized into " + taggedList.Keys.Count + " type groups.  Starting main merge...", LogVerboseLevel.Normal);
-
-            try
-            {
-                merge(taggedList);
-            }
-            catch (Exception ex)
-            {
-                log.Append("Error in merge: " + ex.Message, LogVerboseLevel.Normal);
-            }
-
+           
+                 
             log.Append("ALL DONE!", LogVerboseLevel.Normal);
             log.Close();
         }
 
-        private static void merge(Dictionary<string, List<FileInfo>> taggedList)
+        private static string renameSensor(string _sensorName)
         {
-            ChoParquetRecordConfiguration c = new ChoParquetRecordConfiguration();
-            c.CompressionMethod = Parquet.CompressionMethod.Snappy;
-            foreach (string typeName in taggedList.Keys)
+            if (_sensorName.ToLower() == "tcpconnection_sensor")
             {
-                log.Append("Merging files for type: " + typeName, LogVerboseLevel.Normal);
-                List<dynamic> choDynamicObjects = new List<dynamic>();
+                _sensorName = "tcp_process_conn_incr";
+            }
+            if (_sensorName.ToLower() == "udppacket_sensor")
+            {
+                _sensorName = "udp_process_conn_incr";
+            }
+            return _sensorName;
+        }
 
-                foreach (FileInfo parquetFile in taggedList[typeName])
-                {
-                    foreach (dynamic e in new ChoParquetReader(parquetFile.FullName))
-                    {
-                        choDynamicObjects.Add(e);
-                    }
-                    parquetFile.Delete();
-                }
-                log.Append("Total records found for " + typeName + ": " + choDynamicObjects.Count + "  attempting file merge...", LogVerboseLevel.Normal);
-
-                // create parquet writer and write .merged to merged folder
-                // format: hostname=eventType-timestamp.parquet
-                string mergeFileName = Environment.MachineName + "=" + typeName + "-" + mergeTime.ToFileTimeUtc() + ".parquet";
-                // if default, 'default_sensor' contains a subdir for each sensor created by it, use only the subdir portion of the name
-                string mergeFile = wintapDataRoot.Replace("\\gov.llnl.wintap.etl.sensors.default_sensor", "") + "\\merged\\" + mergeFileName;
-                log.Append("Writing merged contents to file: " + mergeFile, LogVerboseLevel.Normal);
-                FileInfo mergeFileInfo = new FileInfo(mergeFile);
-                Directory.CreateDirectory(mergeFileInfo.DirectoryName);
-                try
-                {
-                    using (var parser = new ChoParquetWriter(mergeFile, c))
-                    {
-                        parser.Write(choDynamicObjects);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    log.Append("ERROR MERGING TYPE: " + typeName + "  msg: " + ex.Message, LogVerboseLevel.Normal);
-                }
-
-                // WintapRecorder support...
-                if (RecordingSession.NowRecording(log))
-                {
-                    log.Append("Mirroring merged parquet to recording directory: " + mergeFile, LogVerboseLevel.Normal);
-                    RecordingSession.Record(mergeFile, typeName, log);
-                }
-
-                choDynamicObjects.Clear();
-                choDynamicObjects = null;
-                log.Append("Merge completed on type: " + typeName, LogVerboseLevel.Normal);
-
-                while (log.PendingEntryCount > 0)
-                {
-                    System.Threading.Thread.Sleep(20);
-                }
+        // call this program for all default_sensor subtypes
+        private static void callMergeOnDefaultTypes(string parquetSearchRoot, long eventTime)
+        {
+            DirectoryInfo directoryInfo = new DirectoryInfo(parquetSearchRoot);
+            foreach(DirectoryInfo defaultType in  directoryInfo.GetDirectories())
+            {
+                runCmdLine(defaultType.FullName, eventTime);
             }
         }
 
-        /// <summary>
-        /// A dictionary of file listings. 
-        /// The dict key is the sensor name
-        /// The list is a group of parquet file objects generated by the named sensor.
-        /// </summary>
-        private static Dictionary<string, List<FileInfo>> groupByType(List<FileInfo> allParquets)
+        private static void runCmdLine(string path, long eventTime)
         {
-            Dictionary<string, List<FileInfo>> _typedList = new Dictionary<string, List<FileInfo>>();
-            foreach (FileInfo genericParquet in allParquets)
-            {
-                string fileName = genericParquet.Name;
-                // file naming convention is: <name-of-datatype>-<timestamp>.parquet
-                string[] typeNameArray = fileName.Split(new char[] { '-' });
-                if (typeNameArray.Length != 2)
-                {
-                    throw new Exception("Unexpected parquet file name. Sensor data files must contain only one dash (-) character.");
-                }
-                string typeName = typeNameArray[0];
-                if (genericParquet.FullName.Contains("tcpconnection"))
-                {
-                    typeName = "tcp_" + typeName;
-                }
-                if (genericParquet.FullName.Contains("udppacket"))
-                {
-                    typeName = "udp_" + typeName;
-                }
-
-                if (_typedList.Keys.Contains(typeName))
-                {
-                    _typedList[typeName].Add(genericParquet);
-                }
-                else
-                {
-                    _typedList.Add(typeName, new List<FileInfo>());
-                    _typedList[typeName].Add(genericParquet);
-                }
-            }
-            if (_typedList.Keys.Count == 0)
-            {
-                throw new Exception("No sensor data types found. Check for parquet files at: " + parquetSearchRoot);
-            }
-            return _typedList;
+            log.Append("Shelling out for parquet merge for sensor: " + path, LogVerboseLevel.Normal);
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
+            psi.Arguments = path + " " + eventTime;
+            Process helperExe = new Process();
+            helperExe.StartInfo = psi;
+            log.Append("Attempting to rerun parquet merger: " + psi.FileName + " " + psi.Arguments, LogVerboseLevel.Normal);
+            helperExe.Start();
+            helperExe.WaitForExit();
+            log.Append("MergeHelper complete on : " + path, LogVerboseLevel.Normal);
         }
 
-        private static List<FileInfo> searchForParquetFiles()
+        private static void processInputs(string[] args)
         {
-            List<FileInfo> _allParquets = new List<FileInfo>();
-            DirectoryInfo rootInfo = new DirectoryInfo(parquetSearchRoot);
-            foreach (FileInfo parquetInfo in rootInfo.GetFiles("*.parquet", SearchOption.AllDirectories))
+            if (args.Count() != 2)
             {
-                _allParquets.Add(parquetInfo);
+                throw new Exception("Wrong number of command line parameters. Expected 2, got " + args.Count());
             }
-            if (_allParquets.Count == 0)
+            if (!new DirectoryInfo(args[0]).Exists)
             {
-                throw new Exception("No parquet files found");
+                throw new Exception("Argument 1 not a valid file system path. parameter value: " + args[0]);
             }
-            return _allParquets;
+            parquetSearchRoot = args[0];
+            DirectoryInfo parquetSearchInfo = new DirectoryInfo(parquetSearchRoot);
+            wintapDataRoot = parquetSearchInfo.Parent.FullName;
+            sensorName = parquetSearchInfo.Name;
+            log.Append("Search root: " + parquetSearchRoot, LogVerboseLevel.Normal);
+            if (parquetSearchInfo.GetFiles("*.parquet").Count() == 0)
+            {
+                throw new Exception("No parquet files found at path: " + parquetSearchInfo.FullName);
+            }
+            if (parquetSearchRoot.ToLower().Contains("merged"))
+            {
+                throw new Exception("invalid action: cannot merge the merge folder");
+            }
+            log.Append("Parsing Merge time from command line args (all merged parquets in an upload batch share this value)", LogVerboseLevel.Normal);
+            try
+            {
+                mergeTime = DateTime.FromFileTimeUtc(Convert.ToInt64(args[1])).ToUniversalTime();
+                if (!(DateTime.UtcNow.Subtract(mergeTime) > new TimeSpan(0, 0, 0) && DateTime.UtcNow.Subtract(mergeTime) < new TimeSpan(0, 1, 0, 0)))
+                {
+                    throw new Exception("Invalid merge time.  Received: " + mergeTime + ".   Value must be within 1 hour of now");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+            log.Append("Merge time: " + mergeTime, LogVerboseLevel.Normal);
         }
     }
 }

@@ -57,7 +57,7 @@ namespace gov.llnl.wintap.etl.load
             ChoParquetRecordConfiguration c = new ChoParquetRecordConfiguration();
             c.CompressionMethod = Parquet.CompressionMethod.Snappy;
             fileName = genNewFilePath(msgType, applyOffset);  // name will be .active to avoid file contention with the uploader.
-            if (bool.Parse(gov.llnl.wintap.etl.shared.Utilities.GetETLConfig().GetElementsByTagName("WriteToParquet")[0].InnerText))
+            if (Utilities.GetETLConfig().WriteToParquet)
             {
                 if (!Busy) 
                 {

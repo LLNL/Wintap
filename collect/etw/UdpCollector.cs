@@ -80,7 +80,7 @@ namespace gov.llnl.wintap.collect
                     wintapBuilder.UdpPacket.DestinationAddress = obj.saddr.ToString();
                     wintapBuilder.UdpPacket.DestinationPort = obj.sport;
                 }
-                EventChannel.Esper.EPRuntime.SendEvent(wintapBuilder);
+                EventChannel.Send(wintapBuilder);
             }
             catch (Exception ex)
             {

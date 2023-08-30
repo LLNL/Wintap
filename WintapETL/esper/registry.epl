@@ -4,7 +4,8 @@
   regActivity.dataType as dataType,
   regActivity.valueName as valueName,
   regActivity.data as data,
-  processIdFor(PID, receiveTime, 'Registry') as processId,
+  PidHash,
+  ProcessName,
   PID,
   activityType,
   min(receiveTime) as firstSeen,
@@ -12,5 +13,5 @@
   count(*) as eventCount,
   'Registry' as MessageType
 from WintapMessage(messageType='Registry').win:time_batch(10 sec) as msg
-group by regActivity.path, regActivity.dataType, regActivity.valueName, regActivity.data, processIdFor(PID, receiveTime, 'Registry'), PID, activityType
+group by regActivity.path, regActivity.dataType, regActivity.valueName, regActivity.data, PidHash, PID, activityType, ProcessName
 having count(*) > 0

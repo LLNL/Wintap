@@ -8,6 +8,7 @@ using com.espertech.esper.client;
 using com.espertech.esper.client.metric;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.load;
+using gov.llnl.wintap.etl.model;
 using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using System;
@@ -35,23 +36,21 @@ namespace gov.llnl.wintap.etl.extract
         private bool fileBusy;  // prevents file IO contention when snapshot is being rotated.
         private Timer flushToDiskTimer;
 
-        protected Sensor(string[] queries, ProcessObjectModel _pom)
+        protected Sensor(string[] queries)
         {
             initSensor();
             foreach (string query in queries)
             {
                 registerQuery(query);
                 esperQueries.Add(query);
-            }
-            ProcessTree = _pom;
+            };
         }
 
-        protected Sensor(string query, ProcessObjectModel _pom)
+        protected Sensor(string query)
         {
             initSensor();
             registerQuery(query);
             esperQueries.Add(query);
-            ProcessTree = _pom;
         }
 
         #region internal
@@ -99,7 +98,6 @@ namespace gov.llnl.wintap.etl.extract
         internal bool IsEnabled { get; set; }
         internal string SensorName { get; set; }
 
-        internal ProcessObjectModel ProcessTree;
 
         /// <summary>
         /// Receives the original WintapMessage from Subscribe
@@ -110,7 +108,6 @@ namespace gov.llnl.wintap.etl.extract
             //pass event into the sensor's dedicated esper engine
             try
             {
-                wintapMessage.EventTime = wintapMessage.EventTime;
                 esper.EPRuntime.SendEvent(wintapMessage);
             }
             catch (Exception ex)
@@ -199,7 +196,7 @@ namespace gov.llnl.wintap.etl.extract
             sensorData = new ConcurrentQueue<ExpandoObject>();
 
             flushToDiskTimer = new Timer();
-            flushToDiskTimer.Interval = gov.llnl.wintap.etl.shared.Utilities.GetSerializationIntervalFromConfig();
+            flushToDiskTimer.Interval = Utilities.GetETLConfig().SerializationIntervalSec * 1000;
             flushToDiskTimer.AutoReset = true;
             flushToDiskTimer.Elapsed += FlushToDiskTimer_Elapsed;
             flushToDiskTimer.Start();
@@ -209,7 +206,7 @@ namespace gov.llnl.wintap.etl.extract
             try
             {
                 Logger.Log.Append("Reading sensor profile preference from configuration", LogLevel.Always);
-                sensorPreference = gov.llnl.wintap.etl.shared.Utilities.GetETLConfig().GetElementsByTagName("Profile")[0].InnerText.ToUpper();
+                sensorPreference = Utilities.GetETLConfig().SensorProfile.ToUpper();
                 if (sensorPreference == "BALANCE")
                 {
                     maxEventsPerSec = 5000;
@@ -269,6 +266,7 @@ namespace gov.llnl.wintap.etl.extract
 
         private void FlushToDiskTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
+            if(this.SensorName == "Host" || this.SensorName == "MacIp") { return; }
             if (!fileBusy)
             {
                 int currentQueueDepth = sensorData.Count;
@@ -333,11 +331,11 @@ namespace gov.llnl.wintap.etl.extract
                         dynamic tempObj = tempQOfType[j];
                         tempQueue.Remove(tempObj);
                     }
-                    if (bool.Parse(gov.llnl.wintap.etl.shared.Utilities.GetETLConfig().GetElementsByTagName("WriteToParquet")[0].InnerText))
+                    if (Utilities.GetETLConfig().WriteToParquet)
                     {
                         parquetWriter.Write(tempQOfType);
                     }
-                    if (bool.Parse(gov.llnl.wintap.etl.shared.Utilities.GetETLConfig().GetElementsByTagName("WriteToCSV")[0].InnerText))
+                    if (Utilities.GetETLConfig().WriteToCsv)
                     {
                         csvWriter.Write(tempQOfType);
                     }

@@ -12,7 +12,6 @@ using gov.llnl.wintap.etl.shared;
 using gov.llnl.wintap.etl.transform;
 using System;
 using System.Dynamic;
-using static gov.llnl.wintap.etl.models.ProcessObjectModel;
 
 namespace gov.llnl.wintap.etl.extract
 {
@@ -21,7 +20,7 @@ namespace gov.llnl.wintap.etl.extract
 
         private HostId host;
 
-        internal PROCESSSTOP_SENSOR(string query, ProcessObjectModel _pom) : base(query, _pom)
+        internal PROCESSSTOP_SENSOR(string query) : base(query)
         {
             host = HOST_SENSOR.Instance.HostId;
         }
@@ -35,7 +34,7 @@ namespace gov.llnl.wintap.etl.extract
             try
             {
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
-                if (wintapMessage.MessageType == "Process" && wintapMessage.ActivityType == "Stop")
+                if (wintapMessage.MessageType == "Process" && wintapMessage.ActivityType == "stop")
                 {
                     handleStopEvent(wintapMessage);
                 }
@@ -50,9 +49,7 @@ namespace gov.llnl.wintap.etl.extract
         {
             try
             {
-                ProcessStartData originalProcess = ProcessTree.FindMostRecentProcessByPID(wintapMessage.PID);
-                ProcessId endedProcess = ProcessIdDictionary.FindProcessKey(originalProcess.PID, originalProcess.EventTime, MessageTypeEnum.Process.ToString());
-                ProcessTerminateData procWD = createProcessTerminate(endedProcess, originalProcess.ParentPidHash, wintapMessage);
+                ProcessTerminateData procWD = createProcessTerminate(wintapMessage);
                 dynamic flatMsg = (ExpandoObject)procWD.ToDynamic();
                 this.Save(flatMsg);
             }
@@ -62,13 +59,13 @@ namespace gov.llnl.wintap.etl.extract
             }
         }
 
-        private ProcessTerminateData createProcessTerminate(ProcessId procId, string parentPidHash, WintapMessage endedProcess)
+        private ProcessTerminateData createProcessTerminate(WintapMessage endedProcess)
         {
-            ProcessTerminateData procWD = new ProcessTerminateData(parentPidHash);
+            ProcessTerminateData procWD = new ProcessTerminateData(endedProcess.Process.ParentPidHash);
             procWD.MessageType = "PROCESS";
-            procWD.ActivityType = "STOP";
-            procWD.PID = procId.OsPid;
-            procWD.PidHash = procId.Hash;
+            procWD.ActivityType = endedProcess.ActivityType;
+            procWD.PID = endedProcess.PID;
+            procWD.PidHash = endedProcess.PidHash;
             procWD.Hostname = host.Hostname;
             procWD.EventTime = endedProcess.EventTime;
             procWD.CommitCharge = endedProcess.Process.CommitCharge;

@@ -255,7 +255,8 @@ namespace WintapRecorder
             string[] logLines = s.Split(new char[] { '\r' });
             foreach (string line in logLines)
             {
-                if (line.ToLower().Contains("process tree valid: true"))
+                // temporary shortcut
+                if (line.ToLower().Contains(" "))
                 {
                     OnOnProcessTreeReadyEvent(e);
                 }

@@ -14,6 +14,10 @@ using System.Text;
 using Newtonsoft.Json;
 using System.IO;
 using gov.llnl.wintap.core.infrastructure;
+using static gov.llnl.wintap.collect.ProcessCollector;
+using gov.llnl.wintap.collect.etw.helpers;
+using gov.llnl.wintap.core.shared;
+using RestSharp;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -29,10 +33,11 @@ namespace gov.llnl.wintap.core.api
         }
 
         [HttpPost]
+        [Route("api/Streams")]
         public IHttpActionResult Post(string name, string query, string state)
         {
             string responseMsg = "OK";
-            bool error = false;         
+            bool error = false;     
             try
             {
                 if(state == "ACTIVE")
@@ -81,6 +86,7 @@ namespace gov.llnl.wintap.core.api
         /// </summary>
         /// <returns></returns>
         [HttpGet]
+        [Route("api/Streams")]
         public IHttpActionResult GetAllStatements()
         {
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
@@ -90,14 +96,21 @@ namespace gov.llnl.wintap.core.api
                 var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
                 if (statement.UserObject != null)
                 {
-                    WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                    if (embeddedStatement.State != "ACTIVE")
+                    try
                     {
-                        embeddedStatement.State = statement.State.ToString();
+                        WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                        if (embeddedStatement.State != "ACTIVE")
+                        {
+                            embeddedStatement.State = statement.State.ToString();
+                        }
+                        if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
+                        {
+                            allStatements.Add(embeddedStatement);
+                        }
                     }
-                    if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
+                    catch (JsonException ex)
                     {
-                        allStatements.Add(embeddedStatement);
+                        // JSONExceptions are expected for plugins, Non-jsonExceptions should bubble up.
                     }
                 }
             }
@@ -158,10 +171,17 @@ namespace gov.llnl.wintap.core.api
                     EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
                     if(statement.UserObject != null)
                     {
-                        WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                        if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
+                        try
                         {
-                            statement.Dispose();
+                            WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                            if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
+                            {
+                                statement.Dispose();
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            // JSONExceptions are expected for plugins, Non-jsonExceptions should bubble up.
                         }
                     }
                 }
@@ -183,7 +203,6 @@ namespace gov.llnl.wintap.core.api
             return result;
         }
 
-
         private void deactivateAll()
         {
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
@@ -193,22 +212,26 @@ namespace gov.llnl.wintap.core.api
                 var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
                 if(statement.UserObject != null)
                 {
-                    WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                    if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
+                    try
                     {
-                        if (workbenchStatement.State == "ACTIVE")
+                        WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                        if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
                         {
-                            workbenchStatement.State = EPStatementState.STARTED.ToString();
+                            if (workbenchStatement.State == "ACTIVE")
+                            {
+                                workbenchStatement.State = EPStatementState.STARTED.ToString();
+                            }
+                            else
+                            {
+                                workbenchStatement.State = statement.State.ToString();
+                            }
+                            statement.Dispose();
+                            // recreate the esper statement - we do this because the userObject on an EPStatement is READ-ONLY
+                            string statementJson = JsonConvert.SerializeObject(workbenchStatement);
+                            var restoredStatement = EventChannel.Esper.EPAdministrator.CreateEPL(workbenchStatement.Query, workbenchStatement.Name, statementJson);
                         }
-                        else
-                        {
-                            workbenchStatement.State = statement.State.ToString();
-                        }
-                        statement.Dispose();
-                        // recreate the esper statement - we do this because the userObject on an EPStatement is READ-ONLY
-                        string statementJson = JsonConvert.SerializeObject(workbenchStatement);
-                        var restoredStatement = EventChannel.Esper.EPAdministrator.CreateEPL(workbenchStatement.Query, workbenchStatement.Name, statementJson);
                     }
+                    catch (JsonException ex) { }
                 }
             }
         }
@@ -286,12 +309,19 @@ namespace gov.llnl.wintap.core.api
                 var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
                 if (statement.UserObject != null)
                 {
-                    WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                    if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
+                    try
                     {
-                        allStatements.Add(new WorkbenchQuery { Name = statement.Name, Query = statement.Text, State = statement.State.ToString().ToUpper(), StatementType = WorkbenchQuery.StatementTypeEnum.User, CreateDate=embeddedStatement.CreateDate });
+                        WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
+                        if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
+                        {
+                            allStatements.Add(new WorkbenchQuery { Name = statement.Name, Query = statement.Text, State = statement.State.ToString().ToUpper(), StatementType = WorkbenchQuery.StatementTypeEnum.User, CreateDate = embeddedStatement.CreateDate });
 
+                        }
                     }
+                    catch(JsonException ex)
+                    {
+                        // expected for IQuery plugins as they use UserObject for non-JSON data
+                    }  
                 }
             }
             DirectoryInfo wintapData = new DirectoryInfo(Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap");

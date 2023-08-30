@@ -24,12 +24,12 @@ using System.Runtime.InteropServices;
 
 // Version information for an assembly consists of the following four values:
 //
-//      Major Version
-//      Minor Version
-//      Build Number
-//      Revision
+//      Major Version  -  breaking changes
+//      Minor Version  -  major features
+//      Build Number   -  minor features
+//      Revision       -  bug fixes
 //
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.1.0.3")]
+[assembly: AssemblyVersion("1.2.1.0")]

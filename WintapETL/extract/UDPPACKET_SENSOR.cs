@@ -6,12 +6,12 @@
 
 using ChoETL;
 using com.espertech.esper.client;
+using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using System;
 using System.Dynamic;
 using System.Timers;
-using static gov.llnl.wintap.etl.models.ProcessObjectModel;
 
 namespace gov.llnl.wintap.etl.extract
 {
@@ -20,7 +20,7 @@ namespace gov.llnl.wintap.etl.extract
         private System.Timers.Timer networkEventTimer;  // guard against stalled ETW session provider in the OS, every net event will reset this timer, on elapse - wintap will restart.
         private string esperQuery;
 
-        internal UDPPACKET_SENSOR(string[] queries, ProcessObjectModel pom) : base(queries, pom)
+        internal UDPPACKET_SENSOR(string[] queries) : base(queries)
         {
             networkEventTimer = new System.Timers.Timer { Interval = 60000 };
             networkEventTimer.Elapsed += NetworkEventTimer_Elapsed;
@@ -38,12 +38,12 @@ namespace gov.llnl.wintap.etl.extract
                 base.HandleSensorEvent(sensorEvent);
                 networkEventTimer.Stop();
                 networkEventTimer.Start();
-                ProcessStartData po = this.ProcessTree.FindMostRecentProcessByPID(Convert.ToInt32(sensorEvent["PID"].ToString()));
-                ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, po.PidHash);
+                ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, sensorEvent["PidHash"].ToString());
                 pci.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
                 pci.MessageType = "PROCESS_CONN_INCR";
                 pci.EventTime = GetUnixNowTime();
                 dynamic flatMsg = (ExpandoObject)pci.ToDynamic();
+                flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 this.Save(flatMsg);
             }
             catch (Exception ex)

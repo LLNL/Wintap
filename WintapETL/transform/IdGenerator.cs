@@ -247,24 +247,6 @@ namespace gov.llnl.wintap.etl.transform
             preImage.Append("`");
             return GetHash(preImage.ToString());
         }
-        internal string GenAttrKeyForProcess_ID(string inContext
-          , string inHostName
-          , int inPid
-          , long inFirstEventTime
-          )
-        {
-            StringBuilder preImage = new StringBuilder(9999);
-            preImage.Append("Process_ID`");
-            preImage.Append(inContext);
-            preImage.Append("`");
-            preImage.Append(inFirstEventTime);
-            preImage.Append("`");
-            preImage.Append(inHostName);
-            preImage.Append("`");
-            preImage.Append(inPid);
-            preImage.Append("`");
-            return GetHash(preImage.ToString());
-        }
         internal string GenAttrKeyForRegistry_Key(string inContext, string inHostName, string inPath, string inValueName)
         {
             StringBuilder preImage = new StringBuilder(9999);
@@ -668,23 +650,6 @@ namespace gov.llnl.wintap.etl.transform
             StringBuilder preImage = new StringBuilder();
             preImage.Append("N`");
             preImage.Append("SNMP_DB");
-            preImage.Append("`");
-            preImage.Append(attrKey);
-            preImage.Append("`");
-
-            // Return as a hash
-            return GetHash(preImage.ToString());
-        }
-
-        internal string GenKeyForProcess(string inContext, string inHostName, int inPid, long inFirstEventTime, string msgType)
-        {
-            // Get the attribute key hash
-            String attrKey = GenAttrKeyForProcess_ID(inContext, inHostName, inPid, inFirstEventTime);
-
-            // Add the entity name
-            StringBuilder preImage = new StringBuilder();
-            preImage.Append("N`");
-            preImage.Append("Process");
             preImage.Append("`");
             preImage.Append(attrKey);
             preImage.Append("`");

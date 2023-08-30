@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Dynamic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -30,6 +32,8 @@ namespace gov.llnl.wintap.collect.models
         public long EventTime { get; set; }
         public long ReceiveTime { get; set; }
         public int PID { get; set; }
+        public string PidHash { get; set; }
+        public string ProcessName { get; set; }
         public string ActivityType { get; set; }
         public ProcessObject Process { get; set; }
         public TcpConnectionObject TcpConnection { get; set; }
@@ -48,8 +52,9 @@ namespace gov.llnl.wintap.collect.models
         public MemInfoWSData MemInfoWS { get; set; }
         public WebActivityData WebActivity { get; set; }
         public MicrosoftWindowsGroupPolicyData MicrosoftWindowsGroupPolicy { get; set; }
-
         public MicrosoftWindowsBitLockerAPIData MicrosoftWindowsBitLockerAPI { get; set; }
+        public KernelApiCallData KernelApiCall { get; set; }
+        public MemoryMapData MemoryMap { get; set; }
 
         /// <summary>
         /// General purpose error reporting for Wintap
@@ -60,6 +65,8 @@ namespace gov.llnl.wintap.collect.models
         public class ProcessObject
         {
             public int ParentPID { get; set; }
+            public string ParentPidHash { get; set; }
+            public string ParentProcessName { get; set; }
             public string Name { get; set; }
             public string Path { get; set; }
             public string CommandLine { get; set; }
@@ -302,7 +309,6 @@ namespace gov.llnl.wintap.collect.models
 
         public class WebActivityData
         {
-            //public enum BrowserEnum { Chrome, Firefox, IE }
             public string Browser { get; set; }
             public string TabTitle { get; set; }
             public string Url { get; set; }
@@ -327,10 +333,87 @@ namespace gov.llnl.wintap.collect.models
         /// </summary>
         public class WintapAlertData
         {
-
-            public string AlertName { get; set; }
+            public enum AlertNameEnum { EVENT_DROP, SYSTEM_UTILIZATION, PROCESS_TREE, OTHER }
+            public AlertNameEnum AlertName { get; set; }
 
             public string AlertDescription { get; set; }
+        }
+
+        /// <summary>
+        /// collector for the Microsoft-Windows-Kernel-Audit-API-Calls ETW provider
+        /// </summary>
+        public class KernelApiCallData
+        {
+            private string providerName;
+            private uint? targetPid;
+            private uint? desiredAccess;
+            private uint returnCode;
+            private string linkSourceName;
+            private string linkTargetName;
+            private long? notifyRoutineAddress;
+            private uint? targetThreatId;
+            public KernelApiCallData(string _providerName, uint? _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId) 
+            {
+                providerName = _providerName;
+                targetPid = _targetPid;
+                desiredAccess = _desiredAccess;
+                returnCode = _returnCode;
+                linkSourceName = _linkSourceName;
+                linkTargetName = _linkTargetName;
+                notifyRoutineAddress = _notifyRoutineAddress;
+                targetThreatId = _targetThreatId;
+            }
+            public string ProviderName
+            {
+                get { return providerName; }
+            }
+            public uint? TargetPid
+            { get { return targetPid; } }
+            public uint? DesiredAccess
+            { get { return desiredAccess; } }
+            public uint ReturnCode
+            { get { return  returnCode; } }
+            public string LinkSourceName
+            { get { return linkSourceName; } }
+            public string LinkTargetName
+            { get {  return linkTargetName; } }
+            public long? NotifyRoutineAddress
+            { get { return notifyRoutineAddress; } }
+            public uint? TargetThreatId
+            { get { return targetThreatId; } }
+        }
+
+        //  summary descriptors taken from:  https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-memory_basic_information
+        public class MemoryMapData
+        {
+            /// <summary>
+            /// For image backed regions, the full path name to the file.
+            /// </summary>
+            public string Description { get; set; }
+
+            /// <summary>
+            /// A pointer to the base address of the region of pages.
+            /// </summary>
+            public string BaseAddress { get; set; }
+
+            /// <summary>
+            /// A pointer to the base address of a range of pages allocated by the VirtualAlloc function. The page pointed to by the BaseAddress member is contained within this allocation range.
+            /// </summary>
+            public string AllocationBaseAddress { get; set; }
+
+            /// <summary>
+            /// The memory protection option when the region was initially allocated. This member can be one of the memory protection constants or 0 if the caller does not have access.
+            /// </summary>
+            public string AllocationProtect { get; set; }
+
+            public long RegionSize { get; set; }
+
+            /// <summary>
+            /// The access protection of the pages in the region. This member is one of the values listed for the AllocationProtect member.
+            /// </summary>
+            public string PageProtect { get; set; }
+
+            public string PageType { get; set; }
         }
     }
 }

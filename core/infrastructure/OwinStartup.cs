@@ -25,17 +25,19 @@ namespace gov.llnl.wintap
         {
 
             // swagger at http://localhost:8099/swagger
-            HttpConfiguration config = new HttpConfiguration();   
+            HttpConfiguration config = new HttpConfiguration();
+
+            //Maps Http routes based on attributes
+            config.MapHttpAttributeRoutes();
+
             config.EnableSwagger(c => c.SingleApiVersion("v1", "Wintap API").Description("methods for interacting with Wintap's embedded Esper streaming event engine.")).EnableSwaggerUi();
-            
+
+
             config.Routes.MapHttpRoute(
                 name: "defaultApiRoute",
                 routeTemplate: "api/{controller}/{id}",
                 defaults: new { id = RouteParameter.Optional }
                 );
-
-            //Maps Http routes based on attributes
-            config.MapHttpAttributeRoutes();
 
             //Enable WebApi  
             appBuilder.UseWebApi(config);

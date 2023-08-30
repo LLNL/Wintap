@@ -111,8 +111,7 @@ namespace gov.llnl.wintap.collect.shared
         private KernelParser()
         {
             // this activates TraceEvent's internal registry/file path lookup tables but introduces some memory and path resolution issues. 
-            //EtwParser = new KernelTraceEventParser(KernelSource.Instance.EtwSource, KernelTraceEventParser.ParserTrackingOptions.RegistryNameToObject | KernelTraceEventParser.ParserTrackingOptions.FileNameToObject);
-            // doing this for now and relying on the file key caching to help with path resolution.
+            // EtwParser = new KernelTraceEventParser(KernelSource.Instance.EtwSource, KernelTraceEventParser.ParserTrackingOptions.RegistryNameToObject | KernelTraceEventParser.ParserTrackingOptions.FileNameToObject);
             EtwParser = new KernelTraceEventParser(KernelSource.Instance.EtwSource);
         }
 

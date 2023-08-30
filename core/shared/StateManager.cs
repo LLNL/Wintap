@@ -40,6 +40,8 @@ namespace gov.llnl.wintap.core.shared
         public static DateTime LastUserActivity { get; set; }
         public readonly TimeSpan MaxUserInactivity = new TimeSpan(0, 0, 5, 0, 0);
 
+        public static string ProcessTreeJSON { get; set; }
+
         /// <summary>
         /// True is Windows Performance Monitor reports any dropped events for the NT Kernel Logger since wintap last started.
         /// </summary>
@@ -58,12 +60,15 @@ namespace gov.llnl.wintap.core.shared
         /// <summary>
         /// Last boot time as reported by WMI
         /// </summary>
-        public DateTime MachineBootTime { get; set; }
+        public static DateTime MachineBootTime { get; set; }
 
         public static int WintapPID { get; set; }
 
 
         internal string FileTableCache;
+
+        //  debug for missing process events
+        public static ConcurrentBag<string> SentProcessList = new ConcurrentBag<string>();
 
         private StateManager()
         {
@@ -73,7 +78,7 @@ namespace gov.llnl.wintap.core.shared
             UserBusy = false;
             WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
-            stateRefresh.Interval = 1000;
+            stateRefresh.Interval = 60000;
             stateRefresh.Enabled = true;
             stateRefresh.AutoReset = true;
             stateRefresh.Elapsed += StateRefresh_Elapsed;
@@ -156,40 +161,6 @@ namespace gov.llnl.wintap.core.shared
             return lastBoot;
         }
 
-        //private Settings getConfig()
-        //{
-        //    Properties.Settings config = new Settings();
-        //    config.FileCollector = false;
-        //    config.ImageLoadCollector = false;
-        //    config.ProcessCollector = false;
-        //    config.MicrosoftWindowsKernelRegistryCollector = false;
-        //    config.SensCollector = false;
-        //    config.TcpCollector = false;
-        //    config.MicrosoftWindowsKernelProcessCollector = false;
-        //    config.UdpCollector = false;
-        //    config.MicrosoftWindowsWin32kCollector = false;
-        //    config.LoggingLevel = "Critical";
-        //    try
-        //    {
-        //        FileInfo configFile = new FileInfo(System.Reflection.Assembly.GetExecutingAssembly().Location + ".config");
-        //        if (configFile.Exists)
-        //        {
-        //            Properties.Settings.Default.Reload();
-        //            config = Properties.Settings.Default;
-        //            WintapLogger.Log.Append("Wintap configuration file loaded from disk", LogLevel.Always);
-        //        }
-        //        else
-        //        {
-        //            WintapLogger.Log.Append("Wintap configuration file not found. Using default settings", LogLevel.Always);
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        WintapLogger.Log.Append("Error reading default configuration from file. Using default configuration", LogLevel.Always);
-        //    }
-        //    return config;
-        //}
-
         private List<DiskVolume> refreshDriveMap()
         {
             List<DiskVolume> driveMap = new List<DiskVolume>();
@@ -202,8 +173,10 @@ namespace gov.llnl.wintap.core.shared
             psi.UseShellExecute = false;
             psi.RedirectStandardOutput = true;
             diskPart.StartInfo = psi;
+            WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, LogLevel.Always);
             diskPart.Start();
             string diskConfig = diskPart.StandardOutput.ReadToEnd();
+            WintapLogger.Log.Append("drive volumes: " + diskConfig, LogLevel.Always);
             string[] configLines = diskConfig.Split(new char[] { '\r' });
             diskPart.WaitForExit();
             foreach (string line in configLines)
@@ -213,68 +186,18 @@ namespace gov.llnl.wintap.core.shared
                 {
                     DiskVolume dv = new DiskVolume();
                     dv.VolumeNumber = Convert.ToInt32(lineArray[3].ToString());
-                    dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString());
+                    dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString().ToLower());
                     driveMap.Add(dv);
+                    WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, LogLevel.Always);
                 }
                 catch (Exception ex) { }
             }
+            if(driveMap.Count == 0)
+            {
+                WintapLogger.Log.Append("ERROR:  No drive map found! ", LogLevel.Always);
+            }
             return driveMap;
         }
-
-        // FILE KEY PERSISTENCE MANAGEMENT
-        //  File path resolution in ETW depends on key references.  Until we figure out how to get proper rundown events for File on startup, we have to build and persist our mapping.  THIS NEEDS FIXING!
-        internal void InvalidateFileTableCache()
-        {
-            try
-            {
-                File.Create(FileTableCache, 1, FileOptions.WriteThrough);
-            }
-            catch (Exception ex) { }
-        }
-
-        internal string[] DeserializeFileTableCache()
-        {
-            string[] cache = new string[0];
-            FileInfo cacheFile = new FileInfo(FileTableCache);
-            if (cacheFile.Exists)
-            {
-                if (cacheFile.Length > 100000000)  // delete and start over if file is over 100MB
-                {
-                    InvalidateFileTableCache();
-                }
-                try
-                {
-                    cache = File.ReadAllLines(FileTableCache);
-                }
-                catch (Exception ex)
-                {
-                    InvalidateFileTableCache();
-                }
-            }
-            return cache;
-        }
-
-        // pipe delimited text file
-        internal int SerializeFileTableCache(ConcurrentDictionary<ulong, FileTableObject> cache)
-        {
-            int linesWritten = 0;
-            if (cache.Keys.Count < 20000)
-            {
-                List<string> csv = new List<string>();
-                foreach (var entry in cache)
-                {
-                    try
-                    {
-                        csv.Add(entry.Key + "|" + entry.Value.FilePath + "|" + entry.Value.LastAccess.ToFileTime());
-                        linesWritten++;
-                    }
-                    catch (Exception ex) { }
-                }
-                File.AppendAllLines(FileTableCache, csv);
-            }
-            return linesWritten;
-        }
-        // END FILE KEY PERSISTENCE MANAGEMENT
 
         private void StateRefresh_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
