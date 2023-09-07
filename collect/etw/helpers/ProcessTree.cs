@@ -48,7 +48,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             // PROCESS TREE GEN
             DateTime lastProcessEventTime = DateTime.Now;
             publishUntracedProcesses();
-            if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(5, 5, 0))
+            if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
             {
                 // get ground truth from boot trace
                 WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Always);
