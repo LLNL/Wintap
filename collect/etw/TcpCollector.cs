@@ -11,6 +11,7 @@ using gov.llnl.wintap.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
+using System.Linq;
 
 namespace gov.llnl.wintap.collect
 {
@@ -192,6 +193,14 @@ namespace gov.llnl.wintap.collect
             this.Counter++;
             WintapMessage wintapBuilder = new WintapMessage(etwObj.TimeStamp, etwObj.ProcessID, this.CollectorName);
             wintapBuilder.ActivityType = etwObj.EventName;
+            if (etwObj.PayloadNames.ToList().Contains("CorrelationId"))
+            {
+                wintapBuilder.CorrelationId = etwObj.PayloadStringByName("CorrelationId");
+            }
+            if (etwObj.PayloadNames.Contains("ActivityId"))
+            {
+                wintapBuilder.ActivityId = Guid.Parse(etwObj.PayloadStringByName("ActivityId"));
+            }
             return wintapBuilder;
         }
 

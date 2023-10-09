@@ -6,9 +6,15 @@
 
 using com.espertech.esper.client;
 using com.espertech.esper.compat.collections;
+using com.espertech.esper.epl.join.plan;
+using com.espertech.esper.events;
+using com.espertech.esper.events.bean;
+using com.espertech.esper.events.map;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
+using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using Microsoft.Win32;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -258,20 +264,24 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 if(queryPlugin.Metadata.Name == pluginHandler)
                 {
-                    foreach(EventBean eb in e.NewEvents)
+                    int currentEventNumber = 1;
+                    int lastEventNumber = e.NewEvents.Count();
+                    List<WintapMessage> results = new List<WintapMessage>();
+                    foreach (EventBean eb in e.NewEvents)
                     {
-                        QueryResult qr = new QueryResult();
-                        qr.Result = new List<KeyValuePair<string, string>>();
-                        qr.Name = queryName;
-                        foreach (string prop in eb.EventType.PropertyNames)
+                        IDictionary<string,object> bebList = eb.Underlying.UnwrapStringDictionary();
+                        foreach(string eventName in bebList.Keys)
                         {
-                            if(eb[prop] != null && !String.IsNullOrEmpty(eb[prop].ToString()))
-                            {
-                                qr.Result.Add(new KeyValuePair<string, string>(prop, eb[prop].ToString()));
-                            }
+                            object wmAsObj;
+                            bebList.TryGetValue(eventName, out wmAsObj);
+                            BeanEventBean beb = (BeanEventBean)wmAsObj;
+                            WintapMessage wm1 = beb.Underlying as WintapMessage;
+                            results.Add(wm1);
                         }
-                        queryPlugin.Value.Process(qr);
                     }
+                    QueryResult qr = new QueryResult() { Name = queryName };
+                    qr.Activity = results;
+                    queryPlugin.Value.Process(qr);
                 }
             }
         }

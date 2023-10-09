@@ -64,9 +64,6 @@ namespace gov.llnl.wintap.core.shared
 
         public static int WintapPID { get; set; }
 
-
-        internal string FileTableCache;
-
         //  debug for missing process events
         public static ConcurrentBag<string> SentProcessList = new ConcurrentBag<string>();
 
@@ -90,7 +87,6 @@ namespace gov.llnl.wintap.core.shared
 
             DriveMap = refreshDriveMap();
             MachineBootTime = refreshLastBoot();
-            FileTableCache = Environment.GetEnvironmentVariable("WINDIR") + @"\Temp\wintap.dat";
             
         }
 

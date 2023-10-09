@@ -252,7 +252,7 @@ namespace gov.llnl.wintap.core.api
                 {
                     try
                     {
-                        if(prop.ToString().Contains("EventTime"))
+                        if (prop.ToString().Contains("EventTime"))
                         {
                             sb.Append(prop.ToString() + "=" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().ToLongTimeString() + " +" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().Millisecond + "ms, ");
                         }

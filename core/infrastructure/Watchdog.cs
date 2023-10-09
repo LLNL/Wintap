@@ -65,18 +65,6 @@ namespace gov.llnl.wintap.core.infrastructure
             perfCheckWorker.DoWork += Watchdog_DoWork;
             perfCheckWorker.RunWorkerCompleted += Watchdog_RunWorkCompleted;
             perfCheckWorker.RunWorkerAsync();
-
-            // AUTO-UPDATE support
-            if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
-            {
-                // we are running in developer mode and we have an auto-update path defined
-                Timer updateCheckTimer = new Timer();
-                updateCheckTimer.Elapsed += UpdateCheckTimer_Elapsed;
-                updateCheckTimer.Interval = 300000;
-                updateCheckTimer.Enabled = true;
-                updateCheckTimer.Start();
-            }
-
         }
 
         private void setupSvcMgr()
@@ -98,34 +86,6 @@ namespace gov.llnl.wintap.core.infrastructure
             schTasks2.Start();
         }
 
-        private void UpdateCheckTimer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            doUpdateCheck();
-        }
-
-        private void doUpdateCheck()
-        {
-            FileInfo updater = new FileInfo(Strings.FileRootPath + "\\WintapSvcMgr.exe");
-            if(updater.Exists)
-            {
-
-                WintapLogger.Log.Append("CHECKING FOR UPDATES...", LogLevel.Always);
-                Process updaterProcess = new Process();
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = updater.FullName;
-                psi.Arguments = "UPDATE";
-                psi.WindowStyle = ProcessWindowStyle.Hidden;
-                updaterProcess.StartInfo = psi;
-                updaterProcess.Start();
-                updaterProcess.WaitForExit();
-                WintapLogger.Log.Append("Spawned the Wintap Update process.   See WintapSvcMgr.log for details", LogLevel.Always);
-            }
-            else
-            {
-                WintapLogger.Log.Append("Wintap update exe file not found.   Auto-update cannot continue.", LogLevel.Always);
-            }
-
-        }
 
         protected internal void Stop()
         {
@@ -162,7 +122,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 else if (WintapProfile.Name == WintapProfile.ProfileEnum.Developer && mem > WintapProfile.MaxMem)
                 {
-                    WintapProfile.BreachCount++;
+                    //WintapProfile.BreachCount++;
                 }
                 else { WintapProfile.BreachCount = 0; }
                 if (WintapProfile.BreachCount >= WintapProfile.MaxBreachCount)

@@ -32,7 +32,6 @@ namespace gov.llnl.wintap.collect.shared
 
         public EtwCollector() : base()
         {
-            //System.Diagnostics.Debugger.Launch();
             EtwDroppedEventCount = 0;
         }
 

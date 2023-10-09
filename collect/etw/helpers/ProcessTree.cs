@@ -42,7 +42,6 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         internal void GenProcessTree()
         {
-            //System.Diagnostics.Debugger.Launch();
             WintapLogger.Log.Append("Generating process tree.", LogLevel.Always);
 
             // PROCESS TREE GEN

@@ -75,6 +75,7 @@ namespace gov.llnl.wintap.etl.load
             }
             createMetaRecords();
             Logger.Log.Append("Total uploaders: " + uploaders.Count, LogLevel.Always);
+            clearMerge();
             workerThread = new BackgroundWorker();
             workerThread.DoWork += WorkerThread_DoWork;
         }
@@ -105,7 +106,7 @@ namespace gov.llnl.wintap.etl.load
         internal void Stop()
         {
             svcRunning = false;
-            System.Threading.Thread.Sleep(4000); // allow sender loop to exit
+            System.Threading.Thread.Sleep(2000); // allow sender loop to exit
             upload();
             cleanup();
         }
@@ -144,6 +145,7 @@ namespace gov.llnl.wintap.etl.load
                         {
                             uploader.PostUpload();
                         }
+                        clearMerge();
                     }
                     uploadTimer.Restart();
                 }
@@ -351,6 +353,17 @@ namespace gov.llnl.wintap.etl.load
             if(uploaders.Count > 0)
             {
                 foreach (FileInfo fi in cacheDir.GetFiles())
+                {
+                    deleteFile(fi);
+                }
+            }
+        }
+
+        private void clearMerge()
+        {
+            if (uploaders.Count > 0)
+            {
+                foreach (FileInfo fi in mergeDir.GetFiles())
                 {
                     deleteFile(fi);
                 }

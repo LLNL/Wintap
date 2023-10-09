@@ -108,13 +108,15 @@ namespace gov.llnl.wintap.etl
                 }
 
                 // do we have a sensor for this MessageType?  call its listen method or call the default listener
-                if (sensors.Where(s => s.SensorName == className).Count() == 1)
+                var sensor = sensors.FirstOrDefault(s => s.SensorName == className);
+                if (sensor != null)
                 {
-                    sensors.Where(s => s.SensorName == className).FirstOrDefault().Listen(eventMsg);
+                    sensor.Listen(eventMsg);
                 }
                 else
                 {
                     sensors.Where(s => s.SensorName == "default_sensor").FirstOrDefault().Listen(eventMsg);
+
                 }
             }
             catch(Exception ex)

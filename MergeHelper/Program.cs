@@ -64,7 +64,6 @@ namespace gov.llnl.wintap.etl.helpers
                         string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("_sensor","") + "+" + mergeTime.ToFileTimeUtc().ToString();
                         string tempFileName = sensorName;
                         command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";
-                        log.Append("Attempting sql: " + command.CommandText, LogVerboseLevel.Normal);
                         var executeNonQuery = command.ExecuteNonQuery();
                         command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
                         executeNonQuery = command.ExecuteNonQuery();

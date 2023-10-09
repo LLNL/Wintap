@@ -35,6 +35,9 @@ namespace gov.llnl.wintap.collect.models
         public string PidHash { get; set; }
         public string ProcessName { get; set; }
         public string ActivityType { get; set; }
+        public string CorrelationId { get; set; }
+        public string ActivityId { get; set; }
+
         public ProcessObject Process { get; set; }
         public TcpConnectionObject TcpConnection { get; set; }
         public UdpPacketObject UdpPacket { get; set; }
@@ -174,15 +177,20 @@ namespace gov.llnl.wintap.collect.models
 
         public class GenericMessageObject
         {
+            public string ProviderName { get; set; }
             public string Provider { get; set; }
             public string EventName { get; set; }
             public int PID { get; set; }
             public DateTime EventTime { get; set; }
             public string Payload { get; set; }
+            public int TargetProcessId { get; set; }
         }
 
         public class WmiActivityObject
         {
+            public int ClientProcessId { get; set; }
+            public int CreatedProcessId {  get; set; }
+            public string CommandLine { get; set; }
             /// <summary>
             /// appears to correlate events related to a single WMI logical activity
             /// </summary>
