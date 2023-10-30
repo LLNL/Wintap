@@ -68,6 +68,8 @@ namespace gov.llnl.wintap.etl.extract
             {
                 dynamic flatMsg = (ExpandoObject)procWD.ToDynamic();
                 this.Save(flatMsg);
+                flatMsg = null;
+                wintapMessage = null;
             }
             catch (Exception ex)
             {
@@ -109,7 +111,7 @@ namespace gov.llnl.wintap.etl.extract
         {
             string sid = "NA";
             if (!String.IsNullOrEmpty(userName))
-            { 
+            {
                 if (userName.ToLower() != "na")
                 {
                     try

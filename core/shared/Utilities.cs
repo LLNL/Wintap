@@ -12,7 +12,7 @@ namespace gov.llnl.wintap.core.shared
     {
         internal static string getMD5(string processPath)
         {
-            StringBuilder hashStr = new StringBuilder(9999);
+            StringBuilder hashStr = new StringBuilder(32);
             if (!String.IsNullOrWhiteSpace(processPath))
             {
                 FileInfo processPathInfo = new FileInfo(processPath);
@@ -36,7 +36,7 @@ namespace gov.llnl.wintap.core.shared
 
         internal static string getSHA2(string processPath)
         {
-            StringBuilder hashStr = new StringBuilder(9999);
+            StringBuilder hashStr = new StringBuilder(64);
             if (!String.IsNullOrWhiteSpace(processPath))
             {
                 FileInfo processPathInfo = new FileInfo(processPath);

@@ -346,9 +346,10 @@ namespace gov.llnl.wintap.collect.etw.helpers
             {
                 //8 represents an access mask of READ_ONLY_EA
                 Winapi.OpenProcessToken(process.Handle, 8, out processHandle);
-                WindowsIdentity wi = new WindowsIdentity(processHandle);
-                string user = wi.Name;
-                return user;
+                using (WindowsIdentity wi = new WindowsIdentity(processHandle))
+                {
+                    return wi.Name;
+                }
             }
             catch (Win32Exception ex)
             {

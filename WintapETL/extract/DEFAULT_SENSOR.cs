@@ -43,6 +43,8 @@ namespace gov.llnl.wintap.etl.extract
                 flatMsg.ActivityId = wintapMessage.ActivityId;
                 flatMsg.CorrelationId = wintapMessage.CorrelationId;
                 this.Save(flatMsg);
+                sensorEvent = null;
+                flatMsg = null;
             }
             catch (Exception ex)
             {

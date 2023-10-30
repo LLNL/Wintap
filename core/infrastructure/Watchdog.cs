@@ -122,7 +122,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 else if (WintapProfile.Name == WintapProfile.ProfileEnum.Developer && mem > WintapProfile.MaxMem)
                 {
-                    //WintapProfile.BreachCount++;
+                    WintapProfile.BreachCount++;
                 }
                 else { WintapProfile.BreachCount = 0; }
                 if (WintapProfile.BreachCount >= WintapProfile.MaxBreachCount)
@@ -264,7 +264,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             BreachCount = 0;
             MaxMem = 700000000;
-            MaxCPU = 10;
+            MaxCPU = 20;
             MaxBreachCount = 2;
             MaxEventCount = 1000;
             SampleInterval = new TimeSpan(0, 0, 45);
