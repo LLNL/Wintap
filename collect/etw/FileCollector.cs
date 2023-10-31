@@ -66,7 +66,7 @@ namespace gov.llnl.wintap.collect
                 KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
                 KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
                 KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
-                //KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
+                KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
                 if (Properties.Settings.Default.CollectFileRead)
                 {
                     KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;

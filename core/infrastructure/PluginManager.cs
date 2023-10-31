@@ -6,6 +6,7 @@
 
 using com.espertech.esper.client;
 using com.espertech.esper.compat.collections;
+using com.espertech.esper.epl.generated;
 using com.espertech.esper.epl.join.plan;
 using com.espertech.esper.events;
 using com.espertech.esper.events.bean;
@@ -232,7 +233,8 @@ namespace gov.llnl.wintap.core.infrastructure
                 WintapMessage pluginEventData = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, "GenericMessage");
                 pluginEventData.GenericMessage = e.GenericEvent;
                 pluginEventData.ActivityType = e.Name; 
-                EventChannel.Esper.EPRuntime.SendEvent(pluginEventData);
+                //EventChannel.Esper.EPRuntime.SendEvent(pluginEventData);
+                EventChannel.Send(pluginEventData);
             }
             catch(Exception ex) 
             {
@@ -264,23 +266,36 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 if(queryPlugin.Metadata.Name == pluginHandler)
                 {
-                    int currentEventNumber = 1;
                     int lastEventNumber = e.NewEvents.Count();
                     List<WintapMessage> results = new List<WintapMessage>();
+                    QueryResult qr = new QueryResult() { Name = queryName };
                     foreach (EventBean eb in e.NewEvents)
                     {
-                        IDictionary<string,object> bebList = eb.Underlying.UnwrapStringDictionary();
-                        foreach(string eventName in bebList.Keys)
+                        try
                         {
-                            object wmAsObj;
-                            bebList.TryGetValue(eventName, out wmAsObj);
-                            BeanEventBean beb = (BeanEventBean)wmAsObj;
-                            WintapMessage wm1 = beb.Underlying as WintapMessage;
-                            results.Add(wm1);
+                            WintapMessage resultmsg = (WintapMessage)eb.Underlying;
+                            results.Add(resultmsg);
+                        }
+                        catch(InvalidCastException ice)
+                        {
+                            IDictionary<string, object> bebList = eb.Underlying.UnwrapStringDictionary();
+                            foreach (string eventName in bebList.Keys)
+                            {
+                                object wmAsObj;
+                                bebList.TryGetValue(eventName, out wmAsObj);
+                                KeyValuePair<string, string> resultPair = new KeyValuePair<string, string>(eventName, wmAsObj.ToString());
+                                qr.EventDetails.Add(resultPair);
+                            }
+                        }
+                        catch(Exception ex)
+                        {
+
                         }
                     }
-                    QueryResult qr = new QueryResult() { Name = queryName };
-                    qr.Activity = results;
+                    if(results.Count >0)
+                    {
+                        qr.Activity = results;
+                    }    
                     queryPlugin.Value.Process(qr);
                 }
             }
