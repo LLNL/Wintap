@@ -2116,12 +2116,6 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_4BAA56F836F445D3BB93C154DCB87F19"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_E81B96A4A1ABB77B1B41A023CC7A7D92"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -2428,6 +2422,12 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_4BAA56F836F445D3BB93C154DCB87F19"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_3AAF641273A243358B66C9D121CE627B"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -2471,6 +2471,12 @@
         {
         "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_2023694A0A9848A5B530B21A8D394335"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_EF35617FA0925783AB5F0CA2863D7B95"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -3810,7 +3816,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:WintapAPI, Version=1.2.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:WintapAPI, Version=1.2.1.1, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_3F0C968DD951F1B2511D5ACC3296F2E6"
@@ -5108,7 +5114,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.0.10.1, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.0.10.2, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_8F375416934C4D2CAB70925D74FF1031"
@@ -6413,6 +6419,37 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_EF35617FA0925783AB5F0CA2863D7B95"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:System.ComponentModel.Annotations, Version=4.2.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_EF35617FA0925783AB5F0CA2863D7B95"
+                    {
+                    "Name" = "8:System.ComponentModel.Annotations.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:System.ComponentModel.Annotations.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_480CA12D06C444D6BF063EE0772BE99F"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F0BC81AE2A4F43948CE7BCB8ACB24830"
             {
             "SourcePath" = "8:..\\bin\\Release\\amd64\\vcruntime140_1.dll"
@@ -6719,17 +6756,6 @@
                         {
                         }
                     }
-                    "{9EF0B969-E518-4E46-987F-47570745A589}:_5817D2D5A31043499AAB9AC82B6BDFCB"
-                    {
-                    "Name" = "8:etl"
-                    "AlwaysCreate" = "11:FALSE"
-                    "Condition" = "8:"
-                    "Transitive" = "11:FALSE"
-                    "Property" = "8:_F37472BF3C5841C4919838F66DCF867D"
-                        "Folders"
-                        {
-                        }
-                    }
                     "{9EF0B969-E518-4E46-987F-47570745A589}:_74A557FC94BF4F229878189C7B1B154E"
                     {
                     "Name" = "8:plugins"
@@ -6793,7 +6819,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Wintap"
         "ProductCode" = "8:{530FE31B-2D0C-421D-80C3-5A7F3BF963BA}"
-        "PackageCode" = "8:{2E93BD15-7289-4D9B-9B2D-D71A2C09D6A0}"
+        "PackageCode" = "8:{D07223BD-706A-4737-9228-49AC7FCC6EE4}"
         "UpgradeCode" = "8:{01A9FD7A-FF51-41BA-AF02-D8D7414CBDF7}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"

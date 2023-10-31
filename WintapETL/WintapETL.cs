@@ -47,15 +47,13 @@ namespace gov.llnl.wintap.etl
         private readonly string esperNameSpacePrefix = "gov.llnl.wintap.etl.esper.";
         private long totalMessageCount;
         ETLConfig etlConfig;
-        // debug
-        private List<string> processPidHash;
+ 
         #endregion
 
         #region public methods
 
         List<string> ISubscribeEtw.Startup()
         {
-            processPidHash = new List<string>();
             List<string> providers = new List<string>() { "Microsoft-Windows-NetworkProfile" };
             return providers;
         }

@@ -71,7 +71,7 @@ namespace gov.llnl.wintap.etl.load
                 catch (Exception ex)
                 {
                     Logger.Log.Append("ERROR:  No assembly matching the name " + u.Name + " was found.  This uploader will not run.  Check the spelling or remove this config entry.", LogLevel.Always);
-                }            
+                }
             }
             createMetaRecords();
             Logger.Log.Append("Total uploaders: " + uploaders.Count, LogLevel.Always);

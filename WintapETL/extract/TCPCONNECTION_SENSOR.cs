@@ -35,7 +35,6 @@ namespace gov.llnl.wintap.etl.extract
             try
             {
                 base.HandleSensorEvent(sensorEvent);
-                //WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
                 networkEventTimer.Stop();
                 networkEventTimer.Start();
                 ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, sensorEvent["PidHash"].ToString());
@@ -54,6 +53,8 @@ namespace gov.llnl.wintap.etl.extract
                 dynamic flatMsg = (ExpandoObject)pci.ToDynamic();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 this.Save(flatMsg);
+                sensorEvent = null;
+                flatMsg = null;
             }
             catch (Exception ex)
             {

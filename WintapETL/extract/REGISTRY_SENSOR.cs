@@ -48,6 +48,8 @@ namespace gov.llnl.wintap.etl.extract
                 flatMsg.MessageType = "PROCESS_REGISTRY";
                 flatMsg.EventTime = GetUnixNowTime();
                 this.Save(flatMsg);
+                sensorEvent = null;
+                flatMsg = null;
             }
             catch (Exception ex)
             {
