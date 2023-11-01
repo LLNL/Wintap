@@ -86,6 +86,7 @@ namespace gov.llnl.wintap.etl.load
             {
                 try
                 {
+                    Logger.Log.Append("DELETING FILE: " + e, LogLevel.Always);
                     FileInfo fileInfo = new FileInfo(e);
                     fileInfo.Delete();
                 }
@@ -145,7 +146,6 @@ namespace gov.llnl.wintap.etl.load
                         {
                             uploader.PostUpload();
                         }
-                        clearMerge();
                     }
                     uploadTimer.Restart();
                 }
@@ -330,6 +330,7 @@ namespace gov.llnl.wintap.etl.load
             {
                 try
                 {
+                    Logger.Log.Append("2 - DELETING FILE: " + file, LogLevel.Always);
                     File.Delete(file);
                     fileCount++;
                 }
@@ -361,6 +362,10 @@ namespace gov.llnl.wintap.etl.load
 
         private void clearMerge()
         {
+            if (!mergeDir.Exists)
+            {
+                mergeDir.Create();
+            }
             if (uploaders.Count > 0)
             {
                 foreach (FileInfo fi in mergeDir.GetFiles())
@@ -401,6 +406,7 @@ namespace gov.llnl.wintap.etl.load
         {
             try
             {
+                Logger.Log.Append("1 - DELETING FILE: " + fi.Name, LogLevel.Always);
                 fi.Delete();
             }
             catch (Exception ex)
