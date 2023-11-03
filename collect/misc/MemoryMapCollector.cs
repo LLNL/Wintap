@@ -145,6 +145,7 @@ namespace gov.llnl.wintap.collect
                     }
 
                     WintapMessage wm = new WintapMessage(DateTime.Now, pid, "MemoryMap");
+                    wm.PidHash = e.NewEvents[0]["PidHash"].ToString();
                     wm.ActivityType = ((StateEnum)memInfo.State).ToString();
                     wm.MemoryMap = new WintapMessage.MemoryMapData();
                     wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
@@ -165,7 +166,7 @@ namespace gov.llnl.wintap.collect
                         }
                     }
 
-                    EventChannel.Send(wm);
+                    EventChannel.Esper.EPRuntime.SendEvent(wm);  // call esper direct since we do not require pidhash lookup.
 
                     baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
                 }
