@@ -40,8 +40,12 @@ namespace gov.llnl.wintap.etl.extract
                 flatMsg.ActivityType = wintapMessage.ActivityType;
                 flatMsg.EventTime = wintapMessage.EventTime;
                 flatMsg.ComputerName = Environment.MachineName;
-                flatMsg.ActivityId = wintapMessage.ActivityId;
-                flatMsg.CorrelationId = wintapMessage.CorrelationId;
+                try
+                {
+                    flatMsg.ActivityId = wintapMessage.ActivityId;
+                    flatMsg.CorrelationId = wintapMessage.CorrelationId;
+                }
+                catch (Exception ex) { }
                 this.Save(flatMsg);
                 sensorEvent = null;
                 flatMsg = null;

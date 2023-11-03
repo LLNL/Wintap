@@ -146,6 +146,7 @@ namespace gov.llnl.wintap.collect
 
                     WintapMessage wm = new WintapMessage(DateTime.Now, pid, "MemoryMap");
                     wm.PidHash = e.NewEvents[0]["PidHash"].ToString();
+                    wm.ProcessName = e.NewEvents[0]["ProcessName"].ToString();
                     wm.ActivityType = ((StateEnum)memInfo.State).ToString();
                     wm.MemoryMap = new WintapMessage.MemoryMapData();
                     wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
@@ -154,7 +155,6 @@ namespace gov.llnl.wintap.collect
                     wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
                     wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
                     wm.MemoryMap.PageProtect = ((AllocationProtectEnum)memInfo.Protect).ToString();
-
 
                     if ((TypeEnum)memInfo.Type == TypeEnum.MEM_IMAGE)
                     {
