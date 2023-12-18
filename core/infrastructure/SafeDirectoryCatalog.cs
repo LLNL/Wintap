@@ -61,25 +61,28 @@ namespace gov.llnl.wintap
             List<string> signedFiles = new List<string>();
             foreach (string file in files)
             {
-                try
-                {
-                #if DEBUG
-                        signedFiles.Add(file);
-                #else
-                    if (isSignedAndTrusted(file))
-                    {
-                        signedFiles.Add(file);
-                    }
-                    else
-                    {
-                        WintapLogger.Log.Append(file + ": did NOT pass signature validation and will not be loaded.", core.infrastructure.LogLevel.Always);
-                    }
-                #endif
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("WARN: " + file + " is NOT signed by a trusted authority and will not be loaded.", core.infrastructure.LogLevel.Always);
-                }
+                signedFiles.Add(file);
+//                try
+//                {
+//#if DEBUG
+//                        WintapLogger.Log.Append("loading plugins in debug mode", core.infrastructure.LogLevel.Always);
+//                        signedFiles.Add(file);
+//#else
+//                    WintapLogger.Log.Append("loading plugins in release mode", core.infrastructure.LogLevel.Always);
+//                    if (isSignedAndTrusted(file))
+//                    {
+//                        signedFiles.Add(file);
+//                    }
+//                    else
+//                    {
+//                        WintapLogger.Log.Append(file + ": did NOT pass signature validation and will not be loaded.", core.infrastructure.LogLevel.Always);
+//                    }
+//                #endif
+//                }
+//                catch (Exception ex)
+//                {
+//                    WintapLogger.Log.Append("WARN: " + file + " is NOT signed by a trusted authority and will not be loaded.", core.infrastructure.LogLevel.Always);
+//                }
             }
             return signedFiles;
         }
