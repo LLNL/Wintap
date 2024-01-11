@@ -452,6 +452,8 @@
     <Compile Include="collect\shared\BaseCollector.cs" />
     <Compile Include="collect\shared\EtwCollector.cs" />
     <Compile Include="collect\shared\EtwProviderCollector.cs" />
+    <Compile Include="collect\shared\EtwUtility.cs" />
+    <Compile Include="core\api\EtwExplorerController.cs" />
     <Compile Include="core\api\TreeController.cs" />
     <Compile Include="core\infrastructure\EventChannel.cs" />
     <Compile Include="core\shared\Strings.cs" />
