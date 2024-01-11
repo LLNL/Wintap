@@ -1,22 +1,14 @@
-﻿using Microsoft.Diagnostics.Tracing.Parsers;
+﻿/*
+ * Copyright (c) 2024, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Session;
-using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data.Common;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Timers;
-using System.Configuration.Provider;
-using com.espertech.esper.client.annotation;
-using System.Diagnostics;
-using Org.BouncyCastle.Bcpg.OpenPgp;
-using gov.llnl.wintap.collect.models;
-using System.Management.Automation.Tracing;
-using gov.llnl.wintap.core.infrastructure;
 
 namespace gov.llnl.wintap.collect.shared
 {
