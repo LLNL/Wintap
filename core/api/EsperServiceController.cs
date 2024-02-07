@@ -17,7 +17,7 @@ namespace gov.llnl.wintap.core.api
     // SignalR (websockets) Hub
     public class WorkbenchHub : Hub
     {
-        public void Send(string queryResult)
+        public void Send(EsperResult queryResult)
         {
            
             Clients.All.addMessage(queryResult);
@@ -134,5 +134,10 @@ namespace gov.llnl.wintap.core.api
             }
             return logChunkOK;
         }
+    }
+
+    public class EsperResult
+    {
+        public string Result { get; set; }
     }
 }
