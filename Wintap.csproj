@@ -444,7 +444,7 @@
     <Compile Include="collect\etw\helpers\ProcessTrace.cs" />
     <Compile Include="collect\etw\ProcessCollector.cs" />
     <Compile Include="collect\log\WindowsEventLogCollector.cs" />
-    <Compile Include="collect\misc\MemoryMapCollector.cs" />
+    <Compile Include="collect\etw\MemoryMapCollector.cs" />
     <Compile Include="collect\misc\WebActivityCollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsBitLockerAPICollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsGroupPolicyCollector.cs" />
