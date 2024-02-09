@@ -20,6 +20,10 @@ namespace gov.llnl.wintap.collect
     internal class MemoryMapCollector : EtwProviderCollector
     {
         Dictionary<string, CommitInfo> commitHistory;
+        private Stopwatch refreshTimer;
+        private bool isStarting;
+        private bool scanningMemory;
+        private long scanErrors;
 
         [DllImport("psapi.dll")]
         static extern bool EnumProcessModules(IntPtr hProcess, [Out] IntPtr[] lphModule, uint cb, out uint lpcbNeeded);
@@ -117,13 +121,13 @@ namespace gov.llnl.wintap.collect
 
         public override bool Start()
         {
-            base.Start();
-            bool status = true;
             WintapLogger.Log.Append(this.CollectorName + " is starting...", LogLevel.Always);
-            string sql = "select * from WintapMessage where MessageType='Process' AND ActivityType='start'";
-            var epQuery = gov.llnl.wintap.core.infrastructure.EventChannel.Esper.EPAdministrator.CreateEPL(sql);
-            epQuery.Events += EpQuery_Events;
-
+            base.Start();
+            refreshTimer = new Stopwatch();
+            refreshTimer.Start();
+            isStarting = true;
+            bool status = true;
+            scanningMemory = false;
 
             WintapLogger.Log.Append(this.CollectorName + " started", LogLevel.Always);
 
@@ -140,9 +144,19 @@ namespace gov.llnl.wintap.collect
                     case "MemInfoWS":
                         if (obj.PayloadNames.Contains("WSCommitInfo"))
                         {
-                            string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
-                            List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
-                            detectChanges(commitInfos, obj.TimeStamp);
+                            if(scanningMemory == false)
+                            {
+                                if (isStarting || refreshTimer.ElapsedMilliseconds > 2000)
+                                {
+                                    refreshTimer.Restart();
+                                    isStarting = false;
+                                    WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Always);
+                                    string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
+                                    List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
+                                    detectChanges(commitInfos, obj.TimeStamp);
+                                    WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY   error count: " + scanErrors + " --------", LogLevel.Always);
+                                }
+                            }                         
                         }
                         break;
                     default:
@@ -151,19 +165,8 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error parsing user mode event: " + ex.Message, LogLevel.Debug);
-            }
-        }
-
-        private void EpQuery_Events(object sender, com.espertech.esper.client.UpdateEventArgs e)
-        {
-            try
-            {
-              
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("WARN problem collecting memory map: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error parsing user mode event: " + ex.Message, LogLevel.Always);
+                scanningMemory = false;
             }
         }
 
@@ -187,32 +190,41 @@ namespace gov.llnl.wintap.collect
 
         private void detectChanges(List<CommitInfo> commitInfos, DateTime eventTime)
         {
+            scanningMemory = true;
             foreach(CommitInfo currentInfo in commitInfos)
             {
-                WintapMessage owningProcess = ProcessTree.GetByPid(currentInfo.ProcessId, eventTime.ToFileTimeUtc());
-                if (owningProcess != null)
+                try
                 {
-                    string pidHash = owningProcess.PidHash;
-                    // do we have an existing commit history for this process?
-                    if (commitHistory.Count(ch => ch.Key == pidHash) > 0)
+                    WintapMessage owningProcess = ProcessTree.GetByPid(currentInfo.ProcessId, eventTime.ToFileTimeUtc());
+                    if (owningProcess != null)
                     {
-                        // yes, so look for changes and trigger MemoryMap snapshot refresh
-                        ulong lastProcessPageCount = Convert.ToUInt64(commitHistory.Where(c => c.Key == pidHash).FirstOrDefault().Value.WorkingSetPageCount);
-                        ulong currentProcessPageCount = Convert.ToUInt64(currentInfo.WorkingSetPageCount);
-                        if (lastProcessPageCount != currentProcessPageCount)
+                        string pidHash = owningProcess.PidHash;
+                        // do we have an existing commit history for this process?
+                        if (commitHistory.Count(ch => ch.Key == pidHash) > 0)
                         {
-                            commitHistory[pidHash] = currentInfo;
-                            refreshSnapshot(owningProcess, currentInfo);
+                            // yes, so look for changes and trigger MemoryMap snapshot refresh
+                            ulong lastProcessPageCount = Convert.ToUInt64(commitHistory.Where(c => c.Key == pidHash).FirstOrDefault().Value.WorkingSetPageCount);
+                            ulong currentProcessPageCount = Convert.ToUInt64(currentInfo.WorkingSetPageCount);
+                            if (lastProcessPageCount != currentProcessPageCount)
+                            {
+                                commitHistory[pidHash] = currentInfo;
+                                refreshSnapshot(owningProcess, currentInfo);
+                            }
+                        }
+                        else
+                        {
+                            // no, so initialize process state
+                            commitHistory.Add(pidHash, currentInfo);
+                            //refreshSnapshot(owningProcess, currentInfo);
                         }
                     }
-                    else
-                    {
-                        // no, so initialize process state
-                        commitHistory.Add(pidHash, currentInfo);
-                        refreshSnapshot(owningProcess, currentInfo);
-                    }
+                }
+                catch (Exception ex)
+                {
+
                 }              
             }
+            scanningMemory = false;
 
             // clean up history
             foreach(CommitInfo historicalCommitInfo in commitHistory.Values)
@@ -225,41 +237,51 @@ namespace gov.llnl.wintap.collect
         {
             if (!processRunning(_owningProcess.PID)) { return; }
             if(_owningProcess.ProcessName == "devenv.exe") { return; }
+            if(_owningProcess.PID < 200) { return; }  // skip protected processes
             Process process = System.Diagnostics.Process.GetProcessById(_owningProcess.PID);
             IntPtr baseAddress = new IntPtr(0);
             WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.PID, "MemoryMap");
+            MEMORY_BASIC_INFORMATION memInfo = new MEMORY_BASIC_INFORMATION();
             while (true)
             {
-                MEMORY_BASIC_INFORMATION memInfo = new MEMORY_BASIC_INFORMATION();
-                bool bytesRead = VirtualQueryEx(process.Handle, baseAddress, out memInfo, (uint)Marshal.SizeOf(memInfo));
-                if (bytesRead == false)
+                try
                 {
-                    break;
-                }
-
-                wm.PidHash = _owningProcess.PidHash;
-                wm.ProcessName = _owningProcess.ProcessName;
-                wm.ActivityType = ((StateEnum)memInfo.State).ToString();
-                wm.MemoryMap = new WintapMessage.MemoryMapData();
-                wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
-                wm.MemoryMap.AllocationProtect = ((AllocationProtectEnum)memInfo.AllocationProtect).ToString();
-                wm.MemoryMap.PageType = ((TypeEnum)memInfo.Type).ToString();
-                wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
-                wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
-                wm.MemoryMap.PageProtect = ((AllocationProtectEnum)memInfo.Protect).ToString();
-
-                if ((TypeEnum)memInfo.Type == TypeEnum.MEM_IMAGE)
-                {
-                    StringBuilder path = new StringBuilder(1024);
-                    uint size = GetModuleFileNameEx(process.Handle, memInfo.BaseAddress, path, 1024);
-                    if (size > 0)
+                    memInfo = new MEMORY_BASIC_INFORMATION();
+                    bool bytesRead = VirtualQueryEx(process.Handle, baseAddress, out memInfo, (uint)Marshal.SizeOf(memInfo));
+                    if (bytesRead == false)
                     {
-                        wm.MemoryMap.Description = path.ToString();
+                        break;
                     }
-                }
+                    wm.PidHash = _owningProcess.PidHash;
+                    wm.ProcessName = _owningProcess.ProcessName;
+                    wm.ActivityType = ((StateEnum)memInfo.State).ToString();
+                    wm.MemoryMap = new WintapMessage.MemoryMapData();
+                    wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
+                    wm.MemoryMap.AllocationProtect = ((AllocationProtectEnum)memInfo.AllocationProtect).ToString();
+                    wm.MemoryMap.PageType = ((TypeEnum)memInfo.Type).ToString();
+                    wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
+                    wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
+                    wm.MemoryMap.PageProtect = ((AllocationProtectEnum)memInfo.Protect).ToString();
 
-                baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
-                EventChannel.Esper.EPRuntime.SendEvent(wm);  // call esper direct since we do not require pidhash lookup.
+                    if ((TypeEnum)memInfo.Type == TypeEnum.MEM_IMAGE)
+                    {
+                        StringBuilder path = new StringBuilder(1024);
+                        uint size = GetModuleFileNameEx(process.Handle, memInfo.BaseAddress, path, 1024);
+                        if (size > 0)
+                        {
+                            wm.MemoryMap.Description = path.ToString();
+                        }
+                    }
+                    baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
+                    EventChannel.Esper.EPRuntime.SendEvent(wm);  // call esper direct since we do not require pidhash lookup.
+                }
+                catch
+                {
+                    scanErrors++;
+                    baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
+                    if(baseAddress.ToInt64() == 0) { break; }
+                }
+               
             }
         }
     }
