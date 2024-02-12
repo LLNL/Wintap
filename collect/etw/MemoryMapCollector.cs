@@ -22,7 +22,7 @@ namespace gov.llnl.wintap.collect
         Dictionary<string, CommitInfo> commitHistory;
         private Stopwatch refreshTimer;
         private bool isStarting;
-        private bool scanningMemory;
+        private bool scanInProgress;
         private long scanErrors;
 
         [DllImport("psapi.dll")]
@@ -127,7 +127,11 @@ namespace gov.llnl.wintap.collect
             refreshTimer.Start();
             isStarting = true;
             bool status = true;
-            scanningMemory = false;
+            scanInProgress = false;
+
+            string sql = "select * from WintapMessage where MessageType='Process' AND ActivityType='start'";
+            var epQuery = gov.llnl.wintap.core.infrastructure.EventChannel.Esper.EPAdministrator.CreateEPL(sql);
+            epQuery.Events += EpQuery_Events;
 
             WintapLogger.Log.Append(this.CollectorName + " started", LogLevel.Always);
 
@@ -144,19 +148,34 @@ namespace gov.llnl.wintap.collect
                     case "MemInfoWS":
                         if (obj.PayloadNames.Contains("WSCommitInfo"))
                         {
-                            if(scanningMemory == false)
+                            string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
+                            int pidofParquet = Process.GetProcessesByName("ParquetViewer")[0].Id;
+                            List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
+
+                            // scan-on-change continously
+                            if(!scanInProgress)
                             {
-                                if (isStarting || refreshTimer.ElapsedMilliseconds > 2000)
-                                {
-                                    refreshTimer.Restart();
-                                    isStarting = false;
-                                    WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Always);
-                                    string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
-                                    List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
-                                    detectChanges(commitInfos, obj.TimeStamp);
-                                    WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY   error count: " + scanErrors + " --------", LogLevel.Always);
-                                }
-                            }                         
+                                scanInProgress = true;
+                                DateTime sweepStartTime = DateTime.Now;
+                                WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Always);
+                                int totalProcessScanCount = detectChanges(commitInfos, obj.TimeStamp);
+                                WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY total scanned: " + totalProcessScanCount + "   err count: " + scanErrors + "  Total Scan Time: " + DateTime.Now.Subtract(sweepStartTime).TotalSeconds + " sec --------", LogLevel.Always);
+                                scanInProgress = false;
+                            }
+
+                            //if (scanningMemory == false)
+                            //{
+                            //    if (isStarting || refreshTimer.ElapsedMilliseconds > 2000)
+                            //    {
+                            //        refreshTimer.Restart();
+                            //        isStarting = false;
+                            //        WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Always);
+                            //        string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
+                            //        List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
+                            //        detectChanges(commitInfos, obj.TimeStamp);
+                            //        WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY   err count: " + scanErrors + " --------", LogLevel.Always);
+                            //    }
+                            //}                         
                         }
                         break;
                     default:
@@ -166,10 +185,23 @@ namespace gov.llnl.wintap.collect
             catch (Exception ex)
             {
                 WintapLogger.Log.Append("Error parsing user mode event: " + ex.Message, LogLevel.Always);
-                scanningMemory = false;
+                scanInProgress = false;
             }
         }
 
+        private void EpQuery_Events(object sender, com.espertech.esper.client.UpdateEventArgs e)
+        {
+            try
+            {
+                WintapMessage newProcess = (WintapMessage)e.NewEvents[0].Underlying;
+                refreshSnapshot(newProcess);
+
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("ERROR scanning memory for new process: " + ex.Message, LogLevel.Always);
+            }
+        }
         private bool processRunning(int pid)
         {
             try
@@ -188,15 +220,16 @@ namespace gov.llnl.wintap.collect
             return false;
         }
 
-        private void detectChanges(List<CommitInfo> commitInfos, DateTime eventTime)
+        private int detectChanges(List<CommitInfo> commitInfos, DateTime eventTime)
         {
-            scanningMemory = true;
+            scanInProgress = true;
+            int scanCount = 0;
             foreach(CommitInfo currentInfo in commitInfos)
             {
                 try
                 {
                     WintapMessage owningProcess = ProcessTree.GetByPid(currentInfo.ProcessId, eventTime.ToFileTimeUtc());
-                    if (owningProcess != null)
+                    if (owningProcess.ProcessName != "unknown")
                     {
                         string pidHash = owningProcess.PidHash;
                         // do we have an existing commit history for this process?
@@ -205,39 +238,44 @@ namespace gov.llnl.wintap.collect
                             // yes, so look for changes and trigger MemoryMap snapshot refresh
                             ulong lastProcessPageCount = Convert.ToUInt64(commitHistory.Where(c => c.Key == pidHash).FirstOrDefault().Value.WorkingSetPageCount);
                             ulong currentProcessPageCount = Convert.ToUInt64(currentInfo.WorkingSetPageCount);
+
                             if (lastProcessPageCount != currentProcessPageCount)
                             {
                                 commitHistory[pidHash] = currentInfo;
-                                refreshSnapshot(owningProcess, currentInfo);
+                                refreshSnapshot(owningProcess);
+                                scanCount++;
                             }
                         }
                         else
                         {
                             // no, so initialize process state
                             commitHistory.Add(pidHash, currentInfo);
-                            //refreshSnapshot(owningProcess, currentInfo);
+                            //refreshSnapshot(owningProcess);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-
+                    WintapLogger.Log.Append("Error scanning memory:  " + ex.Message, LogLevel.Always);
                 }              
             }
-            scanningMemory = false;
+            scanInProgress = false;
 
             // clean up history
             foreach(CommitInfo historicalCommitInfo in commitHistory.Values)
             {
                 // todo
             }
+            return scanCount;
         }
 
-        private void refreshSnapshot(WintapMessage _owningProcess, CommitInfo _commitInfo)
+        private void refreshSnapshot(WintapMessage _owningProcess)
         {
             if (!processRunning(_owningProcess.PID)) { return; }
             if(_owningProcess.ProcessName == "devenv.exe") { return; }
             if(_owningProcess.PID < 200) { return; }  // skip protected processes
+            WintapLogger.Log.Append("Attempting memory scan of: " + _owningProcess.ProcessName, LogLevel.Always);
+            DateTime startScanTime = DateTime.Now;
             Process process = System.Diagnostics.Process.GetProcessById(_owningProcess.PID);
             IntPtr baseAddress = new IntPtr(0);
             WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.PID, "MemoryMap");
@@ -278,12 +316,15 @@ namespace gov.llnl.wintap.collect
                 catch
                 {
                     scanErrors++;
+                    WintapLogger.Log.Append("ERROR performing memory scan of: " + _owningProcess.ProcessName, LogLevel.Always);
                     baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
                     if(baseAddress.ToInt64() == 0) { break; }
                 }
-               
+                
             }
+            WintapLogger.Log.Append("DONE with memory scan of " + _owningProcess.ProcessName + ": " + DateTime.Now.Subtract(startScanTime).TotalMilliseconds + " ms", LogLevel.Always);
         }
+
     }
 
     internal class CommitInfo

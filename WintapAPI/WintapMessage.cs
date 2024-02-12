@@ -353,14 +353,14 @@ namespace gov.llnl.wintap.collect.models
         public class KernelApiCallData
         {
             private string providerName;
-            private uint? targetPid;
+            private int targetPid;
             private uint? desiredAccess;
             private uint returnCode;
             private string linkSourceName;
             private string linkTargetName;
             private long? notifyRoutineAddress;
             private uint? targetThreatId;
-            public KernelApiCallData(string _providerName, uint? _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId) 
+            public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId) 
             {
                 providerName = _providerName;
                 targetPid = _targetPid;
@@ -375,7 +375,7 @@ namespace gov.llnl.wintap.collect.models
             {
                 get { return providerName; }
             }
-            public uint? TargetPid
+            public int? TargetPid
             { get { return targetPid; } }
             public uint? DesiredAccess
             { get { return desiredAccess; } }
