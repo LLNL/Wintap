@@ -149,7 +149,6 @@ namespace gov.llnl.wintap.collect
                         if (obj.PayloadNames.Contains("WSCommitInfo"))
                         {
                             string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
-                            int pidofParquet = Process.GetProcessesByName("ParquetViewer")[0].Id;
                             List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
 
                             // scan-on-change continously
