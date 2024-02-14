@@ -149,7 +149,6 @@ namespace gov.llnl.wintap.collect
                         if (obj.PayloadNames.Contains("WSCommitInfo"))
                         {
                             string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
-                            int pidofParquet = Process.GetProcessesByName("ParquetViewer")[0].Id;
                             List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
 
                             // scan-on-change continously
@@ -242,7 +241,13 @@ namespace gov.llnl.wintap.collect
                             if (lastProcessPageCount != currentProcessPageCount)
                             {
                                 commitHistory[pidHash] = currentInfo;
-                                refreshSnapshot(owningProcess);
+                                //refreshSnapshot(owningProcess);
+                                scanCount++;
+                            }
+                            // process the 'always-scan' list
+                            if(owningProcess.ProcessName == "lsass.exe")
+                            {
+                                refreshSnapshot(owningProcess); scanCount++;
                                 scanCount++;
                             }
                         }

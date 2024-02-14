@@ -28,49 +28,16 @@ namespace gov.llnl.wintap.collect
             base.Process_Event(obj);
             try
             {
-                switch (obj.EventName)
-                {
-                    case "MemInfoWS":
-                        try
-                        {
-                            this.Counter++;
-                            string payload = @obj.ToString().Split(new char[] { '=' })[7];
-                            string json = payload.Replace(@"&quot;", "\"");
-                            json = json.Replace("/>", "");
-                            json = json.TrimStart(new char[] { '\"' });
-                            json = json.TrimEnd(new char[] { '\"' });
-                            json = json.Replace("ProcessID:", "ProcessID:\"");
-                            json = json.Replace(", WorkingSetPageCount:", "\",WorkingSetPageCount:");
-                            json = json.Replace(", ", ",");
-                            var memInfos = JsonConvert.DeserializeObject<List<MemInfo>>(json);
-                            foreach (MemInfo memInfo in memInfos)
-                            {
-                                WintapMessage wm = new WintapMessage(obj.TimeStamp, obj.ProcessID, "MemInfoWS") { ActivityType = obj.EventName };
-                                WintapMessage.MemInfoWSData mem = new MemInfoWSData();
-                                mem.CommitDebtInPages = memInfo.CommitDebtInPages;
-                                mem.CommitPageCount = memInfo.CommitPageCount;
-                                mem.PrivateWorkingSetPageCount = memInfo.PrivateWorkingSetPageCount;
-                                mem.SharedCommitInPages = memInfo.SharedCommitInPages;
-                                mem.StoredPageCount = memInfo.StoredPageCount;
-                                mem.StoreSizePageCount = memInfo.StoreSizePageCount;
-                                mem.VirtualSizeInPages = memInfo.VirtualSizeInPages;
-                                mem.WorkingSetPageCount = memInfo.WorkingSetPageCount;
-                                wm.MemInfoWS = mem;
-                                EventChannel.Send(wm);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            WintapLogger.Log.Append("ERROR: " + ex.Message, LogLevel.Always);
-                        }
-                        break;
-                    default:
-                        break;
-                }
+                MemoryEventData med = new MemoryEventData();
+                med.ThreadId = obj.ThreadID;
+                med.Payload = obj.ToString();
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "Memory");
+                msg.MemoryEvent = med;
+                EventChannel.Send(msg);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error parsing user mode event: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("Error processing memory event: " + ex.Message, LogLevel.Debug);
             }
         }
     }

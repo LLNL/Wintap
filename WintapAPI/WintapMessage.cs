@@ -52,7 +52,7 @@ namespace gov.llnl.wintap.collect.models
         public ThreadStartObject ThreadStart { get; set; } 
         public EventlogEventObject EventLogEvent { get; set; }
         public MicrosoftWindowsCpuTriggerData MicrosoftWindowsCpuTrigger { get; set; }
-        public MemInfoWSData MemInfoWS { get; set; }
+        public MemoryEventData MemoryEvent { get; set; }
         public WebActivityData WebActivity { get; set; }
         public MicrosoftWindowsGroupPolicyData MicrosoftWindowsGroupPolicy { get; set; }
         public MicrosoftWindowsBitLockerAPIData MicrosoftWindowsBitLockerAPI { get; set; }
@@ -315,6 +315,12 @@ namespace gov.llnl.wintap.collect.models
             public double ElapsedTimeMSec { get; set; }
         }
 
+        public class MemoryEventData
+        {
+            public int ThreadId { get; set; }
+            public string Payload { get; set; }
+        }
+
         public class WebActivityData
         {
             public string Browser { get; set; }
@@ -353,6 +359,7 @@ namespace gov.llnl.wintap.collect.models
         public class KernelApiCallData
         {
             private string providerName;
+            private int threadId;
             private int targetPid;
             private uint? desiredAccess;
             private uint returnCode;
@@ -360,7 +367,7 @@ namespace gov.llnl.wintap.collect.models
             private string linkTargetName;
             private long? notifyRoutineAddress;
             private uint? targetThreatId;
-            public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId) 
+            public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId) 
             {
                 providerName = _providerName;
                 targetPid = _targetPid;
@@ -370,6 +377,7 @@ namespace gov.llnl.wintap.collect.models
                 linkTargetName = _linkTargetName;
                 notifyRoutineAddress = _notifyRoutineAddress;
                 targetThreatId = _targetThreatId;
+                threadId = _threadId;
             }
             public string ProviderName
             {
@@ -389,6 +397,8 @@ namespace gov.llnl.wintap.collect.models
             { get { return notifyRoutineAddress; } }
             public uint? TargetThreatId
             { get { return targetThreatId; } }
+            public int ThreadId
+            { get { return threadId; } }
         }
 
         //  summary descriptors taken from:  https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-memory_basic_information
