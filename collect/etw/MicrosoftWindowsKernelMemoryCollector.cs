@@ -31,7 +31,7 @@ namespace gov.llnl.wintap.collect
                 MemoryEventData med = new MemoryEventData();
                 med.ThreadId = obj.ThreadID;
                 med.Payload = obj.ToString();
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "Memory");
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "MemoryEvent");
                 msg.MemoryEvent = med;
                 EventChannel.Send(msg);
             }
