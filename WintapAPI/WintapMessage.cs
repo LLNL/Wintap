@@ -432,6 +432,8 @@ namespace gov.llnl.wintap.collect.models
             public string PageProtect { get; set; }
 
             public string PageType { get; set; }
+
+            public bool MZHeaderPresent { get; set; }
         }
     }
 }

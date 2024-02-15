@@ -432,6 +432,10 @@
     <Reference Include="WebActivatorEx, Version=2.0.0.0, Culture=neutral, PublicKeyToken=7b26dc2a43f6a0d4, processorArchitecture=MSIL">
       <HintPath>packages\WebActivatorEx.2.0\lib\net40\WebActivatorEx.dll</HintPath>
     </Reference>
+    <Reference Include="WintapAPI, Version=1.2.1.1, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>WintapAPI\bin\Release\WintapAPI.dll</HintPath>
+    </Reference>
     <Reference Include="XLR8.CGLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\XLR8.CGLib.1.1.0\lib\net45\XLR8.CGLib.dll</HintPath>
     </Reference>
@@ -586,12 +590,6 @@
   <ItemGroup>
     <Folder Include="App_Start\" />
     <Folder Include="binary\" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="WintapAPI\WintapAPI.csproj">
-      <Project>{c2a9826a-1dde-44c9-8b82-9ce124e027e9}</Project>
-      <Name>WintapAPI</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Microsoft.Diagnostics.Tracing.TraceEvent.1.0.21\build\Microsoft.Diagnostics.Tracing.TraceEvent.targets" Condition="Exists('..\packages\Microsoft.Diagnostics.Tracing.TraceEvent.1.0.21\build\Microsoft.Diagnostics.Tracing.TraceEvent.targets')" />

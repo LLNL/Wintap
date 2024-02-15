@@ -5,6 +5,7 @@ using gov.llnl.wintap.collect.shared;
 using gov.llnl.wintap.core.infrastructure;
 using Microsoft.Diagnostics.Tracing;
 using Newtonsoft.Json;
+using Org.BouncyCastle.Math.EC.Multiplier;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -48,8 +49,16 @@ namespace gov.llnl.wintap.collect
 
         [DllImport("kernel32.dll")]
         static extern bool CloseHandle(IntPtr hObject);
+        [DllImport("kernel32.dll")]
+        static extern bool ReadProcessMemory(
+        IntPtr hProcess,
+        IntPtr lpBaseAddress,
+        [Out] byte[] lpBuffer,
+        int dwSize,
+        out int lpNumberOfBytesRead);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+
         static extern bool GetFileInformationByHandleEx(IntPtr hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, out FILE_NAME_INFO lpFileInformation, uint dwBufferSize);
 
 
@@ -305,6 +314,7 @@ namespace gov.llnl.wintap.collect
                     wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
                     wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
                     wm.MemoryMap.PageProtect = ((AllocationProtectEnum)memInfo.Protect).ToString();
+                    wm.MemoryMap.MZHeaderPresent = false;
 
                     if ((TypeEnum)memInfo.Type == TypeEnum.MEM_IMAGE)
                     {
@@ -315,6 +325,18 @@ namespace gov.llnl.wintap.collect
                             wm.MemoryMap.Description = path.ToString();
                         }
                     }
+
+                    byte[] buffer = new byte[2];
+                    int bytesRead2;
+                    bool success = ReadProcessMemory(process.Handle, baseAddress, buffer, buffer.Length, out bytesRead2);
+                    if (success && bytesRead2 == 2)
+                    {
+                        if (buffer[0] == 'M' && buffer[1] == 'Z')
+                        {
+                            wm.MemoryMap.MZHeaderPresent = true;
+                        }
+                    }
+
                     baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
                     EventChannel.Esper.EPRuntime.SendEvent(wm);  // call esper direct since we do not require pidhash lookup.
                 }
