@@ -367,6 +367,7 @@ namespace gov.llnl.wintap.collect.models
             private string linkTargetName;
             private long? notifyRoutineAddress;
             private uint? targetThreatId;
+
             public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId) 
             {
                 providerName = _providerName;
@@ -399,6 +400,7 @@ namespace gov.llnl.wintap.collect.models
             { get { return targetThreatId; } }
             public int ThreadId
             { get { return threadId; } }
+            public string DesiredAccessString { get; set; }
         }
 
         //  summary descriptors taken from:  https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-memory_basic_information

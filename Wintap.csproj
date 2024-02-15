@@ -434,7 +434,7 @@
     </Reference>
     <Reference Include="WintapAPI, Version=1.2.1.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>WintapAPI\bin\Release\WintapAPI.dll</HintPath>
+      <HintPath>WintapAPI\bin\Debug\WintapAPI.dll</HintPath>
     </Reference>
     <Reference Include="XLR8.CGLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\XLR8.CGLib.1.1.0\lib\net45\XLR8.CGLib.dll</HintPath>
