@@ -386,6 +386,7 @@ namespace gov.llnl.wintap.collect.models
             }
             public int? TargetPid
             { get { return targetPid; } }
+            public string TargetProcessName { get; set; }
             public uint? DesiredAccess
             { get { return desiredAccess; } }
             public uint ReturnCode

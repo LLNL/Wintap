@@ -2,6 +2,7 @@
 using gov.llnl.wintap.collect.shared;
 using gov.llnl.wintap.core.infrastructure;
 using Microsoft.Diagnostics.Tracing;
+using Microsoft.Diagnostics.Tracing.AutomatedAnalysis;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftAntimalwareEngine;
 using Microsoft.Extensions.Primitives;
 using System;
@@ -81,6 +82,14 @@ namespace gov.llnl.wintap.collect
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), null, null, null, null, obj.ThreadID);
                     msg.KernelApiCall.DesiredAccessString = translateDesiredAccessToEnum(msg.KernelApiCall.DesiredAccess);
+                    try
+                    {
+                        msg.KernelApiCall.TargetProcessName = System.Diagnostics.Process.GetProcessById((int)msg.KernelApiCall.TargetPid).ProcessName.ToLower();
+                    }
+                    catch(Exception ex)
+                    {
+                        log.Append("Could not get target process name for OpenProcess event: " + ex.Message, LogLevel.Debug);
+                    }
                 }
                 else if (obj.EventName.Contains("EventID(6)"))
                 {
