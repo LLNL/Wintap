@@ -432,7 +432,7 @@
     <Reference Include="WebActivatorEx, Version=2.0.0.0, Culture=neutral, PublicKeyToken=7b26dc2a43f6a0d4, processorArchitecture=MSIL">
       <HintPath>packages\WebActivatorEx.2.0\lib\net40\WebActivatorEx.dll</HintPath>
     </Reference>
-    <Reference Include="WintapAPI, Version=1.2.1.1, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="WintapAPI, Version=1.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>WintapAPI\bin\Debug\WintapAPI.dll</HintPath>
     </Reference>
