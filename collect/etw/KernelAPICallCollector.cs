@@ -84,7 +84,7 @@ namespace gov.llnl.wintap.collect
                     msg.KernelApiCall.DesiredAccessString = translateDesiredAccessToEnum(msg.KernelApiCall.DesiredAccess);
                     try
                     {
-                        msg.KernelApiCall.TargetProcessName = System.Diagnostics.Process.GetProcessById((int)msg.KernelApiCall.TargetPid).ProcessName.ToLower();
+                        msg.KernelApiCall.TargetProcessName = System.Diagnostics.Process.GetProcessById((int)msg.KernelApiCall.TargetPid).ProcessName.ToLower() + ".exe";
                     }
                     catch(Exception ex)
                     {
