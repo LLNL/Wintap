@@ -3,9 +3,9 @@
     {
       "Properties": {
         "EndPoint": "",
-	"Port": "",
+	      "Port": "",
         "CertificateStore": "",
-	"DeviceCertificateName": ""
+	      "DeviceCertificateName": ""
       },
       "Name": "SignedS3UrlAdapter",
       "Enabled": false
@@ -15,6 +15,14 @@
         "UNCPath": ""
       },
       "Name": "SMBFileShareAdapter",
+      "Enabled": false
+    },
+    {
+      "Properties": {
+        "Bucket": "",
+        "RegionEndpoint":  ""
+      },
+      "Name": "InstanceProfileAdapter",
       "Enabled": false
     }
   ],

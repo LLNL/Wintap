@@ -200,6 +200,7 @@
     <Compile Include="extract\TCPCONNECTION_SENSOR.cs" />
     <Compile Include="extract\UDPPACKET_SENSOR.cs" />
     <Compile Include="load\adapters\base\Uploader.cs" />
+    <Compile Include="load\adapters\InstanceProfileAdapter.cs" />
     <Compile Include="load\adapters\SignedS3UrlAdapter.cs" />
     <Compile Include="load\adapters\SMBFileShareAdapter.cs" />
     <Compile Include="load\CacheManager.cs" />

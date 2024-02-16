@@ -128,7 +128,7 @@ namespace gov.llnl.wintap.etl.load
                     shellMerge();
                     if (mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories).Count() > 0)
                     {
-                        Logger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Debug);
+                        Logger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Always);
                         try
                         {
                             pruneCache();
@@ -139,7 +139,15 @@ namespace gov.llnl.wintap.etl.load
                         }
                         foreach (IUpload uploader in uploaders)
                         {
-                            uploader.PreUpload(etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties);
+                            Logger.Log.Append("Calling pre-upload method on: " + uploader.Name, LogLevel.Always);
+                            try
+                            {
+                                uploader.PreUpload(etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties);
+                            }
+                            catch(Exception ex)
+                            {
+                                Logger.Log.Append($"ERROR in preUpload for {uploader.Name}: {ex.Message}", LogLevel.Always);
+                            }
                         }
                         upload();
                         foreach (IUpload uploader in uploaders)
@@ -159,6 +167,8 @@ namespace gov.llnl.wintap.etl.load
 
         private void upload()
         {
+            Logger.Log.Append("CacheManager upload method is starting. merge directory: " + mergeDir.FullName, LogLevel.Always);
+            
             foreach (FileInfo dataFile in mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories))
             {
                 if (dataFile.Length > 0)
@@ -168,6 +178,7 @@ namespace gov.llnl.wintap.etl.load
                     {
                         try
                         {
+                            Logger.Log.Append("Calling upload: " + uploader.Name, LogLevel.Always);
                             if (uploader.Upload(dataFile.FullName, etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties))
                             {
                                 successfulUpload = true; // any success = all success, for now.
@@ -181,6 +192,8 @@ namespace gov.llnl.wintap.etl.load
                 }
                 System.Threading.Thread.Sleep(250);  // throttle the upload to prevent CPU/IO spike
             }
+
+            Logger.Log.Append("CacheManager upload method is complete", LogLevel.Always);
         }
 
         private void cleanup()
