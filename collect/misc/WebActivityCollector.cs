@@ -10,6 +10,7 @@ using gov.llnl.wintap.collect.shared;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using Microsoft.Diagnostics.Tracing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -38,7 +39,7 @@ namespace gov.llnl.wintap.collect
         {
             // For ETW events set source name here to be the Event Provider name
             this.CollectorName = "WebActivity";
-
+            WintapLogger.Log.Append("WebActivity monitor is starting!!!!!!!!", core.infrastructure.LogLevel.Always);
             mostRecentActivity = DateTime.Now.AddMinutes(-10).ToUniversalTime();
             mostRecentActivityEdge = mostRecentActivity;
             mostRecentActivityFF = mostRecentActivity;
@@ -61,14 +62,24 @@ namespace gov.llnl.wintap.collect
 
         private void gatherBrowserInfo()
         {
-            string user = getUser();
+            string user = StateManager.ActiveUser;
+            if (user.Contains("\\"))
+            {
+                user = user.Split(new char[] { '\\' })[1];
+            }
+            WintapLogger.Log.Append("gatherBrowserInfo called.  User: " + user, core.infrastructure.LogLevel.Always);
+            if(user == "NA")
+            {
+                user = getUser();
+            }
+
             // gather Chrome
             try
             {
                 if(user.ToUpper() == "PHOTONUSER")
                 {
                     string chromeHistoryPath = Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + user + @"\AppData\Local\Google\Chrome\User Data\Default\History";
-                    WintapLogger.Log.Append("Attempting to load Chrome history data from appstream file: " + chromeHistoryPath, LogLevel.Always);
+                    WintapLogger.Log.Append("Attempting to load Chrome history data from appstream file: " + chromeHistoryPath, core.infrastructure.LogLevel.Always);
                     gatherChrome(chromeHistoryPath);
                 }
                 else
@@ -84,7 +95,7 @@ namespace gov.llnl.wintap.collect
             }
             catch(Exception ex)
             {
-               WintapLogger.Log.Append("Error in chrome activity gather: " + ex.Message, LogLevel.Always);
+               WintapLogger.Log.Append("Error in chrome activity gather: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
 
             // gather Firefox
@@ -92,14 +103,11 @@ namespace gov.llnl.wintap.collect
             {
                 DirectoryInfo ffRoot = new DirectoryInfo(Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + user + @"\AppData\Roaming\Mozilla\Firefox\Profiles");
                 string ffProfile = ffRoot.EnumerateDirectories().FirstOrDefault().FullName;
-                if(user.ToUpper() == "PHOTONUSER")
+                foreach (DirectoryInfo ffDir in ffRoot.EnumerateDirectories())
                 {
-                    foreach (DirectoryInfo ffDir in ffRoot.EnumerateDirectories())
+                    if (ffDir.FullName.ToUpper().EndsWith("-RELEASE"))
                     {
-                        if (ffDir.FullName.ToUpper().EndsWith("-RELEASE"))
-                        {
-                            ffProfile = ffDir.FullName;
-                        }
+                        ffProfile = ffDir.FullName;
                     }
                 }
                 gatherFireFox(ffProfile + "\\places.sqlite");
@@ -110,7 +118,7 @@ namespace gov.llnl.wintap.collect
             }
             catch(Exception ex)
             {
-                WintapLogger.Log.Append("Error in firefox activity gather: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error in firefox activity gather: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
 
             // Gather Edge
@@ -119,7 +127,7 @@ namespace gov.llnl.wintap.collect
                 if (user.ToUpper() == "PHOTONUSER")
                 {
                     string edgeHistoryPath = Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + user + @"\AppData\Local\Microsoft\Edge\User Data\Default\History";
-                    WintapLogger.Log.Append("Attempting to load Edge history data from appstream file: " + edgeHistoryPath, LogLevel.Always);
+                    WintapLogger.Log.Append("Attempting to load Edge history data from appstream file: " + edgeHistoryPath, core.infrastructure.LogLevel.Always);
                     gatherEdge(edgeHistoryPath);
                 }
                 else
@@ -136,14 +144,19 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error edge activity gather: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error edge activity gather: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
 
         }
 
         private string getChromeProfileName()
         {
-            string chromeSettingsFile = Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + getUser() + @"\AppData\Local\Google\Chrome\User Data\Local State";
+            string user = StateManager.ActiveUser.ToString();
+            if (user.Contains("\\"))
+            {
+                user = user.Split(new char[] {'\\'})[1];
+            }
+            string chromeSettingsFile = Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + user + @"\AppData\Local\Google\Chrome\User Data\Local State";
             if(StateManager.ActiveUser.ToUpper() == "PHOTONUSER")
             {
                 chromeSettingsFile = chromeSettingsFile.Replace("\\Local State", "\\Default");
@@ -155,7 +168,12 @@ namespace gov.llnl.wintap.collect
 
         private string getEdgeProfileName()
         {
-            string edgeSettingsFile = Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + getUser() + @"\AppData\Local\Microsoft\Edge\User Data\Local State";
+            string user = StateManager.ActiveUser.ToString();
+            if (user.Contains("\\"))
+            {
+                user = user.Split(new char[] { '\\' })[1];
+            }
+            string edgeSettingsFile = Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + user + @"\AppData\Local\Microsoft\Edge\User Data\Local State";
             if (StateManager.ActiveUser.ToUpper() == "PHOTONUSER")
             {
                 edgeSettingsFile = edgeSettingsFile.Replace("\\Local State", "\\Default");
@@ -183,11 +201,11 @@ namespace gov.llnl.wintap.collect
             }
             catch(Exception ex)
             {
-                WintapLogger.Log.Append("ERROR obtaining current username from WMI: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Problem obtaining current username from WMI: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
             if(currentUser == "None")
             {
-                WintapLogger.Log.Append("Unable to resolve username, evaluating environment for special conditions...", LogLevel.Always);
+                WintapLogger.Log.Append("Unable to resolve username, evaluating environment for special conditions...", core.infrastructure.LogLevel.Always);
                 DirectoryInfo profileRoot = new DirectoryInfo("C:\\Users");
                 foreach(DirectoryInfo profileDir in profileRoot.GetDirectories())
                 {
@@ -197,14 +215,14 @@ namespace gov.llnl.wintap.collect
                     }
                 }
             }
-            WintapLogger.Log.Append("getUser returning: " + currentUser, LogLevel.Always);
+            WintapLogger.Log.Append("getUser returning: " + currentUser, core.infrastructure.LogLevel.Always);
             return currentUser;
         }
 
         private void gatherChrome(string sqlLitePath)
         {
             string filePath = copyDB(sqlLitePath);
-            WintapLogger.Log.Append("Attempting to gather CHROME from file: " + filePath, LogLevel.Always);
+            WintapLogger.Log.Append("Attempting to gather CHROME from file: " + filePath, core.infrastructure.LogLevel.Always);
             try
             {
                 SQLiteConnection conn = new SQLiteConnection("Data Source=" + filePath);
@@ -232,7 +250,7 @@ namespace gov.llnl.wintap.collect
             }
             catch(Exception ex)
             {
-                WintapLogger.Log.Append("ERROR gathering chrome: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR gathering chrome: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
         }
 
@@ -240,7 +258,7 @@ namespace gov.llnl.wintap.collect
         {
             string filePath = copyDB(sqlLitePath);
             //string filePath = sqlLitePath;
-            WintapLogger.Log.Append("Attempting to gather EDGE from file: " + filePath, LogLevel.Always);
+            WintapLogger.Log.Append("Attempting to gather EDGE from file: " + filePath, core.infrastructure.LogLevel.Always);
             try
             {
                 SQLiteConnection conn = new SQLiteConnection("Data Source=" + filePath);
@@ -268,7 +286,7 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR gathering edge: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR gathering edge: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
         }
 
@@ -278,7 +296,7 @@ namespace gov.llnl.wintap.collect
             {
                 //string filePath = copyDB(sqlLitePath);
                 string filePath = sqlLitePath;  //  firefox seems to allow reading of the live DB - which is faster...
-                WintapLogger.Log.Append("Attempting to gather firefox from file: " + filePath, LogLevel.Always);
+                WintapLogger.Log.Append("Attempting to gather firefox from file: " + filePath, core.infrastructure.LogLevel.Always);
                 SQLiteConnection conn = new SQLiteConnection("Data Source=" + filePath);
                 conn.Open();
                 SQLiteCommand cmd = new SQLiteCommand();
@@ -303,7 +321,7 @@ namespace gov.llnl.wintap.collect
                             }
                             else
                             {
-                                WintapLogger.Log.Append("FIREFOX DOES NOT HAVE FOCUS.   Current focus is: " + StateManager.PidFocus, LogLevel.Always);
+                                WintapLogger.Log.Append("FIREFOX DOES NOT HAVE FOCUS.   Current focus is: " + StateManager.PidFocus, core.infrastructure.LogLevel.Always);
                             }
                             mostRecentActivityFF = lastVisit;
                         }
@@ -317,14 +335,14 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR gathering firefox: " + ex.Message,LogLevel.Always);
+                WintapLogger.Log.Append("ERROR gathering firefox: " + ex.Message,core.infrastructure.LogLevel.Always);
             }
 
         }
 
         private void sendBrowserEvent(DateTime eventTime, int pid, string browser, string url, string title)
         {
-            WintapLogger.Log.Append("Sending browser event! " + browser + ": " + url + ", title: " + title + " PID: " + pid, LogLevel.Always);
+            WintapLogger.Log.Append("Sending browser event! " + browser + ": " + url + ", title: " + title + " PID: " + pid, core.infrastructure.LogLevel.Always);
             WintapMessage wm = new WintapMessage(eventTime, pid, this.CollectorName);
             WintapMessage.WebActivityData browserEvent = new WintapMessage.WebActivityData();
             browserEvent.Browser = browser.ToString();
@@ -343,7 +361,7 @@ namespace gov.llnl.wintap.collect
         private string resolvePhotonUser()
         {
             string user = "PhotonUser";
-            WintapLogger.Log.Append("Attempting to map PhotonUser...", LogLevel.Always);
+            WintapLogger.Log.Append("Attempting to map PhotonUser...", core.infrastructure.LogLevel.Always);
             RegistryKey usersRoot = Registry.Users;
             foreach (var userKey in usersRoot.GetSubKeyNames())
             {
@@ -364,10 +382,10 @@ namespace gov.llnl.wintap.collect
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("Error reading environment for key: " + userKey + "  exception: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("Error reading environment for key: " + userKey + "  exception: " + ex.Message, core.infrastructure.LogLevel.Always);
                 }
             }
-            WintapLogger.Log.Append("PhotonUser resolution complete.  User: " + user, LogLevel.Always);
+            WintapLogger.Log.Append("PhotonUser resolution complete.  User: " + user, core.infrastructure.LogLevel.Always);
             return user;
         }
 
