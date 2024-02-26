@@ -63,7 +63,7 @@ namespace gov.llnl.wintap.collect
                 if (String.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Always); }
                 if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Always); }
 
-                WintapMessage msg = new WintapMessage(obj.TimeStamp.ToUniversalTime(), obj.ProcessID, "Process") { ActivityType = "start" };
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "Process") { ActivityType = "start" };
                 msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments, UniqueProcessKey = obj.UniqueProcessKey.ToString() };
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
