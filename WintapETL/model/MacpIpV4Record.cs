@@ -9,7 +9,7 @@ namespace gov.llnl.wintap.etl.models
     /// <summary>
     /// A Parquet compatible clone (flattened) of MacIpV4 Pairing which includes the IpV4Addr info
     /// </summary>
-    public class MacIpV4Record
+    public class MacIpV4Record : SensorData
     {
         public string HostName { get; set; }
 

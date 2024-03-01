@@ -10,7 +10,6 @@ using System.Timers;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
-using ChoETL;
 using static gov.llnl.wintap.Interfaces;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.models;

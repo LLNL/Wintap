@@ -1,5 +1,4 @@
-﻿using ChoETL;
-using gov.llnl.wintap.etl.shared;
+﻿using gov.llnl.wintap.etl.shared;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

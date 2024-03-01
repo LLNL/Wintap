@@ -1,14 +1,18 @@
-﻿/*
+﻿ /*
  * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
  */
 
-using ChoETL;
 using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using Microsoft.Win32;
+using Parquet;
+using Parquet.Schema;
+using Parquet.Serialization;
 using System;
+using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Reflection;
 using System.Timers;
@@ -68,7 +72,7 @@ namespace gov.llnl.wintap.etl.extract
         /// <summary>
         /// Send up any host-level changes and check-in with a current "EventTime"
         /// </summary>
-        internal void WriteHostRecord()
+        internal async void WriteHostRecord()
         {
             try
             {
@@ -95,12 +99,17 @@ namespace gov.llnl.wintap.etl.extract
                 {
                     hostDir.Create();
                 }
+                hostFile = Path.Combine(hostDir.FullName, hostFile);
+                ParquetSchema schema = DetermineSchemaFromExpando(host.ToDynamic());
 
-                ChoParquetRecordConfiguration c = new ChoParquetRecordConfiguration();
-                c.CompressionMethod = Parquet.CompressionMethod.Snappy;
-                using (var parser = new ChoParquetWriter<HostData>(hostDir.FullName + "\\" + hostFile, c))
+                ParquetSerializerOptions options = new ParquetSerializerOptions();
+                options.CompressionMethod = CompressionMethod.Snappy;
+                List<ExpandoObject> data = new List<ExpandoObject>();
+                data.Add(host.ToDynamic());
+
+                using (var fileStream = new FileStream(hostFile, FileMode.Create, FileAccess.Write))
                 {
-                    parser.Write(host);
+                    await ParquetSerializer.SerializeAsync(schema, data, fileStream, options);
                 }
             }
             catch (Exception ex)
@@ -110,10 +119,12 @@ namespace gov.llnl.wintap.etl.extract
 
         }
 
+
+
         /// <summary>
         /// Send up any changes to Mac/Ip configurations
         /// </summary>
-        internal void WriteMacIPRecords()
+        internal async void WriteMacIPRecords()
         {
             try
             {
@@ -124,14 +135,22 @@ namespace gov.llnl.wintap.etl.extract
                 {
                     macIpDir.Create();
                 }
+                macIpFile = Path.Combine(macIpDir.FullName, macIpFile);
                 foreach (MacIpV4Record macIp in macIps)
                 {
-                    ChoParquetRecordConfiguration c = new ChoParquetRecordConfiguration();
-                    c.CompressionMethod = Parquet.CompressionMethod.Snappy;
-                    using (var parser = new ChoParquetWriter<MacIpV4Record>(macIpDir.FullName + "\\" + macIpFile, c))
+                    ParquetSchema schema = DetermineSchemaFromExpando(macIp.ToDynamic());
+
+                    ParquetSerializerOptions options = new ParquetSerializerOptions();
+                    options.CompressionMethod = CompressionMethod.Snappy;
+                    List<ExpandoObject> data = new List<ExpandoObject>();
+                    foreach (MacIpV4Record macIpV4Record in macIps)
                     {
-                        Logger.Log.Append("added MAC/IP entry: " + macIp.HostName + "  IP: " + macIp.IpAddr, LogLevel.Always);
-                        parser.Write(macIp);
+                        data.Add(macIpV4Record.ToDynamic());
+                    }
+
+                    using (var fileStream = new FileStream(macIpFile, FileMode.Create, FileAccess.Write))
+                    {
+                        await ParquetSerializer.SerializeAsync(schema, data, fileStream, options);
                     }
                 }
             }
@@ -142,6 +161,23 @@ namespace gov.llnl.wintap.etl.extract
             }
         }
 
+        private static ParquetSchema DetermineSchemaFromExpando(ExpandoObject firstItem)
+        {
+            List<Field> fields = new List<Field>();
+            foreach (var kvp in firstItem)
+            {
+                try
+                {
+                    Type type = kvp.Value?.GetType();
+                    DataField field = new DataField(kvp.Key, type);
+                    fields.Add(field);
+                }
+                catch (Exception ex)
+                { }
+            }
+            ParquetSchema schema = new ParquetSchema(fields.ToArray());
+            return schema;
+        }
         private HostData getHost()
         {
             HostData host = new HostData();

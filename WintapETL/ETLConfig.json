@@ -31,6 +31,5 @@
   "SerializationIntervalSec": 30,
   "UploadIntervalSec": 300,
   "WriteToParquet": true,
-  "WriteToCsv": false
 }
 

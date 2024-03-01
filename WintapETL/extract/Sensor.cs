@@ -32,7 +32,6 @@ namespace gov.llnl.wintap.etl.extract
         private string esperNameSpacePrefix = "gov.llnl.wintap.etl.esper.";
         private ConcurrentQueue<ExpandoObject> sensorData;
         private ParquetWriter parquetWriter;
-        private CsvWriter csvWriter;
         private bool fileBusy;  // prevents file IO contention when snapshot is being rotated.
         private Timer flushToDiskTimer;
 
@@ -190,9 +189,7 @@ namespace gov.llnl.wintap.etl.extract
             this.SensorName = this.GetType().Name.ToLower();
 
             parquetWriter = new ParquetWriter(this.SensorName);
-            csvWriter = new CsvWriter(this.SensorName);
             parquetWriter.Init();
-            csvWriter.Init();
             sensorData = new ConcurrentQueue<ExpandoObject>();
 
             flushToDiskTimer = new Timer();
@@ -308,6 +305,7 @@ namespace gov.llnl.wintap.etl.extract
         {
             int initialQLen = tempQueue.Count;
             int totalObjectsProcessed = 0;
+
             //  in the Default case, we need to create MessageType specific sub queues so that parquet writer has a single schema
             //  Since the Default sensor can contain mixed MessageTypes, enumerate/remove tempQueue by messageType until it's empty
             List<ExpandoObject> tempQOfType = new List<ExpandoObject>();
@@ -334,10 +332,6 @@ namespace gov.llnl.wintap.etl.extract
                     if (Utilities.GetETLConfig().WriteToParquet)
                     {
                         parquetWriter.Write(tempQOfType);
-                    }
-                    if (Utilities.GetETLConfig().WriteToCsv)
-                    {
-                        csvWriter.Write(tempQOfType);
                     }
                 }
             }

@@ -4,13 +4,13 @@
  * All rights reserved.
  */
 
-using ChoETL;
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using System;
 using System.Dynamic;
+using static gov.llnl.wintap.collect.models.WintapMessage;
 
 namespace gov.llnl.wintap.etl.extract
 {
@@ -32,7 +32,19 @@ namespace gov.llnl.wintap.etl.extract
                 // get the nested object as a dynamic so we can append the parent object fields
                 string msgType = wintapMessage.MessageType;
                 //  dynamic resolution detail: wintapmessage MessageType MUST match the underlying class name
-                dynamic flatMsg = (ExpandoObject)wintapMessage.GetType().GetProperty(msgType).GetValue(wintapMessage).ToDynamic();
+                dynamic flatMsg = null;
+                // Use reflection to get the property that matches MessageType
+                var propertyInfo = wintapMessage.GetType().GetProperty(wintapMessage.MessageType);
+                if (propertyInfo != null)
+                {
+                    var propertyValue = propertyInfo.GetValue(wintapMessage);
+
+                    if (propertyValue is WintapBase dynamicConvertible)
+                    {
+                        flatMsg = (ExpandoObject)dynamicConvertible.ToDynamic();
+                    }
+                }
+
                 flatMsg.PidHash = wintapMessage.PidHash;
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.PID = wintapMessage.PID;

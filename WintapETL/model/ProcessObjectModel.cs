@@ -1,10 +1,12 @@
-﻿///*
-// * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
+﻿// * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
 // * Produced at the Lawrence Livermore National Laboratory.
 // * All rights reserved.
 // */
 
-internal class ProcessStartData
+using gov.llnl.wintap.etl.models;
+
+///*
+internal class ProcessStartData : SensorData
 {
     private readonly string _parentPidHash;
     private readonly int _parentPid;

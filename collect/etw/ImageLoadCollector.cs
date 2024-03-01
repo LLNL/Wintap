@@ -58,14 +58,6 @@ namespace gov.llnl.wintap.collect
             {
                 Counter++;
                 WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "ImageLoad");
-                //if (obj.PayloadNames.ToList().Contains("CorrelationId"))
-                //{
-                //    wintapBuilder.CorrelationId = obj.PayloadStringByName("CorrelationId");
-                //}
-                //if (obj.PayloadNames.Contains("ActivityId"))
-                //{
-                //    wintapBuilder.ActivityId = obj.PayloadStringByName("ActivityId");
-                //}
                 wintapBuilder.ImageLoad = new WintapMessage.ImageLoadObject();
                 wintapBuilder.ActivityType = obj.OpcodeName;
                 wintapBuilder.ImageLoad.BuildTime = obj.BuildTime.ToFileTimeUtc();

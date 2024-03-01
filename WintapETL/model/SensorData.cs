@@ -5,6 +5,9 @@
  */
 
 using System;
+using System.Collections.Generic;
+using System.Dynamic;
+using System.Reflection;
 
 namespace gov.llnl.wintap.etl.models
 {
@@ -15,6 +18,20 @@ namespace gov.llnl.wintap.etl.models
         public SensorData()
         {
             hostname = Environment.MachineName;
+        }
+
+        public ExpandoObject ToDynamic()
+        {
+            var expando = new ExpandoObject();
+            var expandoDic = (IDictionary<string, object>)expando;
+
+            foreach (PropertyInfo propertyInfo in this.GetType().GetProperties())
+            {
+                var value = propertyInfo.GetValue(this, null);
+                expandoDic.Add(propertyInfo.Name, value);
+            }
+
+            return expando;
         }
 
         #region public properties

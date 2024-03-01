@@ -4,12 +4,16 @@
  * All rights reserved.
  */
 
-using ChoETL;
 using gov.llnl.wintap.etl.shared;
+using Parquet;
+using Parquet.Data;
+using Parquet.Schema;
+using Parquet.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.IO;
+using System.Linq;
 
 namespace gov.llnl.wintap.etl.load
 {
@@ -28,7 +32,7 @@ namespace gov.llnl.wintap.etl.load
             }
         }
 
-        internal override void Write(List<ExpandoObject> data)
+        internal async override void Write(List<ExpandoObject> data)
         {
             string msgType = "NA";
             bool applyOffset = false;  // stop gap measure to prevent file name collisions on shared event types
@@ -54,20 +58,22 @@ namespace gov.llnl.wintap.etl.load
                 break;
             }
 
-            ChoParquetRecordConfiguration c = new ChoParquetRecordConfiguration();
-            c.CompressionMethod = Parquet.CompressionMethod.Snappy;
             fileName = genNewFilePath(msgType, applyOffset);  // name will be .active to avoid file contention with the uploader.
             if (Utilities.GetETLConfig().WriteToParquet)
             {
                 if (!Busy) 
-                {
+                {               
                     try
                     {
-                        ChoParquetWriter parser = new ChoParquetWriter(fileName, c);
-                        parser.Write(data);
-                        parser.Flush();
-                        parser.Close();
-                        parser.Dispose();
+                        ParquetSchema schema = DetermineSchemaFromExpando(data.First());
+
+                        ParquetSerializerOptions options = new ParquetSerializerOptions();
+                        options.CompressionMethod = CompressionMethod.Snappy;
+
+                        using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
+                        {
+                            await ParquetSerializer.SerializeAsync(schema, data, fileStream, options);
+                        }
                         // rename the file to .parquet so the uploader can find it.
                         FileInfo flushedFile = new FileInfo(fileName);
                         flushedFile.MoveTo(flushedFile.DirectoryName + "\\" + flushedFile.Name.Replace(".parquet.active", ".parquet"));
@@ -83,6 +89,24 @@ namespace gov.llnl.wintap.etl.load
                     Logger.Log.Append("ERROR:  FILE BUSY", LogLevel.Always);
                 }
             }
+        }
+
+        private static ParquetSchema DetermineSchemaFromExpando(ExpandoObject firstItem)
+        {
+            List<Field> fields = new List<Field>();
+            foreach (var kvp in firstItem)
+            {
+                try
+                {
+                    Type type = kvp.Value?.GetType();
+                    DataField field = new DataField(kvp.Key, type);
+                    fields.Add(field);
+                }
+                catch(Exception ex)
+                { }
+            }
+            ParquetSchema schema = new ParquetSchema(fields.ToArray());
+            return schema;
         }
 
         private string genNewFilePath(string msgType, bool applyOffset)

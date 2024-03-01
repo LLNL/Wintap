@@ -4,7 +4,6 @@
  * All rights reserved.
  */
 
-using ChoETL;
 using gov.llnl.wintap.etl.extract;
 using gov.llnl.wintap.etl.load.interfaces;
 using gov.llnl.wintap.etl.model;
