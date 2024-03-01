@@ -166,7 +166,8 @@ namespace gov.llnl.wintap.etl.shared
         {
             string progData = Strings.ParquetDataPath;
             className = className.ToLower();
-            return progData + "\\" + className + "\\";
+            string fullPath = Path.Combine(progData, className);
+            return fullPath;
         }
 
         internal static void LogEvent(int eventID, string v, EventLogEntryType eventType)

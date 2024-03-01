@@ -16,6 +16,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Timers;
 
@@ -188,8 +189,7 @@ namespace gov.llnl.wintap.etl.extract
             IsEnabled = false;
             this.SensorName = this.GetType().Name.ToLower();
 
-            parquetWriter = new ParquetWriter(this.SensorName);
-            parquetWriter.Init();
+            parquetWriter = new ParquetWriter();
             sensorData = new ConcurrentQueue<ExpandoObject>();
 
             flushToDiskTimer = new Timer();
@@ -286,7 +286,7 @@ namespace gov.llnl.wintap.etl.extract
                 {
                     try
                     {
-                        writeToDisk(tempQueue);
+                        serialize(tempQueue);
                         tempQueue.Clear();
                     }
                     catch (Exception ex)
@@ -301,14 +301,16 @@ namespace gov.llnl.wintap.etl.extract
             }
         }
 
-        private void writeToDisk(List<ExpandoObject> tempQueue)
+        private void serialize(List<ExpandoObject> tempQueue)
         {
             int initialQLen = tempQueue.Count;
             int totalObjectsProcessed = 0;
 
             //  in the Default case, we need to create MessageType specific sub queues so that parquet writer has a single schema
             //  Since the Default sensor can contain mixed MessageTypes, enumerate/remove tempQueue by messageType until it's empty
-            List<ExpandoObject> tempQOfType = new List<ExpandoObject>();
+            //  A Batch is a set of Sensor data.   A Set is the sensor data.  Default can have multiple Sets.
+            ConcurrentQueue<ExpandoObject> tempQOfType = new ConcurrentQueue<ExpandoObject>();
+            ParquetWriter.Batch batch = new ParquetWriter.Batch(this.SensorName);
             try
             {
                 while (tempQueue.Count > 0)
@@ -320,27 +322,24 @@ namespace gov.llnl.wintap.etl.extract
                         dynamic tempObj = tempQueue[i];
                         if (tempObj.MessageType == firstMsgType)
                         {
-                            tempQOfType.Add(tempObj);
+                            tempQOfType.Enqueue(tempObj);
                             totalObjectsProcessed++;
                         }
                     }
                     for (int j = 0; j < tempQOfType.Count; j++)
                     {
-                        dynamic tempObj = tempQOfType[j];
+                        dynamic tempObj = tempQOfType.ElementAt(j);
                         tempQueue.Remove(tempObj);
                     }
-                    if (Utilities.GetETLConfig().WriteToParquet)
-                    {
-                        parquetWriter.Write(tempQOfType);
-                    }
+                    ParquetWriter.Batch.SensorData set = new ParquetWriter.Batch.SensorData(this.SensorName, firstMsgType, tempQOfType);
+                    batch.Add(set);
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log.Append("ERROR writing parquet: " + ex.Message, LogLevel.Always);
             }
-
-            Logger.Log.Append("All queues processed.  total objects in queue: " + initialQLen + "  total processed: " + totalObjectsProcessed, LogLevel.Always);
+            parquetWriter.Add(batch);
         }
         private void regMetrics()
         {
