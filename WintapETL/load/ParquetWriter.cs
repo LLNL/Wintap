@@ -27,7 +27,7 @@ namespace gov.llnl.wintap.etl.load
 
         internal ParquetWriter()
         {
-            batchWorker  = new BackgroundWorker();
+            batchWorker = new BackgroundWorker();
             batchWorker.DoWork += BatchWorker_DoWork;
             batchWorker.RunWorkerCompleted += BatchWorker_RunWorkerCompleted;
             batchWorker.RunWorkerAsync();
@@ -40,9 +40,9 @@ namespace gov.llnl.wintap.etl.load
 
         private async void BatchWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            while(batches.TryDequeue(out Batch batch))
+            while (batches.TryDequeue(out Batch batch))
             {
-                for(int i=0; i<batch.Set.Count; i++)
+                for (int i = 0; i < batch.Set.Count; i++)
                 {
                     Batch.SensorData dataSet;
                     batch.Set.TryDequeue(out dataSet);
@@ -62,7 +62,7 @@ namespace gov.llnl.wintap.etl.load
             System.Threading.Thread.Sleep(1000);
         }
 
-        internal int Backlog { get { return batches.Count; } }  
+        internal int Backlog { get { return batches.Count; } }
 
         internal void Add(Batch batch)
         {
@@ -72,7 +72,7 @@ namespace gov.llnl.wintap.etl.load
         internal async Task<string> Write(Batch.SensorData dataSet)
         {
             // prevent file name collisions on shared event types
-            bool applyOffset = false;  
+            bool applyOffset = false;
             foreach (dynamic d in dataSet.Data)
             {
                 if (d.MessageType.ToLower().Contains("conn_incr"))
@@ -96,7 +96,7 @@ namespace gov.llnl.wintap.etl.load
 
             long timestamp = DateTime.UtcNow.ToFileTimeUtc() + Convert.ToInt32(applyOffset);
             string fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
-            Logger.Log.Append($"ParquetWriter is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
+            Logger.Log.Append($"{dataSet.CollectorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
             try
             {
                 ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
@@ -125,7 +125,7 @@ namespace gov.llnl.wintap.etl.load
                     DataField field = new DataField(kvp.Key, type);
                     fields.Add(field);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 { }
             }
             ParquetSchema schema = new ParquetSchema(fields.ToArray());
@@ -136,7 +136,7 @@ namespace gov.llnl.wintap.etl.load
         {
             private readonly long timestamp;
             private readonly string sensorName;
-            private readonly string dataDirectory;
+            //private readonly string dataDirectory;
 
             /// <summary>
             /// The time that this batch was requested by a sensor
@@ -155,12 +155,6 @@ namespace gov.llnl.wintap.etl.load
                 timestamp = DateTime.Now.ToFileTimeUtc(); // so we can process batches in time order
                 sensorName = _sensorName;
                 Set = new ConcurrentQueue<SensorData>();
-                dataDirectory = gov.llnl.wintap.etl.shared.Utilities.GetFileStorePath(sensorName);
-                DirectoryInfo dataDirInfo = new DirectoryInfo(dataDirectory);
-                if (!dataDirInfo.Exists)
-                {
-                    dataDirInfo.Create();
-                }
             }
 
             /// <summary>
@@ -176,29 +170,34 @@ namespace gov.llnl.wintap.etl.load
             internal class SensorData
             {
                 private readonly string sensorName;
-                private readonly string messageType;
+                private readonly string collectorName;
                 private readonly ConcurrentQueue<ExpandoObject> sensorData;
                 private string parquetPath;
 
                 internal SensorData(string _sensorName, string _messageType, ConcurrentQueue<ExpandoObject> sensorData)
                 {
                     this.sensorName = _sensorName.ToLower();
-                    this.messageType = _messageType.ToLower();
+                    this.collectorName = _messageType.ToLower();
                     this.sensorData = sensorData;
                     this.parquetPath = gov.llnl.wintap.etl.shared.Utilities.GetFileStorePath(_sensorName);
-                    if(this.ParquetPath.ToUpper().Contains("DEFAULT_SENSOR"))
+                    if (this.sensorName.ToUpper() == "DEFAULT_SENSOR")
                     {
-                        this.parquetPath = Path.Combine(this.parquetPath, this.messageType, this.messageType);
+                        DirectoryInfo defaultSensorDir = new DirectoryInfo(Path.Combine(this.parquetPath, this.collectorName));
+                        if (!defaultSensorDir.Exists)
+                        {
+                            defaultSensorDir.Create();
+                        }
+                        this.parquetPath = Path.Combine(this.parquetPath, this.collectorName, this.collectorName);
                     }
                     else
                     {
-                        this.parquetPath = Path.Combine(this.parquetPath, this.messageType);
+                        this.parquetPath = Path.Combine(this.parquetPath, this.collectorName);
                     }
                 }
 
-                internal string MessageType { get { return messageType; } }
+                internal string CollectorName { get { return collectorName; } }
                 internal ConcurrentQueue<ExpandoObject> Data { get { return sensorData; } }
-                internal string ParquetPath { get {  return parquetPath; } } 
+                internal string ParquetPath { get { return parquetPath; } }
             }
         }
     }

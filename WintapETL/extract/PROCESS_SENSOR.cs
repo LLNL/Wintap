@@ -74,9 +74,6 @@ namespace gov.llnl.wintap.etl.extract
             {
                 Logger.Log.Append("ERROR saving flattened START event:  " + ex.Message, LogLevel.Always);
             }
-
-            Logger.Log.Append("Sent new Process event: " + wintapMessage.PID + " eventTime: " + wintapMessage.EventTime, LogLevel.Debug);
-
         }
 
         private ProcessStartData createProcessObject(int pid, int parentPid, long eventTime, string path, string commandLine, string user, string md5, string sha2, string msgType, string arguments, string cmdline, string uniqueEtwKey, string pidHash, string parentPidHash, string activityType)

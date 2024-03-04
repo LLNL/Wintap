@@ -19,6 +19,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Timers;
+using static gov.llnl.wintap.etl.shared.Utilities;
 
 
 namespace gov.llnl.wintap.etl.extract
@@ -333,6 +334,7 @@ namespace gov.llnl.wintap.etl.extract
                     }
                     ParquetWriter.Batch.SensorData set = new ParquetWriter.Batch.SensorData(this.SensorName, firstMsgType, tempQOfType);
                     batch.Add(set);
+                    tempQOfType = new ConcurrentQueue<ExpandoObject>();
                 }
             }
             catch (Exception ex)
