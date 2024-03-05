@@ -180,18 +180,19 @@ namespace gov.llnl.wintap.etl.load
                     this.collectorName = _messageType.ToLower();
                     this.sensorData = sensorData;
                     this.parquetPath = gov.llnl.wintap.etl.shared.Utilities.GetFileStorePath(_sensorName);
+                    DirectoryInfo sensorDataDir = new DirectoryInfo(this.parquetPath);
                     if (this.sensorName.ToUpper() == "DEFAULT_SENSOR")
                     {
-                        DirectoryInfo defaultSensorDir = new DirectoryInfo(Path.Combine(this.parquetPath, this.collectorName));
-                        if (!defaultSensorDir.Exists)
-                        {
-                            defaultSensorDir.Create();
-                        }
+                        sensorDataDir = new DirectoryInfo(Path.Combine(this.parquetPath, this.collectorName));
                         this.parquetPath = Path.Combine(this.parquetPath, this.collectorName, this.collectorName);
                     }
                     else
                     {
                         this.parquetPath = Path.Combine(this.parquetPath, this.collectorName);
+                    }
+                    if (!sensorDataDir.Exists)
+                    {
+                        sensorDataDir.Create();
                     }
                 }
 
