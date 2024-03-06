@@ -32,6 +32,7 @@ namespace gov.llnl.wintap.etl.transform
             pci.ConnId = connId;
             pci.LocalIpPrivateGateway = loGW;
             pci.RemoteIpPrivateGateway = hiGW;
+            
             pci.PID = Convert.ToInt32(newEvent["PID"].ToString());
             pci.PidHash = _pidhash;
             if (inboundActivities.Contains(newEvent["activityType"].ToString()))
@@ -88,7 +89,7 @@ namespace gov.llnl.wintap.etl.transform
 
         private static string derivePrivateGateway(long ipAddr, string hostId)
         {
-            String pg = null;
+            String pg = "";
             if ((ipAddr >> 24) == 127)
             {
                 pg = hostId;

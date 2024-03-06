@@ -77,7 +77,9 @@ namespace gov.llnl.wintap.etl.helpers
                             log.Append("Mirroring merged parquet to recording directory: " + mergeFile, LogVerboseLevel.Normal);
                             RecordingSession.Record(mergeFile.FullName, sensorName, log);
                         }
-
+                        command.CommandText = $"DROP TABLE IF EXISTS {tempFileName}";
+                        command.ExecuteNonQuery();
+                        log.Append("Table dropped: " + tempFileName, LogVerboseLevel.Normal);
                     }
                 }
             }
