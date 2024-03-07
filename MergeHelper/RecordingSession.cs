@@ -47,7 +47,7 @@ namespace gov.llnl.wintap.etl.load
             }
             catch (Exception ex)
             {
-                log.Append("Error determining recording session state: " + ex.Message, LogVerboseLevel.Normal);
+                log.Append("Error determining recording session state: " + ex.Message, LogVerboseLevel.Debug);
             }
             log.Append("Returning recording session state: " + nowRecording, LogVerboseLevel.Normal);
             return nowRecording;

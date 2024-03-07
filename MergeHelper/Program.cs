@@ -40,7 +40,7 @@ namespace gov.llnl.wintap.etl.helpers
             }
             catch(Exception ex)
             {
-                log.Append("Error processing inputs: " + ex.Message, LogVerboseLevel.Normal);
+                log.Append("Could not start merge: " + ex.Message, LogVerboseLevel.Normal);
                 log.Close();
                 return;
             }
