@@ -296,7 +296,7 @@ namespace gov.llnl.wintap.etl.load
             hangDetector.Start();
             helperExe.WaitForExit();
             hangDetector.Stop();
-            cleanupUnmergedParquet(path);
+            //cleanupUnmergedParquet(path);
         }
 
         private void cleanupUnmergedParquet(string path)

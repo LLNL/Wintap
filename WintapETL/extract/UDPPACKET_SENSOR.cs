@@ -9,6 +9,7 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using System;
+using System.Collections.Generic;
 using System.Dynamic;
 using System.Timers;
 
@@ -18,9 +19,11 @@ namespace gov.llnl.wintap.etl.extract
     {
         private System.Timers.Timer networkEventTimer;  // guard against stalled ETW session provider in the OS, every net event will reset this timer, on elapse - wintap will restart.
         private string esperQuery;
+        private List<NIC> activeNics;
 
         internal UDPPACKET_SENSOR(string[] queries) : base(queries)
         {
+            activeNics = Utilities.GetActiveNICs();
             networkEventTimer = new System.Timers.Timer { Interval = 60000 };
             networkEventTimer.Elapsed += NetworkEventTimer_Elapsed;
         }
@@ -37,7 +40,7 @@ namespace gov.llnl.wintap.etl.extract
                 base.HandleSensorEvent(sensorEvent);
                 networkEventTimer.Stop();
                 networkEventTimer.Start();
-                ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, sensorEvent["PidHash"].ToString());
+                ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, sensorEvent["PidHash"].ToString(), activeNics);
                 pci.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
                 pci.MessageType = "PROCESS_CONN_INCR";
                 pci.EventTime = GetUnixNowTime();

@@ -11,9 +11,6 @@ namespace gov.llnl.wintap.etl.models
     /// </summary>
     public class MacIpV4Record : SensorData
     {
-        public string HostName { get; set; }
-
-        public long EventTime { get; set; }
 
         /// <summary>
         /// Hash value in uppercase. 

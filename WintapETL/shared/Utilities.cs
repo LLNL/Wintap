@@ -33,7 +33,6 @@ namespace gov.llnl.wintap.etl.shared
                 macIP.IpAddr = ip.IpAddr;
                 macIP.Hash = ip.Hash;
                 macIP.PrivateGateway = ip.PrivateGateway;
-                macIP.HostName = Computer.Get().Name;
                 macIP.EventTime = ((System.DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds();
                 if (netCollection.Where(n => n.Hash == macIP.Hash).Count() == 0)
                 {
@@ -81,24 +80,22 @@ namespace gov.llnl.wintap.etl.shared
                         NIC newNic = new NIC();
                         foreach (UnicastIPAddressInformation unicast in ipInfo.UnicastAddresses.Where(i => i.IsDnsEligible == true))
                         {
-                            newNic.MAC = adapter.GetPhysicalAddress().ToString();
-                            newNic.IPAddess = unicast.Address.MapToIPv4().ToString();
-                            newNic.GW = ipInfo.GatewayAddresses[0].Address.MapToIPv4().ToString();  // active pg:dotted-quad of gateway
-                            if (String.IsNullOrEmpty(newNic.MAC) || String.IsNullOrEmpty(newNic.IPAddess) || String.IsNullOrEmpty(newNic.GW))
+                            try
                             {
-
-                            }
-                            else
-                            {
+                                newNic.MAC = adapter.GetPhysicalAddress().ToString();
+                                newNic.IPAddess = unicast.Address.MapToIPv4().ToString();
+                                newNic.GW = ipInfo.GatewayAddresses[0].Address.MapToIPv4().ToString();  // active pg:dotted-quad of gateway
+                                newNic.IPAddrAsLong = Converters.ConvertIpToLong(newNic.IPAddess);
                                 nicList.Add(newNic);
                             }
+                            catch (Exception ex) { }
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error enumerating NICs: " + ex.Message, LogLevel.Debug);
+                Logger.Log.Append("Could not enumerate network interfaces using .net api: " + ex.Message, LogLevel.Debug);
             }
 
             if (nicList.Count == 0)
@@ -117,6 +114,7 @@ namespace gov.llnl.wintap.etl.shared
             string mac = null;
             string ip = null;
             string gw = null;
+            long ipAddrLong = 0;
             try
             {
                 ManagementObjectSearcher mos = new ManagementObjectSearcher("select * from Win32_NetworkAdapterConfiguration WHERE IPEnabled = 'True'");
@@ -149,6 +147,7 @@ namespace gov.llnl.wintap.etl.shared
                         nic.GW = gw;
                         nic.IPAddess = ip;
                         nic.MAC = mac;
+                        nic.IPAddrAsLong = Converters.ConvertIpToLong(ip);
                         nicList.Add(nic);
                     }
 
@@ -180,6 +179,7 @@ namespace gov.llnl.wintap.etl.shared
     internal class NIC
     {
         internal string IPAddess { get; set; }
+        internal long IPAddrAsLong { get; set; }
         internal string MAC { get; set; }
         internal string GW { get; set; }
     }

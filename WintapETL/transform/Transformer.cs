@@ -10,6 +10,7 @@ using gov.llnl.wintap.etl.models;
 using gov.llnl.wintap.etl.shared;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace gov.llnl.wintap.etl.transform
 {
@@ -18,12 +19,12 @@ namespace gov.llnl.wintap.etl.transform
         internal static string context = "llnl";
 
 
-        internal static ProcessConnIncrData CreateProcessConn(EventBean newEvent, string _pidhash)
+        internal static ProcessConnIncrData CreateProcessConn(EventBean newEvent, string _pidhash, List<NIC> activeNics)
         {
             List<string> inboundActivities = new List<string>() { "TcpIp/Accept", "TcpIp/Recv", "TcpIp/TCPCopy", "UdpIp/Recv" };
             LoHi5Tuple loHi = createLoHi5TupleFrom(newEvent);
-            string loGW = derivePrivateGateway(loHi.LoIPV4LongVal, HOST_SENSOR.Instance.HostId.Hostname);
-            string hiGW = derivePrivateGateway(loHi.HiIPV4LongVal, HOST_SENSOR.Instance.HostId.Hostname);
+            string loGW = derivePrivateGateway(loHi.LoIPV4LongVal, HOST_SENSOR.Instance.HostId.Hostname, activeNics);
+            string hiGW = derivePrivateGateway(loHi.HiIPV4LongVal, HOST_SENSOR.Instance.HostId.Hostname, activeNics);
             IpV4Addr loIp = createIpAddr(loHi.LoAddrStr, (uint)loHi.LoIPV4LongVal, loGW);
             IpV4Addr hiIp = createIpAddr(loHi.HiAddrStr, (uint)loHi.HiIPV4LongVal, hiGW);
             IdGenerator idgen = new IdGenerator();
@@ -87,12 +88,23 @@ namespace gov.llnl.wintap.etl.transform
             return (loHi.Protocol.Equals("TCP", StringComparison.CurrentCultureIgnoreCase)) ? "TCP" : "UDP";
         }
 
-        private static string derivePrivateGateway(long ipAddr, string hostId)
+        private static string derivePrivateGateway(long ipAddr, string hostId, List<NIC> activeNics)
         {
             String pg = "";
             if ((ipAddr >> 24) == 127)
             {
                 pg = hostId;
+            }
+            else
+            {
+                try
+                {
+                    pg = activeNics.Where(n => n.IPAddrAsLong == ipAddr).FirstOrDefault().GW;
+                }
+                catch(Exception ex)
+                {
+                    int i = 0;
+                }
             }
             return pg;
         }
