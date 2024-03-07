@@ -36,7 +36,8 @@ namespace gov.llnl.wintap.etl.extract
                 IdGenerator idGen = new IdGenerator();
                 string pidHash = sensorEvent["PidHash"].ToString();
                 DateTime eventTime = DateTime.FromFileTimeUtc((long)sensorEvent["firstSeen"]);
-                dynamic flatMsg = (ExpandoObject)new WintapMessage.FileActivityObject().ToDynamic();
+                // dynamic flatMsg = (ExpandoObject)new WintapMessage.FileActivityObject().ToDynamic();
+                dynamic flatMsg = new ExpandoObject();  // since we are overriding WintapMessage property name definitions, i.e. File_Path
                 flatMsg.ActivityType = sensorEvent["activityType"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.BytesRequested = Int32.Parse(sensorEvent["bytesRequested"].ToString());

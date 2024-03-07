@@ -26,7 +26,7 @@ namespace gov.llnl.wintap.etl.models
                 return _parentPidHash;
             }
         }
-
+        public string ProcessName { get; set; }
         public long CPUCycleCount { get; set; }
         public int CPUUtilization { get; set; }
         public long CommitCharge { get; set; }

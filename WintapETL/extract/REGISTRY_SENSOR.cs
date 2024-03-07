@@ -31,7 +31,8 @@ namespace gov.llnl.wintap.etl.extract
                 base.HandleSensorEvent(sensorEvent);
                 IdGenerator idGen = new IdGenerator();
                 DateTime eventTime = DateTime.FromFileTimeUtc((long)sensorEvent["firstSeen"]);
-                dynamic flatMsg = (ExpandoObject)new WintapMessage.RegActivityObject().ToDynamic();
+                //dynamic flatMsg = (ExpandoObject)new WintapMessage.RegActivityObject().ToDynamic();
+                dynamic flatMsg = new ExpandoObject();
                 flatMsg.ActivityType = sensorEvent["activityType"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.Reg_Data = sensorEvent["data"].ToString();

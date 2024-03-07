@@ -92,13 +92,12 @@ namespace gov.llnl.wintap.collect
                     }
                     catch(Exception ex)
                     {
-                        log.Append("Could not get target process name for OpenProcess event: " + ex.Message, LogLevel.Debug);
+                        WintapLogger.Log.Append("Could not get target process name for OpenProcess event ", LogLevel.Debug);
                     }
                 }
                 else if (obj.EventName.Contains("EventID(6)"))
                 {
                     msg.ActivityType = "OpenThread";
-                    msg.KernelApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, Convert.ToUInt32(obj.PayloadByName("TargetThreatId")), obj.ThreadID);
                 }

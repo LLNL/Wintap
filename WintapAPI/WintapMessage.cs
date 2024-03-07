@@ -27,6 +27,8 @@ namespace gov.llnl.wintap.collect.models
             this.PID = processId;
             this.MessageType = eventSourceName;
             this.ReceiveTime = DateTime.Now.ToFileTimeUtc();
+            this.ActivityId = "";
+            this.CorrelationId = "";
         }
 
         public string MessageType { get; set; }

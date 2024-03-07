@@ -115,5 +115,9 @@ internal class ProcessStartData : SensorData
         _processArgs = args;
         _eventTime = startTime;
         _uniqueProcessKey = uniqueProcessKey;
+        if(_uniqueProcessKey == null)
+        {
+            _uniqueProcessKey = "";
+        }
     }
 }

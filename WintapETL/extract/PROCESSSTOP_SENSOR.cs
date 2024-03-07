@@ -62,6 +62,7 @@ namespace gov.llnl.wintap.etl.extract
         {
             ProcessTerminateData procWD = new ProcessTerminateData(endedProcess.Process.ParentPidHash);
             procWD.MessageType = "PROCESS";
+            procWD.ProcessName = endedProcess.ProcessName;
             procWD.ActivityType = endedProcess.ActivityType;
             procWD.PID = endedProcess.PID;
             procWD.PidHash = endedProcess.PidHash;

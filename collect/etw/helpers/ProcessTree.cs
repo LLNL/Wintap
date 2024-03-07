@@ -100,6 +100,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             kernelProcess.PidHash = idGen.GenPidHash(4, StateManager.MachineBootTime.ToFileTimeUtc());
             kernelProcess.ProcessName = "ntoskrnl.exe";
             kernelProcess.Process = new WintapMessage.ProcessObject() { CommandLine = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", Name = kernelProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", User = "system" };
+            kernelProcess.Process.Arguments = "";
             PublishProcess(kernelProcess);
 
             // idle not captured through the etw boot trace.
@@ -108,6 +109,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             idleProcess.PidHash = idGen.GenPidHash(0, StateManager.MachineBootTime.ToFileTimeUtc());
             idleProcess.ProcessName = "idle";
             idleProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "idle", Name = idleProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "idle", User = "system" };
+            idleProcess.Process.Arguments = "";
             PublishProcess(idleProcess);
 
             //  UNKOWN process as the faux root for processes with no available parent.  
@@ -116,6 +118,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             unknownProcess.PidHash = idGen.GenPidHash(1, StateManager.MachineBootTime.ToFileTimeUtc());
             unknownProcess.ProcessName = "unknown";
             unknownProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = unknownProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
+            unknownProcess.Process.Arguments = "";
             PublishProcess(unknownProcess);
 
             //  REGISTRY process not get captured in the boot trace but is always running
@@ -125,6 +128,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             registryProcess.PidHash = idGen.GenPidHash(reg.Id, StateManager.MachineBootTime.ToFileTimeUtc());
             registryProcess.ProcessName = reg.ProcessName.ToLower();
             registryProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = registryProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
+            registryProcess.Process.Arguments = "";
             PublishProcess(registryProcess);
         }
 
@@ -204,6 +208,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             newWintapProcess.PidHash = idGen.GenPidHash(wintapProcess.Id, DateTime.Now.ToFileTimeUtc());
             newWintapProcess.ProcessName = "wintap.exe";
             newWintapProcess.Process = new WintapMessage.ProcessObject() { CommandLine = wintapProcess.MainModule.FileName, Name = newWintapProcess.ProcessName, ParentPID = previousWintapProcess.Process.ParentPID, ParentPidHash = previousWintapProcess.Process.ParentPidHash, Path = wintapProcess.MainModule.FileName, User = "system" };
+            newWintapProcess.Process.Arguments = "";
             WintapLogger.Log.Append("New Wintap running under PID: " + newWintapProcess.PID, core.infrastructure. LogLevel.Always);
             PublishProcess(newWintapProcess);
         }

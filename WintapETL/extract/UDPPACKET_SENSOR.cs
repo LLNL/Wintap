@@ -43,6 +43,7 @@ namespace gov.llnl.wintap.etl.extract
                 pci.EventTime = GetUnixNowTime();
                 dynamic flatMsg = (ExpandoObject)pci.ToDynamic();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
+                flatMsg.ActivityType = pci.IpEvent;
                 this.Save(flatMsg);
                 sensorEvent = null;
                 flatMsg = null;

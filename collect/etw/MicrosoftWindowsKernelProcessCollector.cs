@@ -87,6 +87,7 @@ namespace gov.llnl.wintap.collect
                     msg.CorrelationId = obj.PayloadStringByName("CorrelationId");
                 }
                 catch (Exception ex) { }
+                msg.Process.ParentPidHash = "";
                 EventChannel.Send(msg);
             }
             catch (Exception ex)

@@ -62,20 +62,7 @@ namespace gov.llnl.wintap.etl.models
         public long EventTime { get; set; }
         public long ReceiveTime { get; set; }
         public int PID { get; set; }
-        /// <summary>
-        /// Increment type code: 30sec, 5min, 1hr, etc. No validation is done or implied. Sensors can use anything, just be consistent.
-        /// </summary>
-        public string IncrType { get; set; }
-        /// <summary>
-        /// Number of events
-        /// </summary>
-        public int EventCount { get; set; }
-        /// <summary>
-        /// First event timestamp in the increment
-        /// </summary>
-        public long FirstSeenMs { get; set; }
 
-        public long LastSeenMs { get; set; }
         #endregion
 
     }

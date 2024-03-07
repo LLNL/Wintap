@@ -36,6 +36,8 @@ namespace gov.llnl.wintap.etl.extract
         private ParquetWriter parquetWriter;
         private bool fileBusy;  // prevents file IO contention when snapshot is being rotated.
         private Timer flushToDiskTimer;
+        private int canaryCounter;
+        private List<string> canaryCounter2;
 
         protected Sensor(string[] queries)
         {
@@ -131,6 +133,7 @@ namespace gov.llnl.wintap.etl.extract
             }
             else
             {
+                Logger.Log.Append("!!!   NULL pidHash  !!!!", LogLevel.Always);
                 throw new Exception("NULL_PIDHASH");
             }
         }
@@ -187,6 +190,7 @@ namespace gov.llnl.wintap.etl.extract
 
         private void initSensor()
         {
+            canaryCounter2 = new List<string>();
             IsEnabled = false;
             this.SensorName = this.GetType().Name.ToLower();
 
@@ -262,49 +266,91 @@ namespace gov.llnl.wintap.etl.extract
             }
         }
 
+        //private void FlushToDiskTimer_Elapsed(object sender, ElapsedEventArgs e)
+        //{
+        //    if(this.SensorName == "Host" || this.SensorName == "MacIp") { return; }
+        //    int currentQueueDepth = sensorData.Count;
+        //    List<ExpandoObject> tempQueue = new List<ExpandoObject>();
+        //    for (int i = 0; i < currentQueueDepth; i++)
+        //    {
+        //        try
+        //        {
+        //            ExpandoObject msg;
+        //            sensorData.TryDequeue(out msg);
+        //            tempQueue.Add(msg);
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            Logger.Log.Append("ERROR getting message from SendQueue: " + ex.Message, LogLevel.Always);
+        //        }
+
+        //    }
+        //    if (tempQueue.Count > 0)
+        //    {
+        //        try
+        //        {
+        //            serialize(tempQueue);
+        //            tempQueue.Clear();
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            Logger.Log.Append(this.SensorName + ":  ERROR writing event data to disk: " + ex.Message, LogLevel.Always);
+        //        }
+        //    }
+        //}
+
         private void FlushToDiskTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if(this.SensorName == "Host" || this.SensorName == "MacIp") { return; }
-            if (!fileBusy)
+            if (this.SensorName == "Host" || this.SensorName == "MacIp")
             {
-                int currentQueueDepth = sensorData.Count;
-                List<ExpandoObject> tempQueue = new List<ExpandoObject>();
-                for (int i = 0; i < currentQueueDepth; i++)
+                return;
+            }
+
+            int currentQueueDepth = sensorData.Count;
+            List<ExpandoObject> tempQueue = new List<ExpandoObject>();
+
+            for (int i = 0; i < currentQueueDepth; i++)
+            {
+                try
                 {
-                    try
+                    ExpandoObject msg;
+                    if (sensorData.TryDequeue(out msg))
                     {
-                        ExpandoObject msg;
-                        sensorData.TryDequeue(out msg);
                         tempQueue.Add(msg);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Logger.Log.Append("ERROR getting message from SendQueue: " + ex.Message, LogLevel.Always);
+                        Logger.Log.Append($"{this.SensorName}: WARNING - Failed to dequeue message at index {i}", LogLevel.Always);
                     }
-
                 }
-                if (tempQueue.Count > 0)
+                catch (Exception ex)
                 {
-                    try
-                    {
-                        serialize(tempQueue);
-                        tempQueue.Clear();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log.Append(this.SensorName + ":  ERROR writing event data to disk: " + ex.Message, LogLevel.Always);
-                    }
+                    Logger.Log.Append($"{this.SensorName}: ERROR getting message from SendQueue at index {i}: {ex.Message}", LogLevel.Always);
                 }
             }
-            else
+
+            if (tempQueue.Count > 0)
             {
-                Logger.Log.Append("ERROR - parquet file busy ", LogLevel.Always);
+                try
+                {
+                    if(serialize(tempQueue).Count == 0)
+                    {
+                        tempQueue.Clear();
+                    }
+                    else
+                    {
+                        Logger.Log.Append($"{this.SensorName}: ERROR - temp queue not empty after serialize. Dropped event count: {tempQueue.Count}", LogLevel.Always);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log.Append($"{this.SensorName}: ERROR writing event data to disk: {ex.Message}", LogLevel.Always);
+                }
             }
         }
 
-        private void serialize(List<ExpandoObject> tempQueue)
+        private List<ExpandoObject> serialize(List<ExpandoObject> tempQueue)
         {
-            int initialQLen = tempQueue.Count;
             int totalObjectsProcessed = 0;
 
             //  in the Default case, we need to create MessageType specific sub queues so that parquet writer has a single schema
@@ -332,6 +378,7 @@ namespace gov.llnl.wintap.etl.extract
                         dynamic tempObj = tempQOfType.ElementAt(j);
                         tempQueue.Remove(tempObj);
                     }
+
                     ParquetWriter.Batch.SensorData set = new ParquetWriter.Batch.SensorData(this.SensorName, firstMsgType, tempQOfType);
                     batch.Add(set);
                     tempQOfType = new ConcurrentQueue<ExpandoObject>();
@@ -342,6 +389,7 @@ namespace gov.llnl.wintap.etl.extract
                 Logger.Log.Append("ERROR writing parquet: " + ex.Message, LogLevel.Always);
             }
             parquetWriter.Add(batch);
+            return tempQueue;
         }
         private void regMetrics()
         {
