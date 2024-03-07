@@ -13,6 +13,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
 using System.Dynamic;
 using System.IO;
 using System.Linq;
@@ -40,6 +41,33 @@ namespace gov.llnl.wintap.etl.load
 
         private async void BatchWorker_DoWork(object sender, DoWorkEventArgs e)
         {
+            List<string> canaryList = new List<string>();
+            foreach (Batch b in batches)
+            {
+                foreach (Batch.SensorData ds in b.Set)
+                {
+                    if (ds.CollectorName == "imageload")
+                    {
+                        foreach (dynamic d in ds.Data)
+                        {
+                            if (d.ProcessName == "reg.exe")
+                            {
+                                if(!canaryList.Contains(d.PidHash))
+                                {
+                                    canaryList.Add(d.PidHash);
+                                }
+                            }
+                        }
+                    }
+                }
+                if(canaryList.Count > 0)
+                {
+                    Logger.Log.Append("$$$$$$$$$$   Total Reg.exe in current data batch: " + canaryList.Count, LogLevel.Always);
+                }
+                
+            }
+
+
             while (batches.TryDequeue(out Batch batch))
             {
                 for (int i = 0; i < batch.Set.Count; i++)
@@ -59,7 +87,7 @@ namespace gov.llnl.wintap.etl.load
                     }
                 }
             }
-            System.Threading.Thread.Sleep(1000);
+            System.Threading.Thread.Sleep(30000);
         }
 
         internal int Backlog { get { return batches.Count; } }
@@ -108,7 +136,28 @@ namespace gov.llnl.wintap.etl.load
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error in ParquetWriter.Write:  " + ex.Message, shared.LogLevel.Always);
+                Logger.Log.Append($"Error in ParquetWriter.Write: {ex.Message} ", shared.LogLevel.Always);
+                if(ex.Message.Contains("used by another process"))
+                {
+                    Logger.Log.Append($"Retrying write operation...", shared.LogLevel.Always);
+                    timestamp = DateTime.UtcNow.ToFileTimeUtc() + 1;
+                    fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
+                    Logger.Log.Append($"{dataSet.CollectorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
+                    try
+                    {
+                        ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
+                        ParquetSerializerOptions options = new ParquetSerializerOptions();
+                        options.CompressionMethod = CompressionMethod.Snappy;
+                        using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
+                        {
+                            await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
+                        }
+                    }
+                    catch(Exception ex2)
+                    {
+                        Logger.Log.Append($"{SensorName} error on retry of WRITE operation: {ex2.Message}", LogLevel.Always);
+                    }
+                }
             }
             return fileName;
         }

@@ -165,9 +165,7 @@ namespace gov.llnl.wintap.collect
                             {
                                 scanInProgress = true;
                                 DateTime sweepStartTime = DateTime.Now;
-                                WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Always);
                                 int totalProcessScanCount = detectChanges(commitInfos, obj.TimeStamp);
-                                WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY total scanned: " + totalProcessScanCount + "   err count: " + scanErrors + "  Total Scan Time: " + DateTime.Now.Subtract(sweepStartTime).TotalSeconds + " sec --------", LogLevel.Always);
                                 scanInProgress = false;
                             }
 
@@ -192,7 +190,7 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error parsing user mode event: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("WARN problem parsing user mode event: " + ex.Message, LogLevel.Always);
                 scanInProgress = false;
             }
         }
@@ -207,7 +205,7 @@ namespace gov.llnl.wintap.collect
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR scanning memory for new process: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("WARN problem scanning memory for new process: " + ex.Message, LogLevel.Always);
             }
         }
         private bool processRunning(int pid)
@@ -270,7 +268,7 @@ namespace gov.llnl.wintap.collect
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("Error scanning memory:  " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("WARN problem scanning memory:  " + ex.Message, LogLevel.Always);
                 }              
             }
             scanInProgress = false;
@@ -343,7 +341,7 @@ namespace gov.llnl.wintap.collect
                 catch
                 {
                     scanErrors++;
-                    WintapLogger.Log.Append("ERROR performing memory scan of: " + _owningProcess.ProcessName, LogLevel.Always);
+                    WintapLogger.Log.Append("WARN problem performing memory scan of: " + _owningProcess.ProcessName, LogLevel.Always);
                     baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
                     if(baseAddress.ToInt64() == 0) { break; }
                 }

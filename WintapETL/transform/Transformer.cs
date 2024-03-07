@@ -103,7 +103,6 @@ namespace gov.llnl.wintap.etl.transform
                 }
                 catch(Exception ex)
                 {
-                    int i = 0;
                 }
             }
             return pg;
