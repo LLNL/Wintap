@@ -133,7 +133,6 @@ namespace gov.llnl.wintap.etl.extract
             }
             else
             {
-                Logger.Log.Append("!!!   NULL pidHash  !!!!", LogLevel.Always);
                 throw new Exception("NULL_PIDHASH");
             }
         }

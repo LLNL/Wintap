@@ -54,6 +54,21 @@ namespace gov.llnl.wintap.etl.load
                             {
                                 if(!canaryList.Contains(d.PidHash))
                                 {
+                                    Logger.Log.Append("ImageLoad REG.EXE: " + d.PidHash, LogLevel.Always);
+                                    canaryList.Add(d.PidHash);
+                                }
+                            }
+                        }
+                    }
+                    if (ds.CollectorName == "process")
+                    {
+                        foreach (dynamic d in ds.Data)
+                        {
+                            if (d.ProcessName == "reg.exe" && d.ActivityType == "start")
+                            {
+                                if (!canaryList.Contains(d.PidHash))
+                                {
+                                    Logger.Log.Append("Process REG.EXE: " + d.PidHash, LogLevel.Always);
                                     canaryList.Add(d.PidHash);
                                 }
                             }
@@ -67,23 +82,29 @@ namespace gov.llnl.wintap.etl.load
                 
             }
 
-
             while (batches.TryDequeue(out Batch batch))
             {
                 for (int i = 0; i < batch.Set.Count; i++)
                 {
                     Batch.SensorData dataSet;
-                    batch.Set.TryDequeue(out dataSet);
-                    string fileName = await Write(dataSet);
-                    try
+                    if (batch.Set.TryDequeue(out dataSet))
                     {
-                        FileInfo flushedFile = new FileInfo(fileName); // rename the file to .parquet so the uploader can find it.
-                        flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
-                        Logger.Log.Append($"  ready for merge: {fileName}", LogLevel.Always);
+                        string fileName = await Write(dataSet);
+                        try
+                        {
+                            FileInfo flushedFile = new FileInfo(fileName); // rename the file to .parquet so the uploader can find it.
+                            flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
+                            Logger.Log.Append($"  ready for merge: {fileName}", LogLevel.Always);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Always);
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Logger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Always);
+                        Logger.Log.Append($"{dataSet.CollectorName} failed to dequeue its dataset. ERROR.", LogLevel.Always );
+                        i--;  // retry 
                     }
                 }
             }
