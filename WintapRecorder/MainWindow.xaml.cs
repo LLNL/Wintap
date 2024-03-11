@@ -167,8 +167,8 @@ namespace WintapRecorder
             if (streamingParquetDir.Exists)
             {
                 streamingParquetDir.Delete(true);
-                streamingParquetDir.Create();
             }
+            streamingParquetDir.Create();
         }
 
         private void FinalParquetWaitWorker_RunWorkerCompleted(object? sender, RunWorkerCompletedEventArgs e)

@@ -123,6 +123,10 @@ namespace gov.llnl.wintap.core.infrastructure
                     WintapMessage owningProcess = ProcessTree.GetByPid(streamedEvent.PID, streamedEvent.EventTime);
                     streamedEvent.ProcessName = owningProcess.ProcessName;
                     streamedEvent.PidHash = owningProcess.PidHash;
+                    if(owningProcess.ProcessName == "mergehelper.exe" || owningProcess.ProcessName == "wintap.exe") 
+                    { 
+                        return; 
+                    }
                 }
                 catch(InvalidOperationException)
                 {

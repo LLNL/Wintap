@@ -67,7 +67,6 @@ namespace gov.llnl.wintap.collect
                 msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments, UniqueProcessKey = obj.UniqueProcessKey.ToString() };
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
-
                 processTree.PublishProcess(msg);
             }
             catch (Exception ex)
@@ -96,7 +95,7 @@ namespace gov.llnl.wintap.collect
                 msg.Process = new WintapMessage.ProcessObject() { Name = pname.ToLower(), Path = ppath.ToLower(), ParentPID = parentPid, CommandLine = ppath, User = "na", Arguments = "", UniqueProcessKey = "0" };
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
-
+                msg.Process.Arguments = "";
                 processTree.PublishProcess(msg);
             }
         }

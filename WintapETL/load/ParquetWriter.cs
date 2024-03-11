@@ -41,60 +41,25 @@ namespace gov.llnl.wintap.etl.load
 
         private async void BatchWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            List<string> canaryList = new List<string>();
-            foreach (Batch b in batches)
-            {
-                foreach (Batch.SensorData ds in b.Set)
-                {
-                    if (ds.CollectorName == "imageload")
-                    {
-                        foreach (dynamic d in ds.Data)
-                        {
-                            if (d.ProcessName == "reg.exe")
-                            {
-                                if(!canaryList.Contains(d.PidHash))
-                                {
-                                    Logger.Log.Append("ImageLoad REG.EXE: " + d.PidHash, LogLevel.Always);
-                                    canaryList.Add(d.PidHash);
-                                }
-                            }
-                        }
-                    }
-                    if (ds.CollectorName == "process")
-                    {
-                        foreach (dynamic d in ds.Data)
-                        {
-                            if (d.ProcessName == "reg.exe" && d.ActivityType == "start")
-                            {
-                                if (!canaryList.Contains(d.PidHash))
-                                {
-                                    Logger.Log.Append("Process REG.EXE: " + d.PidHash, LogLevel.Always);
-                                    canaryList.Add(d.PidHash);
-                                }
-                            }
-                        }
-                    }
-                }
-                if(canaryList.Count > 0)
-                {
-                    Logger.Log.Append("$$$$$$$$$$   Total Reg.exe in current data batch: " + canaryList.Count, LogLevel.Always);
-                }
-                
-            }
 
             while (batches.TryDequeue(out Batch batch))
             {
-                for (int i = 0; i < batch.Set.Count; i++)
+                while (batch.Set.TryDequeue(out Batch.SensorData dataSet))
                 {
-                    Batch.SensorData dataSet;
-                    if (batch.Set.TryDequeue(out dataSet))
+                    if (dataSet.CollectorName == "imageload")
                     {
-                        string fileName = await Write(dataSet);
+                        Logger.Log.Append($"IMAGE LOAD SENSOR PENDING WRITE COUNT: {dataSet.Data.Count()} calling write async...", LogLevel.Always);
+                    }
+
+                    string fileName = "NA";
+                    fileName = await Write(dataSet);
+                    if(fileName != "NA")
+                    {
                         try
                         {
-                            FileInfo flushedFile = new FileInfo(fileName); // rename the file to .parquet so the uploader can find it.
+                            FileInfo flushedFile = new FileInfo(fileName);
                             flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
-                            Logger.Log.Append($"  ready for merge: {fileName}", LogLevel.Always);
+                            Logger.Log.Append($" ready for merge: {fileName}", LogLevel.Always);
                         }
                         catch (Exception ex)
                         {
@@ -103,8 +68,7 @@ namespace gov.llnl.wintap.etl.load
                     }
                     else
                     {
-                        Logger.Log.Append($"{dataSet.CollectorName} failed to dequeue its dataset. ERROR.", LogLevel.Always );
-                        i--;  // retry 
+                        Logger.Log.Append($"{dataSet.CollectorName}: Call to async WRITE returned no parquet data file.", LogLevel.Always );
                     }
                 }
             }

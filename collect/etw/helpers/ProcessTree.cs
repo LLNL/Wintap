@@ -231,6 +231,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 msg.PidHash = node.Data.PidHash;
                 msg.ProcessName = node.Data.ProcessName;
                 msg.Process = new WintapMessage.ProcessObject() { CommandLine = node.Data.ProcessPath, Name = node.Data.ProcessName, ParentPID = node.Data.ParentPid, ParentPidHash = node.Data.ParentPidHash, Path = node.Data.ProcessPath };
+                msg.Process.Arguments = "";
                 PublishProcess(msg);
             }
             WintapLogger.Log.Append("END:  process tree refresh", core.infrastructure. LogLevel.Always);
