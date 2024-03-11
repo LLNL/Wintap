@@ -34,6 +34,7 @@ namespace gov.llnl.wintap.etl.shared
                 macIP.Hash = ip.Hash;
                 macIP.PrivateGateway = ip.PrivateGateway;
                 macIP.EventTime = ((System.DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds();
+                macIP.AgentId = GetAgentId();
                 if (netCollection.Where(n => n.Hash == macIP.Hash).Count() == 0)
                 {
                     netCollection.Add(macIP);
@@ -41,6 +42,29 @@ namespace gov.llnl.wintap.etl.shared
                 }
             }
             return netCollection;
+        }
+
+        internal static string GetAgentId()
+        {
+            Guid agentId = new Guid();
+            const string registryPath = @"Software\Wintap";
+            const string registryKey = "AgentId";
+            try
+            {
+                using (RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true))
+                {
+                    if (key.GetValueNames().Contains(registryKey))
+                    {
+                        agentId = Guid.Parse(key.GetValue(registryKey).ToString());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error accessing Wintap AgentId from registry: {ex.Message}");
+            }
+
+            return agentId.ToString();
         }
 
         /// <summary>

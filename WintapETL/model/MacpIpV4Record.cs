@@ -49,5 +49,6 @@ namespace gov.llnl.wintap.etl.models
         /// Raw flags. Example: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST>
         /// </summary>
         public string Flags { get; set; }
+        public string AgentId { get; internal set; }
     }
 }

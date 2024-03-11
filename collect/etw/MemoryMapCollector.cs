@@ -3,6 +3,7 @@ using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.collect.shared;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using Microsoft.Diagnostics.Tracing;
 using Newtonsoft.Json;
 using Org.BouncyCastle.Math.EC.Multiplier;
@@ -336,6 +337,7 @@ namespace gov.llnl.wintap.collect
                     }
 
                     baseAddress = new IntPtr(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
+                    wm.AgentId = StateManager.AgentId.ToString();
                     EventChannel.Esper.EPRuntime.SendEvent(wm);  // call esper direct since we do not require pidhash lookup.
                 }
                 catch

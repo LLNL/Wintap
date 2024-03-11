@@ -49,7 +49,7 @@ namespace gov.llnl.wintap.etl.extract
                 flatMsg.PID = Int32.Parse(sensorEvent["PID"].ToString());
                 flatMsg.Hostname = Environment.MachineName.ToLower();
                 flatMsg.File_Path = sensorEvent["path"].ToString().ToLower();
-                flatMsg.File_Hash = idGen.GenKeyForFile(transform.Transformer.context, HOST_SENSOR.Instance.HostId.Hostname, flatMsg.File_Path);
+                flatMsg.File_Hash = idGen.GenKeyForFile(transform.Transformer.context, HOST_SENSOR.Instance.HostId.Hostname, flatMsg.AgentId, flatMsg.File_Path);
                 flatMsg.MessageType = "PROCESS_FILE";
                 flatMsg.EventTime = GetUnixNowTime();
                 this.Save(flatMsg);

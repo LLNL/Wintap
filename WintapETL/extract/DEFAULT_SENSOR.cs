@@ -52,6 +52,7 @@ namespace gov.llnl.wintap.etl.extract
                 flatMsg.ActivityType = wintapMessage.ActivityType;
                 flatMsg.EventTime = wintapMessage.EventTime;
                 flatMsg.ComputerName = Environment.MachineName;
+                flatMsg.AgentId = wintapMessage.AgentId;
                 try
                 {
                     flatMsg.ActivityId = wintapMessage.ActivityId;

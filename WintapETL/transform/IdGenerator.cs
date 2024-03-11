@@ -247,13 +247,15 @@ namespace gov.llnl.wintap.etl.transform
             preImage.Append("`");
             return GetHash(preImage.ToString());
         }
-        internal string GenAttrKeyForRegistry_Key(string inContext, string inHostName, string inPath, string inValueName)
+        internal string GenAttrKeyForRegistry_Key(string inContext, string inHostName, string inAgentId, string inPath, string inValueName)
         {
             StringBuilder preImage = new StringBuilder(9999);
             preImage.Append("Registry_Key`");
             preImage.Append(inContext);
             preImage.Append("`");
             preImage.Append(inHostName);
+            preImage.Append("`");
+            preImage.Append(inAgentId);
             preImage.Append("`");
             preImage.Append(inPath);
             preImage.Append("`");
@@ -264,13 +266,15 @@ namespace gov.llnl.wintap.etl.transform
             preImage.Append("`");
             return GetHash(preImage.ToString());
         }
-        internal string GenAttrKeyForFile(string inContext, string inHostName, string inPath)
+        internal string GenAttrKeyForFile(string inContext, string inHostName, string inAgentId, string inPath)
         {
             StringBuilder preImage = new StringBuilder(9999);
             preImage.Append("File`");
             preImage.Append(inContext);
             preImage.Append("`");
             preImage.Append(inHostName);
+            preImage.Append("`");
+            preImage.Append(inAgentId);
             preImage.Append("`");
             preImage.Append(inPath);
             preImage.Append("`");
@@ -614,6 +618,7 @@ namespace gov.llnl.wintap.etl.transform
 
         internal string GenKeyForHost(string inContext
           , string inName
+          , string inAgentId
           )
         {
             // Get the attribute key hash
@@ -625,6 +630,8 @@ namespace gov.llnl.wintap.etl.transform
             StringBuilder preImage = new StringBuilder();
             preImage.Append("N`");
             preImage.Append("Host");
+            preImage.Append("`");
+            preImage.Append(inAgentId);
             preImage.Append("`");
             preImage.Append(attrKey);
             preImage.Append("`");
@@ -822,10 +829,10 @@ namespace gov.llnl.wintap.etl.transform
             return GetHash(preImage.ToString());
         }
 
-        internal string GenKeyForRegistry_Entry(string inContext, string inHostName, string inPath, string inValueName)
+        internal string GenKeyForRegistry_Entry(string inContext, string inHostName, string inAgentId, string inPath, string inValueName)
         {
             // Get the attribute key hash
-            String attrKey = GenAttrKeyForRegistry_Key(inContext, inHostName, inPath, inValueName);
+            String attrKey = GenAttrKeyForRegistry_Key(inContext, inHostName, inAgentId, inPath, inValueName);
 
             // Add the entity name
             StringBuilder preImage = new StringBuilder();
@@ -839,10 +846,10 @@ namespace gov.llnl.wintap.etl.transform
             return GetHash(preImage.ToString());
         }
 
-        internal string GenKeyForFile(string inContext, string inHostName, string inPath)
+        internal string GenKeyForFile(string inContext, string inHostName, string inAgentId, string inPath)
         {
             // Get the attribute key hash
-            String attrKey = GenAttrKeyForFile(inContext, inHostName, inPath);
+            String attrKey = GenAttrKeyForFile(inContext, inHostName, inAgentId, inPath);
 
             // Add the entity name
             StringBuilder preImage = new StringBuilder();

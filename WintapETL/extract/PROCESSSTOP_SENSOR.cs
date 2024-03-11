@@ -79,6 +79,7 @@ namespace gov.llnl.wintap.etl.extract
             procWD.WriteOperationCount = endedProcess.Process.WriteOperationCount;
             procWD.WriteTransferKiloBytes = endedProcess.Process.WriteTransferKiloBytes;
             procWD.TokenElevationType = endedProcess.Process.TokenElevationType;
+            procWD.AgentId = endedProcess.AgentId;
             return procWD;
         }
 

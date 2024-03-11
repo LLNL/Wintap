@@ -21,13 +21,13 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         internal string GenPidHash(int _pid, long _eventTime)
         {
-            return GenKeyForProcess(context, Environment.MachineName, _pid, _eventTime, msgType);
+            return GenKeyForProcess(context, Environment.MachineName, StateManager.AgentId, _pid, _eventTime, msgType);
         }
 
-        internal string GenKeyForProcess(string inContext, string inHostName, int inPid, long inFirstEventTime, string msgType)
+        internal string GenKeyForProcess(string inContext, string inHostName, Guid agentId, int inPid, long inFirstEventTime, string msgType)
         {
             // Get the attribute key hash
-            String attrKey = GenAttrKeyForProcess_ID(inContext, inHostName, inPid, inFirstEventTime);
+            String attrKey = GenAttrKeyForProcess_ID(inContext, inHostName, agentId.ToString(), inPid, inFirstEventTime);
 
             // Add the entity name
             StringBuilder preImage = new StringBuilder();
@@ -43,6 +43,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         private string GenAttrKeyForProcess_ID(string inContext
          , string inHostName
+         , string inAgentId
          , int inPid
          , long inFirstEventTime
          )
@@ -54,6 +55,8 @@ namespace gov.llnl.wintap.collect.etw.helpers
             preImage.Append(inFirstEventTime);
             preImage.Append("`");
             preImage.Append(inHostName);
+            preImage.Append("`");
+            preImage.Append(inAgentId);
             preImage.Append("`");
             preImage.Append(inPid);
             preImage.Append("`");
