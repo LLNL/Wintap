@@ -12,6 +12,7 @@ namespace gov.llnl.wintap.etl.models
 {
     public class HostData : SensorData
     {
+        public string AgentId { get; set; }
 
         /// <summary>
         /// Hardware architecture

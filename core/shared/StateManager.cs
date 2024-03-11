@@ -19,6 +19,7 @@ using gov.llnl.wintap.Properties;
 using com.espertech.esper.client;
 using System.Net.NetworkInformation;
 using Microsoft.Extensions.Logging;
+using com.espertech.esper.epl.named;
 
 namespace gov.llnl.wintap.core.shared
 {
@@ -29,6 +30,7 @@ namespace gov.llnl.wintap.core.shared
     {
         private static readonly StateManager state = new StateManager();
 
+        public static Guid AgentId { get; private set; }
         public static bool UserBusy { get; set; }
         public static string ActiveUser { get; set; }
         public enum UserStateEnum { LoggedOut, LoggedIn, ScreenLock, ScreenUnlock };
@@ -71,6 +73,7 @@ namespace gov.llnl.wintap.core.shared
         private StateManager()
         {
             SessionId = Guid.NewGuid();
+            AgentId = getAgentId();
             ActiveUser = refreshActiveUser();
             OnBatteryPower = false;
             UserBusy = false;
@@ -89,6 +92,38 @@ namespace gov.llnl.wintap.core.shared
             DriveMap = refreshDriveMap();
             MachineBootTime = refreshLastBoot();
             
+        }
+
+        private Guid getAgentId()
+        {
+            Guid agentId = new Guid();
+            const string registryPath = @"Software\Wintap";
+            const string registryKey = "AgentId";
+            try
+            {
+                using (RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true))
+                {
+                    if(key.GetValueNames().Contains(registryKey))
+                    {
+                        agentId = Guid.Parse(key.GetValue(registryKey).ToString());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error accessing Wintap AgentId from registry: {ex.Message}");
+            }
+            if(agentId == new Guid())
+            {
+                WintapLogger.Log.Append("Generating new Agent Id for this sensor.", infrastructure.LogLevel.Always);
+                agentId = Guid.NewGuid();
+                RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true);
+                key.SetValue(registryKey, agentId.ToString());
+                key.Flush();
+                key.Close();
+                key.Dispose();
+            }
+            return agentId;
         }
 
         private void UserChangeQuery_Events(object sender, UpdateEventArgs e)
