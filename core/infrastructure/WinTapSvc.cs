@@ -75,9 +75,7 @@ namespace gov.llnl.wintap
 
         private void startupWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-
-            WintapLogger.Log.Append("Getting sensor configuration...", LogLevel.Always);
-            
+            WintapLogger.Log.Append("Wintap Agent ID: " + StateManager.AgentId.ToString(), LogLevel.Always);
 
             WintapLogger.Log.Append("loading plugin manager...", LogLevel.Always);
             pluginMgr = new PluginManager();

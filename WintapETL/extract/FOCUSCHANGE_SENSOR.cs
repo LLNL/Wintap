@@ -53,6 +53,7 @@ namespace gov.llnl.wintap.etl.extract
                 wd.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
                 wd.MessageType = "FOCUS_CHANGE";
                 wd.PID = wintapMessage.PID;
+                wd.AgentId = sensorEvent["AgentId"].ToString();
                 this.Save(wd);
             }
             catch (Exception ex)

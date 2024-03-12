@@ -40,6 +40,7 @@ namespace gov.llnl.wintap.etl.extract
                 dynamic flatMsg = new ExpandoObject();  // since we are overriding WintapMessage property name definitions, i.e. File_Path
                 flatMsg.ActivityType = sensorEvent["activityType"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
+                flatMsg.AgentId = sensorEvent["AgentId"].ToString();
                 flatMsg.BytesRequested = Int32.Parse(sensorEvent["bytesRequested"].ToString());
                 flatMsg.EventCount = Int32.Parse(sensorEvent["eventCount"].ToString());
                 flatMsg.FirstSeen = (long)sensorEvent["firstSeen"];

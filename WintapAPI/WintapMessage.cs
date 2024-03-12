@@ -40,6 +40,7 @@ namespace gov.llnl.wintap.collect.models
         public string ActivityType { get; set; }
         public string CorrelationId { get; set; }
         public string ActivityId { get; set; }
+        public string AgentId { get; set; }
 
         public ProcessObject Process { get; set; }
         public TcpConnectionObject TcpConnection { get; set; }

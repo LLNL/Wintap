@@ -92,6 +92,7 @@ namespace gov.llnl.wintap.etl.extract
                 host.WintapVersion = Assembly.GetEntryAssembly().GetName().Version.ToString();
                 host.ETLVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString();
                 host.MessageType = "Host";
+                host.AgentId = getAgentId();
 
                 string hostFile = "host-" + DateTime.UtcNow.ToFileTimeUtc() + ".parquet";  
                 DirectoryInfo hostDir = new DirectoryInfo(this.etlRoot);
@@ -117,6 +118,30 @@ namespace gov.llnl.wintap.etl.extract
                 Logger.Log.Append("error creating host record: " + ex.Message, LogLevel.Always);
             }
 
+        }
+
+        private string getAgentId()
+        {
+            const string registryPath = @"HKEY_LOCAL_MACHINE\Software\Wintap";
+            const string registryKey = "AgentId";
+            string agentId = "NA";
+
+            try
+            {
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(registryPath, true))
+                {
+                    if (key != null)
+                    {
+                        agentId = key.GetValue(registryKey) as string;
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                throw new Exception("NO_AGENT_ID_FOUND");
+            }
+
+            return agentId;
         }
 
 

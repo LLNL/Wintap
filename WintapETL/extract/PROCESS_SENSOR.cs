@@ -55,7 +55,7 @@ namespace gov.llnl.wintap.etl.extract
 
         private void handleStartEvent(WintapMessage wintapMessage)
         {
-            ProcessStartData procWD = createProcessObject(wintapMessage.PID, wintapMessage.Process.ParentPID, wintapMessage.EventTime, wintapMessage.Process.Path, wintapMessage.Process.CommandLine, wintapMessage.Process.User, wintapMessage.Process.MD5, wintapMessage.Process.SHA2, wintapMessage.MessageType, wintapMessage.Process.Arguments, wintapMessage.Process.CommandLine, wintapMessage.Process.UniqueProcessKey, wintapMessage.PidHash, wintapMessage.Process.ParentPidHash, wintapMessage.ActivityType);
+            ProcessStartData procWD = createProcessObject(wintapMessage.PID, wintapMessage.Process.ParentPID, wintapMessage.EventTime, wintapMessage.Process.Path, wintapMessage.Process.CommandLine, wintapMessage.Process.User, wintapMessage.Process.MD5, wintapMessage.Process.SHA2, wintapMessage.MessageType, wintapMessage.Process.Arguments, wintapMessage.Process.CommandLine, wintapMessage.Process.UniqueProcessKey, wintapMessage.PidHash, wintapMessage.Process.ParentPidHash, wintapMessage.ActivityType, wintapMessage.AgentId);
             procWD.Hostname = host.Hostname;
             try
             {
@@ -76,9 +76,9 @@ namespace gov.llnl.wintap.etl.extract
             }
         }
 
-        private ProcessStartData createProcessObject(int pid, int parentPid, long eventTime, string path, string commandLine, string user, string md5, string sha2, string msgType, string arguments, string cmdline, string uniqueEtwKey, string pidHash, string parentPidHash, string activityType)
+        private ProcessStartData createProcessObject(int pid, int parentPid, long eventTime, string path, string commandLine, string user, string md5, string sha2, string msgType, string arguments, string cmdline, string uniqueEtwKey, string pidHash, string parentPidHash, string activityType, string agentId)
         {
-            ProcessStartData procWD = new ProcessStartData(parentPidHash, parentPid, pid, pidHash, parseProcessName(path), eventTime, path, user, getSIDForUser(user), md5, sha2, arguments, cmdline, uniqueEtwKey);
+            ProcessStartData procWD = new ProcessStartData(parentPidHash, parentPid, pid, pidHash, parseProcessName(path), eventTime, path, user, getSIDForUser(user), md5, sha2, arguments, cmdline, uniqueEtwKey, agentId);
             procWD.ActivityType = activityType;
             procWD.Hostname = host.Hostname;
             return procWD;
