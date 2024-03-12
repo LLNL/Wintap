@@ -74,10 +74,13 @@ namespace gov.llnl.wintap.core.shared
         {
             SessionId = Guid.NewGuid();
             AgentId = getAgentId();
+            WintapLogger.Log.Append($"StateManager is refreshing active user info", infrastructure.LogLevel.Always);
             ActiveUser = refreshActiveUser();
+            WintapLogger.Log.Append($"StateManager has active user: {ActiveUser}", infrastructure.LogLevel.Always);
             OnBatteryPower = false;
             UserBusy = false;
             WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
+            WintapLogger.Log.Append($"StateManager has found wintap pid: {WintapPID}", infrastructure.LogLevel.Always);
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
             stateRefresh.Interval = 60000;
             stateRefresh.Enabled = true;
@@ -86,12 +89,22 @@ namespace gov.llnl.wintap.core.shared
             stateRefresh.Start();
 
             // sub to SessionChange and set ActiveUser
-            EPStatement userChangeQuery = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType='SessionChange'");
-            userChangeQuery.Events += UserChangeQuery_Events;
+            WintapLogger.Log.Append($"StateManager is registering for user change notifications...", infrastructure.LogLevel.Always);
+            try
+            {
+                EPStatement userChangeQuery = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType='SessionChange'");
+                userChangeQuery.Events += UserChangeQuery_Events;
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append($"StateManager encountered an error setting up user change notifications: {ex.Message}", infrastructure.LogLevel.Always);
+            }
+            WintapLogger.Log.Append($"StateManager has hooked user change event notification", infrastructure.LogLevel.Always);
 
             DriveMap = refreshDriveMap();
             MachineBootTime = refreshLastBoot();
-            
+
+            WintapLogger.Log.Append($"StateManager is initialized.", infrastructure.LogLevel.Always);
         }
 
         private Guid getAgentId()
