@@ -284,9 +284,12 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 allProcess.Add(systemNode);
 
                 TreeNode parentNode = allProcess.Where(c => c.Data.PidHash == newNode.Data.ParentPidHash).FirstOrDefault();
-                if(parentNode.Children.Where(c => c.Data.PidHash == newNode.Data.PidHash).Count() == 0)
+                if(parentNode != null)
                 {
-                    parentNode.AddChild(newNode);
+                    if (parentNode.Children.Where(c => c.Data.PidHash == newNode.Data.PidHash).Count() == 0)
+                    {
+                        parentNode.AddChild(newNode);
+                    }
                 }
             }
         }

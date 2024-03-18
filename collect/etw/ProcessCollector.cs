@@ -59,6 +59,10 @@ namespace gov.llnl.wintap.collect
             {
                 DateTime recvTime = DateTime.Now;
                 (string path, string arguments) = this.TranslateProcessPath(obj.ImageFileName, obj.CommandLine);
+                if(path == null)
+                {
+                    path = "NA";
+                }
                 if (path == "NA") { path = this.GetProcessPathFromPID(obj.ProcessID); }
                 if (String.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Always); }
                 if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Always); }

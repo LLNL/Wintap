@@ -363,7 +363,6 @@ namespace gov.llnl.wintap.collect.shared
             processPathDelim[0] = windowsPath;
             processPathDelim[1] = windowsPath.Replace(".exe", "");
             string[] processNameDelim = new string[2];
-            processNameDelim[0] = fileName;
             processNameDelim[0] = fileName.Replace(".exe", "");
             string[] originalPathDelim = new string[2];
             originalPathDelim[0] = rawPath;
@@ -405,11 +404,18 @@ namespace gov.llnl.wintap.collect.shared
                 {   
                     var diskInfo = from disk in diskVolumes where disk.VolumeNumber == volumeNumber select disk;
                     DiskVolume dv = diskInfo.FirstOrDefault();
-                    if (diskVolumes.Count() == 1 && originalPath.StartsWith("\\device\\harddiskvolume1"))
+                    if(dv != null)
                     {
-                        dv.VolumeNumber = 1;
+                        if (diskVolumes.Count() == 1 && originalPath.StartsWith("\\device\\harddiskvolume1"))
+                        {
+                            dv.VolumeNumber = 1;
+                        }
+                        newPath = originalPath.Replace(nativePrefix + dv.VolumeNumber, dv.VolumeLetter + ":");
                     }
-                    newPath = originalPath.Replace(nativePrefix + dv.VolumeNumber, dv.VolumeLetter + ":");
+                    else
+                    {
+                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}", LogLevel.Always); 
+                    }
                 }
                 else
                 {
