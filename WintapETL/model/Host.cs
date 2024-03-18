@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-using ChoETL;
+
 using System.Collections.Generic;
 using System.Dynamic;
 
@@ -12,6 +12,7 @@ namespace gov.llnl.wintap.etl.models
 {
     public class HostData : SensorData
     {
+        public string AgentId { get; set; }
 
         /// <summary>
         /// Hardware architecture

@@ -81,6 +81,13 @@ namespace gov.llnl.wintap.collect
                 msg.Process.TokenElevationType = Convert.ToInt32(obj.PayloadStringByName("TokenElevationType").Replace(",", ""));
                 msg.Process.WriteOperationCount = Convert.ToInt64(obj.PayloadStringByName("WriteOperationCount").Replace(",", ""));
                 msg.Process.WriteTransferKiloBytes = Convert.ToInt64(obj.PayloadStringByName("WriteTransferKiloBytes").Replace(",", ""));
+                try
+                {
+                    msg.ActivityId = obj.ActivityID.ToString();
+                    msg.CorrelationId = obj.PayloadStringByName("CorrelationId");
+                }
+                catch (Exception ex) { }
+                msg.Process.ParentPidHash = "";
                 EventChannel.Send(msg);
             }
             catch (Exception ex)

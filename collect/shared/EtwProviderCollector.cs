@@ -92,7 +92,7 @@ namespace gov.llnl.wintap.collect.shared
 
 
         /// <summary>
-        /// This is where the magic happens
+        /// 
         /// </summary>
         /// <param name="obj"></param>
         public virtual void Process_Event(TraceEvent obj)

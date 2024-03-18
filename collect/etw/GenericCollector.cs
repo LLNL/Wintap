@@ -9,6 +9,7 @@ using Microsoft.Diagnostics.Tracing;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using static gov.llnl.wintap.collect.models.WintapMessage;
+using System.Linq;
 
 namespace gov.llnl.wintap.collect.shared
 {
@@ -33,16 +34,24 @@ namespace gov.llnl.wintap.collect.shared
             try
             {
                 // 1.)  Process the event
-                WintapLogger.Log.Append(obj.ToString(), LogLevel.Always);
+                WintapLogger.Log.Append(obj.ToString(), LogLevel.Debug);
                 WintapMessage.GenericMessageObject genericEvent = new GenericMessageObject();
                 genericEvent.EventName = obj.EventName;
                 genericEvent.EventTime = obj.TimeStamp;
                 genericEvent.Payload = obj.ToString();
-                genericEvent.PID = obj.ProcessID;
                 genericEvent.Provider = obj.ProviderGuid.ToString();
+                genericEvent.ProviderName = obj.ProviderName;
+               
+
 
                 // 2.) Create a WintapMessage and attach your event to it
                 WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "GenericMessage");
+                try
+                {
+                    wintapMsg.ActivityId = obj.ActivityID.ToString();
+                    wintapMsg.CorrelationId = obj.PayloadStringByName("CorrelationId");
+                }
+                catch (Exception ex) { }
                 wintapMsg.ActivityType = obj.ProviderName;
                 wintapMsg.GenericMessage = genericEvent;
 

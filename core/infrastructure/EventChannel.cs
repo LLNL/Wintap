@@ -7,6 +7,7 @@
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.collect.models;
+using gov.llnl.wintap.core.shared;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
@@ -123,6 +124,11 @@ namespace gov.llnl.wintap.core.infrastructure
                     WintapMessage owningProcess = ProcessTree.GetByPid(streamedEvent.PID, streamedEvent.EventTime);
                     streamedEvent.ProcessName = owningProcess.ProcessName;
                     streamedEvent.PidHash = owningProcess.PidHash;
+                    streamedEvent.AgentId = StateManager.AgentId.ToString();
+                    if(owningProcess.ProcessName == "mergehelper.exe" || owningProcess.ProcessName == "wintap.exe") 
+                    { 
+                        return; 
+                    }
                 }
                 catch(InvalidOperationException)
                 {

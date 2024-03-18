@@ -252,7 +252,7 @@ namespace gov.llnl.wintap.core.api
                 {
                     try
                     {
-                        if(prop.ToString().Contains("EventTime"))
+                        if (prop.ToString().Contains("EventTime"))
                         {
                             sb.Append(prop.ToString() + "=" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().ToLongTimeString() + " +" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().Millisecond + "ms, ");
                         }
@@ -269,7 +269,9 @@ namespace gov.llnl.wintap.core.api
                 }
                 string TestString = sb.ToString().TrimEnd(new char[] { ',' });
                 string encodedString = System.Net.WebUtility.HtmlEncode(TestString);
-                context.Clients.All.addMessage(encodedString, "OK");
+                EsperResult esperResult = new EsperResult();
+                esperResult.Result = encodedString;
+                context.Clients.All.addMessage(esperResult, "OK");
             }
         }
 

@@ -4,7 +4,6 @@
  * All rights reserved.
  */
 
-using ChoETL;
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.models;
@@ -63,6 +62,7 @@ namespace gov.llnl.wintap.etl.extract
         {
             ProcessTerminateData procWD = new ProcessTerminateData(endedProcess.Process.ParentPidHash);
             procWD.MessageType = "PROCESS";
+            procWD.ProcessName = endedProcess.ProcessName;
             procWD.ActivityType = endedProcess.ActivityType;
             procWD.PID = endedProcess.PID;
             procWD.PidHash = endedProcess.PidHash;
@@ -79,6 +79,7 @@ namespace gov.llnl.wintap.etl.extract
             procWD.WriteOperationCount = endedProcess.Process.WriteOperationCount;
             procWD.WriteTransferKiloBytes = endedProcess.Process.WriteTransferKiloBytes;
             procWD.TokenElevationType = endedProcess.Process.TokenElevationType;
+            procWD.AgentId = endedProcess.AgentId;
             return procWD;
         }
 

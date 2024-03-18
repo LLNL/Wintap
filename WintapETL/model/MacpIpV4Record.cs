@@ -9,11 +9,8 @@ namespace gov.llnl.wintap.etl.models
     /// <summary>
     /// A Parquet compatible clone (flattened) of MacIpV4 Pairing which includes the IpV4Addr info
     /// </summary>
-    public class MacIpV4Record
+    public class MacIpV4Record : SensorData
     {
-        public string HostName { get; set; }
-
-        public long EventTime { get; set; }
 
         /// <summary>
         /// Hash value in uppercase. 
@@ -52,5 +49,6 @@ namespace gov.llnl.wintap.etl.models
         /// Raw flags. Example: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST>
         /// </summary>
         public string Flags { get; set; }
+        public string AgentId { get; internal set; }
     }
 }

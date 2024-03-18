@@ -40,7 +40,7 @@ namespace gov.llnl.wintap.etl.helpers
             }
             catch(Exception ex)
             {
-                log.Append("Error processing inputs: " + ex.Message, LogVerboseLevel.Normal);
+                log.Append("Could not start merge: " + ex.Message, LogVerboseLevel.Normal);
                 log.Close();
                 return;
             }
@@ -64,7 +64,6 @@ namespace gov.llnl.wintap.etl.helpers
                         string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("_sensor","") + "+" + mergeTime.ToFileTimeUtc().ToString();
                         string tempFileName = sensorName;
                         command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";
-                        log.Append("Attempting sql: " + command.CommandText, LogVerboseLevel.Normal);
                         var executeNonQuery = command.ExecuteNonQuery();
                         command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
                         executeNonQuery = command.ExecuteNonQuery();
@@ -78,7 +77,9 @@ namespace gov.llnl.wintap.etl.helpers
                             log.Append("Mirroring merged parquet to recording directory: " + mergeFile, LogVerboseLevel.Normal);
                             RecordingSession.Record(mergeFile.FullName, sensorName, log);
                         }
-
+                        command.CommandText = $"DROP TABLE IF EXISTS {tempFileName}";
+                        command.ExecuteNonQuery();
+                        log.Append("Table dropped: " + tempFileName, LogVerboseLevel.Normal);
                     }
                 }
             }

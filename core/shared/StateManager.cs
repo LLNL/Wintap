@@ -18,6 +18,8 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.Properties;
 using com.espertech.esper.client;
 using System.Net.NetworkInformation;
+using Microsoft.Extensions.Logging;
+using com.espertech.esper.epl.named;
 
 namespace gov.llnl.wintap.core.shared
 {
@@ -28,6 +30,7 @@ namespace gov.llnl.wintap.core.shared
     {
         private static readonly StateManager state = new StateManager();
 
+        public static Guid AgentId { get; private set; }
         public static bool UserBusy { get; set; }
         public static string ActiveUser { get; set; }
         public enum UserStateEnum { LoggedOut, LoggedIn, ScreenLock, ScreenUnlock };
@@ -64,19 +67,20 @@ namespace gov.llnl.wintap.core.shared
 
         public static int WintapPID { get; set; }
 
-
-        internal string FileTableCache;
-
         //  debug for missing process events
         public static ConcurrentBag<string> SentProcessList = new ConcurrentBag<string>();
 
         private StateManager()
         {
             SessionId = Guid.NewGuid();
+            AgentId = getAgentId();
+            WintapLogger.Log.Append($"StateManager is refreshing active user info", infrastructure.LogLevel.Always);
             ActiveUser = refreshActiveUser();
+            WintapLogger.Log.Append($"StateManager has active user: {ActiveUser}", infrastructure.LogLevel.Always);
             OnBatteryPower = false;
             UserBusy = false;
             WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
+            WintapLogger.Log.Append($"StateManager has found wintap pid: {WintapPID}", infrastructure.LogLevel.Always);
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
             stateRefresh.Interval = 60000;
             stateRefresh.Enabled = true;
@@ -85,13 +89,54 @@ namespace gov.llnl.wintap.core.shared
             stateRefresh.Start();
 
             // sub to SessionChange and set ActiveUser
-            EPStatement userChangeQuery = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType='SessionChange'");
-            userChangeQuery.Events += UserChangeQuery_Events;
+            WintapLogger.Log.Append($"StateManager is registering for user change notifications...", infrastructure.LogLevel.Always);
+            try
+            {
+                EPStatement userChangeQuery = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType='SessionChange'");
+                userChangeQuery.Events += UserChangeQuery_Events;
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append($"StateManager encountered an error setting up user change notifications: {ex.Message}", infrastructure.LogLevel.Always);
+            }
+            WintapLogger.Log.Append($"StateManager has hooked user change event notification", infrastructure.LogLevel.Always);
 
             DriveMap = refreshDriveMap();
             MachineBootTime = refreshLastBoot();
-            FileTableCache = Environment.GetEnvironmentVariable("WINDIR") + @"\Temp\wintap.dat";
-            
+
+            WintapLogger.Log.Append($"StateManager is initialized.", infrastructure.LogLevel.Always);
+        }
+
+        private Guid getAgentId()
+        {
+            Guid agentId = new Guid();
+            const string registryPath = @"Software\Wintap";
+            const string registryKey = "AgentId";
+            try
+            {
+                using (RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true))
+                {
+                    if(key.GetValueNames().Contains(registryKey))
+                    {
+                        agentId = Guid.Parse(key.GetValue(registryKey).ToString());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error accessing Wintap AgentId from registry: {ex.Message}");
+            }
+            if(agentId == new Guid())
+            {
+                WintapLogger.Log.Append("Generating new Agent Id for this sensor.", infrastructure.LogLevel.Always);
+                agentId = Guid.NewGuid();
+                RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true);
+                key.SetValue(registryKey, agentId.ToString());
+                key.Flush();
+                key.Close();
+                key.Dispose();
+            }
+            return agentId;
         }
 
         private void UserChangeQuery_Events(object sender, UpdateEventArgs e)
@@ -100,7 +145,7 @@ namespace gov.llnl.wintap.core.shared
             ActiveUser = sessionChange.SessionChange.UserName;
             if(ActiveUser.ToUpper().Contains("PHOTONUSER"))
             {
-                WintapLogger.Log.Append("Attempting to map PhotonUser...", LogLevel.Always);
+                WintapLogger.Log.Append("Attempting to map PhotonUser...", infrastructure.LogLevel.Always);
                 RegistryKey usersRoot = Registry.Users;
                 foreach(var userKey in usersRoot.GetSubKeyNames())
                 {
@@ -108,16 +153,12 @@ namespace gov.llnl.wintap.core.shared
                     {
                         if (userKey.StartsWith("S-1-5-21-"))
                         {
-                            WintapLogger.Log.Append("    Got user registry key: " + userKey, LogLevel.Always);
                             RegistryKey currentUserKey = usersRoot.OpenSubKey(userKey);
                             if (currentUserKey.GetSubKeyNames().Contains("Environment"))
                             {
-                                WintapLogger.Log.Append("   Opening Environment subkey...", LogLevel.Always);
                                 RegistryKey envKey = currentUserKey.OpenSubKey("Environment");
-                                WintapLogger.Log.Append("   Got Environment subkey... sleeping for 5 seconds to allow environment to build", LogLevel.Always);
                                 System.Threading.Thread.Sleep(5000);
                                 ActiveUser = envKey.GetValue("AppStream_UserName").ToString();
-                                WintapLogger.Log.Append("   Got User: " + ActiveUser, LogLevel.Always);
                                 envKey.Close();
                                 envKey.Dispose();
                             }
@@ -125,11 +166,11 @@ namespace gov.llnl.wintap.core.shared
                     }
                     catch(Exception ex)
                     {
-                        WintapLogger.Log.Append("Error reading environment for key: " + userKey + "  exception: " + ex.Message, LogLevel.Always);
+                        WintapLogger.Log.Append("Error reading environment for key: " + userKey + "  exception: " + ex.Message, infrastructure.LogLevel.Always);
                     }
                    
                 }
-                WintapLogger.Log.Append("PhotonUser resolution complete.", LogLevel.Always);
+                WintapLogger.Log.Append("PhotonUser resolution complete.", infrastructure.LogLevel.Always);
             }
         }
 
@@ -156,7 +197,7 @@ namespace gov.llnl.wintap.core.shared
             }
             catch(Exception ex)
             {
-                WintapLogger.Log.Append("ERROR GETTING LAST BOOT TIME, using wintap start time as machine start time. " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR GETTING LAST BOOT TIME, using wintap start time as machine start time. " + ex.Message, infrastructure.LogLevel.Always);
             }
             return lastBoot;
         }
@@ -173,10 +214,10 @@ namespace gov.llnl.wintap.core.shared
             psi.UseShellExecute = false;
             psi.RedirectStandardOutput = true;
             diskPart.StartInfo = psi;
-            WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, LogLevel.Always);
+            WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, infrastructure.LogLevel.Always);
             diskPart.Start();
             string diskConfig = diskPart.StandardOutput.ReadToEnd();
-            WintapLogger.Log.Append("drive volumes: " + diskConfig, LogLevel.Always);
+            WintapLogger.Log.Append("drive volumes: " + diskConfig, infrastructure.LogLevel.Always);
             string[] configLines = diskConfig.Split(new char[] { '\r' });
             diskPart.WaitForExit();
             foreach (string line in configLines)
@@ -188,13 +229,13 @@ namespace gov.llnl.wintap.core.shared
                     dv.VolumeNumber = Convert.ToInt32(lineArray[3].ToString());
                     dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString().ToLower());
                     driveMap.Add(dv);
-                    WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, LogLevel.Always);
+                    WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, infrastructure.LogLevel.Always);
                 }
                 catch (Exception ex) { }
             }
             if(driveMap.Count == 0)
             {
-                WintapLogger.Log.Append("ERROR:  No drive map found! ", LogLevel.Always);
+                WintapLogger.Log.Append("ERROR:  No drive map found! ", infrastructure.LogLevel.Always);
             }
             return driveMap;
         }
@@ -230,7 +271,7 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex)
             {
-
+                WintapLogger.Log.Append("Could not read registry: " + ex.Message, infrastructure.LogLevel.Always);
             }
             return ActiveUser;
         }
@@ -289,20 +330,20 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR retrieving local IP address from .NET provider: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR retrieving local IP address from .NET provider: " + ex.Message, infrastructure.LogLevel.Always);
             }
             if(localIp == "NA")
             {
                 localIp = getLocalIpAddressFromWMI();
             }
-            WintapLogger.Log.Append("Retrieved local IP address: " + localIp, LogLevel.Always);
+            WintapLogger.Log.Append("Retrieved local IP address: " + localIp, infrastructure.LogLevel.Always);
             return localIp;
         }
 
         private static string getLocalIpAddressFromWMI()
         {
             string localIp = "NA";
-            WintapLogger.Log.Append("Attempting to get local IP address from WMI...", LogLevel.Always);
+            WintapLogger.Log.Append("Attempting to get local IP address from WMI...", infrastructure.LogLevel.Always);
             try
             {
                 ManagementObjectSearcher mos = new ManagementObjectSearcher("select * from Win32_NetworkAdapterConfiguration WHERE IPEnabled = 'True'");
@@ -324,7 +365,7 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error enumerating NICs: from WMI " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error enumerating NICs: from WMI " + ex.Message, infrastructure.LogLevel.Always);
             }
             return localIp; ;
         }

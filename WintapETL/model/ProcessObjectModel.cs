@@ -1,10 +1,12 @@
-﻿///*
-// * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
+﻿// * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
 // * Produced at the Lawrence Livermore National Laboratory.
 // * All rights reserved.
 // */
 
-internal class ProcessStartData
+using gov.llnl.wintap.etl.models;
+
+///*
+internal class ProcessStartData : SensorData
 {
     private readonly string _parentPidHash;
     private readonly int _parentPid;
@@ -20,6 +22,7 @@ internal class ProcessStartData
     private readonly string _fileSha2;
     private readonly string _processArgs;
     private readonly string _uniqueProcessKey;
+    private readonly string _agentId;
 
     public string ParentPidHash
     {
@@ -39,6 +42,11 @@ internal class ProcessStartData
     public string PidHash
     {
         get { return _pidHash; }
+    }
+
+    public string AgentId
+    {
+        get { return _agentId; }
     }
 
     public string ProcessName
@@ -97,7 +105,7 @@ internal class ProcessStartData
         get { return _uniqueProcessKey; }
     }
 
-    public ProcessStartData(string parentPidHash, int parentPid, int pid, string pidHash, string processName, long startTime, string processPath, string userName, string userSid, string fileMd5, string fileSha2, string args, string commandLine, string uniqueProcessKey)
+    public ProcessStartData(string parentPidHash, int parentPid, int pid, string pidHash, string processName, long startTime, string processPath, string userName, string userSid, string fileMd5, string fileSha2, string args, string commandLine, string uniqueProcessKey, string agentId)
     {
         _parentPidHash = parentPidHash;
         _parentPid = parentPid;
@@ -113,5 +121,10 @@ internal class ProcessStartData
         _processArgs = args;
         _eventTime = startTime;
         _uniqueProcessKey = uniqueProcessKey;
+        if(_uniqueProcessKey == null)
+        {
+            _uniqueProcessKey = "";
+        }
+        _agentId = agentId;
     }
 }

@@ -6,9 +6,16 @@
 
 using com.espertech.esper.client;
 using com.espertech.esper.compat.collections;
+using com.espertech.esper.epl.generated;
+using com.espertech.esper.epl.join.plan;
+using com.espertech.esper.events;
+using com.espertech.esper.events.bean;
+using com.espertech.esper.events.map;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
+using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using Microsoft.Win32;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -226,7 +233,8 @@ namespace gov.llnl.wintap.core.infrastructure
                 WintapMessage pluginEventData = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, "GenericMessage");
                 pluginEventData.GenericMessage = e.GenericEvent;
                 pluginEventData.ActivityType = e.Name; 
-                EventChannel.Esper.EPRuntime.SendEvent(pluginEventData);
+                //EventChannel.Esper.EPRuntime.SendEvent(pluginEventData);
+                EventChannel.Send(pluginEventData);
             }
             catch(Exception ex) 
             {
@@ -258,20 +266,37 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 if(queryPlugin.Metadata.Name == pluginHandler)
                 {
-                    foreach(EventBean eb in e.NewEvents)
+                    int lastEventNumber = e.NewEvents.Count();
+                    List<WintapMessage> results = new List<WintapMessage>();
+                    QueryResult qr = new QueryResult() { Name = queryName };
+                    foreach (EventBean eb in e.NewEvents)
                     {
-                        QueryResult qr = new QueryResult();
-                        qr.Result = new List<KeyValuePair<string, string>>();
-                        qr.Name = queryName;
-                        foreach (string prop in eb.EventType.PropertyNames)
+                        try
                         {
-                            if(eb[prop] != null && !String.IsNullOrEmpty(eb[prop].ToString()))
+                            WintapMessage resultmsg = (WintapMessage)eb.Underlying;
+                            results.Add(resultmsg);
+                        }
+                        catch(InvalidCastException ice)
+                        {
+                            IDictionary<string, object> bebList = eb.Underlying.UnwrapStringDictionary();
+                            foreach (string eventName in bebList.Keys)
                             {
-                                qr.Result.Add(new KeyValuePair<string, string>(prop, eb[prop].ToString()));
+                                object wmAsObj;
+                                bebList.TryGetValue(eventName, out wmAsObj);
+                                KeyValuePair<string, string> resultPair = new KeyValuePair<string, string>(eventName, wmAsObj.ToString());
+                                qr.EventDetails.Add(resultPair);
                             }
                         }
-                        queryPlugin.Value.Process(qr);
+                        catch(Exception ex)
+                        {
+
+                        }
                     }
+                    if(results.Count >0)
+                    {
+                        qr.Activity = results;
+                    }    
+                    queryPlugin.Value.Process(qr);
                 }
             }
         }

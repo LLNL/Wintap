@@ -99,7 +99,6 @@
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
     <Compile Include="WintapController.cs" />
-    <Compile Include="WintapUpdate.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

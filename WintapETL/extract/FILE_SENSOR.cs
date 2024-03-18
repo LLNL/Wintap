@@ -5,7 +5,7 @@
  * All rights reserved.
  */
 
-using ChoETL;
+
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.models;
@@ -33,26 +33,28 @@ namespace gov.llnl.wintap.etl.extract
         {
             try
             {
-                base.HandleSensorEvent(sensorEvent);
                 IdGenerator idGen = new IdGenerator();
                 string pidHash = sensorEvent["PidHash"].ToString();
-                HostId host = HOST_SENSOR.Instance.HostId;
                 DateTime eventTime = DateTime.FromFileTimeUtc((long)sensorEvent["firstSeen"]);
-                dynamic flatMsg = (ExpandoObject)new WintapMessage.FileActivityObject().ToDynamic();
+                // dynamic flatMsg = (ExpandoObject)new WintapMessage.FileActivityObject().ToDynamic();
+                dynamic flatMsg = new ExpandoObject();  // since we are overriding WintapMessage property name definitions, i.e. File_Path
                 flatMsg.ActivityType = sensorEvent["activityType"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
+                flatMsg.AgentId = sensorEvent["AgentId"].ToString();
                 flatMsg.BytesRequested = Int32.Parse(sensorEvent["bytesRequested"].ToString());
                 flatMsg.EventCount = Int32.Parse(sensorEvent["eventCount"].ToString());
                 flatMsg.FirstSeen = (long)sensorEvent["firstSeen"];
                 flatMsg.LastSeen = (long)sensorEvent["lastSeen"];
                 flatMsg.PidHash = pidHash;
                 flatMsg.PID = Int32.Parse(sensorEvent["PID"].ToString());
-                flatMsg.Hostname = host.Hostname;
+                flatMsg.Hostname = Environment.MachineName.ToLower();
                 flatMsg.File_Path = sensorEvent["path"].ToString().ToLower();
-                flatMsg.File_Hash = idGen.GenKeyForFile(transform.Transformer.context, HOST_SENSOR.Instance.HostId.Hostname, flatMsg.File_Path);
+                flatMsg.File_Hash = idGen.GenKeyForFile(transform.Transformer.context, HOST_SENSOR.Instance.HostId.Hostname, flatMsg.AgentId, flatMsg.File_Path);
                 flatMsg.MessageType = "PROCESS_FILE";
                 flatMsg.EventTime = GetUnixNowTime();
                 this.Save(flatMsg);
+                sensorEvent = null;
+                flatMsg = null;
             }
             catch (Exception ex)
             {
