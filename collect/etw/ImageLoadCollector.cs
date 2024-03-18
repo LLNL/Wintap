@@ -69,7 +69,7 @@ namespace gov.llnl.wintap.collect
                 WintapMessage.ImageLoadObject cachedImageLoad = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault();
                 if (cachedImageLoad != null)
                 {
-                    wintapBuilder.ImageLoad.MD5 = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault().MD5;
+                    wintapBuilder.ImageLoad.MD5 = cachedImageLoad.MD5;
                 }
                 else
                 {
