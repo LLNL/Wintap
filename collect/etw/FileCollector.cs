@@ -264,11 +264,5 @@ namespace gov.llnl.wintap.collect
                 WintapLogger.Log.Append("problem in Kernel_FileIoDelete event:  " + ex.Message, core.infrastructure.LogLevel.Always);
             }
         }
-
-
-        public override void Process_Event(TraceEvent obj)
-        {
-
-        }
     }
 }
