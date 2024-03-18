@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 using gov.llnl.wintap.core.shared;
+using System;
 using System.Web.Http;
 
 namespace gov.llnl.wintap.core.api
@@ -27,18 +28,20 @@ namespace gov.llnl.wintap.core.api
         [HttpGet]
         public IHttpActionResult GetTree()
         {
-            bool error = false;
+            try
+            {
+                IHttpActionResult result = Ok(new
+                {
+                    response = StateManager.ProcessTreeJSON.ToLower()
+                });
 
-            IHttpActionResult result = Ok(new
-            {
-                response = StateManager.ProcessTreeJSON.ToLower()
-            });
-            if (error)
-            {
-                result = BadRequest();
+                return result;
             }
-
-            return result;
+            catch (Exception ex)
+            {
+                return BadRequest("Error processing tree: " + ex.Message);
+            }
         }
+
     }
 }

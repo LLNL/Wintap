@@ -103,14 +103,17 @@ namespace gov.llnl.wintap.collect
             {
                 DirectoryInfo ffRoot = new DirectoryInfo(Environment.GetEnvironmentVariable("SYSTEMDRIVE") + "\\users\\" + user + @"\AppData\Roaming\Mozilla\Firefox\Profiles");
                 string ffProfile = ffRoot.EnumerateDirectories().FirstOrDefault().FullName;
-                foreach (DirectoryInfo ffDir in ffRoot.EnumerateDirectories())
+                if(ffProfile != null)
                 {
-                    if (ffDir.FullName.ToUpper().EndsWith("-RELEASE"))
+                    foreach (DirectoryInfo ffDir in ffRoot.EnumerateDirectories())
                     {
-                        ffProfile = ffDir.FullName;
+                        if (ffDir.FullName.ToUpper().EndsWith("-RELEASE"))
+                        {
+                            ffProfile = ffDir.FullName;
+                        }
                     }
+                    gatherFireFox(ffProfile + "\\places.sqlite");
                 }
-                gatherFireFox(ffProfile + "\\places.sqlite");
             }
             catch(FileNotFoundException fnoEx)
             {
@@ -402,7 +405,7 @@ namespace gov.llnl.wintap.collect
         /// </summary>
         /// <param name="rawTime"></param>
         /// <returns></returns>
-        private DateTime convertGoogleTime(long rawTime)
+        private DateTime convertGoogleTime(double rawTime)
         {
             DateTime googleDate = new DateTime(1601, 1, 1).AddSeconds(rawTime/1000000);
             return googleDate;
