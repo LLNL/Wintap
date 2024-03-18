@@ -21,7 +21,7 @@ using System.Reflection;
 namespace gov.llnl.wintap
 {
     /// <summary>
-    /// Windows Service main entry point
+    /// Windows Service main entry point.
     /// </summary>
     public partial class WinTapSvc : ServiceBase
     {
