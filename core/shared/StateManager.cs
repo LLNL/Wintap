@@ -20,6 +20,7 @@ using com.espertech.esper.client;
 using System.Net.NetworkInformation;
 using Microsoft.Extensions.Logging;
 using com.espertech.esper.epl.named;
+using System.Configuration;
 
 namespace gov.llnl.wintap.core.shared
 {
@@ -56,6 +57,11 @@ namespace gov.llnl.wintap.core.shared
         public static Guid SessionId { get; set; }
 
         /// <summary>
+        /// The enablement state for all wintap event providers
+        /// </summary>
+        public static Dictionary<string, bool> WintapSettings { get; internal set; }
+
+        /// <summary>
         /// A list of physical disk drive number to logical drive letter mappings.  
         /// </summary>
         public List<DiskVolume> DriveMap {get; set;}
@@ -72,6 +78,7 @@ namespace gov.llnl.wintap.core.shared
 
         private StateManager()
         {
+            WintapSettings = getWintapSettings();
             SessionId = Guid.NewGuid();
             AgentId = getAgentId();
             WintapLogger.Log.Append($"StateManager is refreshing active user info", infrastructure.LogLevel.Always);
@@ -105,6 +112,79 @@ namespace gov.llnl.wintap.core.shared
             MachineBootTime = refreshLastBoot();
 
             WintapLogger.Log.Append($"StateManager is initialized.", infrastructure.LogLevel.Always);
+        }
+
+        private Dictionary<string, bool> getWintapSettings()
+        {
+            Dictionary<string, bool> settings = new Dictionary<string, bool>();
+            try
+            {
+                settings["Tcp"] = Properties.Settings.Default.TcpCollector;
+                settings["Udp"] = Properties.Settings.Default.UdpCollector;
+                settings["ImageLoad"] = Properties.Settings.Default.ImageLoadCollector;
+                settings["File"] = Properties.Settings.Default.FileCollector;
+                settings["Registry"] = Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector;
+                settings["MemoryMap"] = Properties.Settings.Default.MemoryMapCollector;
+                settings["ApiCall"] = Properties.Settings.Default.KernelAPICallCollector;
+                settings["DeveloperMode"] = false;
+                if(Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
+                {
+                    settings["DeveloperMode"] = true;
+                }
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append($"StateManager: ERROR reading event provider enablement state, could not build collectorSettings object: {ex.Message}", infrastructure.LogLevel.Always);
+            }
+            return settings;
+        }
+
+        internal static void SetWintapSettings(Dictionary<string, bool> settings)
+        {
+            foreach(KeyValuePair<string, bool> kvp in settings)
+            {
+                if(kvp.Key == "Tcp")
+                {
+                    Properties.Settings.Default.TcpCollector = kvp.Value;
+                }
+                if(kvp.Key == "Udp")
+                {
+                    Properties.Settings.Default.UdpCollector = kvp.Value;
+                }
+                if (kvp.Key == "ImageLoad")
+                {
+                    Properties.Settings.Default.ImageLoadCollector = kvp.Value;
+                }
+                if (kvp.Key == "File")
+                {
+                    Properties.Settings.Default.FileCollector = kvp.Value;
+                }
+                if (kvp.Key == "Registry")
+                {
+                    Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector = kvp.Value;
+                }
+                if (kvp.Key == "MemoryMap")
+                {
+                    Properties.Settings.Default.MemoryMapCollector = kvp.Value;
+                }
+                if (kvp.Key == "ApiCall")
+                {
+                    Properties.Settings.Default.KernelAPICallCollector = kvp.Value;
+                }
+                if (kvp.Key == "DeveloperMode")
+                {
+                    if(kvp.Value == true)
+                    {
+                        Properties.Settings.Default.Profile = "Developer";
+                    }
+                    else
+                    {
+                        Properties.Settings.Default.Profile = "Production";
+                    }
+                }
+            }
+            Properties.Settings.Default.Save();  // saves the config to, and subsequently reads from, System32\config\systemprofile\AppData\Local\...
+            Utilities.RestartWintap("Wintap settings change requested.");
         }
 
         private Guid getAgentId()

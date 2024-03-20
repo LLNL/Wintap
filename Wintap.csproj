@@ -455,6 +455,7 @@
     <Compile Include="collect\shared\EtwUtility.cs" />
     <Compile Include="core\api\EtwExplorerController.cs" />
     <Compile Include="core\api\TreeController.cs" />
+    <Compile Include="core\api\WintapServiceController.cs" />
     <Compile Include="core\infrastructure\EventChannel.cs" />
     <Compile Include="core\shared\Strings.cs" />
     <Compile Include="core\api\EsperServiceController.cs" />

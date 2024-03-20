@@ -1,5 +1,7 @@
-﻿using System;
+﻿using gov.llnl.wintap.core.infrastructure;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -57,5 +59,27 @@ namespace gov.llnl.wintap.core.shared
             }
             return hashStr.ToString();
         }
+
+        internal static void RestartWintap(string reason)
+        {
+            WintapLogger.Log.Append($"Wintap restart called because: {reason} ", LogLevel.Always);
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.UseShellExecute = false;
+                psi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
+                psi.Arguments = "RESTART";
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                Process p = new Process();
+                p.StartInfo = psi;
+                p.Start();
+                p.WaitForExit();
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error calling WintapSvcMgr for wintap restart: " + ex.Message, LogLevel.Always);
+            }
+        }
+
     }
 }
