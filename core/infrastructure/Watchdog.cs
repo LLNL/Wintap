@@ -130,7 +130,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     string alertMsg = "wintap has exceeded maximum performance thresholds. cpu: " + cpu + "  memory: " + mem + "  hitcount: " + WintapProfile.BreachCount;
                     WintapLogger.Log.Append(alertMsg, LogLevel.Always);
                     sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.SYSTEM_UTILIZATION, alertMsg);
-                    restartWintap();
+                    Utilities.RestartWintap(alertMsg);
                 }
             }
             catch (Exception ex)
@@ -196,32 +196,12 @@ namespace gov.llnl.wintap.core.infrastructure
                 if (executeTime > runTTL)
                 {
                     logEvent(104, "Watchdog timeout exceeded on runnable: " + runnable.RunPlugin.Metadata.Name);
-                    restartWintap();
+                    Utilities.RestartWintap("Watchdog timeout exceeded on runnable: " + runnable.RunPlugin.Metadata.Name);
                     throw new Exception("WATCH_DOG_TIMEOUT_EXCEEDED");
                 }
                 System.Threading.Thread.Sleep(1000);
             }
             WintapLogger.Log.Append("Watchdog has completed protected run, run time: " + executeTime, LogLevel.Always);
-        }
-
-        private void restartWintap()
-        {
-            try
-            {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.UseShellExecute = false;
-                psi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
-                psi.Arguments = "RESTART";
-                psi.WindowStyle = ProcessWindowStyle.Hidden;
-                Process p = new Process();
-                p.StartInfo = psi;
-                p.Start();
-                p.WaitForExit();
-            }
-            catch(Exception ex)
-            {
-                WintapLogger.Log.Append("Error calling WintapSvcMgr for wintap restart: " + ex.Message, LogLevel.Always);
-            }
         }
 
         private void RunWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
