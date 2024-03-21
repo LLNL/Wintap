@@ -141,50 +141,89 @@ namespace gov.llnl.wintap.core.shared
 
         internal static void SetWintapSettings(Dictionary<string, bool> settings)
         {
+            Dictionary<string, string> translatedSettings = new Dictionary<string, string>();
             foreach(KeyValuePair<string, bool> kvp in settings)
             {
-                if(kvp.Key == "Tcp")
+
+                if (kvp.Key == "Tcp")
                 {
-                    Properties.Settings.Default.TcpCollector = kvp.Value;
+                    translatedSettings.Add(nameof(Properties.Settings.Default.TcpCollector), kvp.Value.ToString());
                 }
-                if(kvp.Key == "Udp")
+                if (kvp.Key == "Udp")
                 {
-                    Properties.Settings.Default.UdpCollector = kvp.Value;
+                    translatedSettings.Add(nameof(Properties.Settings.Default.UdpCollector), kvp.Value.ToString());
                 }
                 if (kvp.Key == "ImageLoad")
                 {
-                    Properties.Settings.Default.ImageLoadCollector = kvp.Value;
+                    translatedSettings.Add(nameof(Properties.Settings.Default.ImageLoadCollector), kvp.Value.ToString());
                 }
                 if (kvp.Key == "File")
                 {
-                    Properties.Settings.Default.FileCollector = kvp.Value;
+                    translatedSettings.Add(nameof(Properties.Settings.Default.FileCollector), kvp.Value.ToString());
                 }
                 if (kvp.Key == "Registry")
                 {
-                    Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector = kvp.Value;
+                    translatedSettings.Add(nameof(Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector), kvp.Value.ToString());
                 }
                 if (kvp.Key == "MemoryMap")
                 {
-                    Properties.Settings.Default.MemoryMapCollector = kvp.Value;
+                    translatedSettings.Add(nameof(Properties.Settings.Default.MemoryMapCollector), kvp.Value.ToString());
                 }
                 if (kvp.Key == "ApiCall")
                 {
-                    Properties.Settings.Default.KernelAPICallCollector = kvp.Value;
+                    translatedSettings.Add(nameof(Properties.Settings.Default.KernelAPICallCollector), kvp.Value.ToString());
                 }
                 if (kvp.Key == "DeveloperMode")
                 {
+                    string settingName = "Profile";
+                    string settingValue = "Production";
                     if(kvp.Value == true)
                     {
-                        Properties.Settings.Default.Profile = "Developer";
+                        settingValue = "Developer";
                     }
-                    else
-                    {
-                        Properties.Settings.Default.Profile = "Production";
-                    }
+                    translatedSettings.Add(settingName, settingValue);
                 }
             }
-            Properties.Settings.Default.Save();  // saves the config to, and subsequently reads from, System32\config\systemprofile\AppData\Local\...
+            saveSettings(translatedSettings);
             Utilities.RestartWintap("Wintap settings change requested.");
+        }
+
+        private static void saveSettings(Dictionary<string, string> settingsToUpdate)
+        {
+            string appPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string configFile = System.IO.Path.Combine(appPath, "Wintap.exe.config");
+            try
+            {
+                System.Xml.XmlDocument xmlDoc = new System.Xml.XmlDocument();
+                xmlDoc.Load(configFile);
+                System.Xml.XmlNode userSettingsNode = xmlDoc.SelectSingleNode("//userSettings");
+                if (userSettingsNode != null)
+                {
+                    foreach (var settingToUpdate in settingsToUpdate)
+                    {
+                        string settingName = settingToUpdate.Key;
+                        string settingValue = settingToUpdate.Value.ToString();
+                        System.Xml.XmlNode settingNode = userSettingsNode.SelectSingleNode($"//setting[@name='{settingName}']");
+                        if (settingNode != null)
+                        {
+                            settingNode.SelectSingleNode("value").InnerText = settingValue;
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"Setting node '{settingName}' not found in app.config", infrastructure.LogLevel.Always);
+                        }
+                    }
+                    xmlDoc.Save(configFile);
+                }
+                else
+                {
+                    WintapLogger.Log.Append("userSettings section not found in app.config", infrastructure.LogLevel.Always);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error modifying app.config: " + ex.Message, infrastructure.LogLevel.Always);
+            }
         }
 
         private Guid getAgentId()
