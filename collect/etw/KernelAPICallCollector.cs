@@ -2,15 +2,8 @@
 using gov.llnl.wintap.collect.shared;
 using gov.llnl.wintap.core.infrastructure;
 using Microsoft.Diagnostics.Tracing;
-using Microsoft.Diagnostics.Tracing.AutomatedAnalysis;
-using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftAntimalwareEngine;
-using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
-using System.Data.Entity.Migrations.Sql;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.collect
 {

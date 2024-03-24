@@ -14,10 +14,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapETL", "WintapETL\Wint
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapRecorder", "WintapRecorder\WintapRecorder.csproj", "{4FE36182-60AA-4483-982F-821F67D4CEB5}"
 EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapETLSetup", "WintapETLSetup\WintapETLSetup.vdproj", "{656E8892-0B25-412D-AA11-7E0602E3BD7B}"
-EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "WintapSetup\WintapSetup.vdproj", "{492260E5-2335-4843-A597-4CF96DA5E346}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -126,32 +122,6 @@ Global
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Release|x64.Build.0 = Release|x64
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Release|x86.ActiveCfg = Release|Any CPU
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Release|x86.Build.0 = Release|Any CPU
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|Any CPU.ActiveCfg = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|Any CPU.Build.0 = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|ARM64.ActiveCfg = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|ARM64.Build.0 = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|x64.ActiveCfg = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|x64.Build.0 = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|x86.ActiveCfg = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Debug|x86.Build.0 = Debug
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|Any CPU.ActiveCfg = Release
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|Any CPU.Build.0 = Release
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|ARM64.ActiveCfg = Release
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|ARM64.Build.0 = Release
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|x64.ActiveCfg = Release
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|x64.Build.0 = Release
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|x86.ActiveCfg = Release
-		{656E8892-0B25-412D-AA11-7E0602E3BD7B}.Release|x86.Build.0 = Release
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Debug|Any CPU.ActiveCfg = Debug
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Debug|Any CPU.Build.0 = Debug
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Debug|ARM64.ActiveCfg = Debug
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Debug|x64.ActiveCfg = Debug
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Debug|x86.ActiveCfg = Debug
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Release|Any CPU.ActiveCfg = Release
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Release|Any CPU.Build.0 = Release
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Release|ARM64.ActiveCfg = Release
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Release|x64.ActiveCfg = Release
-		{492260E5-2335-4843-A597-4CF96DA5E346}.Release|x86.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

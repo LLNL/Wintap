@@ -8,7 +8,6 @@ using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
@@ -19,7 +18,6 @@ using System.IO;
 using System.Linq;
 using System.Management;
 using System.Security.Principal;
-using System.Threading;
 using System.Timers;
 
 namespace gov.llnl.wintap.collect.etw.helpers

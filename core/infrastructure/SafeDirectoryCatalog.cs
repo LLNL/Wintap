@@ -6,7 +6,6 @@
 
 
 using gov.llnl.wintap.core.infrastructure;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition.Hosting;

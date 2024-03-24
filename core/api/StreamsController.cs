@@ -14,10 +14,6 @@ using System.Text;
 using Newtonsoft.Json;
 using System.IO;
 using gov.llnl.wintap.core.infrastructure;
-using static gov.llnl.wintap.collect.ProcessCollector;
-using gov.llnl.wintap.collect.etw.helpers;
-using gov.llnl.wintap.core.shared;
-using RestSharp;
 
 namespace gov.llnl.wintap.core.api
 {
