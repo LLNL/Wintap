@@ -8,14 +8,10 @@ using com.espertech.esper.client;
 using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Text;
-using System.Web.UI.WebControls;
 
 namespace gov.llnl.wintap.core.infrastructure
 {

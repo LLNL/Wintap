@@ -11,16 +11,11 @@ using System.Linq;
 using System.Management;
 using Microsoft.Win32;
 using System.Diagnostics;
-using System.IO;
 using System.Collections.Concurrent;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.Properties;
 using com.espertech.esper.client;
 using System.Net.NetworkInformation;
-using Microsoft.Extensions.Logging;
-using com.espertech.esper.epl.named;
-using System.Configuration;
 
 namespace gov.llnl.wintap.core.shared
 {

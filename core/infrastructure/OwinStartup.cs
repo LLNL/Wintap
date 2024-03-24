@@ -9,7 +9,7 @@ using Microsoft.Owin.Cors;
 using Microsoft.Owin.FileSystems;
 using Microsoft.Owin.StaticFiles;
 using Owin;
-using Swashbuckle.Application;
+//using Swashbuckle.Application;
 using System.Web.Http;
 
 namespace gov.llnl.wintap
@@ -30,7 +30,7 @@ namespace gov.llnl.wintap
             //Maps Http routes based on attributes
             config.MapHttpAttributeRoutes();
 
-            config.EnableSwagger(c => c.SingleApiVersion("v1", "Wintap API").Description("methods for interacting with Wintap's embedded Esper streaming event engine.")).EnableSwaggerUi();
+            //config.EnableSwagger(c => c.SingleApiVersion("v1", "Wintap API").Description("methods for interacting with Wintap's embedded Esper streaming event engine.")).EnableSwaggerUi();
 
 
             config.Routes.MapHttpRoute(
