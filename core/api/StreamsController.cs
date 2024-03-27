@@ -136,6 +136,7 @@ namespace gov.llnl.wintap.core.api
             catch (Exception ex)
             {
                 responseMsg = ex.Message;
+                error = true;
             }
 
             IHttpActionResult result = Ok(new
