@@ -382,7 +382,6 @@
     <Compile Include="collect\etw\ProcessCollector.cs" />
     <Compile Include="collect\log\WindowsEventLogCollector.cs" />
     <Compile Include="collect\etw\MemoryMapCollector.cs" />
-    <Compile Include="collect\etw\MicrosoftWindowsBitLockerAPICollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsGroupPolicyCollector.cs" />
     <Compile Include="collect\sens\SensCollector.cs" />
     <Compile Include="collect\shared\BaseCollector.cs" />
@@ -397,7 +396,6 @@
     <Compile Include="core\api\EsperServiceController.cs" />
     <Compile Include="core\api\StreamsController.cs" />
     <Compile Include="collect\shared\models\MemInfo.cs" />
-    <Compile Include="collect\etw\MicrosoftWindowsKernelMemoryCollector.cs" />
     <Compile Include="collect\etw\MicrosoftWindowsCpuTriggerCollector.cs" />
     <Compile Include="collect\etw\FileCollector.cs" />
     <Compile Include="collect\etw\ImageLoadCollector.cs" />
