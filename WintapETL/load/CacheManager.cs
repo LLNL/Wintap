@@ -107,7 +107,6 @@ namespace gov.llnl.wintap.etl.load
         {
             svcRunning = false;
             System.Threading.Thread.Sleep(2000); // allow sender loop to exit
-            upload();
             cleanup();
         }
 

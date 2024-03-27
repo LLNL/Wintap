@@ -75,6 +75,17 @@ namespace gov.llnl.wintap
 
         private void startupWorker_DoWork(object sender, DoWorkEventArgs e)
         {
+            try
+            {
+                Utilities.SetDirectoryPermissions(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append("Error setting permissions on Wintap data path, cannot continue.  Message: " + ex.Message, LogLevel.Always);
+                throw new Exception("Invalid data directory");
+            }
+            
+
             WintapLogger.Log.Append("Wintap Agent ID: " + StateManager.AgentId.ToString(), LogLevel.Always);
 
             WintapLogger.Log.Append("loading plugin manager...", LogLevel.Always);
@@ -91,8 +102,6 @@ namespace gov.llnl.wintap
             {
                 foreach (Exception loaderException in ex.LoaderExceptions)
                 {
-                    // Log the loader exception details
-                    // Use your preferred logging framework or mechanism
                     WintapLogger.Log.Append("Loader exception: " + loaderException.ToString(), LogLevel.Always);
                 }
             }

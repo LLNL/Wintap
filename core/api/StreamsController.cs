@@ -263,10 +263,9 @@ namespace gov.llnl.wintap.core.api
                     }
                     catch { }
                 }
-                string TestString = sb.ToString().TrimEnd(new char[] { ',' });
-                string encodedString = System.Net.WebUtility.HtmlEncode(TestString);
+                string resultRow = sb.ToString().TrimEnd(new char[] { ',' });
                 EsperResult esperResult = new EsperResult();
-                esperResult.Result = encodedString;
+                esperResult.Result = resultRow;
                 context.Clients.All.addMessage(esperResult, "OK");
             }
         }
