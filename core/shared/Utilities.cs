@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
+using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -79,6 +81,38 @@ namespace gov.llnl.wintap.core.shared
             {
                 WintapLogger.Log.Append("Error calling WintapSvcMgr for wintap restart: " + ex.Message, LogLevel.Always);
             }
+        }
+
+        internal static void SetDirectoryPermissions(string directoryPath)
+        {
+            WintapLogger.Log.Append($"Attempting to set permissions on {directoryPath}", LogLevel.Always);
+
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+            DirectoryInfo directoryInfo = new DirectoryInfo(directoryPath);
+            DirectorySecurity directorySecurity = directoryInfo.GetAccessControl();
+
+            // Remove all existing access rules
+            AuthorizationRuleCollection rules = directorySecurity.GetAccessRules(true, true, typeof(SecurityIdentifier));
+            foreach (FileSystemAccessRule rule in rules)
+            {
+                directorySecurity.RemoveAccessRuleSpecific(rule);
+            }
+            // Make the ACL explicit for the folder, removing inherited permissions
+            directorySecurity.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+
+            // SYSTEM and administrators only.
+            SecurityIdentifier systemSid = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            SecurityIdentifier administratorsSid = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+            FileSystemAccessRule systemAccessRule = new FileSystemAccessRule(systemSid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow);
+            FileSystemAccessRule adminAccessRule = new FileSystemAccessRule(administratorsSid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow);
+            directorySecurity.AddAccessRule(systemAccessRule);
+            directorySecurity.AddAccessRule(adminAccessRule);
+            directoryInfo.SetAccessControl(directorySecurity);
+
+            WintapLogger.Log.Append($"Permissions for {directoryPath} have been successfully updated.", LogLevel.Always);
         }
 
     }
