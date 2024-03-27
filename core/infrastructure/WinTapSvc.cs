@@ -102,8 +102,6 @@ namespace gov.llnl.wintap
             {
                 foreach (Exception loaderException in ex.LoaderExceptions)
                 {
-                    // Log the loader exception details
-                    // Use your preferred logging framework or mechanism
                     WintapLogger.Log.Append("Loader exception: " + loaderException.ToString(), LogLevel.Always);
                 }
             }
