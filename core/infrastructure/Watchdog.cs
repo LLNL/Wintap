@@ -49,7 +49,7 @@ namespace gov.llnl.wintap.core.infrastructure
         protected internal Watchdog()
         {
             PerformanceBreach = false;
-            workbenchIdleTimeout = new TimeSpan(0, 10, 0);
+            workbenchIdleTimeout = new TimeSpan(0, 20, 0);
         }
 
         protected internal void Start()
@@ -138,8 +138,9 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 if (Properties.Settings.Default.EnableWorkbench)
                 {
-                    if (DateTime.Now.Subtract(StreamsController.LastWorkbenchConnect) > workbenchIdleTimeout && DateTime.Now.Subtract(WorkbenchHub.LastWorkbenchConnect) > workbenchIdleTimeout && DateTime.Now.Subtract(TreeController.LastWorkbenchConnect) > workbenchIdleTimeout && DateTime.Now.Subtract(ExplorerHub.LastWorkbenchConnect) > workbenchIdleTimeout)
+                    if (DateTime.Now.Subtract(StateManager.LastWorkbenchActivity) > workbenchIdleTimeout)
                     {
+                        System.Diagnostics.Debugger.Launch();
                         WintapLogger.Log.Append("Workbench idle time threshold exceeded, disabling workbench...", LogLevel.Always);
                         sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.OTHER, "Workbench idle timeout expired");
                         Dictionary<string, bool> disableWorkbenchSetting = new Dictionary<string, bool>();

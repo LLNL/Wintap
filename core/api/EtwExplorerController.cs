@@ -23,10 +23,9 @@ namespace gov.llnl.wintap.core.api
     // SignalR (websockets) Hub
     public class ExplorerHub : Hub
     {
-        public static DateTime LastWorkbenchConnect;
         public void Send(string queryResult)
         {
-            LastWorkbenchConnect = DateTime.Now;   
+            StateManager.LastWorkbenchActivity = DateTime.Now;   
             Clients.All.addMessage(queryResult);
         }
     }
@@ -108,6 +107,7 @@ namespace gov.llnl.wintap.core.api
             var context = GlobalHost.ConnectionManager.GetHubContext("ExplorerHub");  // signalR
             string jsonString = JsonConvert.SerializeObject(e.ETWSampleEvent);
             context.Clients.All.addMessage(jsonString, "OK");
+            StateManager.LastWorkbenchActivity = DateTime.Now;
         }
        
     }
