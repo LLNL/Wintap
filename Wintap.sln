@@ -129,8 +129,10 @@ Global
 		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Debug|x64.ActiveCfg = Debug
 		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Debug|x86.ActiveCfg = Debug
 		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Release|Any CPU.ActiveCfg = Release
+		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Release|Any CPU.Build.0 = Release
 		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Release|ARM64.ActiveCfg = Release
 		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Release|x64.ActiveCfg = Release
+		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Release|x64.Build.0 = Release
 		{BD252ABA-2A5B-4F56-9413-3174AA9CD895}.Release|x86.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution

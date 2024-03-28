@@ -25,7 +25,7 @@ namespace gov.llnl.wintap.core.api
     {
         public void Send(string queryResult)
         {
-           
+            StateManager.LastWorkbenchActivity = DateTime.Now;   
             Clients.All.addMessage(queryResult);
         }
     }
@@ -107,6 +107,7 @@ namespace gov.llnl.wintap.core.api
             var context = GlobalHost.ConnectionManager.GetHubContext("ExplorerHub");  // signalR
             string jsonString = JsonConvert.SerializeObject(e.ETWSampleEvent);
             context.Clients.All.addMessage(jsonString, "OK");
+            StateManager.LastWorkbenchActivity = DateTime.Now;
         }
        
     }

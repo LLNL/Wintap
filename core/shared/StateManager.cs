@@ -71,8 +71,14 @@ namespace gov.llnl.wintap.core.shared
         //  debug for missing process events
         public static ConcurrentBag<string> SentProcessList = new ConcurrentBag<string>();
 
+        /// <summary>
+        /// Supports idle timeout and reset for Workbench sessions
+        /// </summary>
+        public static DateTime LastWorkbenchActivity { get; set; }
+
         private StateManager()
         {
+            LastWorkbenchActivity = DateTime.Now;
             WintapSettings = getWintapSettings();
             SessionId = Guid.NewGuid();
             AgentId = getAgentId();
@@ -167,6 +173,10 @@ namespace gov.llnl.wintap.core.shared
                 if (kvp.Key == "ApiCall")
                 {
                     translatedSettings.Add(nameof(Properties.Settings.Default.KernelAPICallCollector), kvp.Value.ToString());
+                }
+                if (kvp.Key == "EnableWorkbench")
+                {
+                    translatedSettings.Add(nameof(Properties.Settings.Default.EnableWorkbench), kvp.Value.ToString());
                 }
                 if (kvp.Key == "DeveloperMode")
                 {

@@ -14,6 +14,7 @@ using System.Text;
 using Newtonsoft.Json;
 using System.IO;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -25,13 +26,14 @@ namespace gov.llnl.wintap.core.api
 
         public StreamsController()
         {
-
+            StateManager.LastWorkbenchActivity = DateTime.Now;
         }
 
         [HttpPost]
         [Route("api/Streams")]
         public IHttpActionResult Post(string name, string query, string state)
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             string responseMsg = "OK";
             bool error = false;     
             try
@@ -85,6 +87,7 @@ namespace gov.llnl.wintap.core.api
         [Route("api/Streams")]
         public IHttpActionResult GetAllStatements()
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
             foreach (var statementName in statementNames)
@@ -126,6 +129,7 @@ namespace gov.llnl.wintap.core.api
         [Route("api/Streams/{name}")]
         public IHttpActionResult Get(string name)
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             bool error = false;
             string responseMsg = "OK";
             try
@@ -158,6 +162,7 @@ namespace gov.llnl.wintap.core.api
         [HttpDelete]
         public IHttpActionResult Delete()
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             bool error = false;
             string responseMsg = "OK";
             try
@@ -300,6 +305,7 @@ namespace gov.llnl.wintap.core.api
 
         internal static void Stop()
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
             foreach (var statementName in statementNames)

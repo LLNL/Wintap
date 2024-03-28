@@ -17,9 +17,10 @@ namespace gov.llnl.wintap.core.api
     // SignalR (websockets) Hub
     public class WorkbenchHub : Hub
     {
+
         public void Send(EsperResult queryResult)
         {
-           
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             Clients.All.addMessage(queryResult);
         }
     }
@@ -40,6 +41,7 @@ namespace gov.llnl.wintap.core.api
         /// <returns></returns>
         public IHttpActionResult Get(string id)
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             return Ok(new
             {
                 eventsPerSecond = EventChannel.EventsPerSecond,
