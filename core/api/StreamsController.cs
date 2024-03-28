@@ -22,16 +22,18 @@ namespace gov.llnl.wintap.core.api
     /// </summary>
     public class StreamsController : ApiController
     {
+        public static DateTime LastWorkbenchConnect;
 
         public StreamsController()
         {
-
+            LastWorkbenchConnect = DateTime.Now;
         }
 
         [HttpPost]
         [Route("api/Streams")]
         public IHttpActionResult Post(string name, string query, string state)
         {
+            LastWorkbenchConnect = DateTime.Now;
             string responseMsg = "OK";
             bool error = false;     
             try
@@ -85,6 +87,7 @@ namespace gov.llnl.wintap.core.api
         [Route("api/Streams")]
         public IHttpActionResult GetAllStatements()
         {
+            LastWorkbenchConnect = DateTime.Now;
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
             foreach (var statementName in statementNames)
@@ -126,6 +129,7 @@ namespace gov.llnl.wintap.core.api
         [Route("api/Streams/{name}")]
         public IHttpActionResult Get(string name)
         {
+            LastWorkbenchConnect = DateTime.Now;
             bool error = false;
             string responseMsg = "OK";
             try
@@ -158,6 +162,7 @@ namespace gov.llnl.wintap.core.api
         [HttpDelete]
         public IHttpActionResult Delete()
         {
+            LastWorkbenchConnect = DateTime.Now;
             bool error = false;
             string responseMsg = "OK";
             try
@@ -300,6 +305,7 @@ namespace gov.llnl.wintap.core.api
 
         internal static void Stop()
         {
+            LastWorkbenchConnect = DateTime.Now;
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
             foreach (var statementName in statementNames)

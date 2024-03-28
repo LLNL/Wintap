@@ -23,9 +23,10 @@ namespace gov.llnl.wintap.core.api
     // SignalR (websockets) Hub
     public class ExplorerHub : Hub
     {
+        public static DateTime LastWorkbenchConnect;
         public void Send(string queryResult)
         {
-           
+            LastWorkbenchConnect = DateTime.Now;   
             Clients.All.addMessage(queryResult);
         }
     }

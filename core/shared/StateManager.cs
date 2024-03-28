@@ -168,6 +168,10 @@ namespace gov.llnl.wintap.core.shared
                 {
                     translatedSettings.Add(nameof(Properties.Settings.Default.KernelAPICallCollector), kvp.Value.ToString());
                 }
+                if (kvp.Key == "EnableWorkbench")
+                {
+                    translatedSettings.Add(nameof(Properties.Settings.Default.EnableWorkbench), kvp.Value.ToString());
+                }
                 if (kvp.Key == "DeveloperMode")
                 {
                     string settingName = "Profile";

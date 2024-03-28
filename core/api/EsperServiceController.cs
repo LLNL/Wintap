@@ -17,9 +17,11 @@ namespace gov.llnl.wintap.core.api
     // SignalR (websockets) Hub
     public class WorkbenchHub : Hub
     {
+        public static DateTime LastWorkbenchConnect;
+
         public void Send(EsperResult queryResult)
         {
-           
+            LastWorkbenchConnect = DateTime.Now;
             Clients.All.addMessage(queryResult);
         }
     }

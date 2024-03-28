@@ -15,9 +15,11 @@ namespace gov.llnl.wintap.core.api
     /// </summary>
     public class TreeController : ApiController
     {
+        public static DateTime LastWorkbenchConnect;
+
         public TreeController()
         {
-
+            LastWorkbenchConnect = DateTime.Now;
         }
 
         /// <summary>
@@ -34,7 +36,7 @@ namespace gov.llnl.wintap.core.api
                 {
                     response = StateManager.ProcessTreeJSON.ToLower()
                 });
-
+                LastWorkbenchConnect = DateTime.Now;
                 return result;
             }
             catch (Exception ex)
