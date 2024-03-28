@@ -249,13 +249,7 @@ namespace gov.llnl.wintap.collect
                             if (lastProcessPageCount != currentProcessPageCount)
                             {
                                 commitHistory[pidHash] = currentInfo;
-                                //refreshSnapshot(owningProcess);
-                                scanCount++;
-                            }
-                            // process the 'always-scan' list
-                            if(owningProcess.ProcessName == "lsass.exe")
-                            {
-                                refreshSnapshot(owningProcess); scanCount++;
+                                refreshSnapshot(owningProcess);
                                 scanCount++;
                             }
                         }
@@ -263,7 +257,7 @@ namespace gov.llnl.wintap.collect
                         {
                             // no, so initialize process state
                             commitHistory.Add(pidHash, currentInfo);
-                            //refreshSnapshot(owningProcess);
+                            refreshSnapshot(owningProcess);
                         }
                     }
                 }
@@ -287,7 +281,6 @@ namespace gov.llnl.wintap.collect
             if (!processRunning(_owningProcess.PID)) { return; }
             if(_owningProcess.ProcessName == "devenv.exe") { return; }
             if(_owningProcess.PID < 200) { return; }  // skip protected processes
-            WintapLogger.Log.Append("Attempting memory scan of: " + _owningProcess.ProcessName, LogLevel.Always);
             DateTime startScanTime = DateTime.Now;
             Process process = System.Diagnostics.Process.GetProcessById(_owningProcess.PID);
             IntPtr baseAddress = new IntPtr(0);
@@ -349,9 +342,7 @@ namespace gov.llnl.wintap.collect
                 }
                 
             }
-            WintapLogger.Log.Append("DONE with memory scan of " + _owningProcess.ProcessName + ": " + DateTime.Now.Subtract(startScanTime).TotalMilliseconds + " ms", LogLevel.Always);
         }
-
     }
 
     internal class CommitInfo
