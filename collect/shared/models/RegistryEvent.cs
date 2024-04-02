@@ -13,7 +13,7 @@ namespace gov.llnl.wintap
 {
     internal class RegistryEvent : BaseEvent
     {
-        internal RegistryEvent(TraceEvent obj) : base(obj)  {}
+        internal RegistryEvent(TraceEvent obj) : base(obj) { }
 
         private Guid process_ID;
         public Guid Process_ID
@@ -65,6 +65,11 @@ namespace gov.llnl.wintap
         {
             RegistryKey localRegistry = Registry.LocalMachine;
             this.Data = "";
+            if (!registryKeyExists(this.Path))
+            {
+                this.DataType = RegistryValueKind.Unknown;
+                return this;
+            }
             if (this.Path.StartsWith(@"registry\user\"))
             {
                 localRegistry = Registry.Users.OpenSubKey(this.Path.Replace(@"registry\user\", ""));
@@ -111,6 +116,40 @@ namespace gov.llnl.wintap
                 localRegistry.Dispose();
             }
             return this;
+        }
+
+        internal bool registryKeyExists(string keyPath)
+        {
+            if (this.Path.StartsWith(@"registry\user\"))
+            {
+                RegistryKey key = Registry.Users.OpenSubKey(this.Path.Replace(@"registry\user\", ""));
+                if (key != null)
+                {
+                    key.Close();
+                    return true;
+                }
+            }
+            else if (this.Path.StartsWith(@"registry\machine\"))
+            {
+                RegistryKey key = Registry.LocalMachine.OpenSubKey(this.Path.Replace(@"registry\machine\", "").TrimStart(new char[] { '\\' }));
+                if (key != null)
+                {
+                    key.Close();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        public static bool DoesUserRegistryKeyExist(string keyPath)
+        {
+            RegistryKey key = Registry.Users.OpenSubKey(keyPath);
+            if (key != null)
+            {
+                key.Close();
+                return true;
+            }
+            return false;
         }
     }
 }
