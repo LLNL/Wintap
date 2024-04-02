@@ -14,7 +14,7 @@ using System.Diagnostics;
 namespace gov.llnl.wintap.etl.helpers
 {
     /// <summary>
-    /// Shell program for merging multiple parquets into a single parquet by type.
+    /// Shell  program for merging multiple parquets into a single parquet by type.
     /// program takes a root path containing the individual parquets, and an event time (merge time)
     /// </summary>
     class Program
