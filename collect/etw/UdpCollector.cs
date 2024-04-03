@@ -11,6 +11,7 @@ using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using System;
 using gov.llnl.wintap.collect.models;
+using System.Linq;
 
 namespace gov.llnl.wintap.collect
 {
@@ -66,6 +67,14 @@ namespace gov.llnl.wintap.collect
             {
                 this.Counter++;
                 WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "UdpPacket");
+                //if (obj.PayloadNames.ToList().Contains("CorrelationId"))
+                //{
+                //    wintapBuilder.CorrelationId = obj.PayloadStringByName("CorrelationId");
+                //}
+                //if (obj.PayloadNames.Contains("ActivityId"))
+                //{
+                //    wintapBuilder.ActivityId = obj.PayloadStringByName("ActivityId");
+                //}
                 wintapBuilder.ActivityType = obj.EventName;
                 wintapBuilder.UdpPacket = new WintapMessage.UdpPacketObject();
                 wintapBuilder.UdpPacket.SourceAddress = obj.saddr.ToString();

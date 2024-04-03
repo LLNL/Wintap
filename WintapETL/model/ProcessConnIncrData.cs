@@ -24,7 +24,7 @@ namespace gov.llnl.wintap.etl.models
         /// <summary>
         /// Hash value in uppercase. 
         /// </summary>
-        public string LocalIpHash { get; set; }
+        //public string LocalIpHash { get; set; }
         /// <summary>
         /// IP address as a long(?)
         /// </summary>
@@ -42,7 +42,7 @@ namespace gov.llnl.wintap.etl.models
         /// <summary>
         /// Hash value in uppercase. 
         /// </summary>
-        public string RemoteIpHash { get; set; }
+        //public string RemoteIpHash { get; set; }
         /// <summary>
         /// IP address as a long(?)
         /// </summary>
@@ -73,6 +73,23 @@ namespace gov.llnl.wintap.etl.models
         /// Total size of packets. 
         /// </summary>
         public int PacketSize { get; set; }
+
+        /// <summary>
+        /// Increment type code: 30sec, 5min, 1hr, etc. No validation is done or implied. Sensors can use anything, just be consistent.
+        /// </summary>
+        public string IncrType { get; set; }
+
+        /// <summary>
+        /// Number of events
+        /// </summary>
+        public int EventCount { get; set; }
+
+        /// <summary>
+        /// First event timestamp in the increment
+        /// </summary>
+        public long FirstSeenMs { get; set; }
+
+        public long LastSeenMs { get; set; }
 
     }
 }

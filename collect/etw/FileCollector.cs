@@ -66,7 +66,7 @@ namespace gov.llnl.wintap.collect
                 KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
                 KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
                 KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
-                //KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
+                KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
                 if (Properties.Settings.Default.CollectFileRead)
                 {
                     KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
@@ -92,7 +92,15 @@ namespace gov.llnl.wintap.collect
                     {
                         fileKeyToPath.TryGetValue(obj.FileObject, out path);
                     }
-                    sendFileEvent(path, obj.ProcessID, obj.TimeStamp, FileOperationEnum.CLOSE, 0);
+                    string activityId = null;
+                    string correlationId = null;
+                    try
+                    {
+                        activityId = obj.ActivityID.ToString();
+                        correlationId = obj.PayloadStringByName("CorrelationId");
+                    }
+                    catch (Exception ex) { }
+                    sendFileEvent(path, obj.ProcessID, obj.TimeStamp, FileOperationEnum.CLOSE, 0, activityId, correlationId);
                 }
             }
             catch (Exception ex)
@@ -130,7 +138,15 @@ namespace gov.llnl.wintap.collect
             try
             {
                 string filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
-                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, FileOperationEnum.READ, obj.IoSize);
+                string activityId = null;
+                string correlationId = null;
+                try
+                {
+                    activityId = obj.ActivityID.ToString();
+                    correlationId = obj.PayloadStringByName("CorrelationId");
+                }
+                catch (Exception ex) { }
+                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, FileOperationEnum.READ, obj.IoSize, activityId, correlationId);
             }
             catch (Exception ex)
             {
@@ -148,7 +164,15 @@ namespace gov.llnl.wintap.collect
                 {
                     filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
                 }
-                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, FileOperationEnum.WRITE, obj.IoSize);
+                string activityId = null;
+                string correlationId = null;
+                try
+                {
+                    activityId = obj.ActivityID.ToString();
+                    correlationId = obj.PayloadStringByName("CorrelationId");
+                }
+                catch (Exception ex) { }
+                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, FileOperationEnum.WRITE, obj.IoSize, activityId, correlationId);
             }
             catch (Exception ex)
             {
@@ -174,7 +198,7 @@ namespace gov.llnl.wintap.collect
             return filePath;
         }
 
-        private void sendFileEvent(string filePath, int pid, DateTime eventTime, FileOperationEnum opName, int bytesRequested)
+        private void sendFileEvent(string filePath, int pid, DateTime eventTime, FileOperationEnum opName, int bytesRequested, string activityId, string correlationId)
         {
             if (String.IsNullOrEmpty(filePath))
             {
@@ -195,6 +219,8 @@ namespace gov.llnl.wintap.collect
             wintapBuilder.ActivityType = opName.ToString();
             wintapBuilder.FileActivity.Path = filePath.ToLower();
             wintapBuilder.FileActivity.BytesRequested = bytesRequested;
+            wintapBuilder.ActivityId = activityId;
+            wintapBuilder.CorrelationId = correlationId;
             EventChannel.Send(wintapBuilder);
         }
 
@@ -220,7 +246,15 @@ namespace gov.llnl.wintap.collect
 
                 if (!String.IsNullOrEmpty(filePath))
                 {
-                    sendFileEvent(filePath.ToLower(), pid, obj.TimeStamp, FileOperationEnum.DELETE, 0);
+                    string activityId = null;
+                    string correlationId = null;
+                    try
+                    {
+                        activityId = obj.ActivityID.ToString();
+                        correlationId = obj.PayloadStringByName("CorrelationId");
+                    }
+                    catch (Exception ex) { }
+                    sendFileEvent(filePath.ToLower(), pid, obj.TimeStamp, FileOperationEnum.DELETE, 0, activityId, correlationId);
                 }
 
                 fileKeyToPath.TryRemove(obj.FileKey, out filePath);
@@ -229,12 +263,6 @@ namespace gov.llnl.wintap.collect
             {
                 WintapLogger.Log.Append("problem in Kernel_FileIoDelete event:  " + ex.Message, core.infrastructure.LogLevel.Always);
             }
-        }
-
-
-        public override void Process_Event(TraceEvent obj)
-        {
-
         }
     }
 }

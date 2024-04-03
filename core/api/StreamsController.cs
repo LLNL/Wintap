@@ -14,10 +14,7 @@ using System.Text;
 using Newtonsoft.Json;
 using System.IO;
 using gov.llnl.wintap.core.infrastructure;
-using static gov.llnl.wintap.collect.ProcessCollector;
-using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.core.shared;
-using RestSharp;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -29,13 +26,14 @@ namespace gov.llnl.wintap.core.api
 
         public StreamsController()
         {
-
+            StateManager.LastWorkbenchActivity = DateTime.Now;
         }
 
         [HttpPost]
         [Route("api/Streams")]
         public IHttpActionResult Post(string name, string query, string state)
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             string responseMsg = "OK";
             bool error = false;     
             try
@@ -89,6 +87,7 @@ namespace gov.llnl.wintap.core.api
         [Route("api/Streams")]
         public IHttpActionResult GetAllStatements()
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
             foreach (var statementName in statementNames)
@@ -130,6 +129,7 @@ namespace gov.llnl.wintap.core.api
         [Route("api/Streams/{name}")]
         public IHttpActionResult Get(string name)
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             bool error = false;
             string responseMsg = "OK";
             try
@@ -140,6 +140,7 @@ namespace gov.llnl.wintap.core.api
             catch (Exception ex)
             {
                 responseMsg = ex.Message;
+                error = true;
             }
 
             IHttpActionResult result = Ok(new
@@ -161,6 +162,7 @@ namespace gov.llnl.wintap.core.api
         [HttpDelete]
         public IHttpActionResult Delete()
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             bool error = false;
             string responseMsg = "OK";
             try
@@ -252,7 +254,7 @@ namespace gov.llnl.wintap.core.api
                 {
                     try
                     {
-                        if(prop.ToString().Contains("EventTime"))
+                        if (prop.ToString().Contains("EventTime"))
                         {
                             sb.Append(prop.ToString() + "=" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().ToLongTimeString() + " +" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().Millisecond + "ms, ");
                         }
@@ -267,9 +269,10 @@ namespace gov.llnl.wintap.core.api
                     }
                     catch { }
                 }
-                string TestString = sb.ToString().TrimEnd(new char[] { ',' });
-                string encodedString = System.Net.WebUtility.HtmlEncode(TestString);
-                context.Clients.All.addMessage(encodedString, "OK");
+                string resultRow = sb.ToString().TrimEnd(new char[] { ',' });
+                EsperResult esperResult = new EsperResult();
+                esperResult.Result = resultRow;
+                context.Clients.All.addMessage(esperResult, "OK");
             }
         }
 
@@ -302,6 +305,7 @@ namespace gov.llnl.wintap.core.api
 
         internal static void Stop()
         {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
             var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
             foreach (var statementName in statementNames)

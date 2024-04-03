@@ -174,8 +174,15 @@ namespace gov.llnl.wintap
         /// </summary>
         public string Name { get; set; }
 
+        public List<KeyValuePair<string,string>> EventDetails { get; set; }
 
-        public List<KeyValuePair<string, string>> Result { get; set; }
+        public List<WintapMessage> Activity { get; set; }
+
+        public QueryResult()
+        {
+            EventDetails = new List<KeyValuePair<string,string>>();
+            Activity = new List<WintapMessage>();
+        }
     }
 
 

@@ -4,7 +4,6 @@
  * All rights reserved.
  */
 
-using ChoETL;
 using com.espertech.esper.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.shared;
@@ -32,7 +31,8 @@ namespace gov.llnl.wintap.etl.extract
                 base.HandleSensorEvent(sensorEvent);
                 IdGenerator idGen = new IdGenerator();
                 DateTime eventTime = DateTime.FromFileTimeUtc((long)sensorEvent["firstSeen"]);
-                dynamic flatMsg = (ExpandoObject)new WintapMessage.RegActivityObject().ToDynamic();
+                dynamic flatMsg = new ExpandoObject();
+                flatMsg.AgentId = sensorEvent["AgentId"].ToString();
                 flatMsg.ActivityType = sensorEvent["activityType"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.Reg_Data = sensorEvent["data"].ToString();
@@ -44,10 +44,12 @@ namespace gov.llnl.wintap.etl.extract
                 flatMsg.HostHame = HOST_SENSOR.Instance.HostId.Hostname;
                 flatMsg.Reg_Path = sensorEvent["path"].ToString().ToLower();
                 flatMsg.Reg_Value = sensorEvent["valueName"].ToString();
-                flatMsg.Reg_Id_Hash = idGen.GenKeyForRegistry_Entry(transform.Transformer.context, HOST_SENSOR.Instance.HostId.Hostname, flatMsg.Reg_Path, flatMsg.Reg_Value);
+                flatMsg.Reg_Id_Hash = idGen.GenKeyForRegistry_Entry(transform.Transformer.context, HOST_SENSOR.Instance.HostId.Hostname, flatMsg.AgentId, flatMsg.Reg_Path, flatMsg.Reg_Value);
                 flatMsg.MessageType = "PROCESS_REGISTRY";
                 flatMsg.EventTime = GetUnixNowTime();
                 this.Save(flatMsg);
+                sensorEvent = null;
+                flatMsg = null;
             }
             catch (Exception ex)
             {

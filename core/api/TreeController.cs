@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 using gov.llnl.wintap.core.shared;
+using System;
 using System.Web.Http;
 
 namespace gov.llnl.wintap.core.api
@@ -14,9 +15,10 @@ namespace gov.llnl.wintap.core.api
     /// </summary>
     public class TreeController : ApiController
     {
+
         public TreeController()
         {
-
+            StateManager.LastWorkbenchActivity = DateTime.Now;
         }
 
         /// <summary>
@@ -27,18 +29,20 @@ namespace gov.llnl.wintap.core.api
         [HttpGet]
         public IHttpActionResult GetTree()
         {
-            bool error = false;
-
-            IHttpActionResult result = Ok(new
+            try
             {
-                response = StateManager.ProcessTreeJSON.ToLower()
-            });
-            if (error)
-            {
-                result = BadRequest();
+                IHttpActionResult result = Ok(new
+                {
+                    response = StateManager.ProcessTreeJSON.ToLower()
+                });
+                StateManager.LastWorkbenchActivity = DateTime.Now;
+                return result;
             }
-
-            return result;
+            catch (Exception ex)
+            {
+                return BadRequest("Error processing tree: " + ex.Message);
+            }
         }
+
     }
 }

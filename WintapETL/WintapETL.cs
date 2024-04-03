@@ -10,7 +10,6 @@ using System.Timers;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
-using ChoETL;
 using static gov.llnl.wintap.Interfaces;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.etl.models;
@@ -47,15 +46,13 @@ namespace gov.llnl.wintap.etl
         private readonly string esperNameSpacePrefix = "gov.llnl.wintap.etl.esper.";
         private long totalMessageCount;
         ETLConfig etlConfig;
-        // debug
-        private List<string> processPidHash;
+ 
         #endregion
 
         #region public methods
 
         List<string> ISubscribeEtw.Startup()
         {
-            processPidHash = new List<string>();
             List<string> providers = new List<string>() { "Microsoft-Windows-NetworkProfile" };
             return providers;
         }
@@ -108,13 +105,15 @@ namespace gov.llnl.wintap.etl
                 }
 
                 // do we have a sensor for this MessageType?  call its listen method or call the default listener
-                if (sensors.Where(s => s.SensorName == className).Count() == 1)
+                var sensor = sensors.FirstOrDefault(s => s.SensorName == className);
+                if (sensor != null)
                 {
-                    sensors.Where(s => s.SensorName == className).FirstOrDefault().Listen(eventMsg);
+                    sensor.Listen(eventMsg);
                 }
                 else
                 {
                     sensors.Where(s => s.SensorName == "default_sensor").FirstOrDefault().Listen(eventMsg);
+
                 }
             }
             catch(Exception ex)

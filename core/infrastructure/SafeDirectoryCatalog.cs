@@ -7,11 +7,13 @@
 
 using gov.llnl.wintap.core.infrastructure;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.Composition.Hosting;
 using System.ComponentModel.Composition.Primitives;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 
 namespace gov.llnl.wintap
 {
@@ -24,6 +26,7 @@ namespace gov.llnl.wintap
         public SafeDirectoryCatalog(string directory)
         {
             var files = Directory.EnumerateFiles(directory, "*.dll", SearchOption.TopDirectoryOnly);
+            files = enumerateSignedPlugins(files.ToList());
 
             _catalog = new AggregateCatalog();
 
@@ -40,7 +43,7 @@ namespace gov.llnl.wintap
                 }
                 catch (ReflectionTypeLoadException rtle)
                 {
-                    WintapLogger.Log.Append("Error loading plugin.  Name: " + file + " error: " + rtle.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("WARN: problem loading plugin.  Name: " + file + " error: " + rtle.Message, core.infrastructure.LogLevel.Always);
                 }
                 catch (BadImageFormatException)
                 {
@@ -50,6 +53,63 @@ namespace gov.llnl.wintap
         public override IQueryable<ComposablePartDefinition> Parts
         {
             get { return _catalog.Parts; }
+        }
+
+        private List<string> enumerateSignedPlugins(List<string> files)
+        {
+            List<string> signedFiles = new List<string>();
+            foreach (string file in files)
+            {
+                try
+                {
+#if DEBUG
+                    WintapLogger.Log.Append("loading plugins in debug mode", core.infrastructure.LogLevel.Always);
+                    signedFiles.Add(file);
+#else
+                    WintapLogger.Log.Append("loading plugins in release mode", core.infrastructure.LogLevel.Always);
+                    if (isSignedAndTrusted(file))
+                    {
+                        signedFiles.Add(file);
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append(file + ": did NOT pass signature validation and will not be loaded.", core.infrastructure.LogLevel.Always);
+                    }
+#endif
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("WARN: " + file + " is NOT signed by a trusted authority and will not be loaded.", core.infrastructure.LogLevel.Always);
+                }
+            }
+            return signedFiles;
+        }
+
+        private bool isSignedAndTrusted(string filePath)
+        {
+            bool isSigned = false;
+            X509Certificate2Collection certificates = new X509Certificate2Collection();
+            certificates.Import(filePath);
+            if (certificates.Count > 0)
+            {
+                foreach (var cert in certificates)
+                {
+                    using (X509Chain chain = new X509Chain(true)) // true=only evaluate machine store
+                    {
+                        chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+                        chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+                        chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+                        bool isValid = chain.Build(cert);
+                        chain.ChainPolicy.VerificationTime = DateTime.Now;
+                        if (isValid)
+                        {
+                            isSigned = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            return isSigned;
         }
     }
 }

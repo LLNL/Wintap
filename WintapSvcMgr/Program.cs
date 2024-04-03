@@ -20,7 +20,6 @@ namespace gov.llnl.wintap
             //  HEALTHCHECK
             //  RESTART
             //  RUNDOWN
-
             if(args.Length == 0)
             {
                 Logger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.");
@@ -29,21 +28,7 @@ namespace gov.llnl.wintap
 
             Logger.Log.Append("WintapSvcMgr was started with parameter: " + args[0]);
 
-            if (args[0].ToUpper() == "UPDATE")
-            {
-                if(isDeveloper())
-                {
-                    Logger.Log.Append("Doing update check.");
-                    WintapUpdate wu = new WintapUpdate();
-                    wu.ApplyUpdates();
-                    Logger.Log.Append("Wintap update check complete.");
-                }
-                else
-                {
-                    Logger.Log.Append("Wintap is currently NOT running under the Developer profile.  Auto-updating is NOT supported.");
-                }
-            }
-            else if (args[0].ToUpper() == "HEALTHCHECK")
+            if (args[0].ToUpper() == "HEALTHCHECK")
             {
                 Logger.Log.Append("Doing wintap health check.");
                 

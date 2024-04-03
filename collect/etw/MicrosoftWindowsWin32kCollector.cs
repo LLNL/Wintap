@@ -70,6 +70,12 @@ namespace gov.llnl.wintap.collect
                 msg.FocusChange.FocusChangeSessionId = Convert.ToInt32(obj.PayloadByName("SessionId"));
                 msg.PID = Convert.ToInt32(obj.PayloadByName("NewProcessId"));
                 msg.EventTime = obj.TimeStamp.ToFileTimeUtc();
+                try
+                {
+                    msg.ActivityId = obj.ActivityID.ToString();
+                    msg.CorrelationId = obj.PayloadStringByName("CorrelationId");
+                }
+                catch (Exception ex) { }
                 EventChannel.Send(msg);
                 StateManager.PidFocus = msg.PID;
             }

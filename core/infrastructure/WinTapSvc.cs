@@ -16,11 +16,12 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.shared;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace gov.llnl.wintap
 {
     /// <summary>
-    /// Windows Service main entry point
+    /// Windows Service main entry point.
     /// </summary>
     public partial class WinTapSvc : ServiceBase
     {
@@ -74,9 +75,18 @@ namespace gov.llnl.wintap
 
         private void startupWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-
-            WintapLogger.Log.Append("Getting sensor configuration...", LogLevel.Always);
+            try
+            {
+                Utilities.SetDirectoryPermissions(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append("Error setting permissions on Wintap data path, cannot continue.  Message: " + ex.Message, LogLevel.Always);
+                throw new Exception("Invalid data directory");
+            }
             
+
+            WintapLogger.Log.Append("Wintap Agent ID: " + StateManager.AgentId.ToString(), LogLevel.Always);
 
             WintapLogger.Log.Append("loading plugin manager...", LogLevel.Always);
             pluginMgr = new PluginManager();
@@ -88,9 +98,16 @@ namespace gov.llnl.wintap
                 WintapLogger.Log.Append("attempting to register plugins...", LogLevel.Always);
                 pluginMgr.RegisterPlugins(watchdog);
             }
-            catch(Exception ex)
+            catch (ReflectionTypeLoadException ex)
             {
-                WintapLogger.Log.Append("Error loading plugins: " + ex.Message, LogLevel.Always);
+                foreach (Exception loaderException in ex.LoaderExceptions)
+                {
+                    WintapLogger.Log.Append("Loader exception: " + loaderException.ToString(), LogLevel.Always);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error loading plugin: " + ex.Message, LogLevel.Always);
             }
 
             WintapLogger.Log.Append("workbench config value: " + Properties.Settings.Default.EnableWorkbench, LogLevel.Always);

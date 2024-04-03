@@ -3,9 +3,9 @@
     {
       "Properties": {
         "EndPoint": "",
-	"Port": "",
+	      "Port": "",
         "CertificateStore": "",
-	"DeviceCertificateName": ""
+	      "DeviceCertificateName": ""
       },
       "Name": "SignedS3UrlAdapter",
       "Enabled": false
@@ -16,13 +16,20 @@
       },
       "Name": "SMBFileShareAdapter",
       "Enabled": false
+    },
+    {
+      "Properties": {
+        "Bucket": "",
+        "RegionEndpoint":  ""
+      },
+      "Name": "InstanceProfileAdapter",
+      "Enabled": false
     }
   ],
   "LogLevel": "Normal",
   "SensorProfile": "Quality",
-  "SerializationIntervalSec": 30,
+  "SerializationIntervalSec": 60,
   "UploadIntervalSec": 300,
   "WriteToParquet": true,
-  "WriteToCsv": false
 }
 

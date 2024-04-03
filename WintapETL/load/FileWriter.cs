@@ -6,7 +6,9 @@
 
 using gov.llnl.wintap.etl.shared;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel.Composition.Hosting;
 using System.Dynamic;
 using System.IO;
 using System.Timers;
@@ -17,21 +19,21 @@ namespace gov.llnl.wintap.etl.load
     {
         private string sensorName;
 
-        internal FileWriter(string _sensorName)
+        internal FileWriter()
         {
             Busy = false;
-            this.sensorName = _sensorName;
         }
 
-        internal void Init()
+        internal void Init(string sensorName)
         {
+            
             initializeDataDirectory();
         }
 
         // setup directory structure so we can start writing files.
         private void initializeDataDirectory()
         {
-            Logger.Log.Append("initializing file system to support " + this.DataDirectory, LogLevel.Always);
+            Logger.Log.Append("initializing data directory " + this.DataDirectory, LogLevel.Always);
             try
             {
                 DirectoryInfo dataDirInfo = new DirectoryInfo(this.DataDirectory);
@@ -66,17 +68,6 @@ namespace gov.llnl.wintap.etl.load
 
         }
 
-        internal void closeFile()
-        {
-            Busy = true;
-            FileInfo currentSnapshot = new FileInfo(this.FilePath);
-            if (currentSnapshot.Length == 0)
-            {
-                Delete();  // zero row parquets gum up the ingest
-            }
-        }
-
-        internal abstract void Write(List<ExpandoObject> data);
 
         /// <summary>
         /// The name of the file on disk

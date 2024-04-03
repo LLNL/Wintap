@@ -10,6 +10,7 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -27,7 +28,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
         internal Dictionary<string, TreeNode> nodeLookup = new Dictionary<string, TreeNode>();
         private List<TreeNode> forest = new List<TreeNode>();
         //  dedicated data holder for doing 'most recent' parent lookup
-        private static List<WintapMessage> processStack = new List<WintapMessage>();
+        private static ConcurrentDictionary<string, WintapMessage> processStack = new ConcurrentDictionary<string, WintapMessage>();
         private ProcessTrace processTracer;
         private ProcessHash idGen;
         private ProcessHash.Hasher hasher;
@@ -42,40 +43,46 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         internal void GenProcessTree()
         {
-            //System.Diagnostics.Debugger.Launch();
-            WintapLogger.Log.Append("Generating process tree.", LogLevel.Always);
-
-            // PROCESS TREE GEN
+            WintapLogger.Log.Append("Generating process tree.", core.infrastructure. LogLevel.Always);
             DateTime lastProcessEventTime = DateTime.Now;
             publishUntracedProcesses();
-            if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(5, 5, 0))
+            try
             {
-                // get ground truth from boot trace
-                WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Always);
-                lastProcessEventTime = processTracer.LoadBootTrace();
+                if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
+                {
+                    // get ground truth from boot trace
+                    WintapLogger.Log.Append("Building process tree from boot trace", core.infrastructure.LogLevel.Always);
+                    lastProcessEventTime = processTracer.LoadBootTrace();
+                }
+                else
+                {
+                    // get cached copy from json
+                    WintapLogger.Log.Append("Building process tree from cache", core.infrastructure.LogLevel.Always);
+                    deserializeProcessTree();
+                    // cache holds the wintap process from the boot trace, we must refresh it.
+                    refreshWintapProcess();
+                }
+
             }
-            else
+            catch (Exception ex)
             {
-                // get cached copy from json
-                WintapLogger.Log.Append("Building process tree from cache", LogLevel.Always);
-                deserializeProcessTree();
-                // cache holds the wintap process from the boot trace, we must refresh it.
-                refreshWintapProcess();
+                WintapLogger.Log.Append("ERROR building process tree: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
 
-            Timer processExportTimer = new Timer();
+
+            System.Timers.Timer processExportTimer = new System.Timers.Timer();
             processExportTimer.Interval = 5000;
             processExportTimer.AutoReset = true;
             processExportTimer.Elapsed += serializeProcessTree;
             processExportTimer.Start();
 
-            Timer treePruneTimer = new Timer();
+            System.Timers.Timer treePruneTimer = new System.Timers.Timer();
             treePruneTimer.Interval = 30000;
             treePruneTimer.AutoReset = true;
             treePruneTimer.Elapsed += TreePruneTimer_Elapsed;
             treePruneTimer.Start();
 
-            WintapLogger.Log.Append("attempting to register REFRESH timer", LogLevel.Always);
+            WintapLogger.Log.Append("attempting to register REFRESH timer", core.infrastructure.LogLevel.Always);
             System.Timers.Timer processRefreshTimer = new System.Timers.Timer(300000);  // 5 minute check, but only 'runs' at top of each hour
             processRefreshTimer.Elapsed += ProcessRefreshTimer_Elapsed;
             processRefreshTimer.AutoReset = true;
@@ -91,6 +98,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             kernelProcess.PidHash = idGen.GenPidHash(4, StateManager.MachineBootTime.ToFileTimeUtc());
             kernelProcess.ProcessName = "ntoskrnl.exe";
             kernelProcess.Process = new WintapMessage.ProcessObject() { CommandLine = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", Name = kernelProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", User = "system" };
+            kernelProcess.Process.Arguments = "";
             PublishProcess(kernelProcess);
 
             // idle not captured through the etw boot trace.
@@ -99,6 +107,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             idleProcess.PidHash = idGen.GenPidHash(0, StateManager.MachineBootTime.ToFileTimeUtc());
             idleProcess.ProcessName = "idle";
             idleProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "idle", Name = idleProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "idle", User = "system" };
+            idleProcess.Process.Arguments = "";
             PublishProcess(idleProcess);
 
             //  UNKOWN process as the faux root for processes with no available parent.  
@@ -107,6 +116,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             unknownProcess.PidHash = idGen.GenPidHash(1, StateManager.MachineBootTime.ToFileTimeUtc());
             unknownProcess.ProcessName = "unknown";
             unknownProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = unknownProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
+            unknownProcess.Process.Arguments = "";
             PublishProcess(unknownProcess);
 
             //  REGISTRY process not get captured in the boot trace but is always running
@@ -116,6 +126,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             registryProcess.PidHash = idGen.GenPidHash(reg.Id, StateManager.MachineBootTime.ToFileTimeUtc());
             registryProcess.ProcessName = reg.ProcessName.ToLower();
             registryProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = registryProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
+            registryProcess.Process.Arguments = "";
             PublishProcess(registryProcess);
         }
 
@@ -156,19 +167,24 @@ namespace gov.llnl.wintap.collect.etw.helpers
             {
                 try
                 {
-                    WintapLogger.Log.Append("Refreshing the currently running process list", LogLevel.Always);
+                    WintapLogger.Log.Append("Refreshing the currently running process list", core.infrastructure. LogLevel.Always);
                     publishTree(nodeLookup.First().Value);
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("WARN problem doing process refresh: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("WARN problem doing process refresh: " + ex.Message, core.infrastructure. LogLevel.Always);
                 }
             }
         }
 
         private void TreePruneTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            nodeLookup.First().Value.Prune(nodeLookup.First().Value);
+            List<TreeNode> prunables = nodeLookup.First().Value.Prune(nodeLookup.First().Value);
+            foreach(TreeNode prunable in prunables)
+            {
+                WintapMessage pruned;
+                //processStack.Remove(prunable.Data.PidHash, out pruned);  // todo: fix null pidhash process activity association here
+            }
         }
 
         private void deserializeProcessTree()
@@ -181,22 +197,23 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         private void refreshWintapProcess()
         {
-            WintapLogger.Log.Append("Refreshing Wintap process info", LogLevel.Always);
+            WintapLogger.Log.Append("Refreshing Wintap process info", core.infrastructure. LogLevel.Always);
             System.Diagnostics.Process wintapProcess = System.Diagnostics.Process.GetCurrentProcess();
             // get the previous instance of wintap since it will have the same parent process info.
-            WintapMessage previousWintapProcess = processStack.Where(p => p.ProcessName == "wintap.exe").OrderBy(p => p.EventTime).LastOrDefault();
+            WintapMessage previousWintapProcess = processStack.Where(p => p.Value.ProcessName == "wintap.exe").OrderBy(p => p.Value.EventTime).LastOrDefault().Value;
             WintapMessage newWintapProcess = new WintapMessage(StateManager.MachineBootTime, wintapProcess.Id, "Process");
             newWintapProcess.ActivityType = "refresh";
             newWintapProcess.PidHash = idGen.GenPidHash(wintapProcess.Id, DateTime.Now.ToFileTimeUtc());
             newWintapProcess.ProcessName = "wintap.exe";
             newWintapProcess.Process = new WintapMessage.ProcessObject() { CommandLine = wintapProcess.MainModule.FileName, Name = newWintapProcess.ProcessName, ParentPID = previousWintapProcess.Process.ParentPID, ParentPidHash = previousWintapProcess.Process.ParentPidHash, Path = wintapProcess.MainModule.FileName, User = "system" };
-            WintapLogger.Log.Append("New Wintap running under PID: " + newWintapProcess.PID, LogLevel.Always);
+            newWintapProcess.Process.Arguments = "";
+            WintapLogger.Log.Append("New Wintap running under PID: " + newWintapProcess.PID, core.infrastructure. LogLevel.Always);
             PublishProcess(newWintapProcess);
         }
 
         private void publishTree(TreeNode rootNode)
         {
-            WintapLogger.Log.Append("BEGIN:  process tree refresh", LogLevel.Always);
+            WintapLogger.Log.Append("BEGIN:  process tree refresh", core.infrastructure. LogLevel.Always);
             List<TreeNode> allNodes = rootNode.GetDescendantNodes(rootNode);
             allNodes.Add(rootNode);
             foreach (TreeNode node in allNodes)
@@ -212,9 +229,10 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 msg.PidHash = node.Data.PidHash;
                 msg.ProcessName = node.Data.ProcessName;
                 msg.Process = new WintapMessage.ProcessObject() { CommandLine = node.Data.ProcessPath, Name = node.Data.ProcessName, ParentPID = node.Data.ParentPid, ParentPidHash = node.Data.ParentPidHash, Path = node.Data.ProcessPath };
+                msg.Process.Arguments = "";
                 PublishProcess(msg);
             }
-            WintapLogger.Log.Append("END:  process tree refresh", LogLevel.Always);
+            WintapLogger.Log.Append("END:  process tree refresh", core.infrastructure. LogLevel.Always);
         }
 
         internal void PublishProcess(WintapMessage msg)
@@ -224,7 +242,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             Add(msg);
             StateManager.SentProcessList.Add(msg.PidHash);
             EventChannel.Send(msg);
-            WintapLogger.Log.Append("process sent to subscribers : " + msg.ProcessName + " " + msg.PID + " " + msg.PidHash, LogLevel.Debug);
+            WintapLogger.Log.Append("process sent to subscribers : " + msg.ProcessName + " " + msg.PID + " " + msg.PidHash, core.infrastructure.LogLevel.Debug);
         }
 
         private void serializeProcessTree(object sender, ElapsedEventArgs e)
@@ -245,14 +263,14 @@ namespace gov.llnl.wintap.collect.etw.helpers
         /// <param name="msg"></param>
         internal void Add(WintapMessage msg)
         {
-            processStack.Add(msg); 
+            processStack.TryAdd(msg.PidHash, msg); 
             ProcessData data = new ProcessData() { ParentPid = msg.Process.ParentPID, ParentPidHash = msg.Process.ParentPidHash, Pid = msg.PID, PidHash = msg.PidHash, ProcessName = msg.ProcessName, ProcessPath = msg.Process.Path, EventTimeUTC = msg.EventTime };
             TreeNode newNode = new TreeNode(data);
             if (msg.PID == 4)
             {
                 if (!nodeLookup.Keys.Contains(msg.PidHash))
                 {
-                    WintapLogger.Log.Append("Adding SYSTEM root. ", LogLevel.Always);
+                    WintapLogger.Log.Append("Adding SYSTEM root. ", core.infrastructure. LogLevel.Always);
                     nodeLookup.Add(newNode.Data.PidHash, newNode);
                 }
             }
@@ -264,16 +282,19 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 allProcess.Add(systemNode);
 
                 TreeNode parentNode = allProcess.Where(c => c.Data.PidHash == newNode.Data.ParentPidHash).FirstOrDefault();
-                if(parentNode.Children.Where(c => c.Data.PidHash == newNode.Data.PidHash).Count() == 0)
+                if(parentNode != null)
                 {
-                    parentNode.AddChild(newNode);
+                    if (parentNode.Children.Where(c => c.Data.PidHash == newNode.Data.PidHash).Count() == 0)
+                    {
+                        parentNode.AddChild(newNode);
+                    }
                 }
             }
         }
 
         internal void Remove(int pid, int parentPid)
         {
-            if (processStack.Where(p => p.PID == pid).Any() && processStack.Where(p => p.Process.ParentPID == parentPid).Any())
+            if (processStack.Where(p => p.Value.PID == pid).Any() && processStack.Where(p => p.Value.Process.ParentPID == parentPid).Any())
             {
                 // get TreeNode object by PID
                 TreeNode systemNode = nodeLookup.Values.First();
@@ -290,32 +311,32 @@ namespace gov.llnl.wintap.collect.etw.helpers
         internal static WintapMessage GetByPid(int pid, long eventTime)
         {
             // create instance off of the tree root
-            WintapMessage owningProcess = processStack.Where(p => p.PID == 4).OrderBy(p => p.EventTime).Last();
+            WintapMessage owningProcess = processStack.Where(p => p.Value.PID == 4).OrderBy(p => p.Value.EventTime).Last().Value;
             try
             {
-                owningProcess = processStack.Where(p => p.PID == pid && p.EventTime <= eventTime).OrderBy(p => p.EventTime).Last();
+                owningProcess = processStack.Where(p => p.Value.PID == pid && p.Value.EventTime <= eventTime).OrderBy(p => p.Value.EventTime).Last().Value;
             }
             catch(Exception ex)
             {
                 // assign to unknown if target process is not found
-                owningProcess = processStack.Where(p => p.PID == 1).OrderBy(p => p.EventTime).Last();
+                owningProcess = processStack.Where(p => p.Value.PID == 1).OrderBy(p => p.Value.EventTime).Last().Value;
             }
             return owningProcess;
         }
 
         internal WintapMessage GetKernel()
         {
-            return processStack.First();
+            return processStack.Where(p => p.Value.PID == 4).First().Value;
         }
 
         internal WintapMessage GetParent(int parentPid)
         {
-            return processStack.Where(p => p.PID == parentPid).OrderBy(p => p.EventTime).Last();
+            return processStack.Where(p => p.Value.PID == parentPid).OrderBy(p => p.Value.EventTime).Last().Value;
         }
 
         internal WintapMessage GetUnknown()
         {
-            return processStack.Where(p => p.Process.Name == "unknown").First();
+            return processStack.Where(p => p.Value.Process.Name == "unknown").First().Value;
         }
 
         private string getUser(int processID, string name)
@@ -347,9 +368,10 @@ namespace gov.llnl.wintap.collect.etw.helpers
             {
                 //8 represents an access mask of READ_ONLY_EA
                 Winapi.OpenProcessToken(process.Handle, 8, out processHandle);
-                WindowsIdentity wi = new WindowsIdentity(processHandle);
-                string user = wi.Name;
-                return user;
+                using (WindowsIdentity wi = new WindowsIdentity(processHandle))
+                {
+                    return wi.Name;
+                }
             }
             catch (Win32Exception ex)
             {
@@ -468,7 +490,6 @@ namespace gov.llnl.wintap.collect.etw.helpers
                         {
                             prunables.Add(kid);
                             kid.Parent.RemoveChild(kid);
-                            processStack.Remove(processStack.Where(p => p.PidHash == kid.Data.PidHash).First());
                         }
                     }
                 }

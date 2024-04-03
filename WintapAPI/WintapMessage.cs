@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Dynamic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Policy;
 using System.Text;
@@ -26,6 +27,8 @@ namespace gov.llnl.wintap.collect.models
             this.PID = processId;
             this.MessageType = eventSourceName;
             this.ReceiveTime = DateTime.Now.ToFileTimeUtc();
+            this.ActivityId = "";
+            this.CorrelationId = "";
         }
 
         public string MessageType { get; set; }
@@ -35,6 +38,10 @@ namespace gov.llnl.wintap.collect.models
         public string PidHash { get; set; }
         public string ProcessName { get; set; }
         public string ActivityType { get; set; }
+        public string CorrelationId { get; set; }
+        public string ActivityId { get; set; }
+        public string AgentId { get; set; }
+
         public ProcessObject Process { get; set; }
         public TcpConnectionObject TcpConnection { get; set; }
         public UdpPacketObject UdpPacket { get; set; }
@@ -49,7 +56,7 @@ namespace gov.llnl.wintap.collect.models
         public ThreadStartObject ThreadStart { get; set; } 
         public EventlogEventObject EventLogEvent { get; set; }
         public MicrosoftWindowsCpuTriggerData MicrosoftWindowsCpuTrigger { get; set; }
-        public MemInfoWSData MemInfoWS { get; set; }
+        public MemoryEventData MemoryEvent { get; set; }
         public WebActivityData WebActivity { get; set; }
         public MicrosoftWindowsGroupPolicyData MicrosoftWindowsGroupPolicy { get; set; }
         public MicrosoftWindowsBitLockerAPIData MicrosoftWindowsBitLockerAPI { get; set; }
@@ -62,7 +69,7 @@ namespace gov.llnl.wintap.collect.models
         public WintapAlertData WintapAlert { get; set; }
         
 
-        public class ProcessObject
+        public class ProcessObject : WintapBase
         {
             public int ParentPID { get; set; }
             public string ParentPidHash { get; set; }
@@ -89,7 +96,7 @@ namespace gov.llnl.wintap.collect.models
             public string SHA2 { get; set; }
         }
 
-        public class TcpConnectionObject
+        public class TcpConnectionObject : WintapBase
         {
             public string Direction { get; set; }
             public string SourceAddress { get; set; }
@@ -112,7 +119,7 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
         }
 
-        public class UdpPacketObject
+        public class UdpPacketObject : WintapBase
         {
             public string SourceAddress { get; set; }
             public int SourcePort { get; set; }
@@ -123,7 +130,7 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
         }
 
-        public class ImageLoadObject
+        public class ImageLoadObject : WintapBase
         {
             public string FileName { get; set; }
             public long BuildTime { get; set; }
@@ -135,14 +142,14 @@ namespace gov.llnl.wintap.collect.models
             public string MD5 { get; set; }
         }
 
-        public class FileActivityObject
+        public class FileActivityObject : WintapBase
         {
             public string Path { get; set; }
             public int BytesRequested { get; set; }
             public int PID { get; set; }
         }
 
-        public class RegActivityObject
+        public class RegActivityObject : WintapBase
         {
             public string Path { get; set; }
             public string DataType { get; set; }
@@ -151,38 +158,43 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
         }
 
-        public class FocusChangeObject
+        public class FocusChangeObject : WintapBase
         {
             public int OldProcessId { get; set; }
             public int FocusChangeSessionId { get; set; }
             public int PID { get; set; }
         }
 
-        public class SessionChangeObject
+        public class SessionChangeObject : WintapBase
         {
             public string UserName { get; set; }
             public string Description { get; set; }
             public int PID { get; set; }
         }
 
-        public class WaitCursorData
+        public class WaitCursorData : WintapBase
         {
             public int SessionId { get; set; }
             public int DisplayTimeMS { get; set; }
             public int PID { get; set; }
         }
 
-        public class GenericMessageObject
+        public class GenericMessageObject : WintapBase
         {
+            public string ProviderName { get; set; }
             public string Provider { get; set; }
             public string EventName { get; set; }
             public int PID { get; set; }
             public DateTime EventTime { get; set; }
             public string Payload { get; set; }
+            public int TargetProcessId { get; set; }
         }
 
-        public class WmiActivityObject
+        public class WmiActivityObject : WintapBase
         {
+            public int ClientProcessId { get; set; }
+            public int CreatedProcessId {  get; set; }
+            public string CommandLine { get; set; }
             /// <summary>
             /// appears to correlate events related to a single WMI logical activity
             /// </summary>
@@ -197,7 +209,7 @@ namespace gov.llnl.wintap.collect.models
             public int ResultCode { get; set; }
         }
 
-        public class ThreadStartObject
+        public class ThreadStartObject : WintapBase
         {
             public int SourcePid { get; set; }
             public int TargetPid { get; set; }
@@ -208,7 +220,7 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
         }
 
-        public class EventlogEventObject
+        public class EventlogEventObject : WintapBase
         {
             public string LogName { get; set; }
             public string LogSource { get; set; }
@@ -217,7 +229,7 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
         }
 
-        public class ProcessMetricObject
+        public class ProcessMetricObject : WintapBase
         {
             public string HostName { get; set; }
             public int CpuCoreCount { get; set; }
@@ -230,7 +242,7 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
         }
 
-        public class AppUsageMetric
+        public class AppUsageMetric : WintapBase
         {
             public string ComputerName { get; set; }
             public string UserName { get; set; }
@@ -264,7 +276,7 @@ namespace gov.llnl.wintap.collect.models
             public int AudioOutMS { get; set; }
         }
 
-        public class MicrosoftWindowsCpuTriggerData
+        public class MicrosoftWindowsCpuTriggerData : WintapBase
         {
             public string EventName { get; set; }
             public int PID { get; set; }
@@ -286,7 +298,7 @@ namespace gov.llnl.wintap.collect.models
         /// <summary>
         /// from Microsoft-Windows-Kernel-Memory, eventName: MemInfoWS
         /// </summary>
-        public class MemInfoWSData
+        public class MemInfoWSData : WintapBase
         {
             public long WorkingSetPageCount { get; set; }
             public long CommitPageCount { get; set; }
@@ -307,7 +319,13 @@ namespace gov.llnl.wintap.collect.models
             public double ElapsedTimeMSec { get; set; }
         }
 
-        public class WebActivityData
+        public class MemoryEventData : WintapBase
+        {
+            public int ThreadId { get; set; }
+            public string Payload { get; set; }
+        }
+
+        public class WebActivityData : WintapBase
         {
             public string Browser { get; set; }
             public string TabTitle { get; set; }
@@ -315,12 +333,12 @@ namespace gov.llnl.wintap.collect.models
             public string UserName { get; set; }
         }
 
-        public class MicrosoftWindowsGroupPolicyData
+        public class MicrosoftWindowsGroupPolicyData : WintapBase
         {
             public string FormattedMessage { get; set; }
         }
 
-        public class MicrosoftWindowsBitLockerAPIData
+        public class MicrosoftWindowsBitLockerAPIData : WintapBase
         {
             public string FormattedMessage { get; set; }
             public string IdentificationGUID { get; set; }
@@ -331,7 +349,7 @@ namespace gov.llnl.wintap.collect.models
         /// <summary>
         /// General purpose error reporting mechanism for Wintap
         /// </summary>
-        public class WintapAlertData
+        public class WintapAlertData : WintapBase
         {
             public enum AlertNameEnum { EVENT_DROP, SYSTEM_UTILIZATION, PROCESS_TREE, OTHER }
             public AlertNameEnum AlertName { get; set; }
@@ -342,17 +360,19 @@ namespace gov.llnl.wintap.collect.models
         /// <summary>
         /// collector for the Microsoft-Windows-Kernel-Audit-API-Calls ETW provider
         /// </summary>
-        public class KernelApiCallData
+        public class KernelApiCallData : WintapBase
         {
             private string providerName;
-            private uint? targetPid;
+            private int threadId;
+            private int targetPid;
             private uint? desiredAccess;
             private uint returnCode;
             private string linkSourceName;
             private string linkTargetName;
             private long? notifyRoutineAddress;
             private uint? targetThreatId;
-            public KernelApiCallData(string _providerName, uint? _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId) 
+
+            public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId) 
             {
                 providerName = _providerName;
                 targetPid = _targetPid;
@@ -362,13 +382,15 @@ namespace gov.llnl.wintap.collect.models
                 linkTargetName = _linkTargetName;
                 notifyRoutineAddress = _notifyRoutineAddress;
                 targetThreatId = _targetThreatId;
+                threadId = _threadId;
             }
             public string ProviderName
             {
                 get { return providerName; }
             }
-            public uint? TargetPid
+            public int? TargetPid
             { get { return targetPid; } }
+            public string TargetProcessName { get; set; }
             public uint? DesiredAccess
             { get { return desiredAccess; } }
             public uint ReturnCode
@@ -381,10 +403,13 @@ namespace gov.llnl.wintap.collect.models
             { get { return notifyRoutineAddress; } }
             public uint? TargetThreatId
             { get { return targetThreatId; } }
+            public int ThreadId
+            { get { return threadId; } }
+            public string DesiredAccessString { get; set; }
         }
 
         //  summary descriptors taken from:  https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-memory_basic_information
-        public class MemoryMapData
+        public class MemoryMapData : WintapBase
         {
             /// <summary>
             /// For image backed regions, the full path name to the file.
@@ -414,6 +439,26 @@ namespace gov.llnl.wintap.collect.models
             public string PageProtect { get; set; }
 
             public string PageType { get; set; }
+
+            public bool MZHeaderPresent { get; set; }
         }
+
+        public abstract class WintapBase
+        {
+            public ExpandoObject ToDynamic()
+            {
+                var expando = new ExpandoObject();
+                var expandoDic = (IDictionary<string, object>)expando;
+
+                foreach (PropertyInfo propertyInfo in this.GetType().GetProperties())
+                {
+                    var value = propertyInfo.GetValue(this, null);
+                    expandoDic.Add(propertyInfo.Name, value);
+                }
+
+                return expando;
+            }
+        }
+          
     }
 }

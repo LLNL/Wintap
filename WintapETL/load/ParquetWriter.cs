@@ -4,110 +4,235 @@
  * All rights reserved.
  */
 
-using ChoETL;
 using gov.llnl.wintap.etl.shared;
+using Parquet;
+using Parquet.Data;
+using Parquet.Schema;
+using Parquet.Serialization;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
 using System.Dynamic;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.etl.load
 {
     internal class ParquetWriter : FileWriter
     {
-        private string fileName;
-        private DirectoryInfo dataDirInfo;
+        private ConcurrentQueue<Batch> batches = new ConcurrentQueue<Batch>();  // complete collection of all sensor data awaiting serialization
+        private BackgroundWorker batchWorker;
 
-        internal ParquetWriter(string _sensorName) : base(_sensorName)
+        internal ParquetWriter()
         {
-            this.DataDirectory = gov.llnl.wintap.etl.shared.Utilities.GetFileStorePath(_sensorName);
-            dataDirInfo = new DirectoryInfo(this.DataDirectory);
-            if (!dataDirInfo.Exists)
-            {
-                dataDirInfo.Create();
-            }
+            batchWorker = new BackgroundWorker();
+            batchWorker.DoWork += BatchWorker_DoWork;
+            batchWorker.RunWorkerCompleted += BatchWorker_RunWorkerCompleted;
+            batchWorker.RunWorkerAsync();
         }
 
-        internal override void Write(List<ExpandoObject> data)
+        private void BatchWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            string msgType = "NA";
-            bool applyOffset = false;  // stop gap measure to prevent file name collisions on shared event types
-            foreach (dynamic d in data)
+            batchWorker.RunWorkerAsync();
+        }
+
+        private async void BatchWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+
+            while (batches.TryDequeue(out Batch batch))
             {
-                msgType = d.MessageType;  // the passed in list will be of a single message type, pull it from the first message and use it as the output file name
-                if(msgType.ToLower().Contains("conn_incr"))
+                while (batch.Set.TryDequeue(out Batch.SensorData dataSet))
                 {
-                    if(d.Protocol == "UDP")
+                    if (dataSet.CollectorName == "imageload")
+                    {
+                        Logger.Log.Append($"IMAGE LOAD SENSOR PENDING WRITE COUNT: {dataSet.Data.Count()} calling write async...", LogLevel.Always);
+                    }
+
+                    string fileName = "NA";
+                    fileName = await Write(dataSet);
+                    if(fileName != "NA")
+                    {
+                        try
+                        {
+                            FileInfo flushedFile = new FileInfo(fileName);
+                            flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
+                            Logger.Log.Append($" ready for merge: {fileName}", LogLevel.Always);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Always);
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log.Append($"{dataSet.CollectorName}: Call to async WRITE returned no parquet data file.", LogLevel.Always );
+                    }
+                }
+            }
+            System.Threading.Thread.Sleep(30000);
+        }
+
+        internal int Backlog { get { return batches.Count; } }
+
+        internal void Add(Batch batch)
+        {
+            batches.Enqueue(batch);
+        }
+
+        internal async Task<string> Write(Batch.SensorData dataSet)
+        {
+            // prevent file name collisions on shared event types
+            bool applyOffset = false;
+            foreach (dynamic d in dataSet.Data)
+            {
+                if (d.MessageType.ToLower().Contains("conn_incr"))
+                {
+                    if (d.Protocol == "UDP")
                     {
                         applyOffset = true;
                     }
                 }
-                if (msgType.ToUpper() == "PROCESS")
+                if (d.MessageType.ToUpper() == "PROCESS")
                 {
                     if (d.ActivityType == "STOP")
                     {
                         applyOffset = true;
-                        msgType = msgType + "_stop";
+                        d.MessageType = d.MessageType + "_stop";
                     }
-                    
+
                 }
                 break;
             }
-
-            ChoParquetRecordConfiguration c = new ChoParquetRecordConfiguration();
-            c.CompressionMethod = Parquet.CompressionMethod.Snappy;
-            fileName = genNewFilePath(msgType, applyOffset);  // name will be .active to avoid file contention with the uploader.
-            if (Utilities.GetETLConfig().WriteToParquet)
+            long timestamp = DateTime.UtcNow.ToFileTimeUtc() + Convert.ToInt32(applyOffset);
+            string fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
+            Logger.Log.Append($"{dataSet.CollectorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
+            try
             {
-                if (!Busy) 
+                ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
+                ParquetSerializerOptions options = new ParquetSerializerOptions();
+                options.CompressionMethod = CompressionMethod.Snappy;
+                using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
                 {
+                    await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Append($"Error in ParquetWriter.Write: {ex.Message} ", shared.LogLevel.Always);
+                if(ex.Message.Contains("used by another process"))
+                {
+                    Logger.Log.Append($"Retrying write operation...", shared.LogLevel.Always);
+                    timestamp = DateTime.UtcNow.ToFileTimeUtc() + 1;
+                    fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
+                    Logger.Log.Append($"{dataSet.CollectorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
                     try
                     {
-                        ChoParquetWriter parser = new ChoParquetWriter(fileName, c);
-                        parser.Write(data);
-                        parser.Flush();
-                        parser.Close();
-                        parser.Dispose();
-                        // rename the file to .parquet so the uploader can find it.
-                        FileInfo flushedFile = new FileInfo(fileName);
-                        flushedFile.MoveTo(flushedFile.DirectoryName + "\\" + flushedFile.Name.Replace(".parquet.active", ".parquet"));
+                        ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
+                        ParquetSerializerOptions options = new ParquetSerializerOptions();
+                        options.CompressionMethod = CompressionMethod.Snappy;
+                        using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
+                        {
+                            await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
+                        }
                     }
-                    catch (Exception ex)
+                    catch(Exception ex2)
                     {
-                        Logger.Log.Append("Error in ParquetWriter.Write:  " + ex.Message, shared.LogLevel.Always);
+                        Logger.Log.Append($"{SensorName} error on retry of WRITE operation: {ex2.Message}", LogLevel.Always);
                     }
-
-                }
-                else
-                {
-                    Logger.Log.Append("ERROR:  FILE BUSY", LogLevel.Always);
                 }
             }
+            return fileName;
         }
 
-        private string genNewFilePath(string msgType, bool applyOffset)
+        private static ParquetSchema DetermineSchemaFromExpando(ExpandoObject firstItem)
         {
-            long timestamp = DateTime.UtcNow.ToFileTimeUtc();
-            if(applyOffset)
+            List<Field> fields = new List<Field>();
+            foreach (var kvp in firstItem)
             {
-                timestamp++; 
+                try
+                {
+                    Type type = kvp.Value?.GetType();
+                    DataField field = new DataField(kvp.Key, type);
+                    fields.Add(field);
+                }
+                catch (Exception ex)
+                { }
             }
-            this.FileName = msgType.ToLower() + "-" + timestamp + ".parquet.active";
-            if (DataDirectory.ToUpper().Contains("DEFAULT_SENSOR"))
-            {
-                this.FilePath = DataDirectory + msgType.ToLower() + "\\" + FileName.ToLower();
-            }
-            else
-            {
-                this.FilePath = DataDirectory + FileName.ToLower();
-            }
-            FileInfo sensorFile = new FileInfo(this.FilePath);
-            if (!sensorFile.Directory.Exists)
-            {
-                sensorFile.Directory.Create();
-            }
-            return FilePath;
+            ParquetSchema schema = new ParquetSchema(fields.ToArray());
+            return schema;
         }
 
+        internal class Batch
+        {
+            private readonly long timestamp;
+            private readonly string sensorName;
+            //private readonly string dataDirectory;
+
+            /// <summary>
+            /// The time that this batch was requested by a sensor
+            /// </summary>
+            internal long Timestamp { get { return timestamp; } }
+
+            /// <summary>
+            /// The complete set of data for a given sensor for an interval that ended at the time specified by Name
+            /// </summary>
+            internal ConcurrentQueue<SensorData> Set;
+
+            internal string SensorName { get { return sensorName; } }
+
+            internal Batch(string _sensorName)
+            {
+                timestamp = DateTime.Now.ToFileTimeUtc(); // so we can process batches in time order
+                sensorName = _sensorName;
+                Set = new ConcurrentQueue<SensorData>();
+            }
+
+            /// <summary>
+            /// Adds a set of typed sensor data to the current batch
+            ///     Default sensor can have more than one element in its set, others will be a single.
+            /// </summary>
+            /// <param name="_sensorData"></param>
+            internal void Add(SensorData _sensorData)
+            {
+                Set.Enqueue(_sensorData);
+            }
+
+            internal class SensorData
+            {
+                private readonly string sensorName;
+                private readonly string collectorName;
+                private readonly ConcurrentQueue<ExpandoObject> sensorData;
+                private string parquetPath;
+
+                internal SensorData(string _sensorName, string _messageType, ConcurrentQueue<ExpandoObject> sensorData)
+                {
+                    this.sensorName = _sensorName.ToLower();
+                    this.collectorName = _messageType.ToLower();
+                    this.sensorData = sensorData;
+                    this.parquetPath = gov.llnl.wintap.etl.shared.Utilities.GetFileStorePath(_sensorName);
+                    DirectoryInfo sensorDataDir = new DirectoryInfo(this.parquetPath);
+                    if (this.sensorName.ToUpper() == "DEFAULT_SENSOR")
+                    {
+                        sensorDataDir = new DirectoryInfo(Path.Combine(this.parquetPath, this.collectorName));
+                        this.parquetPath = Path.Combine(this.parquetPath, this.collectorName, this.collectorName);
+                    }
+                    else
+                    {
+                        this.parquetPath = Path.Combine(this.parquetPath, this.collectorName);
+                    }
+                    if (!sensorDataDir.Exists)
+                    {
+                        sensorDataDir.Create();
+                    }
+                }
+
+                internal string CollectorName { get { return collectorName; } }
+                internal ConcurrentQueue<ExpandoObject> Data { get { return sensorData; } }
+                internal string ParquetPath { get { return parquetPath; } }
+            }
+        }
     }
 }

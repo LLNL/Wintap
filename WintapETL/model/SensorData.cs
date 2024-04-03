@@ -5,6 +5,9 @@
  */
 
 using System;
+using System.Collections.Generic;
+using System.Dynamic;
+using System.Reflection;
 
 namespace gov.llnl.wintap.etl.models
 {
@@ -15,6 +18,20 @@ namespace gov.llnl.wintap.etl.models
         public SensorData()
         {
             hostname = Environment.MachineName;
+        }
+
+        public ExpandoObject ToDynamic()
+        {
+            var expando = new ExpandoObject();
+            var expandoDic = (IDictionary<string, object>)expando;
+
+            foreach (PropertyInfo propertyInfo in this.GetType().GetProperties())
+            {
+                var value = propertyInfo.GetValue(this, null);
+                expandoDic.Add(propertyInfo.Name, value);
+            }
+
+            return expando;
         }
 
         #region public properties
@@ -45,20 +62,7 @@ namespace gov.llnl.wintap.etl.models
         public long EventTime { get; set; }
         public long ReceiveTime { get; set; }
         public int PID { get; set; }
-        /// <summary>
-        /// Increment type code: 30sec, 5min, 1hr, etc. No validation is done or implied. Sensors can use anything, just be consistent.
-        /// </summary>
-        public string IncrType { get; set; }
-        /// <summary>
-        /// Number of events
-        /// </summary>
-        public int EventCount { get; set; }
-        /// <summary>
-        /// First event timestamp in the increment
-        /// </summary>
-        public long FirstSeenMs { get; set; }
 
-        public long LastSeenMs { get; set; }
         #endregion
 
     }

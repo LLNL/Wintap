@@ -5,9 +5,11 @@
  */
 
 using gov.llnl.wintap.collect.models;
+using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.shared;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -42,10 +44,12 @@ namespace gov.llnl.wintap.core.infrastructure
         private WintapLogger log;
         private bool runMethodRunning;
         private bool wintapRunning;
+        private TimeSpan workbenchIdleTimeout;
 
         protected internal Watchdog()
         {
             PerformanceBreach = false;
+            workbenchIdleTimeout = new TimeSpan(0, 20, 0);
         }
 
         protected internal void Start()
@@ -65,18 +69,6 @@ namespace gov.llnl.wintap.core.infrastructure
             perfCheckWorker.DoWork += Watchdog_DoWork;
             perfCheckWorker.RunWorkerCompleted += Watchdog_RunWorkCompleted;
             perfCheckWorker.RunWorkerAsync();
-
-            // AUTO-UPDATE support
-            if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
-            {
-                // we are running in developer mode and we have an auto-update path defined
-                Timer updateCheckTimer = new Timer();
-                updateCheckTimer.Elapsed += UpdateCheckTimer_Elapsed;
-                updateCheckTimer.Interval = 300000;
-                updateCheckTimer.Enabled = true;
-                updateCheckTimer.Start();
-            }
-
         }
 
         private void setupSvcMgr()
@@ -98,34 +90,6 @@ namespace gov.llnl.wintap.core.infrastructure
             schTasks2.Start();
         }
 
-        private void UpdateCheckTimer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            doUpdateCheck();
-        }
-
-        private void doUpdateCheck()
-        {
-            FileInfo updater = new FileInfo(Strings.FileRootPath + "\\WintapSvcMgr.exe");
-            if(updater.Exists)
-            {
-
-                WintapLogger.Log.Append("CHECKING FOR UPDATES...", LogLevel.Always);
-                Process updaterProcess = new Process();
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = updater.FullName;
-                psi.Arguments = "UPDATE";
-                psi.WindowStyle = ProcessWindowStyle.Hidden;
-                updaterProcess.StartInfo = psi;
-                updaterProcess.Start();
-                updaterProcess.WaitForExit();
-                WintapLogger.Log.Append("Spawned the Wintap Update process.   See WintapSvcMgr.log for details", LogLevel.Always);
-            }
-            else
-            {
-                WintapLogger.Log.Append("Wintap update exe file not found.   Auto-update cannot continue.", LogLevel.Always);
-            }
-
-        }
 
         protected internal void Stop()
         {
@@ -170,7 +134,18 @@ namespace gov.llnl.wintap.core.infrastructure
                     string alertMsg = "wintap has exceeded maximum performance thresholds. cpu: " + cpu + "  memory: " + mem + "  hitcount: " + WintapProfile.BreachCount;
                     WintapLogger.Log.Append(alertMsg, LogLevel.Always);
                     sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.SYSTEM_UTILIZATION, alertMsg);
-                    restartWintap();
+                    Utilities.RestartWintap(alertMsg);
+                }
+                if (Properties.Settings.Default.EnableWorkbench)
+                {
+                    if (DateTime.Now.Subtract(StateManager.LastWorkbenchActivity) > workbenchIdleTimeout)
+                    {
+                        WintapLogger.Log.Append("Workbench idle time threshold exceeded, disabling workbench...", LogLevel.Always);
+                        sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.OTHER, "Workbench idle timeout expired");
+                        Dictionary<string, bool> disableWorkbenchSetting = new Dictionary<string, bool>();
+                        disableWorkbenchSetting.Add("EnableWorkbench", false);
+                        StateManager.SetWintapSettings(disableWorkbenchSetting);
+                    }
                 }
             }
             catch (Exception ex)
@@ -236,32 +211,12 @@ namespace gov.llnl.wintap.core.infrastructure
                 if (executeTime > runTTL)
                 {
                     logEvent(104, "Watchdog timeout exceeded on runnable: " + runnable.RunPlugin.Metadata.Name);
-                    restartWintap();
+                    Utilities.RestartWintap("Watchdog timeout exceeded on runnable: " + runnable.RunPlugin.Metadata.Name);
                     throw new Exception("WATCH_DOG_TIMEOUT_EXCEEDED");
                 }
                 System.Threading.Thread.Sleep(1000);
             }
             WintapLogger.Log.Append("Watchdog has completed protected run, run time: " + executeTime, LogLevel.Always);
-        }
-
-        private void restartWintap()
-        {
-            try
-            {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.UseShellExecute = false;
-                psi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
-                psi.Arguments = "RESTART";
-                psi.WindowStyle = ProcessWindowStyle.Hidden;
-                Process p = new Process();
-                p.StartInfo = psi;
-                p.Start();
-                p.WaitForExit();
-            }
-            catch(Exception ex)
-            {
-                WintapLogger.Log.Append("Error calling WintapSvcMgr for wintap restart: " + ex.Message, LogLevel.Always);
-            }
         }
 
         private void RunWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
@@ -304,7 +259,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             BreachCount = 0;
             MaxMem = 700000000;
-            MaxCPU = 10;
+            MaxCPU = 20;
             MaxBreachCount = 2;
             MaxEventCount = 1000;
             SampleInterval = new TimeSpan(0, 0, 45);

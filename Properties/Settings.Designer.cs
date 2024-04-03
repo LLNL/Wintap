@@ -12,7 +12,7 @@ namespace gov.llnl.wintap.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.7.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.9.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -218,18 +218,6 @@ namespace gov.llnl.wintap.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MicrosoftWindowsKernelMemoryCollector {
-            get {
-                return ((bool)(this["MicrosoftWindowsKernelMemoryCollector"]));
-            }
-            set {
-                this["MicrosoftWindowsKernelMemoryCollector"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool WebActivityCollector {
             get {
                 return ((bool)(this["WebActivityCollector"]));
@@ -261,18 +249,6 @@ namespace gov.llnl.wintap.Properties {
             }
             set {
                 this["MicrosoftWindowsGroupPolicyCollector"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MicrosoftWindowsBitLockerAPICollector {
-            get {
-                return ((bool)(this["MicrosoftWindowsBitLockerAPICollector"]));
-            }
-            set {
-                this["MicrosoftWindowsBitLockerAPICollector"] = value;
             }
         }
         

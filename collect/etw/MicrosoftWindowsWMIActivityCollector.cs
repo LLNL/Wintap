@@ -9,6 +9,12 @@ using Microsoft.Diagnostics.Tracing;
 using System;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
+using System.Linq;
+using System.Runtime.Remoting;
+using System.Diagnostics;
+using com.espertech.esper.compat;
+using Microsoft.Diagnostics.Tracing.StackSources;
+using XLR8.CGLib;
 
 namespace gov.llnl.wintap.collect
 {
@@ -26,29 +32,56 @@ namespace gov.llnl.wintap.collect
         public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
+            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "WmiActivity");
+            if (obj.PayloadNames.Contains("CorrelationId"))
+            {
+                msg.CorrelationId = obj.PayloadStringByName("CorrelationId");
+            }
+            if (obj.PayloadNames.Contains("ActivityId"))
+            {
+                msg.ActivityId = obj.PayloadStringByName("ActivityId");
+            }
+            msg.WmiActivity = new WintapMessage.WmiActivityObject();
             try
             {
-                switch (obj.ProviderName)
+                if(obj.PayloadNames.Contains("Operation"))
                 {
-                    case "Microsoft-Windows-WMI-Activity":
-                        if (obj.EventName.Trim() == "EventID(11)")
-                        {
-                            parseWmiEvent(obj, 11);
-                        }
-                        else if (obj.EventName.Trim() == "EventID(13)")
-                        {
-                            parseWmiEvent(obj, 13);
-                        }
-                        break;
-                    default:
-                        break;
+                    msg.WmiActivity.Operation = obj.PayloadByName("Operation").ToString();
                 }
-                obj = null;
+                if (obj.PayloadNames.Contains("User"))
+                {
+                    msg.WmiActivity.Operation = obj.PayloadByName("User").ToString();
+                }
+                if (obj.PayloadNames.Contains("IsLocal"))
+                {
+                    msg.WmiActivity.IsLocal = bool.Parse(obj.PayloadByName("IsLocal").ToString());
+                }
+                if (obj.PayloadNames.Contains("ClientProcessId"))
+                {
+                    msg.WmiActivity.ClientProcessId = Convert.ToInt32(obj.PayloadByName("ClientProcessId").ToString().Replace(",",""));
+                }
+                if (obj.PayloadNames.Contains("OperationId"))
+                {
+                    msg.WmiActivity.OperationId = Convert.ToInt32(obj.PayloadByName("OperationId").ToString().Replace(",", ""));
+                }
+                if (obj.PayloadNames.Contains("ResultCode"))
+                {
+                    msg.WmiActivity.ResultCode = Convert.ToInt32(obj.PayloadByName("ResultCode"));
+                }
+                if (obj.PayloadNames.Contains("Commandline"))
+                {
+                    msg.WmiActivity.CommandLine = obj.PayloadStringByName("Commandline");
+                }
+                if (obj.PayloadNames.Contains("CreatedProcessId"))
+                {
+                    msg.WmiActivity.CreatedProcessId = Convert.ToInt32(obj.PayloadStringByName("CreatedProcessId").Replace(",",""));
+                }
             }
             catch (Exception ex)
             {
                 WintapLogger.Log.Append("Error parsing user mode event: " + ex.Message, LogLevel.Debug);
             }
+            EventChannel.Send(msg);
         }
 
         private void parseWmiEvent(TraceEvent obj, int eventId)

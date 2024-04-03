@@ -33,6 +33,12 @@ namespace gov.llnl.wintap.collect
                 msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                 msg.MicrosoftWindowsGroupPolicy = new WintapMessage.MicrosoftWindowsGroupPolicyData();
                 msg.MicrosoftWindowsGroupPolicy.FormattedMessage = obj.FormattedMessage;
+                try
+                {
+                    msg.ActivityId = obj.ActivityID.ToString();
+                    msg.CorrelationId = obj.PayloadStringByName("CorrelationId");
+                }
+                catch (Exception ex) { }
                 EventChannel.Send(msg);
             }
             catch (Exception ex)
