@@ -28,7 +28,7 @@
   ],
   "LogLevel": "Normal",
   "SensorProfile": "Quality",
-  "SerializationIntervalSec": 30,
+  "SerializationIntervalSec": 60,
   "UploadIntervalSec": 300,
   "WriteToParquet": true,
 }

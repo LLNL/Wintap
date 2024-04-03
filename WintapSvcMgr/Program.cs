@@ -20,7 +20,6 @@ namespace gov.llnl.wintap
             //  HEALTHCHECK
             //  RESTART
             //  RUNDOWN
-
             if(args.Length == 0)
             {
                 Logger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.");

@@ -140,7 +140,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     if (DateTime.Now.Subtract(StateManager.LastWorkbenchActivity) > workbenchIdleTimeout)
                     {
-                        System.Diagnostics.Debugger.Launch();
                         WintapLogger.Log.Append("Workbench idle time threshold exceeded, disabling workbench...", LogLevel.Always);
                         sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.OTHER, "Workbench idle timeout expired");
                         Dictionary<string, bool> disableWorkbenchSetting = new Dictionary<string, bool>();
