@@ -1,0 +1,23 @@
+﻿@Name('udp-activity')
+@Description('Summarize send/receive activity in 10 second increments using contexts')
+@EventRepresentation(map)
+context Every10Seconds select istream
+  "UDP" as protocol,
+  udpPacket.sourceAddress as srcIp,
+  udpPacket.sourcePort as srcPort,
+  udpPacket.destinationAddress as destIp,
+  udpPacket.destinationPort as destPort,
+  PID,
+  PidHash,
+  ProcessName,
+  activityType,
+  sum(udpPacket.packetSize) as packetSize,
+  min(receiveTime) as firstSeen,
+  max(receiveTime) as lastSeen,
+  count(*) as eventCount,
+  'UdpPacket' as MessageType,
+  AgentId
+from WintapMessage(messageType='UdpPacket') as msg
+group by udpPacket.sourceAddress, udpPacket.sourcePort, udpPacket.destinationAddress, udpPacket.destinationPort, PidHash, PID, ProcessName, activityType, AgentId
+having count(*) > 0
+output snapshot when terminated
