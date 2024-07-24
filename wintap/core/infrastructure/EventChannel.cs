@@ -5,9 +5,9 @@
  */
 
 using com.espertech.esper.client;
-using gov.llnl.wintap.collect.etw.helpers;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;

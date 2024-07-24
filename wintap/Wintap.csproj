@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Remove="App_Start\**" />
     <Compile Remove="binary\**" />
+    <Compile Remove="platform\windows\collect\misc\**" />
     <Compile Remove="MergeHelper\**" />
     <Compile Remove="WintapAPI\**" />
     <Compile Remove="WintapETL\**" />
@@ -52,8 +53,10 @@
     <Compile Remove="WintapSvcMgr\**" />
     <Content Remove="App_Start\**" />
     <Content Remove="binary\**" />
+    <Content Remove="platform\windows\collect\misc\**" />
     <EmbeddedResource Remove="App_Start\**" />
     <EmbeddedResource Remove="binary\**" />
+    <EmbeddedResource Remove="platform\windows\collect\misc\**" />
     <EmbeddedResource Remove="MergeHelper\**" />
     <EmbeddedResource Remove="WintapAPI\**" />
     <EmbeddedResource Remove="WintapETL\**" />
@@ -61,6 +64,7 @@
     <EmbeddedResource Remove="WintapSvcMgr\**" />
     <None Remove="App_Start\**" />
     <None Remove="binary\**" />
+    <None Remove="platform\windows\collect\misc\**" />
     <None Remove="MergeHelper\**" />
     <None Remove="WintapAPI\**" />
     <None Remove="WintapETL\**" />
@@ -87,7 +91,7 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="NOTICE.txt" />
+    <Content Include="..\NOTICE.txt" />
     <None Update="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -142,9 +146,6 @@
       <Isolated>False</Isolated>
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </COMReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="collect\misc\" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\WintapAPI\WintapAPI.csproj" />
@@ -213,8 +214,8 @@
     <PackageReference Include="System.ServiceModel.Federation" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="collect\shared\BaseCollector - Copy.cs" />
-    <Compile Remove="collect\shared\EtwCollector - Copy.cs" />
+    <Compile Remove="platform\windows\collect\shared\BaseCollector - Copy.cs" />
+    <Compile Remove="platform\windows\collect\shared\EtwCollector - Copy.cs" />
     <Compile Remove="core\shared\SingleLogit.cs" />
   </ItemGroup>
   <PropertyGroup>

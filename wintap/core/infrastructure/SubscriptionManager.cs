@@ -4,8 +4,8 @@
  * All rights reserved.
  */
 
-using gov.llnl.wintap.collect;
-using gov.llnl.wintap.collect.shared;
+using gov.llnl.wintap.platform.windows.collect.etw;
+using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using System;
