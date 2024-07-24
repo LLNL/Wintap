@@ -43,16 +43,24 @@
   </PropertyGroup>
   <PropertyGroup />
   <ItemGroup>
+    <Compile Remove="App_Start\**" />
+    <Compile Remove="binary\**" />
     <Compile Remove="MergeHelper\**" />
     <Compile Remove="WintapAPI\**" />
     <Compile Remove="WintapETL\**" />
     <Compile Remove="WintapRecorder\**" />
     <Compile Remove="WintapSvcMgr\**" />
+    <Content Remove="App_Start\**" />
+    <Content Remove="binary\**" />
+    <EmbeddedResource Remove="App_Start\**" />
+    <EmbeddedResource Remove="binary\**" />
     <EmbeddedResource Remove="MergeHelper\**" />
     <EmbeddedResource Remove="WintapAPI\**" />
     <EmbeddedResource Remove="WintapETL\**" />
     <EmbeddedResource Remove="WintapRecorder\**" />
     <EmbeddedResource Remove="WintapSvcMgr\**" />
+    <None Remove="App_Start\**" />
+    <None Remove="binary\**" />
     <None Remove="MergeHelper\**" />
     <None Remove="WintapAPI\**" />
     <None Remove="WintapETL\**" />
@@ -136,12 +144,10 @@
     </COMReference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="App_Start\" />
-    <Folder Include="binary\" />
     <Folder Include="collect\misc\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="WintapAPI\WintapAPI.csproj" />
+    <ProjectReference Include="..\WintapAPI\WintapAPI.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.7.1.1" />

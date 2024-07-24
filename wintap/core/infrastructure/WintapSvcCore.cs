@@ -22,7 +22,6 @@ using Microsoft.Extensions.Options;
 using System.Threading.Tasks;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using SampleApp.Services;
 using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
 using Codeblaze.SemanticKernel.Connectors.Ollama;
 using Microsoft.SemanticKernel.ChatCompletion;
