@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using SampleApp.Services;
 using System.Text.Json;
 using System.Web.Services.Description;
 using System.Runtime.CompilerServices;
