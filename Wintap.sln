@@ -28,6 +28,17 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "platform", "platform", "{94
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "windows", "windows", "{F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{39BB107A-F80C-49B8-BCDA-11C080592E99}"
+	ProjectSection(SolutionItems) = preProject
+		CONTRIBUTIONS.md = CONTRIBUTIONS.md
+		LICENSE = LICENSE
+		NOTICE.txt = NOTICE.txt
+		README.md = README.md
+		Wintap 6 Developer's Guide.pdf = Wintap 6 Developer's Guide.pdf
+		wintap.ico = wintap.ico
+		Wintap.png = Wintap.png
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
