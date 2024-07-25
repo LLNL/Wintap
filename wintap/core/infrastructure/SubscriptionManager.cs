@@ -38,7 +38,7 @@ namespace gov.llnl.wintap.core.infrastructure
             baseCollectors.Add(pc);
 
             // start modelled collectors
-            string nameSpace = "gov.llnl.wintap.collect";
+            string nameSpace = "gov.llnl.wintap.platform.windows.collect.etw";
             foreach (SettingsProperty sp in Properties.Settings.Default.Properties)
             {
                 if (sp.Name.EndsWith("Collector") && Properties.Settings.Default[sp.Name].ToString() == "True")

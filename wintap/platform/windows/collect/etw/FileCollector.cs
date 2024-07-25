@@ -72,7 +72,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void EtwParser_FileIOClose(FileIOSimpleOpTraceData obj)
         {
-            base.Process_Event(obj);
+            UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 string path = "";
@@ -124,7 +124,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void Kernel_FileIoRead(FileIOReadWriteTraceData obj)
         {
-            base.Process_Event(obj);
+            UpdateStatistics(obj.Source.EventsLost);
             if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
@@ -147,7 +147,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void Kernel_FileIoWrite(FileIOReadWriteTraceData obj)
         {
-            base.Process_Event(obj);
+            UpdateStatistics(obj.Source.EventsLost);
             if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
