@@ -19,7 +19,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     internal class MicrosoftWindowsWin32kCollector : EtwProviderCollector
     {
 
-        public MicrosoftWindowsWin32kCollector() : base()
+        MicrosoftWindowsWin32kCollector() : base()
         {
             CollectorName = "Microsoft-Windows-Win32k";
             EtwProviderId = "8C416C79-D49B-4F01-A467-E56D3AA8234C";
@@ -27,7 +27,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EventLevel = TraceEventLevel.Informational;
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             try
@@ -61,7 +61,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         }
         private void parseFocusChange(TraceEvent obj)
         {
-            Counter++;
             try
             {
                 WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "FocusChange");

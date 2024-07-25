@@ -24,16 +24,15 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public enum ProcessActivityEnum { start, stop, refresh };
 
-        public ProcessCollector() : base()
+        internal ProcessCollector() : base()
         {
             CollectorName = "Process";
             EtwProviderId = "SystemTraceControlGuid";
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.Process;
         }
 
-        public override bool Start()
+        internal override bool Start()
         {
-            enabled = true;   // disable throttling for Process
             //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
             EPStatement etlToEsperPattern = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name FROM pattern[every PartA=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ProcessStart/Start') -> PartB=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ImageLoad' AND PID=PartA.PID) where timer:within(3 sec)]");
             etlToEsperPattern.Events += etlToEsperPattern_Events;
@@ -45,7 +44,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelParser.Instance.EtwParser.ProcessStart += new Action<ProcessTraceData>(Kernel_ProcessStart);
 
             WintapLogger.Log.Append("Process collection startup complete.", LogLevel.Always);
-            return enabled;
+            return true;
         }
 
         /// <summary>
@@ -54,11 +53,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// <param name="obj"></param>
         private void Kernel_ProcessStart(ProcessTraceData obj)
         {
-            Counter++;
+            base.Process_Event(obj);
             try
             {
                 DateTime recvTime = DateTime.Now;
-                (string path, string arguments) = TranslateProcessPath(obj.ImageFileName, obj.CommandLine);
+                (string path, string arguments) = base.TranslateProcessPath(obj.ImageFileName, obj.CommandLine);
                 if (path == null)
                 {
                     path = "NA";

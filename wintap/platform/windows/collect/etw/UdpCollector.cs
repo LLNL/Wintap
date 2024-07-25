@@ -26,14 +26,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.NetworkTCPIP;
         }
 
-        public override bool Start()
+        internal override bool Start()
         {
             if (EventsPerSecond < MaxEventsPerSecond)
             {
                 KernelParser.Instance.EtwParser.UdpIpFail += Kernel_UdpIpFail;
                 KernelParser.Instance.EtwParser.UdpIpSend += Kernel_UdpIpSendRecv;
                 KernelParser.Instance.EtwParser.UdpIpRecv += Kernel_UdpIpSendRecv;
-                UpdateStatistics();
+                CacheStatistics();
                 enabled = true;
             }
             else
@@ -47,7 +47,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                Counter++;
+                base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "UdpPacket");
                 wintapMsg.ActivityType = obj.EventName;
                 WintapMessage.FailureCodeType failEnum = (WintapMessage.FailureCodeType)Enum.Parse(wintapMsg.UdpPacket.FailureCode.GetType(), obj.FailureCode.ToString(), true);
@@ -64,7 +64,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                Counter++;
+                base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "UdpPacket");
                 //if (obj.PayloadNames.ToList().Contains("CorrelationId"))
                 //{
@@ -95,10 +95,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 WintapLogger.Log.Append("Error sending UDP event: " + ex.Message, LogLevel.Always);
             }
         }
-
-        public override void Process_Event(TraceEvent obj)
+        
+        internal override void Process_Event(TraceEvent obj)
         {
-            throw new NotImplementedException();
+
         }
     }
 }

@@ -28,7 +28,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EtwProviderId = "";
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
 

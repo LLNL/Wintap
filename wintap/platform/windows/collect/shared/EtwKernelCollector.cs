@@ -19,7 +19,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
     /// <summary>
     /// The set of providers that create the kernel session event stream
     /// </summary>
-    public sealed class KernelSession : EtwCollector
+    internal sealed class KernelSession : BaseWinCollector
     {
         /// <summary>
         /// Current count of events dropped for this ETW session as reported by Performance Monitor
@@ -44,7 +44,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         {
             //avoid a race condition on NT Kernel Logger
             System.Threading.Thread.Sleep(2000);
-            EtwSessionName = "NT Kernel Logger";
+            this.EtwSessionName = "NT Kernel Logger";
             EtwSession = new TraceEventSession(EtwSessionName, TraceEventSessionOptions.Create);
 
             //EtwSession.StackCompression = true;  // enables stack walking???

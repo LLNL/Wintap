@@ -9,6 +9,7 @@ using System.Linq;
 using Microsoft.Diagnostics.Tracing;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared.models;
@@ -25,19 +26,19 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private long lastRegPath;
         private RegistryManager regMan;
 
-        public MicrosoftWindowsKernelRegistryCollector() : base()
+        internal MicrosoftWindowsKernelRegistryCollector() : base()
         {
             CollectorName = "Registry";
             EtwProviderId = "70EB4F03-C1DE-4F73-A051-33D13D5413BD";
             regMan = new RegistryManager();
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             try
             {
-                if (obj.ProcessID == wintapPID) { return; }
+                if (obj.ProcessID == StateManager.WintapPID) { return; }
                 switch (obj.ProviderName)
                 {
                     case "Microsoft-Windows-Kernel-Registry":

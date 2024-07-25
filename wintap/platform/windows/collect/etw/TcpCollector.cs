@@ -11,6 +11,7 @@ using Microsoft.Diagnostics.Tracing;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using System.Linq;
+using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.platform.windows.collect.shared;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
@@ -28,7 +29,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.NetworkTCPIP;
         }
 
-        public override bool Start()
+        internal override bool Start()
         {
             enabled = true;  // disable throttling of TCP, too important.
 
@@ -51,9 +52,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 KernelParser.Instance.EtwParser.TcpIpSend += Kernel_TcpIpSend;
                 // typegroup fail
                 KernelParser.Instance.EtwParser.TcpIpFail += Kernel_TcpIpFail;
-                UpdateStatistics();
+                CacheStatistics();
                 WintapLogger.Log.Append("Kernel Tcp/Ip provider is be enabled.", LogLevel.Always);
-                UpdateStatistics();
+                CacheStatistics();
                 enabled = true;
             }
             else
@@ -67,6 +68,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
+                base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
                 msg.TcpConnection = new WintapMessage.TcpConnectionObject();
                 msg.TcpConnection.PacketSize = obj.size;
@@ -121,6 +123,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
+                base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
                 msg.TcpConnection = new WintapMessage.TcpConnectionObject();
                 msg.TcpConnection.DestinationPort = obj.dport;
@@ -170,6 +173,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
+                base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
                 msg.TcpConnection = new WintapMessage.TcpConnectionObject();
                 msg.TcpConnection.SourceAddress = obj.saddr.ToString();
@@ -190,7 +194,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private WintapMessage getWintapTCPBuilder(dynamic etwObj, string msgType)
         {
-            Counter++;
             WintapMessage wintapBuilder = new WintapMessage(etwObj.TimeStamp, etwObj.ProcessID, CollectorName);
             wintapBuilder.ActivityType = etwObj.EventName;
             //if (etwObj.PayloadNames.ToList().Contains("CorrelationId"))
@@ -204,9 +207,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return wintapBuilder;
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
-            throw new NotImplementedException();
+
         }
     }
 }

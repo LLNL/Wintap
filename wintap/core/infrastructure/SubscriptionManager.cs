@@ -20,12 +20,12 @@ namespace gov.llnl.wintap.core.infrastructure
     public class SubscriptionManager
     {
         private List<EtwProviderCollector> etwCollectors;
-        private List<BaseCollector> baseCollectors;
+        private List<BaseWinCollector> baseCollectors;
         private Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords kernelFlags;
 
         internal SubscriptionManager()
         {
-            baseCollectors = new List<BaseCollector>();
+            baseCollectors = new List<BaseWinCollector>();
             etwCollectors = new List<EtwProviderCollector>();
         }
 
@@ -57,7 +57,7 @@ namespace gov.llnl.wintap.core.infrastructure
                         MethodInfo method = type.GetMethod("Start");
                         if ((bool)method.Invoke(instance, null))
                         {
-                            baseCollectors.Add((BaseCollector)instance); // save the collectors so we can call thier Stop() methods on shutdown.
+                            baseCollectors.Add((BaseWinCollector)instance); // save the collectors so we can call thier Stop() methods on shutdown.
                         }
                         try
                         {
@@ -98,7 +98,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 GenericCollector gc = new GenericCollector() { CollectorName = etwCollectorName, EtwProviderId = genericProvider };
                 if (gc.Start())
                 {
-                    baseCollectors.Add((BaseCollector)gc);
+                    baseCollectors.Add((BaseWinCollector)gc);
                 }
             }
             WintapLogger.Log.Append("Done loading unmodelled collectors", LogLevel.Always);
@@ -118,7 +118,7 @@ namespace gov.llnl.wintap.core.infrastructure
         internal void Stop()
         {
             WintapLogger.Log.Append("Sensor shutting down. ", LogLevel.Always);
-            foreach(BaseCollector collector in baseCollectors)
+            foreach(BaseWinCollector collector in baseCollectors)
             {
                 collector.Stop();
             }

@@ -29,7 +29,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     /// Until then, registry should be collected using the User mode provider (Microsoft-Windows-Kernel-Registry) where we can implement filtering.
     /// 
     /// </summary>
-    class RegistryCollector : EtwProviderCollector
+    internal class RegistryCollector : EtwProviderCollector
     {
         private enum LastActionEnum { Create, Read, Write, Delete }
         private LastActionEnum lastRegAction;
@@ -37,7 +37,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private RegistryManager regMan;
         private int rundowns;
 
-        public RegistryCollector() : base()
+        internal RegistryCollector() : base()
         {
             rundowns = 0;
             CollectorName = "Registry";
@@ -47,33 +47,27 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             regMan.RegParents = new Dictionary<ulong, string>();
         }
 
-        public override bool Start()
+        internal override bool Start()
         {
-            if (EventsPerSecond < MaxEventsPerSecond)
-            {
-                enabled = true;
-                KernelParser.Instance.EtwParser.RegistrySetValue += KernelParser_RegistrySetValue;
-                KernelParser.Instance.EtwParser.RegistryKCBRundownEnd += EtwParser_RegistryKCBRundownEnd;
-                KernelParser.Instance.EtwParser.RegistryCreate += EtwParser_RegistryCreate;
-                //KernelParser.Instance.EtwParser.RegistryOpen += EtwParser_RegistryOpen;
-                //KernelParser.Instance.EtwParser.RegistryQueryValue += KernelParser_RegistryQueryValue;
-            }
-            else
-            {
-                WintapLogger.Log.Append(CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
-            }
+            KernelParser.Instance.EtwParser.RegistrySetValue += KernelParser_RegistrySetValue;
+            KernelParser.Instance.EtwParser.RegistryKCBRundownEnd += EtwParser_RegistryKCBRundownEnd;
+            KernelParser.Instance.EtwParser.RegistryCreate += EtwParser_RegistryCreate;
+            //KernelParser.Instance.EtwParser.RegistryOpen += EtwParser_RegistryOpen;
+            //KernelParser.Instance.EtwParser.RegistryQueryValue += KernelParser_RegistryQueryValue;
             lastRegPath = 0;
 
-            return enabled;
+            return true;
         }
 
         private void EtwParser_RegistryOpen(RegistryTraceData obj)
         {
+            base.Process_Event(obj);
             addParentKey(obj);
         }
 
         private void EtwParser_RegistryCreate(RegistryTraceData obj)
         {
+            base.Process_Event(obj);
             addParentKey(obj);
         }
 
@@ -100,6 +94,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
+                base.Process_Event(obj);
                 // strip the odd prefix off the keyname
                 string keypath = obj.KeyName.ToLower();
                 string[] regPrefix = new string[2];
@@ -128,7 +123,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void KernelParser_RegistryQueryValue(RegistryTraceData obj)
         {
-            Counter++;
+            base.Process_Event(obj);
             try
             {
                 string keypath = KernelParser.Instance.EtwParser.FileIDToFileName(obj.KeyHandle).ToLower().TrimStart(new char[] { '\\' }).TrimStart(new char[] { '\\' });
@@ -159,9 +154,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EventChannel.Send(msg);
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
-            throw new NotImplementedException();
+
         }
     }
 }

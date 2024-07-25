@@ -15,17 +15,20 @@ using System.Diagnostics;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.collect.models;
 using System.Timers;
+using gov.llnl.wintap.core.collect;
 
 namespace gov.llnl.wintap.platform.windows.collect.shared
 {
     /// <summary>
     /// base class of a curated ETW event provider
     /// </summary>
-    internal abstract class EtwProviderCollector : EtwCollector
+    internal abstract class EtwProviderCollector : BaseWinCollector
     {
         private TraceEventSession traceEventSession;
         private ETWTraceEventSource traceEventSource;
 
+        public string EtwSessionName { get; set; }
+        public BaseWinCollector.CollectorTypeEnum CollectorType;
         public string EtwProviderId { get; set; }
         public TraceEventLevel EventLevel { get; set; }
         // use perfmon keyword to get the hex value, then convert to decimal for usage here.
@@ -37,42 +40,34 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
         public EtwProviderCollector() : base()
         {
-            CollectorType = CollectorTypeEnum.ETW;
+            CollectorType = BaseWinCollector.CollectorTypeEnum.ETW;
 
         }
 
-        public override bool Start()
+        internal virtual bool Start()
         {
             EtwSessionName = "Wintap.Collectors." + CollectorName;
-            if (EventsPerSecond < MaxEventsPerSecond)
-            {
-                traceEventSession = new TraceEventSession(EtwSessionName, TraceEventSessionOptions.Create);
 
-                // hook perfmon here to monitor for session stats:  total subs, total events, total dropped events
-                // in addition to publishing the metrics in props, have an event fire on dropped events eventargs holds the name of the session and dropped event count
-                traceEventSession.EnableProvider(EtwProviderId, EventLevel, TraceEventFlags);
-                traceEventSource = new ETWTraceEventSource(EtwSessionName, TraceEventSourceType.Session);
-                WintapLogger.Log.Append("attempting to enable provider: " + EtwProviderId + " from collector: " + CollectorName + ", trace flags: " + TraceEventFlags + ", trace level: " + EventLevel, LogLevel.Always);
-                RegisteredTraceEventParser traceEventParser = new RegisteredTraceEventParser(traceEventSource);
-                traceEventParser.All += Process_Event;
-                base.Start();
+            traceEventSession = new TraceEventSession(EtwSessionName, TraceEventSessionOptions.Create);
 
-                BackgroundWorker etwListenerThread = new BackgroundWorker();
-                etwListenerThread.WorkerSupportsCancellation = true;
-                etwListenerThread.DoWork += new DoWorkEventHandler(etwListenerThread_DoWork);
-                etwListenerThread.RunWorkerAsync();
-                enabled = true;
-            }
-            else
-            {
-                WintapLogger.Log.Append(CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
-            }
-            return enabled;
+            // hook perfmon here to monitor for session stats:  total subs, total events, total dropped events
+            // in addition to publishing the metrics in props, have an event fire on dropped events eventargs holds the name of the session and dropped event count
+            traceEventSession.EnableProvider(EtwProviderId, EventLevel, TraceEventFlags);
+            traceEventSource = new ETWTraceEventSource(EtwSessionName, TraceEventSourceType.Session);
+            WintapLogger.Log.Append("attempting to enable provider: " + EtwProviderId + " from collector: " + CollectorName + ", trace flags: " + TraceEventFlags + ", trace level: " + EventLevel, LogLevel.Always);
+            RegisteredTraceEventParser traceEventParser = new RegisteredTraceEventParser(traceEventSource);
+            traceEventParser.All += Process_Event;
+
+            BackgroundWorker etwListenerThread = new BackgroundWorker();
+            etwListenerThread.WorkerSupportsCancellation = true;
+            etwListenerThread.DoWork += new DoWorkEventHandler(etwListenerThread_DoWork);
+            etwListenerThread.RunWorkerAsync();
+
+            return true;
         }
 
-        public override void Stop()
+        internal void Stop()
         {
-            base.Stop();
             string etwSessionName = "Wintap.Collectors." + EtwProviderId;
             try
             {
@@ -92,12 +87,12 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
 
         /// <summary>
-        /// 
+        /// When inherited, this intermediate method signature auto-gens ETW scaffolding which provides a better design time experience for devs
         /// </summary>
         /// <param name="obj"></param>
-        public virtual void Process_Event(TraceEvent obj)
+        internal virtual void Process_Event(TraceEvent obj)
         {
-            Counter++;
+            base.UpdateStatistics(obj.Source.EventsLost);
         }
 
         private void etwListenerThread_DoWork(object sender, DoWorkEventArgs e)

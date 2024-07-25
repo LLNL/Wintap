@@ -22,7 +22,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     {
         private Dictionary<int, string> processLookup;
 
-        public MicrosoftWindowsKernelProcessCollector() : base()
+        internal MicrosoftWindowsKernelProcessCollector() : base()
         {
             CollectorName = "Microsoft-Windows-Kernel-Process";
             EtwProviderId = "22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716";
@@ -30,7 +30,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             processLookup = new Dictionary<int, string>();
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
 

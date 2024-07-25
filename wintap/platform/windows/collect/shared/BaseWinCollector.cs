@@ -17,10 +17,11 @@ using System.Linq;
 using System.Management;
 using System.Security.Principal;
 using System.Timers;
+using gov.llnl.wintap.core.collect;
 
 namespace gov.llnl.wintap.platform.windows.collect.shared
 {
-    public class BaseCollector
+    public class BaseWinCollector : BaseTelemetryCollector
     {
         private string nativePrefix = @"\device\harddiskvolume";
         private ConcurrentQueue<int> performanceSampleSet;
@@ -45,7 +46,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             }
         }
 
-        public BaseCollector()
+        public BaseWinCollector()
         {
             collectorType = CollectorTypeEnum.General;
             performanceSampleSet = new ConcurrentQueue<int>();
@@ -57,7 +58,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             averager = new Timer(10000);
             averager.Elapsed += Averager_Elapsed;
             averager.Start();
-            UpdateStatistics();
+            CacheStatistics();
 
         }
 
@@ -67,6 +68,8 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         /// Number of events received
         /// </summary>
         public long Counter { get; set; }
+
+        public string EtwSessionName { get; set; }
 
         public virtual bool Start()
         {
@@ -86,22 +89,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
         }
 
-        /// <summary>
-        /// The name of the thing that generates the events this instance collects. 
-        /// For ETW sources, you may want to use the ProviderName or the EventName fields.
-        /// </summary>
-        internal string CollectorName { get; set; }
-
-        /// <summary>
-        /// An average of events over a 10 second duration.  Value will be 0 until enough events accumulate to compute the 10 second average.
-        /// </summary>
-        internal int EventsPerSecond
-        {
-            get
-            {
-                return eventsPerSecond;
-            }
-        }
+        
 
 
         internal int MaxEventsPerSecond;
@@ -109,7 +97,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         /// <summary>
         /// get provider specific metrics from last wintap session from the registry.  
         /// </summary>
-        internal void UpdateStatistics()
+        internal void CacheStatistics()
         {
             try
             {

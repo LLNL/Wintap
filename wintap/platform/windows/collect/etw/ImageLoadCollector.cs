@@ -23,40 +23,31 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private List<WintapMessage.ImageLoadObject> eventCache = new List<WintapMessage.ImageLoadObject>();
 
-        public ImageLoadCollector() : base()
+        internal ImageLoadCollector() : base()
         {
             CollectorName = "ImageLoad";
             EtwProviderId = "SystemTraceControlGuid";
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.ImageLoad;
         }
 
-        public override bool Start()
+        internal override bool Start()
         {
-            if (EventsPerSecond < MaxEventsPerSecond)
-            {
-                KernelParser.Instance.EtwParser.ImageLoad += Kernel_ImageLoad;
-                KernelParser.Instance.EtwParser.ImageUnload += Kernel_ImageLoad;
-                enabled = true;
-                UpdateStatistics();
-            }
-            else
-            {
-                WintapLogger.Log.Append(CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
-            }
-            return enabled;
+            base.Start();
+            KernelParser.Instance.EtwParser.ImageLoad += Kernel_ImageLoad;
+            KernelParser.Instance.EtwParser.ImageUnload += Kernel_ImageLoad;
+            return true;
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
-            // kernel event collectors provide thier own event processing methods
-            throw new NotImplementedException();
+            // kernel event collectors have specialized event processing methods
         }
 
         internal void Kernel_ImageLoad(ImageLoadTraceData obj)
         {
             try
             {
-                Counter++;
+                base.Process_Event(obj);
                 WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "ImageLoad");
                 wintapBuilder.ImageLoad = new WintapMessage.ImageLoadObject();
                 wintapBuilder.ActivityType = obj.OpcodeName;

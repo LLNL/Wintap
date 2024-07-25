@@ -52,36 +52,27 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 source.Process(); // Invoke callbacks, will break at eof
                 WintapLogger.Log.Append("Rundown file event trace complete. total rundowns processed: " + counter, LogLevel.Always);
             }
-            UpdateStatistics();
 
         }
 
-        public override bool Start()
+        public bool Start()
         {
-            enabled = false;
-            if (EventsPerSecond < MaxEventsPerSecond)
+            base.Start();
+            KernelParser.Instance.EtwParser.FileIOWrite += Kernel_FileIoWrite;
+            KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
+            KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
+            KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
+            KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
+            if (Properties.Settings.Default.CollectFileRead)
             {
-                enabled = true;
-                KernelParser.Instance.EtwParser.FileIOWrite += Kernel_FileIoWrite;
-                KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
-                KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
-                KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
-                KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
-                if (Properties.Settings.Default.CollectFileRead)
-                {
-                    KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
-                }
+                KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
             }
-            else
-            {
-                WintapLogger.Log.Append(CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
-            }
-            return enabled;
+            return true;
         }
 
         private void EtwParser_FileIOClose(FileIOSimpleOpTraceData obj)
         {
-            Counter++;
+            base.Process_Event(obj);
             try
             {
                 string path = "";
@@ -111,7 +102,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         void Kernel_FileIoCreate(FileIOCreateTraceData obj)
         {
-            Counter++;
+            UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 fileKeyToPath.TryAdd(obj.FileObject, obj.FileName);  // FileObject is per-openfile not per-filename (fileKey). 
@@ -122,7 +113,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void EtwParser_FileIOName(FileIONameTraceData obj)
         {
-            Counter++;
+            UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 fileKeyToPath.TryAdd(obj.FileKey, obj.FileName);
@@ -133,7 +124,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void Kernel_FileIoRead(FileIOReadWriteTraceData obj)
         {
-            Counter++;
+            base.Process_Event(obj);
             if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
@@ -156,6 +147,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void Kernel_FileIoWrite(FileIOReadWriteTraceData obj)
         {
+            base.Process_Event(obj);
             if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
@@ -208,7 +200,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 return;
             }
-            if (pid == wintapPID)
+            if (pid == StateManager.WintapPID)
             {
                 return;
             }
@@ -226,12 +218,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         void Kernel_FileIoDelete(FileIOInfoTraceData obj)
         {
-            Counter++;
+            base.Process_Event(obj);
             try
             {
                 int pid = obj.ProcessID;
                 string filePath = "";
-                if (pid == wintapPID)
+                if (pid == StateManager.WintapPID)
                 {
                     return;  // prevent feedback loop
                 }

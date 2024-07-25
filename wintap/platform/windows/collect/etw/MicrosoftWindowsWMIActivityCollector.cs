@@ -23,13 +23,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     /// </summary>
     internal class MicrosoftWindowsWMIActivityCollector : EtwProviderCollector
     {
-        public MicrosoftWindowsWMIActivityCollector() : base()
+        internal MicrosoftWindowsWMIActivityCollector() : base()
         {
             CollectorName = "Microsoft-Windows-WMI-Activity";
             EtwProviderId = "1418EF04-B0B4-4623-BF7E-D74AB47BBDAA";
         }
 
-        public override void Process_Event(TraceEvent obj)
+        internal override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "WmiActivity");

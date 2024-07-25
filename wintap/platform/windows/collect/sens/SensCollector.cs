@@ -21,7 +21,7 @@
 //    /// System Event Notification Services (SENS) collector
 //    /// SENS:  https://docs.microsoft.com/en-us/windows/win32/sens/notifications
 //    /// </summary>
-//    internal class SensCollector : BaseCollector, SensEvents.ISensLogon
+//    internal class SensCollector : BaseWinCollector, SensEvents.ISensLogon
 //    {
 //        public SensCollector() : base()
 //        {
