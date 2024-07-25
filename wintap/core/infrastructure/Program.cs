@@ -38,6 +38,7 @@ using static System.Net.Mime.MediaTypeNames;
 using System.ComponentModel;
 using Microsoft.SemanticKernel.Connectors.Chroma;
 
+System.Diagnostics.Debugger.Launch();
 var builder = WebApplication.CreateBuilder(args);
 // Add services to the DI container.
 // If you only need API controllers (no views or pages), use this:

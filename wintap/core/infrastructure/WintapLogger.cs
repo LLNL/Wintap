@@ -118,7 +118,7 @@ namespace gov.llnl.wintap.core.infrastructure
             statusMsg = "n/a";
 
             // Contat the path
-            logPath = Path.Combine(logDir, logName, ".log");
+            logPath = Path.Combine(logDir, logName + ".log");
             // Record the start time
             startTime = DateTime.Now;
             switch (LogType)
