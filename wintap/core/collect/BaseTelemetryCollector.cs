@@ -13,6 +13,7 @@ namespace gov.llnl.wintap.core.collect
         private int _eventAccumulator;
         private int _droppedEvents;
         private int _lastDroppedEvents;
+        private int _currentDroppedEvents;
         private int _totalEvents;
 
         /// <summary>
@@ -38,6 +39,18 @@ namespace gov.llnl.wintap.core.collect
         {
             _eventsPerSecond = _eventAccumulator;
             _eventAccumulator = 0;
+            if (_currentDroppedEvents > _lastDroppedEvents)
+            {
+                _lastDroppedEvents = _currentDroppedEvents;
+                StateManager.DroppedEventsDetected = true;
+                WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, Process.GetCurrentProcess().Id, "WintapAlert");
+                alertMsg.WintapAlert = new WintapMessage.WintapAlertData();
+                alertMsg.WintapAlert.AlertName = WintapMessage.WintapAlertData.AlertNameEnum.EVENT_DROP;
+                alertMsg.WintapAlert.AlertDescription = "ETW Session is dropping events.  Session Name: " + CollectorName + " Total events dropped since sensor start: " + _droppedEvents;
+                EventChannel.Send(alertMsg);
+                WintapLogger.Log.Append(alertMsg.WintapAlert.AlertDescription, core.infrastructure.LogLevel.Always);
+            }
+            WintapLogger.Log.Append("ETW Session: " + CollectorName + " events per second: " + _eventsPerSecond, core.infrastructure.LogLevel.Always);
         }
 
 
@@ -63,21 +76,11 @@ namespace gov.llnl.wintap.core.collect
         /// <param name="droppedEvents"></param>
         protected void UpdateStatistics(int droppedEvents)
         {
-            if (droppedEvents > _lastDroppedEvents)
-            {
-                _droppedEvents += droppedEvents;
-                StateManager.DroppedEventsDetected = true;
-                WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, Process.GetCurrentProcess().Id, "WintapAlert");
-                alertMsg.WintapAlert = new WintapMessage.WintapAlertData();
-                alertMsg.WintapAlert.AlertName = WintapMessage.WintapAlertData.AlertNameEnum.EVENT_DROP;
-                alertMsg.WintapAlert.AlertDescription = "ETW Session is dropping events.  Session Name: " + CollectorName + " Total events dropped since sensor start: " + _droppedEvents;
-                EventChannel.Send(alertMsg);
-                WintapLogger.Log.Append(alertMsg.WintapAlert.AlertDescription, core.infrastructure.LogLevel.Always);
-            }
+            _lastDroppedEvents = droppedEvents;
             _totalEvents++;
             _eventAccumulator++;
             _droppedEvents = _lastDroppedEvents;
-            WintapLogger.Log.Append("ETW Session: " + CollectorName + " events per second: " + _eventsPerSecond, core.infrastructure.LogLevel.Always);
+            
         }
 
     }
