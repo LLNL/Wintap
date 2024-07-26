@@ -205,14 +205,14 @@ namespace gov.llnl.wintap
             }
 
             // ETW rundown to resolve file paths.  TODO:  only do if FILE events are enabled.
-            WintapLogger.Log.Append("Doing ETW File path rundown", LogLevel.Always);
-            ProcessStartInfo rundownPsi = new ProcessStartInfo();
-            rundownPsi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
-            rundownPsi.Arguments = "RUNDOWN";
-            System.Diagnostics.Process rundown = new Process();
-            rundown.StartInfo = rundownPsi;
-            rundown.Start();
-            rundown.WaitForExit();
+            WintapLogger.Log.Append("NOT Doing ETW File path rundown", LogLevel.Always);
+            //ProcessStartInfo rundownPsi = new ProcessStartInfo();
+            //rundownPsi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
+            //rundownPsi.Arguments = "RUNDOWN";
+            //System.Diagnostics.Process rundown = new Process();
+            //rundown.StartInfo = rundownPsi;
+            //rundown.Start();
+            //rundown.WaitForExit();
 
 
             System.Threading.Thread.Sleep(5000);  // allow plugins to init

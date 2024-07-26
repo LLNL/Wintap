@@ -17,7 +17,7 @@ namespace gov.llnl.wintap.platform.windows.collect.log
     /// <summary>
     /// Sipmle collector for the Windows event logs (System, Application, Security)
     /// </summary>
-    internal class WindowsEventlogCollector : BaseCollector
+    internal class WindowsEventlogCollector : BaseWinCollector
     {
         public WindowsEventlogCollector() : base()
         {
