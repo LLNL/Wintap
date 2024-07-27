@@ -33,34 +33,27 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             enabled = true;  // disable throttling of TCP, too important.
 
-            if (EventsPerSecond < MaxEventsPerSecond)
-            {
-                // typegroup 1 events
-                KernelParser.Instance.EtwParser.TcpIpReconnect += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpRecv += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpRetransmit += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpTCPCopy += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpDisconnect += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpARPCopy += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpDupACK += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpFullACK += Kernel_TcpIp_TypeGroup1_Handler;
-                KernelParser.Instance.EtwParser.TcpIpPartACK += Kernel_TcpIp_TypeGroup1_Handler;
-                // typegroup 2 events
-                KernelParser.Instance.EtwParser.TcpIpConnect += Kernel_TcpIp_TypeGroup2_Handler;
-                KernelParser.Instance.EtwParser.TcpIpAccept += Kernel_TcpIp_TypeGroup2_Handler;
-                // typegroup send
-                KernelParser.Instance.EtwParser.TcpIpSend += Kernel_TcpIpSend;
-                // typegroup fail
-                KernelParser.Instance.EtwParser.TcpIpFail += Kernel_TcpIpFail;
-                CacheStatistics();
-                WintapLogger.Log.Append("Kernel Tcp/Ip provider is be enabled.", LogLevel.Always);
-                CacheStatistics();
-                enabled = true;
-            }
-            else
-            {
-                WintapLogger.Log.Append(CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
-            }
+            // typegroup 1 events
+            KernelParser.Instance.EtwParser.TcpIpReconnect += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpRecv += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpRetransmit += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpTCPCopy += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpDisconnect += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpARPCopy += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpDupACK += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpFullACK += Kernel_TcpIp_TypeGroup1_Handler;
+            KernelParser.Instance.EtwParser.TcpIpPartACK += Kernel_TcpIp_TypeGroup1_Handler;
+            // typegroup 2 events
+            KernelParser.Instance.EtwParser.TcpIpConnect += Kernel_TcpIp_TypeGroup2_Handler;
+            KernelParser.Instance.EtwParser.TcpIpAccept += Kernel_TcpIp_TypeGroup2_Handler;
+            // typegroup send
+            KernelParser.Instance.EtwParser.TcpIpSend += Kernel_TcpIpSend;
+            // typegroup fail
+            KernelParser.Instance.EtwParser.TcpIpFail += Kernel_TcpIpFail;
+            CacheStatistics();
+            WintapLogger.Log.Append("Kernel Tcp/Ip provider is be enabled.", LogLevel.Always);
+            CacheStatistics();
+            enabled = true;
             return enabled;
         }
 
@@ -68,7 +61,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                base.UpdateStatistics(obj.Source.EventsLost);
+                // todo:
+                // base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
                 msg.TcpConnection = new WintapMessage.TcpConnectionObject();
                 msg.TcpConnection.PacketSize = obj.size;
@@ -123,7 +117,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                base.UpdateStatistics(obj.Source.EventsLost);
+                // todo:
+                // base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
                 msg.TcpConnection = new WintapMessage.TcpConnectionObject();
                 msg.TcpConnection.DestinationPort = obj.dport;
@@ -173,7 +168,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                base.UpdateStatistics(obj.Source.EventsLost);
+                // todo:
+                // base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
                 msg.TcpConnection = new WintapMessage.TcpConnectionObject();
                 msg.TcpConnection.SourceAddress = obj.saddr.ToString();

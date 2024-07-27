@@ -72,7 +72,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void EtwParser_FileIOClose(FileIOSimpleOpTraceData obj)
         {
-            UpdateStatistics(obj.Source.EventsLost);
+            // todo:
+            //UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 string path = "";
@@ -102,7 +103,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         void Kernel_FileIoCreate(FileIOCreateTraceData obj)
         {
-            UpdateStatistics(obj.Source.EventsLost);
+            // todo:
+            //UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 fileKeyToPath.TryAdd(obj.FileObject, obj.FileName);  // FileObject is per-openfile not per-filename (fileKey). 
@@ -113,7 +115,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void EtwParser_FileIOName(FileIONameTraceData obj)
         {
-            UpdateStatistics(obj.Source.EventsLost);
+            // todo:
+            //UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 fileKeyToPath.TryAdd(obj.FileKey, obj.FileName);
@@ -124,7 +127,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void Kernel_FileIoRead(FileIOReadWriteTraceData obj)
         {
-            UpdateStatistics(obj.Source.EventsLost);
+            // todo:
+            //UpdateStatistics(obj.Source.EventsLost);
             if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
@@ -147,7 +151,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private void Kernel_FileIoWrite(FileIOReadWriteTraceData obj)
         {
-            UpdateStatistics(obj.Source.EventsLost);
+            // todo:
+            //UpdateStatistics(obj.Source.EventsLost);
             if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {

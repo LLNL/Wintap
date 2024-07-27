@@ -21,7 +21,7 @@ using gov.llnl.wintap.core.collect;
 
 namespace gov.llnl.wintap.platform.windows.collect.shared
 {
-    public class BaseWinCollector : BaseTelemetryCollector
+    public class BaseWinCollector : BaseCollector
     {
         private string nativePrefix = @"\device\harddiskvolume";
         private ConcurrentQueue<int> performanceSampleSet;
@@ -51,7 +51,6 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             collectorType = CollectorTypeEnum.General;
             performanceSampleSet = new ConcurrentQueue<int>();
             Counter = 0;
-            MaxEventsPerSecond = WintapProfile.MaxEventCount;
             enabled = false;
             eventsPerSecond = 0;
             lastAveraged = DateTime.Now;
@@ -70,29 +69,6 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         public long Counter { get; set; }
 
         public string EtwSessionName { get; set; }
-
-        public virtual bool Start()
-        {
-            if (EventsPerSecond < MaxEventsPerSecond)
-            {
-                enabled = true;
-            }
-            else
-            {
-                WintapLogger.Log.Append(CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
-            }
-            return enabled;
-        }
-
-        public virtual void Stop()
-        {
-
-        }
-
-        
-
-
-        internal int MaxEventsPerSecond;
 
         /// <summary>
         /// get provider specific metrics from last wintap session from the registry.  

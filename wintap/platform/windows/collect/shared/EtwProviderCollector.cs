@@ -92,7 +92,8 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         /// <param name="obj"></param>
         internal virtual void Process_Event(TraceEvent obj)
         {
-            base.UpdateStatistics(obj.Source.EventsLost);
+            // todo:
+            // base.UpdateStatistics(obj.Source.EventsLost);
         }
 
         private void etwListenerThread_DoWork(object sender, DoWorkEventArgs e)

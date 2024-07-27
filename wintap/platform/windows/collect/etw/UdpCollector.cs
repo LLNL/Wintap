@@ -28,18 +28,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         internal override bool Start()
         {
-            if (EventsPerSecond < MaxEventsPerSecond)
-            {
-                KernelParser.Instance.EtwParser.UdpIpFail += Kernel_UdpIpFail;
-                KernelParser.Instance.EtwParser.UdpIpSend += Kernel_UdpIpSendRecv;
-                KernelParser.Instance.EtwParser.UdpIpRecv += Kernel_UdpIpSendRecv;
-                CacheStatistics();
-                enabled = true;
-            }
-            else
-            {
-                WintapLogger.Log.Append(CollectorName + " volume too high, last per/sec average: " + EventsPerSecond + "  this provider will NOT be enabled.", LogLevel.Always);
-            }
+            KernelParser.Instance.EtwParser.UdpIpFail += Kernel_UdpIpFail;
+            KernelParser.Instance.EtwParser.UdpIpSend += Kernel_UdpIpSendRecv;
+            KernelParser.Instance.EtwParser.UdpIpRecv += Kernel_UdpIpSendRecv;
+            CacheStatistics();
+            enabled = true;
             return enabled;
         }
 
@@ -47,7 +40,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                base.UpdateStatistics(obj.Source.EventsLost);
+                // todo:
+                // base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "UdpPacket");
                 wintapMsg.ActivityType = obj.EventName;
                 WintapMessage.FailureCodeType failEnum = (WintapMessage.FailureCodeType)Enum.Parse(wintapMsg.UdpPacket.FailureCode.GetType(), obj.FailureCode.ToString(), true);
@@ -64,7 +58,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                base.UpdateStatistics(obj.Source.EventsLost);
+                // todo:
+                // base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "UdpPacket");
                 //if (obj.PayloadNames.ToList().Contains("CorrelationId"))
                 //{
