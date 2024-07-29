@@ -141,7 +141,10 @@ namespace gov.llnl.wintap.core.infrastructure
                     return;
                 }
             }
-            EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
+            if(streamedEvent.PID != StateManager.WintapPID)
+            {
+                EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
+            }
         }
 
         public static EPServiceProvider Esper

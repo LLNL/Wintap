@@ -129,7 +129,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             // todo:
             //UpdateStatistics(obj.Source.EventsLost);
-            if (obj.ProcessID == StateManager.WintapPID) { return; }
             try
             {
                 string filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
@@ -205,11 +204,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 return;
             }
-            if (pid == StateManager.WintapPID)
-            {
-                return;
-            }
-
             WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, CollectorName);
             wintapBuilder.FileActivity = new WintapMessage.FileActivityObject();
             wintapBuilder.MessageType = CollectorName;
