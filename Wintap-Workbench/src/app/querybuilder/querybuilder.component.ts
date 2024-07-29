@@ -1,3 +1,4 @@
+import { Injectable } from '@angular/core';
 import {
     Component, ViewChild, AfterViewInit, OnInit, ElementRef, QueryList
 } from '@angular/core';
@@ -10,15 +11,19 @@ import { CodemirrorComponent } from '@ctrl/ngx-codemirror';
 import * as CodeMirror from 'codemirror';
 import 'codemirror/addon/mode/overlay';
 import './wintapmessage';
-import * as signalR from '@microsoft/signalr';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import 'codemirror/addon/hint/show-hint';
+
 
 declare var $: any;
 
 interface expandedRows {
     [key: string]: boolean;
 }
+
+@Injectable({
+    providedIn: 'root'
+})
 
 @Component({
   selector: 'app-querybuilder',
@@ -66,7 +71,7 @@ export class QuerybuilderComponent implements AfterViewInit, OnInit {
     esperResult!: EsperResult;
     selectedResult: any = null;
 
-    constructor(private http: HttpClient, private httpHeaders: HttpHeaders, private cd: ChangeDetectorRef) {
+    constructor(private http: HttpClient, private cd: ChangeDetectorRef) {
         
     }
 
@@ -211,6 +216,7 @@ export class QuerybuilderComponent implements AfterViewInit, OnInit {
         const codeMirrorInstance = this.codeEditor.codeMirror;
         const editorContent = codeMirrorInstance!.getValue();
         const encodedContent = encodeURIComponent(editorContent);
+        console.log('attempting to activate: ' + eplName + '   content: ' + encodedContent);
         this.addStream(eplName, encodedContent, "ACTIVE").subscribe(
             (response) => {
                 console.log('Success:', response);
@@ -315,7 +321,7 @@ export class QuerybuilderComponent implements AfterViewInit, OnInit {
       }
 
       addStream(shortName: string, queryString: string, stateString: string): Observable<any> {
-        const apiUrl = `/api/streams/post`;
+        const apiUrl = `/api/streams`;
         const body = {
             name: shortName,
             query: queryString,
@@ -323,8 +329,9 @@ export class QuerybuilderComponent implements AfterViewInit, OnInit {
         };
         const headers = new HttpHeaders({
           'Content-Type': 'application/json'
-      });
-      return this.http.post(apiUrl, body, { headers });
+        });
+          console.log('body of request: ' + JSON.stringify(body) + ' headers: ' + JSON.stringify(headers));
+          return this.http.post(apiUrl, body, { headers });
     }
     
 

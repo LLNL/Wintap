@@ -43,7 +43,6 @@ export class EtwExplorerComponent implements AfterViewInit, OnInit {
   constructor(private http: HttpClient, private cd: ChangeDetectorRef) {
     this.connection = $.hubConnection('/signalr');
     const hubProxy = this.connection.createHubProxy('explorerHub');
-      //this.cd = _cd;
 }
 
     ngOnInit() {

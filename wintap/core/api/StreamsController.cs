@@ -32,7 +32,7 @@ namespace gov.llnl.wintap.core.api
         }
 
         [HttpPost]
-        [Route("api/Streams")]
+        [Route("api/streams")]
         public IActionResult Post(string name, string query, string state)
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
