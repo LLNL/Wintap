@@ -1,0 +1,28 @@
+<div class="grid">
+	<div class="col-12">
+		<div class="card">
+			<h5>Process Tree</h5>
+			<div class="flex flex-wrap gap-2">
+				<button pButton pRipple type="button" label="Expand All" class="p-button-outlined p-button-success small-button" style="font-size: 0.6rem; padding: 5px 10px;" icon="pi pi-arrows-v" (click)="expandAll(this.nodes)"></button>
+			</div>
+			<p-treeTable [value]="nodes" [columns]="cols" selectionMode="checkbox">
+				<ng-template pTemplate="header" let-columns>
+					<tr>
+						<th *ngFor="let col of columns">
+							{{col.header}}
+						</th>
+					</tr>
+				</ng-template>
+				<ng-template pTemplate="body" let-rowNode let-rowData="rowData" let-columns="columns">
+					<tr>
+						<td *ngFor="let col of columns; let i = index">
+							<p-treeTableToggler [rowNode]="rowNode" *ngIf="i === 0"></p-treeTableToggler>
+							<!-- <p-treeTableCheckbox [value]="rowNode" *ngIf="i === 0"></p-treeTableCheckbox> -->
+							{{rowData[col.field]}}
+						</td>
+					</tr>
+				</ng-template>
+			</p-treeTable>
+		</div>
+	</div>
+</div>

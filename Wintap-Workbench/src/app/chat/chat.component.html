@@ -1,0 +1,48 @@
+<!-- chat.component.html -->
+
+<!-- Header -->
+<header>
+    <h1>Wintap Local Language Model</h1>
+    <h5>Model: phi-3-mini</h5>
+  </header>
+  <div class="card">
+    <!-- Prompt Window -->
+    <div class="prompt-window" style="display: flex; align-items: flex-start;">
+      <div class="p-float-label" style="flex-grow: 1;">
+        <textarea #prompt id="float-input" rows="1" pInputTextarea
+                  (keydown.enter)="sendPrompt(); $event.preventDefault()" 
+                  [disabled]="isPromptDisabled"
+                  style="width: 100%;"></textarea>
+        <label for="float-input">Prompt</label>
+      </div>
+      <p-button pRipple type="button" class="p-button-success" icon="pi pi-send" (click)="sendPrompt()" style="padding-left: 5px"></p-button>
+      <p-button pRipple type="button" label=""  class="p-button-warning" icon="pi pi-refresh" (click)="performSetup()" style="padding-left: 5px"></p-button>
+    </div>
+
+    <p-progressSpinner #spinner [hidden]="isSpinnerHidden" ariaLabel="loading"></p-progressSpinner>
+  </div>
+
+
+  
+ 
+<!-- Results Window -->
+<div class="results-window">
+    <p *ngIf="results.length === 0"></p>
+    <p-scrollPanel  #response [style]="{ width: '100%', height: '100%' }">
+      <p> {{ userPrompt }} </p>
+      <p>{{ results.join('') }}</p>
+    </p-scrollPanel>
+  </div>
+
+  
+  <!-- LLM Output -->
+  <div class="llm-output">
+    <p>{{ llmOutput }}</p>
+  </div>
+  <p-badge [value]="tokensUsed" style="padding-top: 15px"></p-badge>
+  
+  
+  <!-- Error Message -->
+  <div class="error-message" *ngIf="errorMessage !== ''">
+    {{ errorMessage }}
+  </div>
