@@ -6,7 +6,9 @@
 
 using gov.llnl.wintap.platform.windows.collect.shared;
 using gov.llnl.wintap.platform.windows.infrastructure;
+using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 namespace gov.llnl.wintap.core.infrastructure
 {
 
@@ -25,19 +27,46 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal void Start()
         {
-#if WINDOWS
-            winCollectors = winSubMgr.Start();
-#endif
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                winCollectors = winSubMgr.Start();
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                // linuxCollectors = linuxSubMgr.Start()
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                // macCollectors = osxSubMgr.Start()
+            }
+            else
+            {
+                Console.WriteLine("Running on an unsupported platform");
+            }
             WintapLogger.Log.Append("Done loading collectors", LogLevel.Always);
         }
 
         internal void Stop()
         {
             WintapLogger.Log.Append("Sensor shutting down. ", LogLevel.Always);
-            foreach(BaseWinCollector collector in winCollectors)
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                collector.Stop();
+                foreach (BaseWinCollector collector in winCollectors)
+                {
+                    collector.Stop();
+                }
             }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                // stop linux collectors
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                // stop Mac collectors
+            }
+
             WintapLogger.Log.Append("Sensor shutdown", LogLevel.Always);
         }     
     }
