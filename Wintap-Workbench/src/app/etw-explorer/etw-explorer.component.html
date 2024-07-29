@@ -3,7 +3,7 @@
         <div class="card">
             <span class="block text-500 font-medium mb-3">ETW Providers</span>
             <p>Total Rows: {{ providerListing.length }}</p>
-            <p-table #dt1 [value]="providerListing" dataKey="ProviderName" [rows]="10" [loading]="loading" styleClass="p-datatable-gridlines" [paginator]="true" [globalFilterFields]="['ProviderName']" responsiveLayout="scroll" selectionMode="single" [(selection)]="selectedProvider">
+            <p-table #dt1 [value]="providerListing" dataKey="providerName" [rows]="10" [loading]="loading" styleClass="p-datatable-gridlines" [paginator]="true" [globalFilterFields]="['providerName']" responsiveLayout="scroll" selectionMode="single" [(selection)]="selectedProvider">
                 <ng-template pTemplate="caption">
                     <div class="flex justify-content-between flex-column sm:flex-row">
                         <span class="p-input-icon-left mb-2">
@@ -34,7 +34,7 @@
                 </ng-template>
                 <ng-template pTemplate="body" let-selectedSample>
                     <tr [pSelectableRow]="selectedSample">
-                        <td>{{ selectedSample.ProviderName }}</td>
+                        <td>{{ selectedSample.providerName }}</td>
                     </tr>
                 </ng-template>
             </p-table>

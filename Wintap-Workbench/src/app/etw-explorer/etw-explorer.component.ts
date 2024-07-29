@@ -5,7 +5,8 @@ import { Table } from 'primeng/table';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ChangeDetectorRef } from '@angular/core';
-import 'signalr';
+import { HubConnectionBuilder } from '@microsoft/signalr';
+import { HttpHeaders } from '@angular/common/http';
 
 declare var $: any;
 
@@ -37,39 +38,48 @@ export class EtwExplorerComponent implements AfterViewInit, OnInit {
   filteredRowCount: number = 0;
   eventNameOptions!: any[];
   uniqueEventNames: Set<string> = new Set();
+  //cd: ChangeDetectorRef;
 
   constructor(private http: HttpClient, private cd: ChangeDetectorRef) {
     this.connection = $.hubConnection('/signalr');
     const hubProxy = this.connection.createHubProxy('explorerHub');
-
-    hubProxy.on('addMessage', (data: string) => {
-       // Decode known HTML entities with string replacement
-    const decodedData = data.replace(/&quot;/g, '"')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&apos;/g, "'")
-
-      // Then parse the JSON
-      let parsedData = JSON.parse(decodedData);
-      this.etwSamples.push(parsedData);
-      this.uniqueEventNames.add(parsedData.EventName);
-      this.updateEventNameOptions();
-      this.eventDataTable.totalRecords++;
-        cd.detectChanges();
-      });
-    
-  
-    // Start the connection
-    this.connection.start()
-      .done(() => {
-        console.log('Connected to the hub');
-      })
-      .fail((error: any) => {
-        console.error('Failed to connect to the hub:', error);
-      });
+      //this.cd = _cd;
 }
 
-ngOnInit() {
+    ngOnInit() {
+
+        this.connection = new HubConnectionBuilder()
+            .withUrl('/signalr/explorerHub')
+            .withAutomaticReconnect([0, 2000, 10000, 30000])
+            .build();
+
+        this.connection
+            .start()
+            .catch(console.error('error'));
+
+        console.log('connection state: ' + this.connection.state); // Check the state here
+
+        const fullyQualifiedUrl = `${window.location.protocol}//${window.location.hostname}`;
+
+        console.log(`URL:  ${fullyQualifiedUrl}`);
+
+        this.connection.on('ReceiveMessage', (data: string) => {
+            // Decode known HTML entities with string replacement
+            const decodedData = data.replace(/&quot;/g, '"')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&apos;/g, "'")
+
+            // Then parse the JSON
+            let parsedData = JSON.parse(decodedData);
+            this.etwSamples.push(parsedData);
+            this.uniqueEventNames.add(parsedData.EventName);
+            this.updateEventNameOptions();
+            this.eventDataTable.totalRecords++;
+            this.cd.detectChanges();
+        });
+
+
     this.loading = false;
     this.eventNameOptions = [
       { label: 'Event 1', value: 'Event 1' },
@@ -86,7 +96,8 @@ fetchProviderListing() {
 
 startProvider() {
   const selectedRow = this.eventDataTable.selection;
-        const providerName = this.selectedProvider.ProviderName;
+    const providerName = this.selectedProvider.providerName;
+    console.log('starting provider: ' + providerName);
         this.enableProvider(providerName).subscribe(
           (response) => {
               console.log('Success:', response);
@@ -148,7 +159,7 @@ export interface ApiResponse {
 }
 
 export interface  EtwProvider {
-  ProviderName: string;
+  providerName: string;
 }
 
 export interface ETWSample {
