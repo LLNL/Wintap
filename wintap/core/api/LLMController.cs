@@ -59,7 +59,7 @@ namespace gov.llnl.wintap.core.api
         private ChatHistory chat;
         private IChatCompletionService ai;
 
-    public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai)
+        public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai)
         {
             this.hubContext = _hubContext;
             memory = _memory;

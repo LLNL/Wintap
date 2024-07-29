@@ -38,7 +38,6 @@ using static System.Net.Mime.MediaTypeNames;
 using System.ComponentModel;
 using Microsoft.SemanticKernel.Connectors.Chroma;
 
-System.Diagnostics.Debugger.Launch();
 var builder = WebApplication.CreateBuilder(args);
 // Add services to the DI container.
 // If you only need API controllers (no views or pages), use this:
@@ -194,7 +193,7 @@ app.MapControllers();  // This will map the routes to the API controllers
 
 app.UseEndpoints(endpoints =>
 {
-    //endpoints.MapHub<ExplorerHub>("/api/ExplorerHub");
+    endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
     //endpoints.MapHub<WorkbenchHub>("/api/WorkbenchHub");
     endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });

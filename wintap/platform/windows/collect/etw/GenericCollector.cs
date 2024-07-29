@@ -20,7 +20,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     /// </summary>
     class GenericCollector : EtwProviderCollector
     {
-        internal GenericCollector() : base()
+        public GenericCollector() : base()
         {
             // For ETW events set source name here to be the Event Provider name for documentation purposes and then override it in your event processing and give it the more granular EventName value.
             CollectorName = "";
@@ -28,7 +28,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EtwProviderId = "";
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
 

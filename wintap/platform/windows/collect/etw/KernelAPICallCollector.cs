@@ -39,7 +39,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EtwProviderId = "e02a841c-75a3-4fa7-afc8-ae09cf9b7f23";
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "KernelApiCall");

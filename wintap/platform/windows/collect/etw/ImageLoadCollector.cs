@@ -23,14 +23,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private List<WintapMessage.ImageLoadObject> eventCache = new List<WintapMessage.ImageLoadObject>();
 
-        internal ImageLoadCollector() : base()
+        public ImageLoadCollector() : base()
         {
             CollectorName = "ImageLoad";
             EtwProviderId = "SystemTraceControlGuid";
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.ImageLoad;
         }
 
-        internal override bool Start()
+        public override bool Start()
         {
             base.Start();
             KernelParser.Instance.EtwParser.ImageLoad += Kernel_ImageLoad;
@@ -38,12 +38,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return true;
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
             // kernel event collectors have specialized event processing methods
         }
 
-        internal void Kernel_ImageLoad(ImageLoadTraceData obj)
+        public void Kernel_ImageLoad(ImageLoadTraceData obj)
         {
             try
             {

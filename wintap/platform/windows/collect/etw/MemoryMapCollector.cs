@@ -128,7 +128,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             commitHistory = new Dictionary<string, CommitInfo>();
         }
 
-        internal override bool Start()
+        public override bool Start()
         {
             WintapLogger.Log.Append(CollectorName + " is starting...", LogLevel.Always);
             base.Start();
@@ -147,7 +147,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return status;
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             try

@@ -37,7 +37,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private RegistryManager regMan;
         private int rundowns;
 
-        internal RegistryCollector() : base()
+        public RegistryCollector() : base()
         {
             rundowns = 0;
             CollectorName = "Registry";
@@ -47,7 +47,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             regMan.RegParents = new Dictionary<ulong, string>();
         }
 
-        internal override bool Start()
+        public override bool Start()
         {
             KernelParser.Instance.EtwParser.RegistrySetValue += KernelParser_RegistrySetValue;
             KernelParser.Instance.EtwParser.RegistryKCBRundownEnd += EtwParser_RegistryKCBRundownEnd;
@@ -154,7 +154,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EventChannel.Send(msg);
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
 
         }

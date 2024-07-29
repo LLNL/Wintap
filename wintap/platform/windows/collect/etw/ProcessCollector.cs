@@ -24,14 +24,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public enum ProcessActivityEnum { start, stop, refresh };
 
-        internal ProcessCollector() : base()
+        public ProcessCollector() : base()
         {
             CollectorName = "Process";
             EtwProviderId = "SystemTraceControlGuid";
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.Process;
         }
 
-        internal override bool Start()
+        public override bool Start()
         {
             //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
             EPStatement etlToEsperPattern = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name FROM pattern[every PartA=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ProcessStart/Start') -> PartB=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ImageLoad' AND PID=PartA.PID) where timer:within(3 sec)]");

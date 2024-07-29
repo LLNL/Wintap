@@ -26,7 +26,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.NetworkTCPIP;
         }
 
-        internal override bool Start()
+        public override bool Start()
         {
             KernelParser.Instance.EtwParser.UdpIpFail += Kernel_UdpIpFail;
             KernelParser.Instance.EtwParser.UdpIpSend += Kernel_UdpIpSendRecv;
@@ -91,7 +91,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
         
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
 
         }

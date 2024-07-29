@@ -19,7 +19,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     internal class MicrosoftWindowsWin32kCollector : EtwProviderCollector
     {
 
-        MicrosoftWindowsWin32kCollector() : base()
+        public MicrosoftWindowsWin32kCollector() : base()
         {
             CollectorName = "Microsoft-Windows-Win32k";
             EtwProviderId = "8C416C79-D49B-4F01-A467-E56D3AA8234C";
@@ -27,7 +27,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EventLevel = TraceEventLevel.Informational;
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             try

@@ -29,7 +29,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.NetworkTCPIP;
         }
 
-        internal override bool Start()
+        public override bool Start()
         {
             enabled = true;  // disable throttling of TCP, too important.
 
@@ -203,7 +203,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return wintapBuilder;
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
 
         }

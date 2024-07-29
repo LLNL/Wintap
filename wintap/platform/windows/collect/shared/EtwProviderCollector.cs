@@ -44,7 +44,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
         }
 
-        internal virtual bool Start()
+        public virtual bool Start()
         {
             EtwSessionName = "Wintap.Collectors." + CollectorName;
 
@@ -66,7 +66,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             return true;
         }
 
-        internal void Stop()
+        public void Stop()
         {
             string etwSessionName = "Wintap.Collectors." + EtwProviderId;
             try
@@ -90,7 +90,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         /// When inherited, this intermediate method signature auto-gens ETW scaffolding which provides a better design time experience for devs
         /// </summary>
         /// <param name="obj"></param>
-        internal virtual void Process_Event(TraceEvent obj)
+        public virtual void Process_Event(TraceEvent obj)
         {
             // todo:
             // base.UpdateStatistics(obj.Source.EventsLost);

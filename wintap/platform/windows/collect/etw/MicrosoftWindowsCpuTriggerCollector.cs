@@ -26,7 +26,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         }
 
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             try

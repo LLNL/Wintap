@@ -26,19 +26,18 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private long lastRegPath;
         private RegistryManager regMan;
 
-        internal MicrosoftWindowsKernelRegistryCollector() : base()
+        public MicrosoftWindowsKernelRegistryCollector() : base()
         {
             CollectorName = "Registry";
             EtwProviderId = "70EB4F03-C1DE-4F73-A051-33D13D5413BD";
             regMan = new RegistryManager();
         }
 
-        internal override void Process_Event(TraceEvent obj)
+        public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
             try
             {
-                if (obj.ProcessID == StateManager.WintapPID) { return; }
                 switch (obj.ProviderName)
                 {
                     case "Microsoft-Windows-Kernel-Registry":

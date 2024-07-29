@@ -34,15 +34,15 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // linuxCollectors = linuxSubMgr.Start()
+                // do linux stuff!
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                // macCollectors = osxSubMgr.Start()
+                // do Mac stuff!
             }
             else
             {
-                Console.WriteLine("Running on an unsupported platform");
+                WintapLogger.Log.Append("Running on an unsupported platform", LogLevel.Always);
             }
             WintapLogger.Log.Append("Done loading collectors", LogLevel.Always);
         }
