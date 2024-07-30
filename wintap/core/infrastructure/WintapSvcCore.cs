@@ -31,6 +31,8 @@ using Microsoft.SemanticKernel;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
+using gov.llnl.wintap.core.etl;
+using Org.BouncyCastle.Asn1.Pkcs;
 
 namespace gov.llnl.wintap
 {
@@ -68,7 +70,7 @@ namespace gov.llnl.wintap
         
         private async Task test()
         {
-            string rag_data = "C:\\programdata\\wintap\\ragdata.txt";
+            string rag_data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "ragdata", "ragdata.txt");
 
             var kernelBuilder = Kernel.CreateBuilder();
             var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "phi3", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434"))
@@ -168,8 +170,7 @@ namespace gov.llnl.wintap
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error setting permissions on Wintap data path, cannot continue.  Message: " + ex.Message, LogLevel.Always);
-                throw new Exception("Invalid data directory");
+                WintapLogger.Log.Append("NOT setting permissions on Wintap data path, cannot continue.  Message: " + ex.Message, LogLevel.Always);
             }
 
 
@@ -216,12 +217,14 @@ namespace gov.llnl.wintap
 
 
             System.Threading.Thread.Sleep(5000);  // allow plugins to init
-            WintapLogger.Log.Append("Starting Wintap collectors", LogLevel.Always);
-            subscriptionMgr = new SubscriptionManager();
-            subscriptionMgr.Start();
+
+
+
             try
             {
-
+                WintapLogger.Log.Append("Starting Wintap collectors", LogLevel.Always);
+                subscriptionMgr = new SubscriptionManager();
+                subscriptionMgr.Start();
             }
             catch (Exception ex)
             {

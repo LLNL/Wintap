@@ -10,8 +10,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapAPI", "WintapAPI\Wint
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MergeHelper", "platform\windows\MergeHelper\MergeHelper.csproj", "{D8516370-E5E4-4002-915D-3245F5B259D6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapETL", "WintapETL\WintapETL.csproj", "{CC904063-6532-44B4-8FB3-73FBA4012CB4}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapRecorder", "platform\windows\WintapRecorder\WintapRecorder.csproj", "{4FE36182-60AA-4483-982F-821F67D4CEB5}"
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "platform\windows\WintapSetup\WintapSetup.vdproj", "{BD252ABA-2A5B-4F56-9413-3174AA9CD895}"
@@ -44,21 +42,21 @@ EndProject
 Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench", "Wintap-Workbench\", "{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}"
 	ProjectSection(WebsiteProperties) = preProject
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
-		Debug.AspNetCompiler.VirtualPath = "/localhost_53241"
+		Debug.AspNetCompiler.VirtualPath = "/localhost_55868"
 		Debug.AspNetCompiler.PhysicalPath = "Wintap-Workbench\"
-		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_53241\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_55868\"
 		Debug.AspNetCompiler.Updateable = "true"
 		Debug.AspNetCompiler.ForceOverwrite = "true"
 		Debug.AspNetCompiler.FixedNames = "false"
 		Debug.AspNetCompiler.Debug = "True"
-		Release.AspNetCompiler.VirtualPath = "/localhost_53241"
+		Release.AspNetCompiler.VirtualPath = "/localhost_55868"
 		Release.AspNetCompiler.PhysicalPath = "Wintap-Workbench\"
-		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_53241\"
+		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_55868\"
 		Release.AspNetCompiler.Updateable = "true"
 		Release.AspNetCompiler.ForceOverwrite = "true"
 		Release.AspNetCompiler.FixedNames = "false"
 		Release.AspNetCompiler.Debug = "False"
-		VWDPort = "53241"
+		VWDPort = "55868"
 		SlnRelativePath = "Wintap-Workbench\"
 	EndProjectSection
 EndProject
@@ -138,22 +136,6 @@ Global
 		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|x64.Build.0 = Release|x64
 		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|x86.ActiveCfg = Release|Any CPU
 		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|x86.Build.0 = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|ARM64.ActiveCfg = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|ARM64.Build.0 = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x64.ActiveCfg = Debug|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x64.Build.0 = Debug|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x86.Build.0 = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|ARM64.ActiveCfg = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|ARM64.Build.0 = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x64.ActiveCfg = Release|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x64.Build.0 = Release|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x86.ActiveCfg = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x86.Build.0 = Release|Any CPU
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Debug|ARM64.ActiveCfg = Debug|Any CPU

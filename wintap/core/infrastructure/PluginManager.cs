@@ -25,6 +25,7 @@ using System.ComponentModel.Composition.Hosting;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
+using gov.llnl.wintap.core.etl;
 using static gov.llnl.wintap.Interfaces;
 
 namespace gov.llnl.wintap.core.infrastructure
@@ -37,11 +38,8 @@ namespace gov.llnl.wintap.core.infrastructure
     {
         public static int PluginCount = 0;
         internal static List<string> DynamicEtwProviderList = new List<string>();
-        //debug
-        private int activityEventCounter;
-        private int processEventCounter;
-        // end debug
-
+        private WintapETL etl;
+        private bool doETL = false;
         private WintapLogger log;
         private Watchdog watchdog;
         private ConcurrentQueue<Runnable> runQueue;   
@@ -62,7 +60,10 @@ namespace gov.llnl.wintap.core.infrastructure
         internal PluginManager()
         {
             runQueue = new ConcurrentQueue<Runnable>();
-            WintapLogger.Log.Append("Plugin manager is started", LogLevel.Always);
+            etl = new WintapETL();
+            doETL = etl.Start();
+
+            WintapLogger.Log.Append("Plugin manager is started, ETL Support: " + doETL, LogLevel.Always);
             
         }
 
@@ -156,7 +157,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
             // Hook up event delivery from Esper to Subscribers
-            if (subscribers.Count() > 0)
+            if (subscribers.Count() > 0 || doETL)
             {
                 try
                 {
@@ -197,32 +198,39 @@ namespace gov.llnl.wintap.core.infrastructure
         private void All_Events(object sender, UpdateEventArgs e)
         {
             EventBean[] newEvents = e.NewEvents;
-            try
+            WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
+            for (int i = 0; i < newEvents.Count(); i++)
             {
-                WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
-                for (int i = 0; i < newEvents.Count(); i++)
+                wmArray[i] = (WintapMessage)newEvents[i].Underlying;
+            }
+            foreach (Lazy<ISubscribe, ISubscribeData> consumer in subscribers)
+            {
+                foreach (WintapMessage msg in wmArray)
                 {
-                    wmArray[i] = (WintapMessage)newEvents[i].Underlying;
-                }
-                foreach (Lazy<ISubscribe, ISubscribeData> consumer in subscribers)
-                {
-                    foreach (WintapMessage msg in wmArray)
+                    try
                     {
-                        try
-                        {
-                            processEventCounter++;
-                            consumer.Value.Subscribe(msg);
-                        }
-                        catch (Exception ex)
-                        {
-                            WintapLogger.Log.Append("could not deliver PROCESS event to subscriber because: " + ex.Message, LogLevel.Debug);
-                        }
+                        consumer.Value.Subscribe(msg);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append("could not deliver event to subscriber because: " + ex.Message, LogLevel.Debug);
                     }
                 }
             }
-            catch (Exception ex)
+            // if we loaded a valid JSON ETL config, process the events to parquet and upload.
+            if (doETL)
             {
-                WintapLogger.Log.Append("ERROR passing PROCESS event to etw subscriber: " + ex.Message + "  " + ex.InnerException, LogLevel.Debug);
+                foreach (WintapMessage msg in wmArray)
+                {
+                    try
+                    {
+                        etl.Subscribe(msg);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append("could not deliver event for ETL processing: " + ex.Message, LogLevel.Debug);
+                    }
+                }
             }
         }
 

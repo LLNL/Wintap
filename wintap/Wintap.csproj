@@ -153,6 +153,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.7.1.1" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.400.1" />
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
     <PackageReference Include="Castle.Core" Version="4.2.1" />
     <PackageReference Include="Castle.Windsor" Version="4.1.0" />
@@ -178,6 +179,7 @@
     <PackageReference Include="Microsoft.Windows.Compatibility" Version="8.0.4" />
     <PackageReference Include="NEsper" Version="6.1.1" />
     <PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
+    <PackageReference Include="Parquet.Net" Version="4.24.0" />
     <PackageReference Include="System.ComponentModel.Composition" Version="8.0.0" />
     <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
@@ -218,6 +220,34 @@
     <Compile Remove="platform\windows\collect\shared\BaseCollector - Copy.cs" />
     <Compile Remove="platform\windows\collect\shared\EtwCollector - Copy.cs" />
     <Compile Remove="core\shared\SingleLogit.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="core\etl\ETLConfig.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="core\etl\esper\default.epl" />
+    <None Remove="core\etl\esper\esper-context.epl" />
+    <None Remove="core\etl\esper\file.epl" />
+    <None Remove="core\etl\esper\focuschange.epl" />
+    <None Remove="core\etl\esper\process-stop.epl" />
+    <None Remove="core\etl\esper\process.epl" />
+    <None Remove="core\etl\esper\registry.epl" />
+    <None Remove="core\etl\esper\tcp.epl" />
+    <None Remove="core\etl\esper\udp.epl" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="core\etl\esper\default.epl" />
+    <EmbeddedResource Include="core\etl\esper\esper-context.epl" />
+    <EmbeddedResource Include="core\etl\esper\file.epl" />
+    <EmbeddedResource Include="core\etl\esper\focuschange.epl" />
+    <EmbeddedResource Include="core\etl\esper\process-stop.epl" />
+    <EmbeddedResource Include="core\etl\esper\process.epl" />
+    <EmbeddedResource Include="core\etl\esper\registry.epl" />
+    <EmbeddedResource Include="core\etl\esper\tcp.epl" />
+    <EmbeddedResource Include="core\etl\esper\udp.epl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="core\etl\ETLConfig.json" />
   </ItemGroup>
   <PropertyGroup>
     <PreBuildEvent>reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy /v Enabled /t REG_DWORD /d 0 /f</PreBuildEvent>
