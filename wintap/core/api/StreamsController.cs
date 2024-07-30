@@ -15,6 +15,7 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using System.Web;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -31,34 +32,42 @@ namespace gov.llnl.wintap.core.api
             StateManager.LastWorkbenchActivity = DateTime.Now;
         }
 
+        public class QueryObject
+        {
+            public string name { get; set; }
+            public string query { get; set; }
+            public string state { get; set; }
+        }
+
         [HttpPost]
         [Route("api/streams")]
-        public IActionResult Post(string name, string query, string state)
+        public IActionResult Post([FromBody] QueryObject q)
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
             string responseMsg = "OK";
             bool error = false;     
             try
             {
-                if(state == "ACTIVE")
+                if(q.state == "ACTIVE")
                 {
                     deactivateAll();   // only want 1 active query at a time
                 }
-                EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(name);
+                EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(q.name);
                 if(statement != null)
                 {
-                    EventChannel.Esper.EPAdministrator.GetStatement(name).Dispose(); ;  // we need to set ACTIVE in userObject for this query which can only happen on create (read-only), so destroy it here first.
+                    EventChannel.Esper.EPAdministrator.GetStatement(q.name).Dispose(); ;  // we need to set ACTIVE in userObject for this query which can only happen on create (read-only), so destroy it here first.
                 }
-                if(state != "DELETE")
+                string statementDecode = HttpUtility.UrlDecode(q.query);
+                if (q.state != "DELETE")
                 {
-                    WorkbenchQuery embeddedStatement = new WorkbenchQuery() { Name = name, Query = @query, State = state, CreateDate = DateTime.Now, StatementType = WorkbenchQuery.StatementTypeEnum.User };
+                    WorkbenchQuery embeddedStatement = new WorkbenchQuery() { Name = q.name, Query = statementDecode, State = q.state, CreateDate = DateTime.Now, StatementType = WorkbenchQuery.StatementTypeEnum.User };
                     string jsonStatement = JsonConvert.SerializeObject(embeddedStatement);
-                    statement = EventChannel.Esper.EPAdministrator.CreateEPL(@query, name, jsonStatement);  // setting the userObject so we can serialize to disk on sensor shutdown
-                    if (state == "ACTIVE")
+                    statement = EventChannel.Esper.EPAdministrator.CreateEPL(statementDecode, q.name, jsonStatement);  // setting the userObject so we can serialize to disk on sensor shutdown
+                    if (q.state == "ACTIVE")
                     {
                         statement.Events += Eps_Events;
                     }
-                    if (state == "STOP")
+                    if (q.state == "STOP")
                     {
                         statement.Stop();
                     }
