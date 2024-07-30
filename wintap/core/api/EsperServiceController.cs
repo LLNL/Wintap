@@ -15,16 +15,6 @@ using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.core.api
 {
-    // SignalR (websockets) Hub
-    public class WorkbenchHub : Hub
-    {
-
-        public async Task Send(string queryResult)
-        {
-            StateManager.LastWorkbenchActivity = DateTime.Now;
-            await Clients.All.SendAsync("ReceiveMessage", queryResult);
-        }
-    }
 
     // meta data controller for the esper engine
     public class EsperServiceController : ControllerBase

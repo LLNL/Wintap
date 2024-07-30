@@ -63,7 +63,7 @@ export class QuerybuilderComponent implements AfterViewInit, OnInit {
     loading: boolean = true;
     showConfirmDialog = false;
     showInvalidQueryDialog = false;
-    connection: any;
+    private connection: any;
     queryResults: string[] = [];
     queryError: string = '';
 
@@ -72,7 +72,8 @@ export class QuerybuilderComponent implements AfterViewInit, OnInit {
     selectedResult: any = null;
 
     constructor(private http: HttpClient, private cd: ChangeDetectorRef) {
-        
+        this.connection = $.hubConnection('/signalr');
+        const hubProxy = this.connection.createHubProxy('workbenchHub');
     }
 
     ngOnInit() {
@@ -94,7 +95,8 @@ export class QuerybuilderComponent implements AfterViewInit, OnInit {
       console.log(`URL:  ${fullyQualifiedUrl}`);
       console.log("wp2");
     this.connection.on('ReceiveMessage', (message: EsperResult) => {
-      console.log('esper query result: ' + JSON.stringify(message));
+        console.log('esper query result: ' + message.result);
+
       this.esperResults.push(message);
           this.cd.detectChanges();  
     });
@@ -383,5 +385,5 @@ export interface Statement {
 }
 
 export interface EsperResult {
-  Result: string;
+  result: string;
 }

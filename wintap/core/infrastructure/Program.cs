@@ -194,7 +194,7 @@ app.MapControllers();  // This will map the routes to the API controllers
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
-    //endpoints.MapHub<WorkbenchHub>("/api/WorkbenchHub");
+    endpoints.MapHub<WorkbenchHub>("/signalr/WorkbenchHub");
     endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });
 

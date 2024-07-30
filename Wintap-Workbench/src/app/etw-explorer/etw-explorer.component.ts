@@ -52,9 +52,7 @@ export class EtwExplorerComponent implements AfterViewInit, OnInit {
             .withAutomaticReconnect([0, 2000, 10000, 30000])
             .build();
 
-        this.connection
-            .start()
-            .catch(console.error('error'));
+        this.connection.start().catch(console.error('error'));
 
         console.log('connection state: ' + this.connection.state); // Check the state here
 

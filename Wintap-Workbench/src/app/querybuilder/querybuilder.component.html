@@ -91,7 +91,7 @@
     <div class="card">
         <span class="block text-500 font-medium mb-3">Events</span>
         <p>Total Rows: {{ esperResults.length }}</p>
-        <p-table #resultsTable [value]="esperResults" dataKey="Result" [rows]="10" [loading]="loading" styleClass="p-datatable-gridlines" [paginator]="true" [globalFilterFields]="['Result']" responsiveLayout="scroll" selectionMode="single" [(selection)]="selectedResult">
+        <p-table #resultsTable [value]="esperResults" dataKey="result" [rows]="10" [loading]="loading" styleClass="p-datatable-gridlines" [paginator]="true" [globalFilterFields]="['Result']" responsiveLayout="scroll" selectionMode="single" [(selection)]="selectedResult">
             <ng-template pTemplate="caption">
                 <div class="flex justify-content-between flex-column sm:flex-row">
                     <button pButton label="Clear" class="p-button-outlined mb-2" icon="pi pi-filter-slash" (click)="clearResults(resultsTable)"></button>
@@ -124,7 +124,7 @@
             </ng-template>
             <ng-template pTemplate="body" let-esperResult>
                 <tr [pSelectableRow]="esperResult">
-                    <td>{{ esperResult.Result }}</td>
+                    <td>{{ esperResult.result }}</td>
                 </tr>
             </ng-template>
         </p-table>

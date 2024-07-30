@@ -16,9 +16,23 @@ using gov.llnl.wintap.core.shared;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using System.Web;
+using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.core.api
 {
+
+    // SignalR (websockets) Hub
+    public class WorkbenchHub : Hub
+    {
+
+        public async Task Send(string queryResult)
+        {
+            StateManager.LastWorkbenchActivity = DateTime.Now;
+            await Clients.All.SendAsync("ReceiveMessage", queryResult);
+        }
+    }
+
+
     /// <summary>
     /// API for interfacing Esper with the Workbench
     /// </summary>
