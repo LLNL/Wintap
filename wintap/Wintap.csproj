@@ -161,6 +161,7 @@
     <PackageReference Include="Common.Logging" Version="3.4.1" />
     <PackageReference Include="Common.Logging.Core" Version="3.4.1" />
     <PackageReference Include="Crc32.NET" Version="1.2.0" />
+    <PackageReference Include="DuckDB.NET.Data.Full" Version="1.0.2" />
     <PackageReference Include="LLamaSharp" Version="0.11.2" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.11.2" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />

@@ -123,7 +123,7 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 if (uploadTimer.Elapsed.TotalSeconds > etlConfig.UploadIntervalSec)
                 {
-                    shellMerge();
+                    doMerge();
                     if (mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories).Count() > 0)
                     {
                         Logger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Always);
@@ -249,9 +249,10 @@ namespace gov.llnl.wintap.core.etl.load
         }
 
         /// Running external program to do the merging to avoid parquet schema stickiness  
-        private void shellMerge()
+        private void doMerge()
         {
             DateTime mergeTime = DateTime.UtcNow;
+            Merge merger = new Merge();
             foreach (DirectoryInfo sensorDir in cacheDir.GetDirectories())
             {
                 if (sensorDir.Name.ToUpper() == "CSV") { continue; }
@@ -262,40 +263,26 @@ namespace gov.llnl.wintap.core.etl.load
                     {
                         foreach (DirectoryInfo defaultSensor in sensorDir.GetDirectories())
                         {
-
-                            runMerger(defaultSensor.FullName, mergeTime.ToFileTimeUtc());
+                            string[] mergeArgs = new string[2];
+                            mergeArgs[0] = defaultSensor.FullName;
+                            mergeArgs[1] = mergeTime.ToFileTimeUtc().ToString();
+                            merger.Start(mergeArgs);
                         }
                     }
                     else
                     {
-                        runMerger(sensorDir.FullName, mergeTime.ToFileTimeUtc());
+                        string[] mergeArgs = new string[2];
+                        mergeArgs[0] = sensorDir.FullName;
+                        mergeArgs[1] = mergeTime.ToFileTimeUtc().ToString();
+                        merger.Start(mergeArgs);
                     }
 
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Append("ERROR RUNNING SHELL PROGRAM: " + ex.Message, LogLevel.Always);
+                    Logger.Log.Append("ERROR RUNNING MERGE: " + ex.Message, LogLevel.Always);
                 }
             }
-        }
-
-        private void runMerger(string path, long eventTime)
-        {
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = Strings.WintapPath + @"mergertool\MergeHelper.exe";
-            psi.Arguments = path + " " + eventTime;
-            Process helperExe = new Process();
-            helperExe.StartInfo = psi;
-            Logger.Log.Append("Requesting parquet merge: " + psi.FileName + " " + psi.Arguments, LogLevel.Always);
-            helperExe.Start();
-            mergeHelperPid = helperExe.Id;
-            Timer hangDetector = new Timer();
-            hangDetector.Interval = 30000;
-            hangDetector.Elapsed += HangDetector_Elapsed;
-            hangDetector.Start();
-            helperExe.WaitForExit();
-            hangDetector.Stop();
-            cleanupUnmergedParquet(path);
         }
 
         private void cleanupUnmergedParquet(string path)
