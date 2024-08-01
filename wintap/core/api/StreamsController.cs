@@ -17,6 +17,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using System.Web;
 using System.Threading.Tasks;
+using com.espertech.esper.runtime.client;
+using com.espertech.esper.common.client;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -51,6 +53,7 @@ namespace gov.llnl.wintap.core.api
             public string name { get; set; }
             public string query { get; set; }
             public string state { get; set; }
+            public string deploymentid { get; set; }
         }
 
         [HttpPost]
@@ -66,17 +69,17 @@ namespace gov.llnl.wintap.core.api
                 {
                     deactivateAll();   // only want 1 active query at a time
                 }
-                EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(q.name);
+                EPStatement statement = EventChannel.EsperRuntime.DeploymentService.GetStatement(q.deploymentid, q.name);
                 if(statement != null)
                 {
-                    EventChannel.Esper.EPAdministrator.GetStatement(q.name).Dispose(); ;  // we need to set ACTIVE in userObject for this query which can only happen on create (read-only), so destroy it here first.
+                    EventChannel.EsperRuntime.DeploymentService.Undeploy(q.deploymentid); ;  // we need to set ACTIVE in userObject for this query which can only happen on create (read-only), so destroy it here first.
                 }
                 string statementDecode = HttpUtility.UrlDecode(q.query);
                 if (q.state != "DELETE")
                 {
                     WorkbenchQuery embeddedStatement = new WorkbenchQuery() { Name = q.name, Query = statementDecode, State = q.state, CreateDate = DateTime.Now, StatementType = WorkbenchQuery.StatementTypeEnum.User };
                     string jsonStatement = JsonConvert.SerializeObject(embeddedStatement);
-                    statement = EventChannel.Esper.EPAdministrator.CreateEPL(statementDecode, q.name, jsonStatement);  // setting the userObject so we can serialize to disk on sensor shutdown
+                    statement = EventChannel.compileDeploy(statementDecode, q.name, jsonStatement);  // setting the userObject so we can serialize to disk on sensor shutdown
                     if (q.state == "ACTIVE")
                     {
                         statement.Events += Eps_Events;
@@ -369,6 +372,7 @@ namespace gov.llnl.wintap.core.api
         public enum StatementTypeEnum { User, Sensor }
 
         public string Name { get; set; }
+        public string DeploymentId { get; set; }
         public string Query { get; set; }
         public StatementTypeEnum StatementType { get; set; }
         public string State { get; set; }

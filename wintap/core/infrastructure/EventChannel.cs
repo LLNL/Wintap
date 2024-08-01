@@ -1,10 +1,9 @@
-﻿/*
- * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
- * Produced at the Lawrence Livermore National Laboratory.
- * All rights reserved.
- */
-
-using com.espertech.esper.client;
+﻿using com.espertech.esper.client;
+using com.espertech.esper.common.client;
+using com.espertech.esper.common.client.configuration;
+using com.espertech.esper.compat;
+using com.espertech.esper.compiler.client;
+using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
@@ -15,46 +14,26 @@ using System.Diagnostics;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
-    /// <summary>
-    /// Wrapper around Esper
-    /// https://www.espertech.com/
-    /// </summary>
     public sealed class EventChannel
     {
         private static readonly EventChannel instance = new EventChannel();
-        private static EPServiceProvider epService;
         private static long eventsPerSecond;
         private static long maxEventsPerSecond;
         private static DateTime maxEventTime;
         private static long totalEvents;
         private static Stopwatch stopWatch;
-        // event buffering members
         private static ConcurrentQueue<WintapMessage> eventBuffer;
         private static Stopwatch bufferProcessingInterval;
         private static int droppedEventCount;
 
-        public static long EventsPerSecond
-        {
-            get { return eventsPerSecond; }
-        }
-        public static long MaxEventsPerSecond
-        {
-            get { return maxEventsPerSecond; }
-        }
-        public static DateTime MaxEventTime
-        {
-            get { return maxEventTime; }
-        }
-        public static long TotalEvents
-        {
-            get { return totalEvents; }
-        }
-        public static string Runtime
-        {
-            get { return stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss"); }
-        }
-
-        public static com.espertech.esper.client.Configuration hwConfig { get; set; }
+        public static long EventsPerSecond { get { return eventsPerSecond; } }
+        public static long MaxEventsPerSecond { get { return maxEventsPerSecond; } }
+        public static DateTime MaxEventTime { get { return maxEventTime; } }
+        public static long TotalEvents { get { return totalEvents; } }
+        public static string Runtime { get { return stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss"); } }
+        public static Configuration esperConfig { get; set; }
+        private static EPRuntime esperRuntime;
+        
 
         private EventChannel()
         {
@@ -68,28 +47,45 @@ namespace gov.llnl.wintap.core.infrastructure
             statsWorker.RunWorkerAsync();
         }
 
+        public static EPDeployment compileDeploy(EPRuntime runtime, String epl)
+        {
+            // Obtain a copy of the engine configuration
+            Configuration configuration = runtime.ConfigurationDeepCopy;
+
+            // Build compiler arguments
+            CompilerArguments args = new CompilerArguments(configuration);
+
+            // Make the existing EPL objects available to the compiler
+            args.GetPath().Add(runtime.RuntimePath);
+
+            // Compile
+            EPCompiled compiled = EPCompilerProvider.GetCompiler().Compile(epl, args);
+
+            // Return the deployment
+            return runtime.DeploymentService.Deploy(compiled);
+        }
+
         private void StatsWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            while(true)
+            while (true)
             {
                 System.Threading.Thread.Sleep(1000);
-                eventsPerSecond = EventChannel.Esper.EPRuntime.NumEventsEvaluated;
-                if(eventsPerSecond > maxEventsPerSecond)
+                eventsPerSecond = EsperRuntime.MetricsService.GetRuntimeMetric().InputCountDelta;
+                if (eventsPerSecond > maxEventsPerSecond)
                 {
                     maxEventsPerSecond = eventsPerSecond;
                     maxEventTime = DateTime.Now;
                 }
                 totalEvents = totalEvents + eventsPerSecond;
-                EventChannel.Esper.EPRuntime.ResetStats();
-
-                while(eventBuffer.Count > 0)
+                //EventChannel.Esper.EsperRuntime.ResetStats();
+                while (eventBuffer.Count > 0)
                 {
                     WintapMessage bufferedEvent;
                     DateTime processingScope = DateTime.Now.AddSeconds(-3);
                     eventBuffer.TryDequeue(out bufferedEvent);
-                    if(bufferedEvent != null)
+                    if (bufferedEvent != null)
                     {
-                        if(bufferedEvent.EventTime > processingScope.ToFileTimeUtc())
+                        if (bufferedEvent.EventTime > processingScope.ToFileTimeUtc())
                         {
                             break;
                         }
@@ -98,24 +94,21 @@ namespace gov.llnl.wintap.core.infrastructure
                             WintapMessage owningProcess = ProcessTree.GetByPid(bufferedEvent.PID, bufferedEvent.EventTime);
                             bufferedEvent.ProcessName = owningProcess.ProcessName;
                             bufferedEvent.PidHash = owningProcess.PidHash;
-                            EventChannel.Esper.EPRuntime.SendEvent(bufferedEvent);
+                            EsperRuntime.EventService.SendEventBean(bufferedEvent, "WintapMessage");
                         }
                         catch (Exception ex)
                         {
                             droppedEventCount++;
-                            WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message +  ",  total dropped event count: " + droppedEventCount, LogLevel.Always);
+                            WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message + ", total dropped event count: " + droppedEventCount, LogLevel.Always);
                         }
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// Prepares and sends the event into the Wintap event processing stream.  
-        /// </summary>
         public static void Send(WintapMessage streamedEvent)
         {
-            if(streamedEvent.MessageType != "ProcessPartial")
+            if (streamedEvent.MessageType != "ProcessPartial")
             {
                 try
                 {
@@ -124,45 +117,49 @@ namespace gov.llnl.wintap.core.infrastructure
                     streamedEvent.ProcessPath = owningProcess.ProcessPath;
                     streamedEvent.PidHash = owningProcess.PidHash;
                     streamedEvent.AgentId = StateManager.AgentId.ToString();
-                    if(owningProcess.ProcessName == "mergehelper.exe" || owningProcess.ProcessName == "wintap.exe") 
-                    { 
-                        return; 
+                    if (owningProcess.ProcessName == "mergehelper.exe" || owningProcess.ProcessName == "wintap.exe")
+                    {
+                        return;
                     }
                 }
-                catch(InvalidOperationException)
+                catch (InvalidOperationException)
                 {
                     eventBuffer.Enqueue(streamedEvent);
-                    WintapLogger.Log.Append("PidHash not found for PID: " + streamedEvent.PID + ".  queued for retry", LogLevel.Debug);
+                    WintapLogger.Log.Append("PidHash not found for PID: " + streamedEvent.PID + ". queued for retry", LogLevel.Debug);
                     return;
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     WintapLogger.Log.Append("ERROR sending event for MessageType: " + streamedEvent.MessageType + ", ActivityType: " + streamedEvent.ActivityType + ", pid: " + streamedEvent.PID + ": " + ex.Message, LogLevel.Always);
                     return;
                 }
             }
-            if(streamedEvent.PID != StateManager.WintapPID)
+            if (streamedEvent.PID != StateManager.WintapPID)
             {
-                EventChannel.Esper.EPRuntime.SendEvent(streamedEvent);
+                EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
             }
         }
 
-        public static EPServiceProvider Esper
+        public static EPRuntime EsperRuntime
         {
             get
             {
-                if(epService == null)
+                if (esperRuntime == null)
                 {
-                    hwConfig = new com.espertech.esper.client.Configuration();
-                    hwConfig.EngineDefaults.EventMeta.ClassPropertyResolutionStyle = PropertyResolutionStyle.CASE_INSENSITIVE;
-                    hwConfig.EngineDefaults.MetricsReporting.EngineInterval = 1000;
-                    hwConfig.SetMetricsReportingEnabled();
-                    hwConfig.AddEventType("WintapMessage", typeof(WintapMessage).FullName);
-                    hwConfig.AddEventType("ProcessTreeEvent", typeof(ProcessTreeEvent).FullName);
+                    var esperConfig = new Configuration();
+                    esperConfig.Common.EventMeta.ClassPropertyResolutionStyle = PropertyResolutionStyle.CASE_INSENSITIVE;
+                    esperRuntime.MetricsService.SetMetricsReportingEnabled();
+                    esperRuntime.MetricsService.SetMetricsReportingInterval(null, 1000);
+                    esperConfig.Common.AddEventType(typeof(WintapMessage));
+                    esperConfig.Common.AddEventType(typeof(ProcessTreeEvent));
+                    // following three config settings from the Esper 8 upgrade guide: 
+                    esperConfig.Compiler.ByteCode.IsAllowSubscriber = true;
+                    esperConfig.Compiler.ByteCode.SetAccessModifiersPublic();
+                    esperConfig.Compiler.ByteCode.BusModifierEventType = com.espertech.esper.common.client.util.EventTypeBusModifier.BUS;
                     
-                    epService = EPServiceProviderManager.GetDefaultProvider(hwConfig);
+                    esperRuntime = EPRuntimeProvider.GetDefaultRuntime(esperConfig);
                 }
-                return epService;
+                return esperRuntime;
             }
         }
     }

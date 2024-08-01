@@ -229,7 +229,7 @@ namespace gov.llnl.wintap.core.etl.extract
             backoffTimer = new Timer { Interval = 120000 };
             backoffTimer.Elapsed += BackoffTimer_Elapsed;
             esperQueries = new List<string>();
-            hwConfig = gov.llnl.wintap.core.infrastructure.EventChannel.hwConfig;
+            hwConfig = gov.llnl.wintap.core.infrastructure.EventChannel.esperConfig;
             hwConfig.EngineDefaults.EventMeta.ClassPropertyResolutionStyle = PropertyResolutionStyle.CASE_INSENSITIVE;
             hwConfig.EngineDefaults.MetricsReporting.EngineInterval = 1000;
             hwConfig.SetMetricsReportingEnabled();
