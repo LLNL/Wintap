@@ -21,7 +21,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         internal List<BaseWinCollector> Start()
         {
 
-        List<BaseWinCollector> baseCollectors = new List<BaseWinCollector>();
+            List<BaseWinCollector> baseCollectors = new List<BaseWinCollector>();
             // start process collector first for process attribution
             ProcessCollector pc = new ProcessCollector();
             pc.Start();

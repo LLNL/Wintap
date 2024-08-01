@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+using gov.llnl.wintap.core.collect;
+using gov.llnl.wintap.platform.linux.infrastructure;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using gov.llnl.wintap.platform.windows.infrastructure;
 using System;
@@ -17,12 +19,17 @@ namespace gov.llnl.wintap.core.infrastructure
         private List<EtwProviderCollector> etwCollectors;
         private List<BaseWinCollector> winCollectors;
         private WindowsSubscriptionManager winSubMgr;
+        private LinuxSubscriptionManager linuxSubMgr;
+        private List<BaseCollector> linuxCollectors;
 
         internal SubscriptionManager()
         {
             winCollectors = new List<BaseWinCollector>();
             etwCollectors = new List<EtwProviderCollector>();
             winSubMgr = new WindowsSubscriptionManager();
+
+            linuxCollectors = new List<BaseCollector>();
+            linuxSubMgr = new LinuxSubscriptionManager();
         }
 
         internal void Start()
@@ -35,6 +42,7 @@ namespace gov.llnl.wintap.core.infrastructure
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 // do linux stuff!
+                linuxCollectors = linuxSubMgr.Start();
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {

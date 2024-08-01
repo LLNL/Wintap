@@ -16,6 +16,11 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.collect.models;
 using com.espertech.esper.client;
 using System.Net.NetworkInformation;
+using System.IO;
+using Parquet.Schema;
+using Newtonsoft.Json;
+using System.Runtime.InteropServices;
+using gov.llnl.wintap.platform.windows.shared;
 
 namespace gov.llnl.wintap.core.shared
 {
@@ -78,10 +83,16 @@ namespace gov.llnl.wintap.core.shared
 
         private StateManager()
         {
+            WintapLogger.Log.Append($"StateManager is sttarting", infrastructure.LogLevel.Always);
             LastWorkbenchActivity = DateTime.Now;
+            WintapLogger.Log.Append($"Getting Wintap settings from config", infrastructure.LogLevel.Always);
             WintapSettings = getWintapSettings();
             SessionId = Guid.NewGuid();
-            AgentId = getAgentId();
+
+            WintapState wintapState = readState();
+
+            WintapLogger.Log.Append($"StateManager is getting AgentId", infrastructure.LogLevel.Always);
+            AgentId = getAgentId(wintapState);
             WintapLogger.Log.Append($"StateManager is refreshing active user info", infrastructure.LogLevel.Always);
             ActiveUser = refreshActiveUser();
             WintapLogger.Log.Append($"StateManager has active user: {ActiveUser}", infrastructure.LogLevel.Always);
@@ -109,8 +120,13 @@ namespace gov.llnl.wintap.core.shared
             }
             WintapLogger.Log.Append($"StateManager has hooked user change event notification", infrastructure.LogLevel.Always);
 
-            DriveMap = refreshDriveMap();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                DriveMap = WindowsStateManager.RefreshDriveMap();
+            }
             MachineBootTime = refreshLastBoot();
+
+            writeState(wintapState);
 
             WintapLogger.Log.Append($"StateManager is initialized.", infrastructure.LogLevel.Always);
         }
@@ -196,7 +212,7 @@ namespace gov.llnl.wintap.core.shared
         private static void saveSettings(Dictionary<string, string> settingsToUpdate)
         {
             string appPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-            string configFile = System.IO.Path.Combine(appPath, "Wintap.exe.config");
+            string configFile = System.IO.Path.Combine(appPath, "Wintap.dll.config");
             try
             {
                 System.Xml.XmlDocument xmlDoc = new System.Xml.XmlDocument();
@@ -231,34 +247,20 @@ namespace gov.llnl.wintap.core.shared
             }
         }
 
-        private Guid getAgentId()
+        private Guid getAgentId(WintapState state)
         {
             Guid agentId = new Guid();
-            const string registryPath = @"Software\Wintap";
-            const string registryKey = "AgentId";
             try
             {
-                using (RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true))
-                {
-                    if(key.GetValueNames().Contains(registryKey))
-                    {
-                        agentId = Guid.Parse(key.GetValue(registryKey).ToString());
-                    }
-                }
+                agentId = Guid.Parse(state.AgentId);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error accessing Wintap AgentId from registry: {ex.Message}");
-            }
+            catch (Exception ex) { }
+
             if(agentId == new Guid())
             {
                 WintapLogger.Log.Append("Generating new Agent Id for this sensor.", infrastructure.LogLevel.Always);
                 agentId = Guid.NewGuid();
-                RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true);
-                key.SetValue(registryKey, agentId.ToString());
-                key.Flush();
-                key.Close();
-                key.Dispose();
+                state.AgentId = agentId.ToString();
             }
             return agentId;
         }
@@ -309,59 +311,11 @@ namespace gov.llnl.wintap.core.shared
         internal static DateTime refreshLastBoot()
         {
             DateTime lastBoot = WintapLogger.Log.StartTime;
-            try
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                SelectQuery query = new SelectQuery(@"SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
-                foreach (ManagementObject mo in searcher.Get())
-                {
-                    lastBoot = ManagementDateTimeConverter.ToDateTime(mo.Properties["LastBootUpTime"].Value.ToString());
-                    break;
-                }
-            }
-            catch(Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR GETTING LAST BOOT TIME, using wintap start time as machine start time. " + ex.Message, infrastructure.LogLevel.Always);
+                lastBoot = WindowsStateManager.GetLastBootTime();
             }
             return lastBoot;
-        }
-
-        private List<DiskVolume> refreshDriveMap()
-        {
-            List<DiskVolume> driveMap = new List<DiskVolume>();
-            string script = Environment.GetEnvironmentVariable("WINDIR") + @"\Temp\wintap_diskgather.txt";
-            System.IO.File.WriteAllText(script, "list volume");
-            System.Diagnostics.Process diskPart = new Process();
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\System32\\diskpart.exe";
-            psi.Arguments = "/S " + script;
-            psi.UseShellExecute = false;
-            psi.RedirectStandardOutput = true;
-            diskPart.StartInfo = psi;
-            WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, infrastructure.LogLevel.Always);
-            diskPart.Start();
-            string diskConfig = diskPart.StandardOutput.ReadToEnd();
-            WintapLogger.Log.Append("drive volumes: " + diskConfig, infrastructure.LogLevel.Always);
-            string[] configLines = diskConfig.Split(new char[] { '\r' });
-            diskPart.WaitForExit();
-            foreach (string line in configLines)
-            {
-                string[] lineArray = line.Split(new char[] { ' ' });
-                try
-                {
-                    DiskVolume dv = new DiskVolume();
-                    dv.VolumeNumber = Convert.ToInt32(lineArray[3].ToString());
-                    dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString().ToLower());
-                    driveMap.Add(dv);
-                    WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, infrastructure.LogLevel.Always);
-                }
-                catch (Exception ex) { }
-            }
-            if(driveMap.Count == 0)
-            {
-                WintapLogger.Log.Append("ERROR:  No drive map found! ", infrastructure.LogLevel.Always);
-            }
-            return driveMap;
         }
 
         private void StateRefresh_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
@@ -377,25 +331,9 @@ namespace gov.llnl.wintap.core.shared
         private string refreshActiveUser()
         {
             ActiveUser = "NA";
-            try
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                RegistryKey usersRoot = Registry.Users;
-                foreach (string userKeyName in usersRoot.GetSubKeyNames())
-                {
-                    RegistryKey userKey = Registry.Users.OpenSubKey(userKeyName);
-                    if (userKey.GetSubKeyNames().Contains("Volatile Environment"))
-                    {
-                        ActiveUser = userKey.OpenSubKey("Volatile Environment").GetValue("USERNAME").ToString();
-                    }
-                    userKey.Close();
-                    userKey.Dispose();
-                }
-                usersRoot.Close();
-                usersRoot.Dispose();
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("Could not read registry: " + ex.Message, infrastructure.LogLevel.Always);
+                ActiveUser = WindowsStateManager.RefreshActiveUser();
             }
             return ActiveUser;
         }
@@ -403,23 +341,9 @@ namespace gov.llnl.wintap.core.shared
         private bool refreshBatteryState()
         {
             OnBatteryPower = false;
-            try
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                WqlObjectQuery w = new WqlObjectQuery("Select * from Win32_Battery");
-                ManagementObjectSearcher mos = new ManagementObjectSearcher(w);
-                foreach (ManagementObject mo in mos.Get())
-                {
-                    if (mo.Properties["BatteryStatus"].Value.ToString() == "1")
-                    {
-                        OnBatteryPower = true;
-                    }
-                    break;
-                }
-                mos.Dispose();
-            }
-            catch (Exception ex)
-            {
-
+                OnBatteryPower = WindowsStateManager.RefreshBatteryState();
             }
             return OnBatteryPower;
         }
@@ -493,6 +417,27 @@ namespace gov.llnl.wintap.core.shared
             }
             return localIp; ;
         }
+
+        private void writeState(WintapState state)
+        {
+            string jsonString = JsonConvert.SerializeObject(state);
+            string filePath = Path.Combine(Environment.CurrentDirectory, "wintapstate.json");
+            File.WriteAllText(filePath, jsonString);
+        }
+
+        private WintapState readState()
+        {
+            FileInfo stateInfo = new FileInfo(Path.Combine(Environment.CurrentDirectory, "wintapstate.json"));
+            WintapState wintapState = new WintapState();
+            if (stateInfo.Exists)
+            {
+                string readJsonString = File.ReadAllText(Path.Combine(Environment.CurrentDirectory, "wintapstate.json"));
+                WintapState deserializedState = JsonConvert.DeserializeObject<WintapState>(readJsonString);
+                wintapState = deserializedState;
+            }
+
+            return wintapState;
+        }
     }
 
     public class DiskVolume
@@ -502,5 +447,10 @@ namespace gov.llnl.wintap.core.shared
         public string VolumeLabel { get; set; }
         public string FileSystem { get; set; }
         public string VolumeType { get; set; }
+    }
+
+    public class WintapState
+    {
+        public string AgentId { get; set; }
     }
 }

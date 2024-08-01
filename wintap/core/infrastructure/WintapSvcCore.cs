@@ -33,6 +33,7 @@ using System.Net.Http;
 using System.Text;
 using gov.llnl.wintap.core.etl;
 using Org.BouncyCastle.Asn1.Pkcs;
+using System.Runtime.InteropServices;
 
 namespace gov.llnl.wintap
 {
@@ -57,10 +58,6 @@ namespace gov.llnl.wintap
         {
             WintapLogger.Log.Append("Creating startup thread.", LogLevel.Always);
 
-            //await test();
-            
-
-
             BackgroundWorker startupWorker = new BackgroundWorker();
             startupWorker.DoWork += startupWorker_DoWork;
             startupWorker.RunWorkerAsync();
@@ -68,70 +65,6 @@ namespace gov.llnl.wintap
 
         }
         
-        private async Task test()
-        {
-            string rag_data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "ragdata", "ragdata.txt");
-
-            var kernelBuilder = Kernel.CreateBuilder();
-            var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "phi3", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434"))
-                .Build();
-
-            HttpClient httpClient = new HttpClient();
-            httpClient.Timeout = new TimeSpan(0, 5, 0);
-
-            Console.WriteLine("Generating embeddings...");
-            ISemanticTextMemory memory = new MemoryBuilder()
-                .WithLoggerFactory(kernel.LoggerFactory)
-                .WithMemoryStore(new VolatileMemoryStore())
-                .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
-                .Build();
-
-            string collectionName = "testCollection";
-            string s = System.IO.File.ReadAllText(rag_data);
-            List<string> paragraphs = TextChunker.SplitPlainTextParagraphs(TextChunker.SplitPlainTextLines(s, 128), 256);
-            try
-            {
-                for (int i = 0; i < paragraphs.Count; i++)
-                {
-                    await memory.SaveInformationAsync(collectionName, paragraphs[i], $"paragraph{i}");
-                }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("Error getting embeddings: " + ex.Message, core.infrastructure.LogLevel.Always);
-            }
-
-
-
-            IChatCompletionService ai = kernel.GetRequiredService<IChatCompletionService>();
-
-            ChatHistory chat = new("You are an I that helps users understand the shipping status of orders.");
-
-            string question = "Jane Smith";
-            StringBuilder builder = new StringBuilder();
-            await foreach (MemoryQueryResult result in memory.SearchAsync(collectionName, question, 3, 0, withEmbeddings: true))
-            {
-                builder.AppendLine(result.Metadata.Text);
-            }
-            int contextToRemove = -1;
-            if (builder.Length != 0)
-            {
-                builder.Insert(0, "Here's some additional information: ");
-                contextToRemove = chat.Count;
-                chat.AddUserMessage(builder.ToString());
-            }
-            chat.AddUserMessage(question);
-            builder.Clear();
-            await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat))
-            {
-                Console.Write(message);
-                builder.Append(message.Content);
-            }
-            chat.AddAssistantMessage(builder.ToString());
-           
-        }
-
-
         //protected override void OnStop()
         //{
         //    WintapLogger.Log.Append("Stop command received.  Attempting to shutdown plugins", LogLevel.Always);
@@ -166,7 +99,10 @@ namespace gov.llnl.wintap
         {
             try
             {
-                Utilities.SetDirectoryPermissions(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    Utilities.SetDirectoryPermissions(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
+                }
             }
             catch (Exception ex)
             {

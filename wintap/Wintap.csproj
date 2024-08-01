@@ -129,26 +129,6 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <COMReference Include="COMAdmin">
-      <Guid>{F618C513-DFB8-11D1-A2CF-00805FC79235}</Guid>
-      <VersionMajor>1</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>tlbimp</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </COMReference>
-    <COMReference Include="COMSVCSLib">
-      <Guid>{2A005C00-A5DE-11CF-9E66-00AA00A3F464}</Guid>
-      <VersionMajor>1</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>tlbimp</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
-    </COMReference>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\WintapAPI\WintapAPI.csproj" />
   </ItemGroup>
   <ItemGroup>
@@ -162,8 +142,6 @@
     <PackageReference Include="Common.Logging.Core" Version="3.4.1" />
     <PackageReference Include="Crc32.NET" Version="1.2.0" />
     <PackageReference Include="DuckDB.NET.Data.Full" Version="1.0.2" />
-    <PackageReference Include="LLamaSharp" Version="0.11.2" />
-    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.11.2" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNet.WebApi.OwinSelfHost" Version="5.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="8.0.4" />
@@ -264,4 +242,14 @@
     <AssemblyVersion>7.0.0.0</AssemblyVersion>
     <FileVersion>7.0.0.0</FileVersion>
   </PropertyGroup>
+  <PropertyGroup>
+	<TargetFramework>net8.0</TargetFramework>
+	<RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <Target Name="SetPublishDir" BeforeTargets="Publish">
+    <PropertyGroup>
+	  <PublishDir Condition="'$(RuntimeIdentifier)' == 'win-x64'">$(OutputPath)publish\win-x64\</PublishDir>
+	  <PublishDir Condition="'$(RuntimeIdentifier)' == 'linux-x64'">$(OutputPath)publish\linux-x64\</PublishDir>
+	</PropertyGroup>
+  </Target>
 </Project>
