@@ -5,6 +5,8 @@
  */
 
 using com.espertech.esper.client;
+using com.espertech.esper.common.client;
+using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
@@ -34,9 +36,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public override bool Start()
         {
             //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
-            EPStatement etlToEsperPattern = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name FROM pattern[every PartA=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ProcessStart/Start') -> PartB=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ImageLoad' AND PID=PartA.PID) where timer:within(3 sec)]");
+            WintapLogger.Log.Append("Assembling boot trace process events...!!!", LogLevel.Always);
+            WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Always);
+            EPStatement etlToEsperPattern = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name FROM pattern[every PartA=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ProcessStart/Start') -> PartB=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ImageLoad' AND PID=PartA.PID) where timer:within(3 sec)]").Statements[0];
             etlToEsperPattern.Events += etlToEsperPattern_Events;
 
+            WintapLogger.Log.Append("Building process tree.", LogLevel.Always);
             processTree = new ProcessTree();
             processTree.GenProcessTree();
 
@@ -87,7 +92,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private void etlToEsperPattern_Events(object sender, UpdateEventArgs e)
         {
             EventBean[] partials = e.NewEvents;
-            foreach (com.espertech.esper.events.map.MapEventBean partial in partials)
+            foreach (EventBean partial in partials)
             {
                 int pid = Convert.ToInt32(partial.Get("PartA.PID").ToString());
                 long eventTime = Convert.ToInt64(partial.Get("PartA.EventTime").ToString());

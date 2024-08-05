@@ -5,6 +5,7 @@
  */
 
 using com.espertech.esper.client;
+using com.espertech.esper.common.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.shared;
 using gov.llnl.wintap.core.etl.transform;

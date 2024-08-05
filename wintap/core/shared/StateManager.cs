@@ -21,6 +21,7 @@ using Parquet.Schema;
 using Newtonsoft.Json;
 using System.Runtime.InteropServices;
 using gov.llnl.wintap.platform.windows.shared;
+using com.espertech.esper.runtime.client;
 
 namespace gov.llnl.wintap.core.shared
 {
@@ -111,8 +112,8 @@ namespace gov.llnl.wintap.core.shared
             WintapLogger.Log.Append($"StateManager is registering for user change notifications...", infrastructure.LogLevel.Always);
             try
             {
-                EPStatement userChangeQuery = EventChannel.Esper.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType='SessionChange'");
-                userChangeQuery.Events += UserChangeQuery_Events;
+                EPStatement userChangeQuery = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT * FROM WintapMessage WHERE MessageType='SessionChange'").Statements[0];
+                //TODO :  userChangeQuery.Events += UserChangeQuery_Events;
             }
             catch(Exception ex)
             {
@@ -263,41 +264,6 @@ namespace gov.llnl.wintap.core.shared
                 state.AgentId = agentId.ToString();
             }
             return agentId;
-        }
-
-        private void UserChangeQuery_Events(object sender, UpdateEventArgs e)
-        {
-            WintapMessage sessionChange = (WintapMessage)e.NewEvents[0].Underlying;
-            ActiveUser = sessionChange.SessionChange.UserName;
-            if(ActiveUser.ToUpper().Contains("PHOTONUSER"))
-            {
-                WintapLogger.Log.Append("Attempting to map PhotonUser...", infrastructure.LogLevel.Always);
-                RegistryKey usersRoot = Registry.Users;
-                foreach(var userKey in usersRoot.GetSubKeyNames())
-                {
-                    try
-                    {
-                        if (userKey.StartsWith("S-1-5-21-"))
-                        {
-                            RegistryKey currentUserKey = usersRoot.OpenSubKey(userKey);
-                            if (currentUserKey.GetSubKeyNames().Contains("Environment"))
-                            {
-                                RegistryKey envKey = currentUserKey.OpenSubKey("Environment");
-                                System.Threading.Thread.Sleep(5000);
-                                ActiveUser = envKey.GetValue("AppStream_UserName").ToString();
-                                envKey.Close();
-                                envKey.Dispose();
-                            }
-                        }
-                    }
-                    catch(Exception ex)
-                    {
-                        WintapLogger.Log.Append("Error reading environment for key: " + userKey + "  exception: " + ex.Message, infrastructure.LogLevel.Always);
-                    }
-                   
-                }
-                WintapLogger.Log.Append("PhotonUser resolution complete.", infrastructure.LogLevel.Always);
-            }
         }
 
         public static StateManager State

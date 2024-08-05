@@ -3,7 +3,6 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using System;
 using System.Diagnostics;
-using com.espertech.esper.pattern.observer;
 
 namespace gov.llnl.wintap.core.collect
 {

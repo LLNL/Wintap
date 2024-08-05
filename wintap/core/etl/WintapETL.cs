@@ -61,16 +61,17 @@ namespace gov.llnl.wintap.core.etl
                 processObjectModelWorker.RunWorkerAsync();
 
 
-                BackgroundWorker workerThread = new BackgroundWorker();
-                workerThread.DoWork += WorkerThread_DoWork;
-                workerThread.RunWorkerCompleted += WorkerThread_RunWorkerCompleted;
-                workerThread.RunWorkerAsync();
+                BackgroundWorker cacheManagerThread = new BackgroundWorker();
+                cacheManagerThread.DoWork += cacheManager_DoWork;
+                cacheManagerThread.RunWorkerCompleted += cacheManager_RunWorkerCompleted;
+                cacheManagerThread.RunWorkerAsync();
 
                 Timer statsUpdateTimer = new Timer();
                 statsUpdateTimer.Interval = 5000;
                 statsUpdateTimer.AutoReset = true;
                 statsUpdateTimer.Elapsed += StatsUpdateTimer_Elapsed;
-                statsUpdateTimer.Start();
+                //statsUpdateTimer.Start();
+
                 etlLoaded = true;
             }
             catch (Exception ex)
@@ -85,69 +86,6 @@ namespace gov.llnl.wintap.core.etl
             return etlLoaded;
 
         }
-
-        /// <summary>
-        /// entry point for WintapMessage streaming from Wintap
-        /// </summary>
-        /// <param name="eventMsg"></param>
-        public void Subscribe(WintapMessage eventMsg)
-        {
-            try
-            {
-                totalMessageCount++;
-                string className = eventMsg.MessageType.ToLower() + "_sensor";
-                if (eventMsg.MessageType.ToUpper() == "PROCESS" && eventMsg.ActivityType.ToUpper() == "STOP")
-                {
-                    className = "processstop_sensor";
-                }
-
-                // do we have a sensor for this MessageType?  call its listen method or call the default listener
-                var sensor = sensors.FirstOrDefault(s => s.SensorName == className);
-                if (sensor != null)
-                {
-                    sensor.Listen(eventMsg);
-                }
-                else
-                {
-                    sensors.Where(s => s.SensorName == "default_sensor").FirstOrDefault().Listen(eventMsg);
-
-                }
-            }
-            catch(Exception ex)
-            {
-                Logger.Log.Append("ERROR handling subscribe request: " + ex.Message, LogLevel.Debug);
-            }
-
-
-            try
-            {
-                switch (eventMsg.MessageType)
-                {
-                    case "GENERIC":
-                        if (eventMsg.GenericMessage.Provider == "Microsoft-Windows-NetworkProfile")
-                        {
-                            if (eventMsg.GenericMessage.Payload.Contains("Network Connectivity Level Changed: True") || eventMsg.GenericMessage.Payload.Contains("Host Name Changed: True"))
-                            {
-                                if (DateTime.Now.Subtract(lastNetChange) > new TimeSpan(0, 0, 1, 0, 0))  // etw will spew duplicate events for one physical network change
-                                {
-                                    Logger.Log.Append("Change in network state detected, sending up Host and MacIp records", LogLevel.Always);
-                                    HOST_SENSOR.Instance.WriteHostRecord();
-                                    HOST_SENSOR.Instance.WriteMacIPRecords();
-                                    lastNetChange = DateTime.Now;
-                                }
-                            }
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Append("Could not check if WintapMessage contains NetworkProfile provider: " + ex.Message, LogLevel.Always);
-            }
-        }
-
 
 
         public void Shutdown()
@@ -186,6 +124,7 @@ namespace gov.llnl.wintap.core.etl
         private void ProcessObjectModelWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             Logger.Log.Append("Creating process sensors", LogLevel.Always);
+
             processSensor = new PROCESS_SENSOR(esperNameSpacePrefix + "process.epl");
             processStopSensor = new PROCESSSTOP_SENSOR(esperNameSpacePrefix + "process-stop.epl");
             Logger.Log.Append("Process context created.", LogLevel.Always);
@@ -196,12 +135,12 @@ namespace gov.llnl.wintap.core.etl
             Logger.Log.Append("Total wintap messages received: " + totalMessageCount, LogLevel.Always);
         }
 
-        private void WorkerThread_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void cacheManager_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             Logger.Log.Append("initialization complete", LogLevel.Always);
         }
 
-        private void WorkerThread_DoWork(object sender, DoWorkEventArgs e)
+        private void cacheManager_DoWork(object sender, DoWorkEventArgs e)
         {
             Logger.Log.Append("creating wintap data cache manager", LogLevel.Always);
             List<IUpload> uploaders = new List<IUpload>();

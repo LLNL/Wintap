@@ -48,47 +48,23 @@ namespace gov.llnl.wintap.core.api
             StateManager.LastWorkbenchActivity = DateTime.Now;
         }
 
-        public class QueryObject
-        {
-            public string name { get; set; }
-            public string query { get; set; }
-            public string state { get; set; }
-            public string deploymentid { get; set; }
-        }
-
+        /// <summary>
+        /// Activate, Stop or Delete handling
+        /// </summary>
+        /// <param name="q"></param>
+        /// <returns></returns>
         [HttpPost]
         [Route("api/streams")]
-        public IActionResult Post([FromBody] QueryObject q)
+        public IActionResult Post([FromBody] EsperQuery q)
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
             string responseMsg = "OK";
             bool error = false;     
             try
             {
-                if(q.state == "ACTIVE")
-                {
-                    deactivateAll();   // only want 1 active query at a time
-                }
-                EPStatement statement = EventChannel.EsperRuntime.DeploymentService.GetStatement(q.deploymentid, q.name);
-                if(statement != null)
-                {
-                    EventChannel.EsperRuntime.DeploymentService.Undeploy(q.deploymentid); ;  // we need to set ACTIVE in userObject for this query which can only happen on create (read-only), so destroy it here first.
-                }
-                string statementDecode = HttpUtility.UrlDecode(q.query);
-                if (q.state != "DELETE")
-                {
-                    WorkbenchQuery embeddedStatement = new WorkbenchQuery() { Name = q.name, Query = statementDecode, State = q.state, CreateDate = DateTime.Now, StatementType = WorkbenchQuery.StatementTypeEnum.User };
-                    string jsonStatement = JsonConvert.SerializeObject(embeddedStatement);
-                    statement = EventChannel.compileDeploy(statementDecode, q.name, jsonStatement);  // setting the userObject so we can serialize to disk on sensor shutdown
-                    if (q.state == "ACTIVE")
-                    {
-                        statement.Events += Eps_Events;
-                    }
-                    if (q.state == "STOP")
-                    {
-                        statement.Stop();
-                    }
-                }              
+                q = EventChannel.ManageWorkbenchQuery(q);
+                EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
+                esperDeployment.Statements[0].Events += ActiveQuery_Events;
             }
             catch(Exception ex)
             {
@@ -116,31 +92,7 @@ namespace gov.llnl.wintap.core.api
         public IActionResult GetAllStatements()
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
-            List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
-            var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
-            foreach (var statementName in statementNames)
-            {
-                var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                if (statement.UserObject != null)
-                {
-                    try
-                    {
-                        WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                        if (embeddedStatement.State != "ACTIVE")
-                        {
-                            embeddedStatement.State = statement.State.ToString();
-                        }
-                        if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
-                        {
-                            allStatements.Add(embeddedStatement);
-                        }
-                    }
-                    catch (JsonException ex)
-                    {
-                        // JSONExceptions are expected for plugins, Non-jsonExceptions should bubble up.
-                    }
-                }
-            }
+            List<EsperQuery> allStatements = EventChannel.getWorkbenchState();
             IActionResult result = Ok(new
             {
                 response = allStatements
@@ -162,8 +114,8 @@ namespace gov.llnl.wintap.core.api
             string responseMsg = "OK";
             try
             {
-                var statement = EventChannel.Esper.EPAdministrator.GetStatement(name);
-                responseMsg = statement.Text;
+                var statement = EventChannel.getWorkbenchState().Where(s => s.Name ==  name).FirstOrDefault();
+                responseMsg = statement.Query;
             }
             catch (Exception ex)
             {
@@ -195,26 +147,12 @@ namespace gov.llnl.wintap.core.api
             string responseMsg = "OK";
             try
             {
-                var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
-                foreach (var statementName in statementNames)
+                foreach (EsperQuery esperQuery in EventChannel.getWorkbenchState())
                 {
-                    EPStatement statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                    if(statement.UserObject != null)
-                    {
-                        try
-                        {
-                            WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                            if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
-                            {
-                                statement.Dispose();
-                            }
-                        }
-                        catch (JsonException ex)
-                        {
-                            // JSONExceptions are expected for plugins, Non-jsonExceptions should bubble up.
-                        }
-                    }
+                    esperQuery.State = EsperQuery.EsperState.DELETED;
+                    EventChannel.ManageWorkbenchQuery(esperQuery);
                 }
+
             }
             catch (Exception ex)
             {
@@ -233,45 +171,14 @@ namespace gov.llnl.wintap.core.api
             return result;
         }
 
-        private void deactivateAll()
-        {
-            var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
-            foreach (var statementName in statementNames)
-            {
-                //  loop thru destroy/recreate ALL user queries and map any ACTIVE workbenchStatment state to a STARTED EPL state
-                var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                if(statement.UserObject != null)
-                {
-                    try
-                    {
-                        WorkbenchQuery workbenchStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                        if (workbenchStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User)
-                        {
-                            if (workbenchStatement.State == "ACTIVE")
-                            {
-                                workbenchStatement.State = EPStatementState.STARTED.ToString();
-                            }
-                            else
-                            {
-                                workbenchStatement.State = statement.State.ToString();
-                            }
-                            statement.Dispose();
-                            // recreate the esper statement - we do this because the userObject on an EPStatement is READ-ONLY
-                            string statementJson = JsonConvert.SerializeObject(workbenchStatement);
-                            var restoredStatement = EventChannel.Esper.EPAdministrator.CreateEPL(workbenchStatement.Query, workbenchStatement.Name, statementJson);
-                        }
-                    }
-                    catch (JsonException ex) { }
-                }
-            }
-        }
+     
 
         /// <summary>
         /// web sockets method for broadcasting query results
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void Eps_Events(object sender, UpdateEventArgs e)
+        private void ActiveQuery_Events(object sender, UpdateEventArgs e)
         {
             foreach(var esperObject in e.NewEvents)
             {
@@ -302,80 +209,5 @@ namespace gov.llnl.wintap.core.api
                 hubContext.Clients.All.SendAsync("ReceiveMessage", esperResult, "OK");
             }
         }
-
-        internal static void LoadInteractiveQueries()
-        {
-            try
-            {
-                FileInfo esperQueryFile = new FileInfo(Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Esper.json");
-                if (esperQueryFile.Exists)
-                {
-                    string json = System.IO.File.ReadAllText(Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Esper.json");
-                    List<WorkbenchQuery> statements = JsonConvert.DeserializeObject<List<WorkbenchQuery>>(json);
-                    foreach (var statement in statements.OrderBy(s => s.CreateDate))
-                    {
-                        string jsonStatement = JsonConvert.SerializeObject(statement);
-                        var eps = EventChannel.Esper.EPAdministrator.CreateEPL(statement.Query, statement.Name, jsonStatement);
-                        if (statement.State == "STARTED" && !statement.Name.Contains("--"))
-                        {
-                            eps.Start();
-                        }
-                    }
-                }
-            }
-            catch(Exception ex)
-            {
-
-            }
-           
-        }
-
-        internal static void Stop()
-        {
-            StateManager.LastWorkbenchActivity = DateTime.Now;
-            List<WorkbenchQuery> allStatements = new List<WorkbenchQuery>();
-            var statementNames = EventChannel.Esper.EPAdministrator.StatementNames;
-            foreach (var statementName in statementNames)
-            {
-                var statement = EventChannel.Esper.EPAdministrator.GetStatement(statementName);
-                if (statement.UserObject != null)
-                {
-                    try
-                    {
-                        WorkbenchQuery embeddedStatement = JsonConvert.DeserializeObject<WorkbenchQuery>((string)statement.UserObject);
-                        if (embeddedStatement.StatementType == WorkbenchQuery.StatementTypeEnum.User && !statement.Name.Contains("--"))
-                        {
-                            allStatements.Add(new WorkbenchQuery { Name = statement.Name, Query = statement.Text, State = statement.State.ToString().ToUpper(), StatementType = WorkbenchQuery.StatementTypeEnum.User, CreateDate = embeddedStatement.CreateDate });
-
-                        }
-                    }
-                    catch(JsonException ex)
-                    {
-                        // expected for IQuery plugins as they use UserObject for non-JSON data
-                    }  
-                }
-            }
-            DirectoryInfo wintapData = new DirectoryInfo(Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap");
-            if(!wintapData.Exists)
-            {
-                wintapData.Create();
-            }
-            if(allStatements.Count > 0)
-            {
-                System.IO.File.WriteAllText(Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Esper.json", JsonConvert.SerializeObject(allStatements, Formatting.Indented));
-            }
-        }
-    }
-
-    public class WorkbenchQuery
-    {
-        public enum StatementTypeEnum { User, Sensor }
-
-        public string Name { get; set; }
-        public string DeploymentId { get; set; }
-        public string Query { get; set; }
-        public StatementTypeEnum StatementType { get; set; }
-        public string State { get; set; }
-        public DateTime CreateDate { get; set; }
     }
 }

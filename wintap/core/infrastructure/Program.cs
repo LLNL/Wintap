@@ -50,8 +50,7 @@ builder.Services.AddControllers();
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Always);
 
 var kernelBuilder = Kernel.CreateBuilder();
-var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "phi3", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434"))
-    .Build();
+var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "phi3", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
 
 HttpClient httpClient = new HttpClient();
 httpClient.Timeout = new TimeSpan(0, 5, 0);
@@ -124,7 +123,7 @@ app.UseEndpoints(endpoints =>
 {
     endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
     endpoints.MapHub<WorkbenchHub>("/signalr/WorkbenchHub");
-    endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
+    //endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });
 
 app.Run(); 

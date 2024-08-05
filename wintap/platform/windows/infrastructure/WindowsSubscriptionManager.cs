@@ -23,6 +23,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
             List<BaseWinCollector> baseCollectors = new List<BaseWinCollector>();
             // start process collector first for process attribution
+            WintapLogger.Log.Append("Starting Process collector", LogLevel.Always);
             ProcessCollector pc = new ProcessCollector();
             pc.Start();
             kernelFlags = KernelTraceEventParser.Keywords.Process;

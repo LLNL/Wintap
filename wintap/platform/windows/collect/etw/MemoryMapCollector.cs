@@ -1,4 +1,5 @@
 ﻿using com.espertech.esper.compat;
+using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
@@ -139,7 +140,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             scanInProgress = false;
 
             string sql = "select * from WintapMessage where MessageType='Process' AND ActivityType='start'";
-            var epQuery = EventChannel.Esper.EPAdministrator.CreateEPL(sql);
+            var epQuery = EventChannel.compileDeploy(EventChannel.EsperRuntime, sql).Statements[0];
             epQuery.Events += EpQuery_Events;
 
             WintapLogger.Log.Append(CollectorName + " started", LogLevel.Always);
@@ -195,7 +196,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
 
-        private void EpQuery_Events(object sender, com.espertech.esper.client.UpdateEventArgs e)
+        private void EpQuery_Events(object sender, UpdateEventArgs e)
         {
             try
             {
@@ -330,7 +331,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
                     baseAddress = new nint(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
                     wm.AgentId = StateManager.AgentId.ToString();
-                    EventChannel.Esper.EPRuntime.SendEvent(wm);  // call esper direct since we do not require pidhash lookup.
+                    EventChannel.EsperRuntime.EventService.SendEventBean(wm, "WintapMessage");  // call esper direct since we do not require pidhash lookup.
                 }
                 catch
                 {

@@ -42,7 +42,7 @@ namespace gov.llnl.wintap
     /// </summary>
     public partial class WinTapSvc : BackgroundService
     {
-
+        
         private PluginManager pluginMgr;
         private SubscriptionManager subscriptionMgr;
         private string[] args;
@@ -189,7 +189,6 @@ namespace gov.llnl.wintap
                 WintapLogger.Log.Append("error in workbench extraction: " + ex.Message, LogLevel.Always);
             }
 
-            StreamsController.LoadInteractiveQueries();  // load from disk
             string baseAddress = "http://127.0.0.1:" + Properties.Settings.Default.ApiPort + "/";
 
             try

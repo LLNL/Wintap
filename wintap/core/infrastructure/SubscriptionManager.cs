@@ -24,6 +24,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal SubscriptionManager()
         {
+
             winCollectors = new List<BaseWinCollector>();
             etwCollectors = new List<EtwProviderCollector>();
             winSubMgr = new WindowsSubscriptionManager();
@@ -37,6 +38,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
+                WintapLogger.Log.Append("Starting WindowsSubscriptionManager", LogLevel.Always);
                 winCollectors = winSubMgr.Start();
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
