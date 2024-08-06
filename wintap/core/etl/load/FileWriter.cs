@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -33,7 +33,7 @@ namespace gov.llnl.wintap.core.etl.load
         // setup directory structure so we can start writing files.
         private void initializeDataDirectory()
         {
-            Logger.Log.Append("initializing data directory " + this.DataDirectory, LogLevel.Always);
+            WintapLogger.Log.Append("initializing data directory " + this.DataDirectory, LogLevel.Always);
             try
             {
                 DirectoryInfo dataDirInfo = new DirectoryInfo(this.DataDirectory);
@@ -41,12 +41,12 @@ namespace gov.llnl.wintap.core.etl.load
                 {
                     dataDirInfo.Create();
                 }
-                Logger.Log.Append("initializing file system directory: " + dataDirInfo.FullName, LogLevel.Always);
-                Logger.Log.Append("     exists: " + dataDirInfo.Exists, LogLevel.Always);
+                WintapLogger.Log.Append("initializing file system directory: " + dataDirInfo.FullName, LogLevel.Always);
+                WintapLogger.Log.Append("     exists: " + dataDirInfo.Exists, LogLevel.Always);
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("error initializing sensor " + this.DataDirectory + ": " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("error initializing sensor " + this.DataDirectory + ": " + ex.Message, LogLevel.Always);
             }
         }
 
@@ -57,12 +57,12 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 try
                 {
-                    Logger.Log.Append("Deleting zero-row parquet from file system: " + parquet.FullName, LogLevel.Always);
+                    WintapLogger.Log.Append("Deleting zero-row parquet from file system: " + parquet.FullName, LogLevel.Always);
                     parquet.Delete();
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Append("Problem deleting zero-row parquet from file system: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("Problem deleting zero-row parquet from file system: " + ex.Message, LogLevel.Always);
                 }
             }
 

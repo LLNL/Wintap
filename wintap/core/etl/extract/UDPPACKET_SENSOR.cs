@@ -8,6 +8,7 @@ using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.models;
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.etl.shared;
 using System;
 using System.Collections.Generic;
@@ -31,7 +32,7 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private void NetworkEventTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            Logger.Log.Append("ETW session provider has ceased to send network events for 60 seconds.  restart Wintap?", LogLevel.Always);
+            WintapLogger.Log.Append("ETW session provider has ceased to send network events for 60 seconds.  restart Wintap?", LogLevel.Always);
         }
 
         protected override void HandleSensorEvent(EventBean sensorEvent)
@@ -55,7 +56,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error creating UdpPacket data object for pid: " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error creating UdpPacket data object for pid: " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Always);
             }
         }
     }

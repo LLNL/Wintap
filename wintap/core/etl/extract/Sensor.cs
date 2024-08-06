@@ -11,8 +11,8 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.load;
 using gov.llnl.wintap.core.etl.model;
 using gov.llnl.wintap.core.etl.models;
-using gov.llnl.wintap.core.etl.shared;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.etl.shared;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -23,7 +23,6 @@ using System.Linq;
 using System.Reflection;
 using System.Timers;
 using static gov.llnl.wintap.core.etl.shared.Utilities;
-using LogLevel = gov.llnl.wintap.core.etl.shared.LogLevel;
 
 
 namespace gov.llnl.wintap.core.etl.extract
@@ -114,7 +113,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Problem sending WintapMessage event from: " + this.GetType().Name + ":" + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Problem sending WintapMessage event from: " + this.GetType().Name + ":" + ex.Message, LogLevel.Always);
             }
         }
 
@@ -141,14 +140,14 @@ namespace gov.llnl.wintap.core.etl.extract
         {
             try
             {
-                Logger.Log.Append("Handing esper overrun condition in " + this.GetType().Name + "  suspending ETL data stream for: " + backoffTimer.Interval + "ms", LogLevel.Always);
+                WintapLogger.Log.Append("Handing esper overrun condition in " + this.GetType().Name + "  suspending ETL data stream for: " + backoffTimer.Interval + "ms", LogLevel.Always);
                 backoffTimer.Start();
                 this.Stop();
                 sendThrottleEvent("SUSPEND");
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Problem attempting to suspend esper processing in  " + this.GetType().Name + ": " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Problem attempting to suspend esper processing in  " + this.GetType().Name + ": " + ex.Message, LogLevel.Always);
             }
         }
 
@@ -200,12 +199,12 @@ namespace gov.llnl.wintap.core.etl.extract
             flushToDiskTimer.Elapsed += FlushToDiskTimer_Elapsed;
             flushToDiskTimer.Start();
 
-            Logger.Log.Append("Initializing sensor: " + this.GetType().Name, LogLevel.Always);
+            WintapLogger.Log.Append("Initializing sensor: " + this.GetType().Name, LogLevel.Always);
             
             regContext();
 
             IsEnabled = true;
-            Logger.Log.Append("initialization complete on: " + this.GetType().Name, LogLevel.Always);
+            WintapLogger.Log.Append("initialization complete on: " + this.GetType().Name, LogLevel.Always);
         }
 
 
@@ -230,12 +229,12 @@ namespace gov.llnl.wintap.core.etl.extract
                     }
                     else
                     {
-                        Logger.Log.Append($"{this.SensorName}: WARNING - Failed to dequeue message at index {i}", LogLevel.Always);
+                        WintapLogger.Log.Append($"{this.SensorName}: WARNING - Failed to dequeue message at index {i}", LogLevel.Always);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Append($"{this.SensorName}: ERROR getting message from SendQueue at index {i}: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"{this.SensorName}: ERROR getting message from SendQueue at index {i}: {ex.Message}", LogLevel.Always);
                 }
             }
 
@@ -249,12 +248,12 @@ namespace gov.llnl.wintap.core.etl.extract
                     }
                     else
                     {
-                        Logger.Log.Append($"{this.SensorName}: ERROR - temp queue not empty after serialize. Dropped event count: {tempQueue.Count}", LogLevel.Always);
+                        WintapLogger.Log.Append($"{this.SensorName}: ERROR - temp queue not empty after serialize. Dropped event count: {tempQueue.Count}", LogLevel.Always);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Append($"{this.SensorName}: ERROR writing event data to disk: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"{this.SensorName}: ERROR writing event data to disk: {ex.Message}", LogLevel.Always);
                 }
             }
         }
@@ -296,7 +295,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("ERROR writing parquet: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR writing parquet: " + ex.Message, LogLevel.Always);
             }
             parquetWriter.Add(batch);
             return tempQueue;
@@ -307,37 +306,36 @@ namespace gov.llnl.wintap.core.etl.extract
             var assembly = Assembly.GetExecutingAssembly();
             try
             {
-                Logger.Log.Append("registering Esper Context query", LogLevel.Always);
+                WintapLogger.Log.Append("registering Esper Context query", LogLevel.Always);
                 var esper1 = esperNameSpacePrefix + "esper-context.epl";
 
                 using (Stream stream = assembly.GetManifestResourceStream(esper1))
                 using (StreamReader reader = new StreamReader(stream))
                 {
                     string esperQuery = reader.ReadToEnd();
-                    Logger.Log.Append("ESPER QUERY READ FROM MANIFEST: " + esperQuery, gov.llnl.wintap.core.etl.shared.LogLevel.Always);
+                    WintapLogger.Log.Append("ESPER QUERY READ FROM MANIFEST: " + esperQuery, LogLevel.Always);
                     gov.llnl.wintap.core.infrastructure.EventChannel.compileDeploy(gov.llnl.wintap.core.infrastructure.EventChannel.EsperRuntime, esperQuery);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("problem creating esper context query: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("problem creating esper context query: " + ex.Message, LogLevel.Always);
             }
         }
 
         private void registerQuery(string queryPath)
         {
-            Logger.Log.Append("registering query: " + queryPath, LogLevel.Always);
+            WintapLogger.Log.Append("registering query: " + queryPath, LogLevel.Always);
             try
             {
                 string esperQuery = readQueryFromFile(queryPath);
-                Logger.Log.Append("Registering query!! : " + esperQuery, LogLevel.Always);
                 EPStatement newStatement = gov.llnl.wintap.core.infrastructure.EventChannel.compileDeploy(gov.llnl.wintap.core.infrastructure.EventChannel.EsperRuntime, esperQuery).Statements[0];
                 newStatement.Events += ProcStatement_Events;
-                Logger.Log.Append("EPL created and event handlers attached on " + GetType().Name, LogLevel.Always);
+                WintapLogger.Log.Append("EPL created and event handlers attached on " + GetType().Name, LogLevel.Always);
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("error registering EPL: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("error registering EPL: " + ex.Message, LogLevel.Always);
             }
 
 
@@ -379,7 +377,7 @@ namespace gov.llnl.wintap.core.etl.extract
             wd.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
             wd.Type = "GENERIC_INFO";
             wd.EventTime = GetUnixNowTime();
-            Logger.Log.Append(wd.Info + ": " + wd.Message, LogLevel.Debug);
+            WintapLogger.Log.Append(wd.Info + ": " + wd.Message, LogLevel.Debug);
         }
         #endregion
     }

@@ -8,6 +8,7 @@ using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using gov.llnl.wintap.core.etl.extract;
 using gov.llnl.wintap.core.etl.models;
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.etl.shared;
 using System;
 using System.Collections.Generic;

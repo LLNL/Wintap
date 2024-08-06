@@ -8,7 +8,7 @@ using System;
 using System.Linq;
 using System.Collections.Concurrent;
 using gov.llnl.wintap.core.etl.models;
-using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.etl.extract;
 
 namespace gov.llnl.wintap.core.etl.transform
@@ -37,11 +37,11 @@ namespace gov.llnl.wintap.core.etl.transform
             ProcessIdMap removedValue;
             if (!processKeys.TryRemove(pid, out removedValue))
             {
-                Logger.Log.Append("No key removed for pid: " + pid, LogLevel.Debug);
+                WintapLogger.Log.Append("No key removed for pid: " + pid, LogLevel.Debug);
             }
             else
             {
-                Logger.Log.Append("Key removed for pid: " + pid, LogLevel.Debug);
+                WintapLogger.Log.Append("Key removed for pid: " + pid, LogLevel.Debug);
             }
         }
 
@@ -80,7 +80,7 @@ namespace gov.llnl.wintap.core.etl.transform
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Exception in addProcessKey: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Exception in addProcessKey: " + ex.Message, LogLevel.Always);
             }
         }
     }

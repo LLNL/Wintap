@@ -25,9 +25,9 @@ namespace gov.llnl.wintap
             }
             catch(Exception ex)
             {
-                Logger.Log.Append("ERROR getting Wintap service start type: " + ex.Message);
+                WintapLogger.Log.Append("ERROR getting Wintap service start type: " + ex.Message);
             }
-            Logger.Log.Append("Returning service set to AUTOMATIC: " + setToAuto);
+            WintapLogger.Log.Append("Returning service set to AUTOMATIC: " + setToAuto);
             return setToAuto;
         }
 
@@ -35,7 +35,7 @@ namespace gov.llnl.wintap
         {
             try
             {
-                Logger.Log.Append("Attempting to set Wintap service start type.");
+                WintapLogger.Log.Append("Attempting to set Wintap service start type.");
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\System32\\sc.exe";
                 psi.Arguments = "config wintap start=auto";
@@ -46,9 +46,9 @@ namespace gov.llnl.wintap
             }
             catch(Exception ex)
             {
-                Logger.Log.Append("ERROR setting Wintap service start type: " + ex.Message);
+                WintapLogger.Log.Append("ERROR setting Wintap service start type: " + ex.Message);
             }
-            Logger.Log.Append("Service start type complete");
+            WintapLogger.Log.Append("Service start type complete");
         }
 
         /// <summary>
@@ -68,9 +68,9 @@ namespace gov.llnl.wintap
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("ERROR getting Wintap service state: " + ex.Message);
+                WintapLogger.Log.Append("ERROR getting Wintap service state: " + ex.Message);
             }
-            Logger.Log.Append("Wintap service controller QUERY method complete, returning RUNNING state to caller: " + wintapRunning);
+            WintapLogger.Log.Append("Wintap service controller QUERY method complete, returning RUNNING state to caller: " + wintapRunning);
             return wintapRunning;
         }
 
@@ -85,14 +85,14 @@ namespace gov.llnl.wintap
                     sc.Start();
                     sc.WaitForStatus(ServiceControllerStatus.Running, svcTimeout);
                     reqSucceeded = true;
-                    Logger.Log.Append("Wintap start request complete.  New state: " + sc.Status);
+                    WintapLogger.Log.Append("Wintap start request complete.  New state: " + sc.Status);
                 }
             }
             catch(Exception ex)
             {
-                Logger.Log.Append("ERROR starting Wintap: " + ex.Message);
+                WintapLogger.Log.Append("ERROR starting Wintap: " + ex.Message);
             }
-            Logger.Log.Append("Wintap service controller START method complete, returning RUNNING state to caller: " + reqSucceeded);
+            WintapLogger.Log.Append("Wintap service controller START method complete, returning RUNNING state to caller: " + reqSucceeded);
             return reqSucceeded;
         }
 
@@ -110,29 +110,29 @@ namespace gov.llnl.wintap
                 }
                 else
                 {
-                    Logger.Log.Append("Wintap was already in a STOPPED state");
+                    WintapLogger.Log.Append("Wintap was already in a STOPPED state");
                 }
             }
             catch(Exception ex)
             {
-                Logger.Log.Append("ERROR attempting to shutdown Wintap: " + ex.Message);
+                WintapLogger.Log.Append("ERROR attempting to shutdown Wintap: " + ex.Message);
                 try
                 {
                     System.Diagnostics.Process[] allWintaps = System.Diagnostics.Process.GetProcessesByName("wintap.exe");
                     for(int i = 0; i < allWintaps.Length; i++)
                     {
-                        Logger.Log.Append("attempting to terminate wintap process with PID: " + allWintaps[i].Id);
+                        WintapLogger.Log.Append("attempting to terminate wintap process with PID: " + allWintaps[i].Id);
                         allWintaps[i].Kill();
                     }
-                    Logger.Log.Append("Wintap process termination complete.");
+                    WintapLogger.Log.Append("Wintap process termination complete.");
                 }
                 catch(Exception ex2)
                 {
-                    Logger.Log.Append("Error terminating Wintap: " + ex2.Message);
+                    WintapLogger.Log.Append("Error terminating Wintap: " + ex2.Message);
                     stopReqSucceeded = false;
                 }
             }
-            Logger.Log.Append("Wintap service controller STOP method complete, returning STOP state to caller: " + stopReqSucceeded);
+            WintapLogger.Log.Append("Wintap service controller STOP method complete, returning STOP state to caller: " + stopReqSucceeded);
             return stopReqSucceeded;
         }
     }

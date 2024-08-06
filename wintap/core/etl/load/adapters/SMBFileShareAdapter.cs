@@ -1,7 +1,7 @@
 ﻿using Amazon.S3;
 using gov.llnl.wintap.core.etl.load.adapters.baseclass;
 using gov.llnl.wintap.core.etl.load.interfaces;
-using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -38,7 +38,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             catch(Exception ex)
             {
                 preUploadSuccess = false;
-                Logger.Log.Append("Error in " + this.Name + "   could not parse UNCPath from config.  Verify the value is defined and is a parseable UNC path", LogLevel.Always);
+                WintapLogger.Log.Append("Error in " + this.Name + "   could not parse UNCPath from config.  Verify the value is defined and is a parseable UNC path", LogLevel.Always);
             }
             this.startSessionStats();
             return preUploadSuccess;
@@ -55,7 +55,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
             catch(Exception ex)
             {
-                Logger.Log.Append("Error uploading file: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error uploading file: " + ex.Message, LogLevel.Always);
                 uploadSuccess = false;
             }
             return uploadSuccess;

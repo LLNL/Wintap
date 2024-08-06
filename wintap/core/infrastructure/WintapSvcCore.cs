@@ -112,7 +112,7 @@ namespace gov.llnl.wintap
 
             WintapLogger.Log.Append("Wintap Agent ID: " + StateManager.AgentId.ToString(), LogLevel.Always);
 
-            WintapLogger.Log.Append("loading plugin manager...", LogLevel.Always);
+            WintapLogger.Log.Append("loading plugin manager...!", LogLevel.Always);
             pluginMgr = new PluginManager();
 
             WintapLogger.Log.Append("Creating performance monitor", LogLevel.Always);

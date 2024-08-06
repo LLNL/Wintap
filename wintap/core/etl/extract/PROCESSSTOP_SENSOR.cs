@@ -8,7 +8,7 @@ using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.models;
-using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.etl.transform;
 using System;
 using System.Dynamic;
@@ -41,7 +41,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Top level error in process event handler: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("Top level error in process event handler: " + ex.Message, LogLevel.Debug);
             }
         }
 
@@ -55,7 +55,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("ERROR handling Process terminate on pid: " + wintapMessage.PID + ", " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("ERROR handling Process terminate on pid: " + wintapMessage.PID + ", " + ex.Message, LogLevel.Debug);
             }
         }
 

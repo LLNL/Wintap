@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using Parquet;
 using Parquet.Data;
 using Parquet.Schema;
@@ -48,7 +48,7 @@ namespace gov.llnl.wintap.core.etl.load
                 {
                     if (dataSet.CollectorName == "imageload")
                     {
-                        Logger.Log.Append($"IMAGE LOAD SENSOR PENDING WRITE COUNT: {dataSet.Data.Count()} calling write async...", LogLevel.Always);
+                        WintapLogger.Log.Append($"IMAGE LOAD SENSOR PENDING WRITE COUNT: {dataSet.Data.Count()} calling write async...", LogLevel.Always);
                     }
 
                     string fileName = "NA";
@@ -59,16 +59,16 @@ namespace gov.llnl.wintap.core.etl.load
                         {
                             FileInfo flushedFile = new FileInfo(fileName);
                             flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
-                            Logger.Log.Append($" ready for merge: {fileName}", LogLevel.Always);
+                            WintapLogger.Log.Append($" ready for merge: {fileName}", LogLevel.Always);
                         }
                         catch (Exception ex)
                         {
-                            Logger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Always);
+                            WintapLogger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Always);
                         }
                     }
                     else
                     {
-                        Logger.Log.Append($"{dataSet.CollectorName}: Call to async WRITE returned no parquet data file.", LogLevel.Always );
+                        WintapLogger.Log.Append($"{dataSet.CollectorName}: Call to async WRITE returned no parquet data file.", LogLevel.Always );
                     }
                 }
             }
@@ -108,7 +108,7 @@ namespace gov.llnl.wintap.core.etl.load
             }
             long timestamp = DateTime.UtcNow.ToFileTimeUtc() + Convert.ToInt32(applyOffset);
             string fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
-            Logger.Log.Append($"{dataSet.CollectorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
+            WintapLogger.Log.Append($"{dataSet.CollectorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
             try
             {
                 ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
@@ -121,13 +121,13 @@ namespace gov.llnl.wintap.core.etl.load
             }
             catch (Exception ex)
             {
-                Logger.Log.Append($"Error in ParquetWriter.Write: {ex.Message} ", shared.LogLevel.Always);
+                WintapLogger.Log.Append($"Error in ParquetWriter.Write: {ex.Message} ", LogLevel.Always);
                 if(ex.Message.Contains("used by another process"))
                 {
-                    Logger.Log.Append($"Retrying write operation...", shared.LogLevel.Always);
+                    WintapLogger.Log.Append($"Retrying write operation...", LogLevel.Always);
                     timestamp = DateTime.UtcNow.ToFileTimeUtc() + 1;
                     fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
-                    Logger.Log.Append($"{dataSet.CollectorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
+                    WintapLogger.Log.Append($"{dataSet.CollectorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
                     try
                     {
                         ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
@@ -140,7 +140,7 @@ namespace gov.llnl.wintap.core.etl.load
                     }
                     catch(Exception ex2)
                     {
-                        Logger.Log.Append($"{SensorName} error on retry of WRITE operation: {ex2.Message}", LogLevel.Always);
+                        WintapLogger.Log.Append($"{SensorName} error on retry of WRITE operation: {ex2.Message}", LogLevel.Always);
                     }
                 }
             }

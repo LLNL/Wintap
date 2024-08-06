@@ -8,7 +8,7 @@ using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.models;
-using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Dynamic;
 using static gov.llnl.wintap.collect.models.WintapMessage;
@@ -59,7 +59,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error creating FocusChange data object on PID : " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error creating FocusChange data object on PID : " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Always);
             }
         }
     }

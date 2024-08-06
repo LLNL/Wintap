@@ -7,8 +7,8 @@
 using gov.llnl.wintap.core.etl.extract;
 using gov.llnl.wintap.core.etl.load.interfaces;
 using gov.llnl.wintap.core.etl.model;
-using gov.llnl.wintap.core.etl.models;
 using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -38,9 +38,9 @@ namespace gov.llnl.wintap.core.etl.load
         internal CacheManager(ETLConfig _config)
         {
             uploaders = new List<IUpload>();
-            Logger.Log.Append("Cache Manager is starting up", LogLevel.Always);
+            WintapLogger.Log.Append("Cache Manager is starting up", LogLevel.Always);
             etlConfig = _config;
-            Logger.Log.Append("Upload interval (sec): " + etlConfig.UploadIntervalSec, LogLevel.Always);
+            WintapLogger.Log.Append("Upload interval (sec): " + etlConfig.UploadIntervalSec, LogLevel.Always);
             svcRunning = true;
             SendQueue = new ConcurrentQueue<dynamic>();
             DirectoryInfo parquetDir = new DirectoryInfo(Strings.ParquetDataPath);
@@ -52,7 +52,7 @@ namespace gov.llnl.wintap.core.etl.load
             mergeDir = new DirectoryInfo(cacheDir.FullName + "\\merged");
             bytesOnDisk = getCurrentCacheDirSize();
 
-            Logger.Log.Append("Loading data uploaders...", LogLevel.Always);
+            WintapLogger.Log.Append("Loading data uploaders...", LogLevel.Always);
             foreach (ETLConfig.Adapter u in etlConfig.Adapters)
             {
                 try
@@ -64,16 +64,16 @@ namespace gov.llnl.wintap.core.etl.load
                     {
                         uploaders.Add(uploader);
                         uploader.UploadCompleted += Uploader_UploadCompleted;
-                        Logger.Log.Append("Loaded uploader: " + u.Name, LogLevel.Always);
+                        WintapLogger.Log.Append("Loaded uploader: " + u.Name, LogLevel.Always);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Append("ERROR:  No assembly matching the name " + u.Name + " was found.  This uploader will not run.  Check the spelling or remove this config entry.", LogLevel.Always);
+                    WintapLogger.Log.Append("ERROR:  No assembly matching the name " + u.Name + " was found.  This uploader will not run.  Check the spelling or remove this config entry.", LogLevel.Always);
                 }
             }
             createMetaRecords();
-            Logger.Log.Append("Total uploaders: " + uploaders.Count, LogLevel.Always);
+            WintapLogger.Log.Append("Total uploaders: " + uploaders.Count, LogLevel.Always);
             clearMerge();
             workerThread = new BackgroundWorker();
             workerThread.DoWork += WorkerThread_DoWork;
@@ -85,7 +85,7 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 try
                 {
-                    Logger.Log.Append("DELETING FILE: " + e, LogLevel.Always);
+                    WintapLogger.Log.Append("DELETING FILE: " + e, LogLevel.Always);
                     FileInfo fileInfo = new FileInfo(e);
                     fileInfo.Delete();
                 }
@@ -112,7 +112,7 @@ namespace gov.llnl.wintap.core.etl.load
 
         private void WorkerThread_DoWork(object sender, DoWorkEventArgs e)
         {
-            Logger.Log.Append("uploader thread is running", LogLevel.Always);
+            WintapLogger.Log.Append("uploader thread is running", LogLevel.Always);
             if (!mergeDir.Exists)
             {
                 mergeDir.Create();
@@ -126,25 +126,25 @@ namespace gov.llnl.wintap.core.etl.load
                     doMerge();
                     if (mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories).Count() > 0)
                     {
-                        Logger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Always);
+                        WintapLogger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Always);
                         try
                         {
                             pruneCache();
                         }
                         catch (Exception ex)
                         {
-                            Logger.Log.Append("error cleaning up cache files: " + ex.Message, LogLevel.Always);
+                            WintapLogger.Log.Append("error cleaning up cache files: " + ex.Message, LogLevel.Always);
                         }
                         foreach (IUpload uploader in uploaders)
                         {
-                            Logger.Log.Append("Calling pre-upload method on: " + uploader.Name, LogLevel.Always);
+                            WintapLogger.Log.Append("Calling pre-upload method on: " + uploader.Name, LogLevel.Always);
                             try
                             {
                                 uploader.PreUpload(etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties);
                             }
                             catch(Exception ex)
                             {
-                                Logger.Log.Append($"ERROR in preUpload for {uploader.Name}: {ex.Message}", LogLevel.Always);
+                                WintapLogger.Log.Append($"ERROR in preUpload for {uploader.Name}: {ex.Message}", LogLevel.Always);
                             }
                         }
                         upload();
@@ -165,7 +165,7 @@ namespace gov.llnl.wintap.core.etl.load
 
         private void upload()
         {
-            Logger.Log.Append("CacheManager upload method is starting. merge directory: " + mergeDir.FullName, LogLevel.Always);
+            WintapLogger.Log.Append("CacheManager upload method is starting. merge directory: " + mergeDir.FullName, LogLevel.Always);
             
             foreach (FileInfo dataFile in mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories))
             {
@@ -176,7 +176,7 @@ namespace gov.llnl.wintap.core.etl.load
                     {
                         try
                         {
-                            Logger.Log.Append("Calling upload: " + uploader.Name, LogLevel.Always);
+                            WintapLogger.Log.Append("Calling upload: " + uploader.Name, LogLevel.Always);
                             if (uploader.Upload(dataFile.FullName, etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties))
                             {
                                 successfulUpload = true; // any success = all success, for now.
@@ -184,14 +184,14 @@ namespace gov.llnl.wintap.core.etl.load
                         }
                         catch (Exception ex)
                         {
-                            Logger.Log.Append("Upload failed with error: " + ex.Message, LogLevel.Always);
+                            WintapLogger.Log.Append("Upload failed with error: " + ex.Message, LogLevel.Always);
                         }
                     }
                 }
                 System.Threading.Thread.Sleep(250);  // throttle the upload to prevent CPU/IO spike
             }
 
-            Logger.Log.Append("CacheManager upload method is complete", LogLevel.Always);
+            WintapLogger.Log.Append("CacheManager upload method is complete", LogLevel.Always);
         }
 
         private void cleanup()
@@ -206,7 +206,7 @@ namespace gov.llnl.wintap.core.etl.load
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error cleaning up active files: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error cleaning up active files: " + ex.Message, LogLevel.Always);
             }
         }
 
@@ -280,7 +280,7 @@ namespace gov.llnl.wintap.core.etl.load
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Append("ERROR RUNNING MERGE: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("ERROR RUNNING MERGE: " + ex.Message, LogLevel.Always);
                 }
             }
         }
@@ -300,23 +300,23 @@ namespace gov.llnl.wintap.core.etl.load
                 }
                 catch(Exception ex)
                 {
-                    Logger.Log.Append("ERROR deleting merged parquet: " + ex.Message, LogLevel.Debug);
+                    WintapLogger.Log.Append("ERROR deleting merged parquet: " + ex.Message, LogLevel.Debug);
                 }
             }
         }
 
         private void HangDetector_Elapsed(object sender, ElapsedEventArgs e)
         {
-            Logger.Log.Append("MergeHelper process hang detected", LogLevel.Always);
+            WintapLogger.Log.Append("MergeHelper process hang detected", LogLevel.Always);
             Process hungHelper = Process.GetProcessById(mergeHelperPid);
             if (hungHelper.ProcessName.ToLower().StartsWith("mergehelper"))
             {
                 hungHelper.Kill();
-                Logger.Log.Append("MergeHelper killed, clearing parquet", LogLevel.Always);
+                WintapLogger.Log.Append("MergeHelper killed, clearing parquet", LogLevel.Always);
 
                 DirectoryInfo parquetDir = new DirectoryInfo(Strings.ParquetDataPath);
                 long totalParquetRemoved = deleteParquetFiles(parquetDir.FullName, 0);
-                Logger.Log.Append("Total parquet cleared: " + totalParquetRemoved, LogLevel.Always);
+                WintapLogger.Log.Append("Total parquet cleared: " + totalParquetRemoved, LogLevel.Always);
             }
         }
 
@@ -328,7 +328,7 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 try
                 {
-                    Logger.Log.Append("2 - DELETING FILE: " + file, LogLevel.Always);
+                    WintapLogger.Log.Append("2 - DELETING FILE: " + file, LogLevel.Always);
                     File.Delete(file);
                     fileCount++;
                 }
@@ -381,10 +381,10 @@ namespace gov.llnl.wintap.core.etl.load
             long freeBytes = getFreeBytes(cacheDir.FullName.First() + ":\\");
             long maxCacheSizeBytes = 256000000;
             bytesOnDisk = getCurrentCacheDirSize();
-            Logger.Log.Append("cache prune finds current size of cache: " + bytesOnDisk + " bytes, max size: " + maxCacheSizeBytes + " bytes", LogLevel.Debug);
+            WintapLogger.Log.Append("cache prune finds current size of cache: " + bytesOnDisk + " bytes, max size: " + maxCacheSizeBytes + " bytes", LogLevel.Debug);
             if (bytesOnDisk > maxCacheSizeBytes)
             {
-                Logger.Log.Append("max cache size exceeded. pruning oldest files", LogLevel.Always);
+                WintapLogger.Log.Append("max cache size exceeded. pruning oldest files", LogLevel.Always);
                 long currentSizeBytes = 0;
                 IOrderedEnumerable<FileInfo> cacheFiles = cacheDir.GetFiles().OrderByDescending(f => f.CreationTime);  // oldest first
                 foreach (FileInfo fi in cacheFiles)
@@ -395,7 +395,7 @@ namespace gov.llnl.wintap.core.etl.load
                         deleteFile(fi);
                     }
                 }
-                Logger.Log.Append("prune complete, new cache size: " + bytesOnDisk, LogLevel.Always);
+                WintapLogger.Log.Append("prune complete, new cache size: " + bytesOnDisk, LogLevel.Always);
             }
             bytesOnDisk = getCurrentCacheDirSize();
         }
@@ -404,12 +404,12 @@ namespace gov.llnl.wintap.core.etl.load
         {
             try
             {
-                Logger.Log.Append("1 - DELETING FILE: " + fi.Name, LogLevel.Always);
+                WintapLogger.Log.Append("1 - DELETING FILE: " + fi.Name, LogLevel.Always);
                 fi.Delete();
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("ERROR deleting cache file: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("ERROR deleting cache file: " + ex.Message, LogLevel.Debug);
                 gov.llnl.wintap.core.etl.shared.Utilities.LogEvent(1005, "error deleting cache file: " + ex.Message, EventLogEntryType.Warning);
             }
         }

@@ -6,6 +6,7 @@
 
 using gov.llnl.wintap.core.etl.models;
 using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using Microsoft.Win32;
 using Parquet;
 using Parquet.Schema;
@@ -116,7 +117,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("error creating host record: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("error creating host record: " + ex.Message, LogLevel.Always);
             }
 
         }
@@ -158,7 +159,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error creatig MacIp: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error creatig MacIp: " + ex.Message, LogLevel.Always);
 
             }
         }

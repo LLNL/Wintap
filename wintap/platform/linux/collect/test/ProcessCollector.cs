@@ -9,6 +9,7 @@ using System;
 using Castle.MicroKernel;
 using System.IO;
 using System.Diagnostics;
+using System.ComponentModel;
 
 namespace gov.llnl.wintap.platform.linux.collect.test
 {
@@ -25,17 +26,21 @@ namespace gov.llnl.wintap.platform.linux.collect.test
         {
             WintapLogger.Log.Append("Linux process collector has started.", LogLevel.Always);
 
+            BackgroundWorker eventGenThread = new BackgroundWorker();
+            eventGenThread.DoWork += EventGenThread_DoWork;
+            eventGenThread.RunWorkerAsync();
 
             Process currentProcess = Process.GetCurrentProcess();
             string processName = currentProcess.ProcessName;
             string processPath = currentProcess.MainModule.FileName;
-            int processId = currentProcess.Id;
+            int processId = currentProcess.Id + 1;  // incr to defeat wintap pid filtering
 
             WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = "start" };
             msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
             msg.ReceiveTime = msg.EventTime;
             msg.ProcessName = msg.Process.Name;
             msg.ProcessPath = msg.Process.Path;
+            msg.MessageType = "Process";
 
             EventChannel.Send(msg);
 
@@ -44,5 +49,27 @@ namespace gov.llnl.wintap.platform.linux.collect.test
             return true;
         }
 
+        private void EventGenThread_DoWork(object sender, DoWorkEventArgs e)
+        {
+            while(true)
+            {
+                Process currentProcess = Process.GetCurrentProcess();
+                string processName = currentProcess.ProcessName;
+                string processPath = currentProcess.MainModule.FileName;
+                int processId = currentProcess.Id;
+
+                WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = "start" };
+                msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
+                msg.ReceiveTime = msg.EventTime;
+                msg.ProcessName = msg.Process.Name;
+                msg.ProcessPath = msg.Process.Path;
+
+                EventChannel.Send(msg);
+
+                WintapLogger.Log.Append("Linux process event sent to esper: " + msg.ProcessName + "  PID: " + msg.PID, LogLevel.Always);
+
+                System.Threading.Thread.Sleep(5000);
+            }
+        }
     }
 }

@@ -8,7 +8,7 @@ using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.models;
-using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.etl.transform;
 using System;
 using System.Dynamic;
@@ -34,7 +34,7 @@ namespace gov.llnl.wintap.core.etl.extract
 
         internal void Stop()
         {
-            Logger.Log.Append("PROCESS_SENSOR Stop called.", LogLevel.Always);
+            WintapLogger.Log.Append("PROCESS_SENSOR Stop called.", LogLevel.Always);
         }
 
         protected override void HandleSensorEvent(EventBean sensorEvent)
@@ -50,7 +50,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Top level error in process event handler: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("Top level error in process event handler: " + ex.Message, LogLevel.Debug);
             }
         }
 
@@ -73,7 +73,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("ERROR saving flattened START event:  " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR saving flattened START event:  " + ex.Message, LogLevel.Always);
             }
         }
 
@@ -99,7 +99,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("error parsing process name: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("error parsing process name: " + ex.Message, LogLevel.Debug);
             }
             return procName;
         }
@@ -118,7 +118,7 @@ namespace gov.llnl.wintap.core.etl.extract
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log.Append("error getting SID for user: " + userName + ", msg: " + ex.Message, LogLevel.Debug);
+                        WintapLogger.Log.Append("error getting SID for user: " + userName + ", msg: " + ex.Message, LogLevel.Debug);
                     }
                 }
             }

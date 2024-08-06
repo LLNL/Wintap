@@ -14,10 +14,13 @@ using System.Net.NetworkInformation;
 using System.Xml;
 using gov.llnl.wintap.core.etl.models;
 using gov.llnl.wintap.core.etl.model;
+using gov.llnl.wintap.core.infrastructure;
 using Newtonsoft.Json;
 using System.IO;
 using System.Diagnostics;
 using System.Reflection;
+using System.Security.Principal;
+using System.Runtime.InteropServices;
 
 namespace gov.llnl.wintap.core.etl.shared
 {
@@ -40,7 +43,7 @@ namespace gov.llnl.wintap.core.etl.shared
                 if (netCollection.Where(n => n.Hash == macIP.Hash).Count() == 0)
                 {
                     netCollection.Add(macIP);
-                    Logger.Log.Append("Adding NIC info object: " + nic.IPAddess, LogLevel.Always);
+                    WintapLogger.Log.Append("Adding NIC info object: " + nic.IPAddess, LogLevel.Always);
                 }
             }
             return netCollection;
@@ -123,20 +126,24 @@ namespace gov.llnl.wintap.core.etl.shared
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Could not enumerate network interfaces using .net api: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("Could not enumerate network interfaces using .net api: " + ex.Message, LogLevel.Debug);
             }
 
             if (nicList.Count == 0)
             {
-                Logger.Log.Append("No NIC found, attempting WMI ", LogLevel.Always);
-                nicList = getNICsFromWMI();
+                WintapLogger.Log.Append("No NIC found", LogLevel.Always);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    WintapLogger.Log.Append("Attempting to get NIC info from WMI...", LogLevel.Always);
+                    nicList = getNICsFromWMI();
+                }
             }
             return nicList;
         }
 
         private static List<NIC> getNICsFromWMI()
         {
-            Logger.Log.Append("Attempting alternate method for NIC retrieval using WMI ", LogLevel.Always);
+            WintapLogger.Log.Append("Attempting alternate method for NIC retrieval using WMI ", LogLevel.Always);
             List<NIC> nicList = new List<NIC>();
             NIC nic = new NIC();
             string mac = null;
@@ -184,7 +191,7 @@ namespace gov.llnl.wintap.core.etl.shared
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error enumerating NICs: from WMI " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("Error enumerating NICs: from WMI " + ex.Message, LogLevel.Debug);
             }
             return nicList;
         }
@@ -352,7 +359,7 @@ namespace gov.llnl.wintap.core.etl.shared
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error getting Processor Speed: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error getting Processor Speed: " + ex.Message, LogLevel.Always);
             }
             return speed * 1000000;
         }
@@ -366,7 +373,7 @@ namespace gov.llnl.wintap.core.etl.shared
             }
             catch (Exception ex)
             {
-                Logger.Log.Append("Error getting processor count: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error getting processor count: " + ex.Message, LogLevel.Always);
             }
             return procCount;
         }

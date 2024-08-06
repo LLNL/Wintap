@@ -56,8 +56,11 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal PluginManager()
         {
+            WintapLogger.Log.Append("Plugin manager is starting ", LogLevel.Always);
             runQueue = new ConcurrentQueue<Runnable>();
+            WintapLogger.Log.Append("Creating WintapETL ", LogLevel.Always);
             etl = new WintapETL();
+            WintapLogger.Log.Append("Starting WintapETL ", LogLevel.Always);
             doETL = etl.Start();
 
             WintapLogger.Log.Append("Plugin manager is started, ETL Support: " + doETL, LogLevel.Always);
