@@ -53,25 +53,19 @@ namespace gov.llnl.wintap.core.etl
             bool etlLoaded = false;
             try
             {
-                WintapLogger.Log.Append("ETL is starting, getting config... ", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
-
                 etlConfig = Utilities.GetETLConfig();
-                WintapLogger.Log.Append("Got ETL config, creating process model thread... ", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
-
-
+               
                 lastNetChange = DateTime.Now;
                 BackgroundWorker processObjectModelWorker = new BackgroundWorker();
                 processObjectModelWorker.DoWork += ProcessObjectModelWorker_DoWork;
                 processObjectModelWorker.RunWorkerCompleted += ProcessObjectModelWorker_RunWorkerCompleted;
                 processObjectModelWorker.RunWorkerAsync();
 
-                WintapLogger.Log.Append("Process model thread created, spinning up cacheManager thread.... ", llnl.wintap.core.infrastructure.LogLevel.Always);
                 BackgroundWorker cacheManagerThread = new BackgroundWorker();
                 cacheManagerThread.DoWork += cacheManager_DoWork;
                 cacheManagerThread.RunWorkerCompleted += cacheManager_RunWorkerCompleted;
                 cacheManagerThread.RunWorkerAsync();
 
-                WintapLogger.Log.Append("ETL is started", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
                 Timer statsUpdateTimer = new Timer();
                 statsUpdateTimer.Interval = 5000;
                 statsUpdateTimer.AutoReset = true;
@@ -85,10 +79,6 @@ namespace gov.llnl.wintap.core.etl
                 WintapLogger.Log.Append("Could not start ETL: " + ex.Message, gov.llnl.wintap.core.infrastructure.LogLevel.Always);
             }
             
-
-            //string wintapVersion = System.Reflection.Assembly.GetEntryAssembly().GetName().Version.ToString();
-
-            WintapLogger.Log.Append("startup complete, ETL Loaded: " + etlLoaded, gov.llnl.wintap.core.infrastructure.LogLevel.Always);
             return etlLoaded;
 
         }
@@ -133,7 +123,6 @@ namespace gov.llnl.wintap.core.etl
 
             processSensor = new PROCESS_SENSOR(esperNameSpacePrefix + "process.epl");
             processStopSensor = new PROCESSSTOP_SENSOR(esperNameSpacePrefix + "process-stop.epl");
-            WintapLogger.Log.Append("Process context created.", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
         }
 
         private void StatsUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
@@ -150,12 +139,10 @@ namespace gov.llnl.wintap.core.etl
         {
             WintapLogger.Log.Append("creating wintap data cache manager", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
             List<IUpload> uploaders = new List<IUpload>();
-            cacheMgr = new CacheManager(etlConfig);
-            cacheMgr.Start();
-            WintapLogger.Log.Append("File uploader is running", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
             try
             {
-
+                cacheMgr = new CacheManager(etlConfig);
+                cacheMgr.Start();
             }
             catch (Exception ex)
             {

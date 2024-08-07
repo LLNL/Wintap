@@ -46,9 +46,9 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 while (batch.Set.TryDequeue(out Batch.SensorData dataSet))
                 {
-                    if (dataSet.CollectorName == "imageload")
+                    if (dataSet.CollectorName.ToLower() == "process")
                     {
-                        WintapLogger.Log.Append($"IMAGE LOAD SENSOR PENDING WRITE COUNT: {dataSet.Data.Count()} calling write async...", LogLevel.Always);
+                        WintapLogger.Log.Append($"PROCESS SENSOR PENDING WRITE COUNT: {dataSet.Data.Count()} calling write async...", LogLevel.Always);
                     }
 
                     string fileName = "NA";
@@ -84,6 +84,7 @@ namespace gov.llnl.wintap.core.etl.load
 
         internal async Task<string> Write(Batch.SensorData dataSet)
         {
+            WintapLogger.Log.Append($"IS THIS THING ON?!! {dataSet.CollectorName} ", LogLevel.Always);
             // prevent file name collisions on shared event types
             bool applyOffset = false;
             foreach (dynamic d in dataSet.Data)
@@ -192,7 +193,7 @@ namespace gov.llnl.wintap.core.etl.load
 
             /// <summary>
             /// Adds a set of typed sensor data to the current batch
-            ///     Default sensor can have more than one element in its set, others will be a single.
+            ///     Default sensor can have more than one type in its set, others will be a single.
             /// </summary>
             /// <param name="_sensorData"></param>
             internal void Add(SensorData _sensorData)

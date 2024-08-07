@@ -10,16 +10,22 @@ using Castle.MicroKernel;
 using System.IO;
 using System.Diagnostics;
 using System.ComponentModel;
+using System.Collections.Concurrent;
 
 namespace gov.llnl.wintap.platform.linux.collect.test
 {
     public class ProcessCollector : BaseCollector
     {
+        private ConcurrentDictionary<string, WintapMessage> processDictionary;
+        private ProcessHash idGen;
+
         public enum ProcessActivityEnum { start, stop, refresh };
 
         public ProcessCollector() : base()
         {
             CollectorName = "Process";
+            idGen = new ProcessHash();
+            processDictionary = new ConcurrentDictionary<string, WintapMessage>();
         }
 
         public override bool Start()
@@ -30,23 +36,13 @@ namespace gov.llnl.wintap.platform.linux.collect.test
             eventGenThread.DoWork += EventGenThread_DoWork;
             eventGenThread.RunWorkerAsync();
 
-            Process currentProcess = Process.GetCurrentProcess();
-            string processName = currentProcess.ProcessName;
-            string processPath = currentProcess.MainModule.FileName;
-            int processId = currentProcess.Id + 1;  // incr to defeat wintap pid filtering
-
-            WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = "start" };
-            msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
-            msg.ReceiveTime = msg.EventTime;
-            msg.ProcessName = msg.Process.Name;
-            msg.ProcessPath = msg.Process.Path;
-            msg.MessageType = "Process";
-
-            EventChannel.Send(msg);
-
-            WintapLogger.Log.Append("Linux process collector sent it's first WintapMessage.", LogLevel.Always);
-
             return true;
+        }
+
+        public WintapMessage GetOwningProcess(WintapMessage msg)
+        {
+
+            return msg;
         }
 
         private void EventGenThread_DoWork(object sender, DoWorkEventArgs e)
@@ -56,17 +52,18 @@ namespace gov.llnl.wintap.platform.linux.collect.test
                 Process currentProcess = Process.GetCurrentProcess();
                 string processName = currentProcess.ProcessName;
                 string processPath = currentProcess.MainModule.FileName;
-                int processId = currentProcess.Id;
+                int processId = currentProcess.Id + 1; // defeat wintap self-event filtering
 
                 WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = "start" };
                 msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
-                msg.ReceiveTime = msg.EventTime;
-                msg.ProcessName = msg.Process.Name;
-                msg.ProcessPath = msg.Process.Path;
+                msg.ProcessName = processName;
+                msg.MessageType = "Process";
+                msg.PidHash = idGen.GenPidHash(msg.PID, msg.EventTime);
+                processDictionary.TryAdd(msg.PidHash, msg);
 
                 EventChannel.Send(msg);
 
-                WintapLogger.Log.Append("Linux process event sent to esper: " + msg.ProcessName + "  PID: " + msg.PID, LogLevel.Always);
+                WintapLogger.Log.Append($"Linux process event sent to esper!  ProcessName: {msg.ProcessName}, PidHash: {msg.PidHash}", LogLevel.Always);
 
                 System.Threading.Thread.Sleep(5000);
             }

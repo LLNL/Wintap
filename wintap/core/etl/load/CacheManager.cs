@@ -49,7 +49,7 @@ namespace gov.llnl.wintap.core.etl.load
                 parquetDir.Create();
             }
             cacheDir = new DirectoryInfo(Strings.ParquetDataPath);
-            mergeDir = new DirectoryInfo(cacheDir.FullName + "\\merged");
+            mergeDir = new DirectoryInfo(Path.Combine(cacheDir.FullName,"merged"));
             bytesOnDisk = getCurrentCacheDirSize();
 
             WintapLogger.Log.Append("Loading data uploaders...", LogLevel.Always);
@@ -287,7 +287,7 @@ namespace gov.llnl.wintap.core.etl.load
 
         private void cleanupUnmergedParquet(string path)
         {
-            if(path.EndsWith("\\merged")) { return; }
+            if(path.EndsWith("merged")) { return; }
             DirectoryInfo directoryInfo = new DirectoryInfo(path);
             foreach(FileInfo file in directoryInfo.GetFiles())
             {

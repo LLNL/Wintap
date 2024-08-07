@@ -59,7 +59,6 @@ namespace gov.llnl.wintap.core.infrastructure
 
         public static EPDeployment compileDeploy(EPRuntime runtime, String epl)
         {
-            WintapLogger.Log.Append("compileDeploy called", LogLevel.Always);
             // Obtain a copy of the engine configuration
             Configuration configuration = EventChannel.EsperConfig;
 
@@ -73,7 +72,6 @@ namespace gov.llnl.wintap.core.infrastructure
             EPCompiled compiled = EPCompilerProvider.GetCompiler().Compile(epl, args);
 
             // Return the deployment
-            WintapLogger.Log.Append("Got compiled statement, attempting deployment", LogLevel.Always);
             return runtime.DeploymentService.Deploy(compiled);
         }
 
@@ -129,7 +127,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     streamedEvent.ProcessPath = owningProcess.ProcessPath;
                     streamedEvent.PidHash = owningProcess.PidHash;
                     streamedEvent.AgentId = StateManager.AgentId.ToString();
-                    if (owningProcess.ProcessName == "mergehelper.exe" || owningProcess.ProcessName == "wintap.exe")
+                    if (owningProcess.ProcessName == "wintap.exe")
                     {
                         return;
                     }
@@ -236,20 +234,16 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 if (esperRuntime == null)
                 {
-                    WintapLogger.Log.Append("Building esper runtime", LogLevel.Always);
                     var esperConfig = new Configuration();
                     esperConfig.Common.EventMeta.ClassPropertyResolutionStyle = PropertyResolutionStyle.CASE_INSENSITIVE;
-                    WintapLogger.Log.Append("WP 0.5", LogLevel.Always);
                     //esperRuntime.MetricsService.SetMetricsReportingEnabled();
                     //esperRuntime.MetricsService.SetMetricsReportingInterval(null, 1000);
-                    //WintapLogger.Log.Append("WP1", LogLevel.Always);
                     esperConfig.Common.AddEventType(typeof(WintapMessage));
                     //esperConfig.Common.AddEventType(typeof(ProcessTreeEvent));
                     // following three config settings from the Esper 8 upgrade guide: 
                     esperConfig.Compiler.ByteCode.IsAllowSubscriber = true;
                     esperConfig.Compiler.ByteCode.SetAccessModifiersPublic();
                     esperConfig.Compiler.ByteCode.BusModifierEventType = com.espertech.esper.common.client.util.EventTypeBusModifier.BUS;
-                    WintapLogger.Log.Append("RETURNING esper runtime", LogLevel.Always);
                     esperRuntime = EPRuntimeProvider.GetDefaultRuntime(esperConfig);
                     EsperConfig = esperConfig;
                 }

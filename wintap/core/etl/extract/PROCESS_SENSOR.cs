@@ -56,6 +56,7 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private void handleStartEvent(WintapMessage wintapMessage)
         {
+            WintapLogger.Log.Append($"Process Sensor is handling a process event: {wintapMessage.ProcessName} {wintapMessage.PidHash}", LogLevel.Always);
             ProcessStartData procWD = createProcessObject(wintapMessage.PID, wintapMessage.Process.ParentPID, wintapMessage.EventTime, wintapMessage.Process.Path, wintapMessage.Process.CommandLine, wintapMessage.Process.User, wintapMessage.Process.MD5, wintapMessage.Process.SHA2, wintapMessage.MessageType, wintapMessage.Process.Arguments, wintapMessage.Process.CommandLine, wintapMessage.Process.UniqueProcessKey, wintapMessage.PidHash, wintapMessage.Process.ParentPidHash, wintapMessage.ActivityType, wintapMessage.AgentId);
             procWD.Hostname = host.Hostname;
             try
@@ -68,6 +69,7 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 dynamic flatMsg = (ExpandoObject)procWD.ToDynamic();
                 this.Save(flatMsg);
+                WintapLogger.Log.Append($"Process Sensor saved: {wintapMessage.ProcessName} {wintapMessage.PidHash}", LogLevel.Always);
                 flatMsg = null;
                 wintapMessage = null;
             }

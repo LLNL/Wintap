@@ -23,6 +23,7 @@ using System.Linq;
 using System.Reflection;
 using System.Timers;
 using static gov.llnl.wintap.core.etl.shared.Utilities;
+using System.Runtime.InteropServices;
 
 
 namespace gov.llnl.wintap.core.etl.extract
@@ -103,6 +104,7 @@ namespace gov.llnl.wintap.core.etl.extract
 
         /// <summary>
         /// Receives the original WintapMessage from Subscribe
+        /// TODO:  do we still need this?
         /// </summary>
         /// <param name="wintapMessage"></param>
         internal void Listen(WintapMessage wintapMessage)
@@ -198,8 +200,6 @@ namespace gov.llnl.wintap.core.etl.extract
             flushToDiskTimer.AutoReset = true;
             flushToDiskTimer.Elapsed += FlushToDiskTimer_Elapsed;
             flushToDiskTimer.Start();
-
-            WintapLogger.Log.Append("Initializing sensor: " + this.GetType().Name, LogLevel.Always);
             
             regContext();
 
@@ -261,7 +261,6 @@ namespace gov.llnl.wintap.core.etl.extract
         private List<ExpandoObject> serialize(List<ExpandoObject> tempQueue)
         {
             int totalObjectsProcessed = 0;
-
             //  in the Default case, we need to create MessageType specific sub queues so that parquet writer has a single schema
             //  Since the Default sensor can contain mixed MessageTypes, enumerate/remove tempQueue by messageType until it's empty
             //  A Batch is a set of Sensor data.   A Set is the sensor data.  Default can have multiple Sets.
@@ -313,19 +312,17 @@ namespace gov.llnl.wintap.core.etl.extract
                 using (StreamReader reader = new StreamReader(stream))
                 {
                     string esperQuery = reader.ReadToEnd();
-                    WintapLogger.Log.Append("ESPER QUERY READ FROM MANIFEST: " + esperQuery, LogLevel.Always);
                     gov.llnl.wintap.core.infrastructure.EventChannel.compileDeploy(gov.llnl.wintap.core.infrastructure.EventChannel.EsperRuntime, esperQuery);
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("problem creating esper context query: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("problem creating esper context query: " + ex.Message, LogLevel.Debug);
             }
         }
 
         private void registerQuery(string queryPath)
         {
-            WintapLogger.Log.Append("registering query: " + queryPath, LogLevel.Always);
             try
             {
                 string esperQuery = readQueryFromFile(queryPath);
