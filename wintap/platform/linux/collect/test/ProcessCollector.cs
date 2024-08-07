@@ -14,6 +14,9 @@ using System.Collections.Concurrent;
 
 namespace gov.llnl.wintap.platform.linux.collect.test
 {
+    /// <summary>
+    ///   THIS IS A DEMO - this is not a real collector, but it demonstrates the Wintap framework functionality on Linux.
+    /// </summary>
     public class ProcessCollector : BaseCollector
     {
         private ConcurrentDictionary<string, WintapMessage> processDictionary;
@@ -39,6 +42,9 @@ namespace gov.llnl.wintap.platform.linux.collect.test
             return true;
         }
 
+        // TODO:  Process and PidHash lookup needs to be general purpose, if we get serious about linux
+        // support within Wintap, we should extract out the ProcessPidhash management code from the 
+        // windows collector and make it general purpose.
         public WintapMessage GetOwningProcess(WintapMessage msg)
         {
 
@@ -49,6 +55,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
         {
             while(true)
             {
+                System.Threading.Thread.Sleep(5000);
                 Process currentProcess = Process.GetCurrentProcess();
                 string processName = currentProcess.ProcessName;
                 string processPath = currentProcess.MainModule.FileName;
@@ -65,7 +72,6 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
                 WintapLogger.Log.Append($"Linux process event sent to esper!  ProcessName: {msg.ProcessName}, PidHash: {msg.PidHash}", LogLevel.Always);
 
-                System.Threading.Thread.Sleep(5000);
             }
         }
     }

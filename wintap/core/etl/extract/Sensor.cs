@@ -204,7 +204,7 @@ namespace gov.llnl.wintap.core.etl.extract
             regContext();
 
             IsEnabled = true;
-            WintapLogger.Log.Append("initialization complete on: " + this.GetType().Name, LogLevel.Always);
+            WintapLogger.Log.Append("initialization complete on: " + this.GetType().Name, LogLevel.Debug);
         }
 
 
@@ -305,7 +305,6 @@ namespace gov.llnl.wintap.core.etl.extract
             var assembly = Assembly.GetExecutingAssembly();
             try
             {
-                WintapLogger.Log.Append("registering Esper Context query", LogLevel.Always);
                 var esper1 = esperNameSpacePrefix + "esper-context.epl";
 
                 using (Stream stream = assembly.GetManifestResourceStream(esper1))
@@ -328,7 +327,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 string esperQuery = readQueryFromFile(queryPath);
                 EPStatement newStatement = gov.llnl.wintap.core.infrastructure.EventChannel.compileDeploy(gov.llnl.wintap.core.infrastructure.EventChannel.EsperRuntime, esperQuery).Statements[0];
                 newStatement.Events += ProcStatement_Events;
-                WintapLogger.Log.Append("EPL created and event handlers attached on " + GetType().Name, LogLevel.Always);
+                WintapLogger.Log.Append("EPL created and event handlers attached on " + GetType().Name, LogLevel.Debug);
             }
             catch (Exception ex)
             {
