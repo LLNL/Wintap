@@ -11,11 +11,12 @@ using System.IO;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace gov.llnl.wintap.platform.linux.collect.test
 {
     /// <summary>
-    ///   THIS IS A DEMO - this is not a real collector, but it demonstrates the Wintap framework functionality on Linux.
+    ///   THIS IS A DEMO -  it demonstrates the Wintap framework functionality on Linux.
     /// </summary>
     public class ProcessCollector : BaseCollector
     {
@@ -28,17 +29,15 @@ namespace gov.llnl.wintap.platform.linux.collect.test
         {
             CollectorName = "Process";
             idGen = new ProcessHash();
-            processDictionary = new ConcurrentDictionary<string, WintapMessage>();
+            processDictionary = new ConcurrentDictionary<string, WintapMessage>();  // pidhash, wintapmessage of process
         }
 
         public override bool Start()
         {
             WintapLogger.Log.Append("Linux process collector has started.", LogLevel.Always);
-
             BackgroundWorker eventGenThread = new BackgroundWorker();
             eventGenThread.DoWork += EventGenThread_DoWork;
             eventGenThread.RunWorkerAsync();
-
             return true;
         }
 
@@ -47,13 +46,13 @@ namespace gov.llnl.wintap.platform.linux.collect.test
         // windows collector and make it general purpose.
         public WintapMessage GetOwningProcess(WintapMessage msg)
         {
-
-            return msg;
+            //  returns the most recent process matching msg PID
+            return processDictionary.Where(p => p.Value.PID == msg.PID && p.Value.EventTime <= msg.EventTime).OrderBy(p => p.Value.EventTime).Last().Value;
         }
 
         private void EventGenThread_DoWork(object sender, DoWorkEventArgs e)
         {
-            while(true)
+            while (true)
             {
                 System.Threading.Thread.Sleep(5000);
                 Process currentProcess = Process.GetCurrentProcess();
@@ -61,7 +60,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
                 string processPath = currentProcess.MainModule.FileName;
                 int processId = currentProcess.Id + 1; // defeat wintap self-event filtering
 
-                WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = "start" };
+                WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = ProcessActivityEnum.start.ToString() };
                 msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
                 msg.ProcessName = processName;
                 msg.MessageType = "Process";
