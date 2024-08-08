@@ -46,11 +46,6 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 while (batch.Set.TryDequeue(out Batch.SensorData dataSet))
                 {
-                    if (dataSet.CollectorName.ToLower() == "process")
-                    {
-                        WintapLogger.Log.Append($"PROCESS SENSOR PENDING WRITE COUNT: {dataSet.Data.Count()} calling write async...", LogLevel.Always);
-                    }
-
                     string fileName = "NA";
                     fileName = await Write(dataSet);
                     if(fileName != "NA")
@@ -84,7 +79,6 @@ namespace gov.llnl.wintap.core.etl.load
 
         internal async Task<string> Write(Batch.SensorData dataSet)
         {
-            WintapLogger.Log.Append($"IS THIS THING ON?!! {dataSet.CollectorName} ", LogLevel.Always);
             // prevent file name collisions on shared event types
             bool applyOffset = false;
             foreach (dynamic d in dataSet.Data)

@@ -18,8 +18,6 @@ namespace gov.llnl.wintap.core.etl.load
 
         internal void Start(string[] args)
         {
-            WintapLogger.Log.Append("Merge is starting", LogLevel.Always);
-
             // CHECK AND PROCESS INPUTS
             try
             {

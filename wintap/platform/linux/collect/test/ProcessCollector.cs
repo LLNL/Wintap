@@ -34,7 +34,6 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
         public override bool Start()
         {
-            System.Diagnostics.Debugger.Launch();
             WintapLogger.Log.Append("Linux process collector has started.", LogLevel.Always);
             BackgroundWorker eventGenThread = new BackgroundWorker();
             eventGenThread.DoWork += EventGenThread_DoWork;

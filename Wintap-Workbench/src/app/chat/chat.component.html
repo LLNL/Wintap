@@ -10,7 +10,7 @@
     <div class="results-window">
         <div class="message" *ngFor="let message of messages">
             <div [ngClass]="{'user-message': message.isUser, 'ai-message': !message.isUser}">
-                <img *ngIf="!message.isUser" src="assets/wintap.ico" alt="AI Icon" class="ai-icon">
+                <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="AI Icon" class="ai-icon">
                 <p>{{ message.text }}</p>
                 <span class="timestamp">{{ message.timestamp | date:'shortTime' }}</span>
             </div>
