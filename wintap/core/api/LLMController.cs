@@ -83,7 +83,7 @@ namespace gov.llnl.wintap.core.api
         public async Task Put([FromBody] PromptModel promptModel)
         {
             WintapLogger.Log.Append($"Got inference request", LogLevel.Always);
-            string collectionName = "wintap2";
+            string collectionName = "contextData";
             string question = promptModel.Prompt;
             StringBuilder builder = new StringBuilder();
             double minRel = Settings.Default.MinRelevance;

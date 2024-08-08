@@ -67,7 +67,7 @@ ISemanticTextMemory memory = new MemoryBuilder()
     .Build();
 
 // use a persistent memory store:
-var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
+//var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
 //ISemanticTextMemory memory = new MemoryBuilder()
 //    .WithLoggerFactory(kernel.LoggerFactory)
 //    .WithMemoryStore(chromaMemoryStore)
