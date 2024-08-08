@@ -123,7 +123,7 @@ app.UseEndpoints(endpoints =>
 {
     endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
     endpoints.MapHub<WorkbenchHub>("/signalr/WorkbenchHub");
-    //endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
+    endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });
 
 app.Run(); 

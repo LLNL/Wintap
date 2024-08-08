@@ -1,48 +1,36 @@
-<!-- chat.component.html -->
-
 <!-- Header -->
 <header>
     <h1>Wintap Local Language Model</h1>
     <h5>Model: phi-3-mini</h5>
-  </header>
-  <div class="card">
-    <!-- Prompt Window -->
-    <div class="prompt-window" style="display: flex; align-items: flex-start;">
-      <div class="p-float-label" style="flex-grow: 1;">
-        <textarea #prompt id="float-input" rows="1" pInputTextarea
-                  (keydown.enter)="sendPrompt(); $event.preventDefault()" 
-                  [disabled]="isPromptDisabled"
-                  style="width: 100%;"></textarea>
-        <label for="float-input">Prompt</label>
-      </div>
-      <p-button pRipple type="button" class="p-button-success" icon="pi pi-send" (click)="sendPrompt()" style="padding-left: 5px"></p-button>
-      <p-button pRipple type="button" label=""  class="p-button-warning" icon="pi pi-refresh" (click)="performSetup()" style="padding-left: 5px"></p-button>
+</header>
+
+<!-- Chat Container -->
+<div class="chat-container">
+    <!-- Results Window -->
+    <div class="results-window">
+        <div class="message" *ngFor="let message of messages">
+            <div [ngClass]="{'user-message': message.isUser, 'ai-message': !message.isUser}">
+                <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="AI Icon" class="ai-icon">
+                <p>{{ message.text }}</p>
+                <span class="timestamp">{{ message.timestamp | date:'shortTime' }}</span>
+            </div>
+        </div>
+        <p-progressSpinner #spinner [hidden]="isSpinnerHidden" ariaLabel="loading"></p-progressSpinner>
     </div>
 
-    <p-progressSpinner #spinner [hidden]="isSpinnerHidden" ariaLabel="loading"></p-progressSpinner>
-  </div>
+    <!-- Prompt Window -->
+    <div class="prompt-window">
+        <textarea #prompt id="float-input" rows="1" pInputTextarea (keydown.enter)="sendPrompt(); $event.preventDefault()" [disabled]="isPromptDisabled" (input)="adjustTextareaHeight($event)" style="width: 100%;"></textarea>
+        <button type="button" class="send-button" (click)="sendPrompt()">
+            <i class="pi pi-send"></i>
+        </button>
+        <button type="button" class="refresh-button" (click)="performSetup()">
+            <i class="pi pi-refresh"></i>
+        </button>
+    </div>
+</div>
 
-
-  
- 
-<!-- Results Window -->
-<div class="results-window">
-    <p *ngIf="results.length === 0"></p>
-    <p-scrollPanel  #response [style]="{ width: '100%', height: '100%' }">
-      <p> {{ userPrompt }} </p>
-      <p>{{ results.join('') }}</p>
-    </p-scrollPanel>
-  </div>
-
-  
-  <!-- LLM Output -->
-  <div class="llm-output">
-    <p>{{ llmOutput }}</p>
-  </div>
-  <p-badge [value]="tokensUsed" style="padding-top: 15px"></p-badge>
-  
-  
-  <!-- Error Message -->
-  <div class="error-message" *ngIf="errorMessage !== ''">
+<!-- Error Message -->
+<div class="error-message" *ngIf="errorMessage !== ''">
     {{ errorMessage }}
-  </div>
+</div>
