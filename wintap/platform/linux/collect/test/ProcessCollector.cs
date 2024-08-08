@@ -34,6 +34,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
         public override bool Start()
         {
+            System.Diagnostics.Debugger.Launch();
             WintapLogger.Log.Append("Linux process collector has started.", LogLevel.Always);
             BackgroundWorker eventGenThread = new BackgroundWorker();
             eventGenThread.DoWork += EventGenThread_DoWork;
@@ -52,26 +53,36 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
         private void EventGenThread_DoWork(object sender, DoWorkEventArgs e)
         {
-            while (true)
-            {
-                System.Threading.Thread.Sleep(5000);
-                Process currentProcess = Process.GetCurrentProcess();
-                string processName = currentProcess.ProcessName;
-                string processPath = currentProcess.MainModule.FileName;
-                int processId = currentProcess.Id + 1; // defeat wintap self-event filtering
+            //while (true)
+            //{
+            //    System.Threading.Thread.Sleep(5000);
+            //    Process currentProcess = Process.GetCurrentProcess();
+            //    string processName = currentProcess.ProcessName;
+            //    string processPath = currentProcess.MainModule.FileName;
+            //    int processId = currentProcess.Id + 1; // defeat wintap self-event filtering
 
-                WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = ProcessActivityEnum.start.ToString() };
-                msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
-                msg.ProcessName = processName;
-                msg.MessageType = "Process";
-                msg.PidHash = idGen.GenPidHash(msg.PID, msg.EventTime);
-                processDictionary.TryAdd(msg.PidHash, msg);
+            //    WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = ProcessActivityEnum.start.ToString() };
+            //    msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
+            //    msg.ProcessName = processName;
+            //    msg.MessageType = "Process";
+            //    msg.PidHash = idGen.GenPidHash(msg.PID, msg.EventTime);
+            //    processDictionary.TryAdd(msg.PidHash, msg);
 
-                EventChannel.Send(msg);
+            //    EventChannel.Send(msg);
 
-                WintapLogger.Log.Append($"Linux process event sent to esper!  ProcessName: {msg.ProcessName}, PidHash: {msg.PidHash}", LogLevel.Always);
+            //    WintapLogger.Log.Append($"Linux process event sent to esper!  ProcessName: {msg.ProcessName}, PidHash: {msg.PidHash}", LogLevel.Always);
 
-            }
+            //}
+
+            PcapCollector pcapCollector = new PcapCollector(@"c:\data\pcap\ygm-class-long.scap99");
+            //PcapCollector pcapCollector = new PcapCollector(@"c:\data\pcap\mesa.pcap");
+            pcapCollector.Emit += PcapCollector_Emit;
+            pcapCollector.Start();
+        }
+
+        private void PcapCollector_Emit(object sender, PcapEventArgs e)
+        {
+            WintapLogger.Log.Append("Got PCAP Event!  Packet Index: " + e.PacketIndex, LogLevel.Always);
         }
     }
 }

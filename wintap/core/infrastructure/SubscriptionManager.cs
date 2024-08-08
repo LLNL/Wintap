@@ -39,6 +39,7 @@ namespace gov.llnl.wintap.core.infrastructure
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 WintapLogger.Log.Append("Starting WindowsSubscriptionManager", LogLevel.Always);
+                linuxCollectors = linuxSubMgr.Start();
                 winCollectors = winSubMgr.Start();
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

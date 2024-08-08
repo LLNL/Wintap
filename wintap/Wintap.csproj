@@ -158,6 +158,7 @@
     <PackageReference Include="NEsper.Runtime" Version="8.9.0" />
     <PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
     <PackageReference Include="Parquet.Net" Version="4.24.0" />
+    <PackageReference Include="SharpPcap" Version="6.3.0" />
     <PackageReference Include="System.ComponentModel.Composition" Version="8.0.0" />
     <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
