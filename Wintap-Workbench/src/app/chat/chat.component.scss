@@ -41,7 +41,7 @@
 
 .ai-message {
     align-self: flex-start;
-    background-color: #add8e6; /* Changed to light blue */
+    background-color: #add8e6; /* Light blue */
     color: black; /* Ensure text is readable on light blue background */
     padding: 10px;
     border-radius: 10px;
@@ -59,7 +59,7 @@
     left: -10px;
     width: 0;
     height: 0;
-    border-right: 10px solid #add8e6; /* Changed to light blue */
+    border-right: 10px solid #add8e6; /* Light blue */
     border-top: 10px solid transparent;
     border-bottom: 10px solid transparent;
 }
@@ -109,4 +109,33 @@ textarea {
     color: red;
     text-align: center;
     margin-top: 10px;
+}
+
+/* New CSS for Progress Spinner */
+.progress-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    width: 24px;
+    margin-left: 10px;
+}
+
+.progress-spinner .spinner {
+    border: 2px solid #f3f3f3; /* Light grey */
+    border-top: 2px solid #007bff; /* Blue */
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }

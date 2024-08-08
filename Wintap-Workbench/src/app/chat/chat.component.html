@@ -15,7 +15,9 @@
                 <span class="timestamp">{{ message.timestamp | date:'shortTime' }}</span>
             </div>
         </div>
-        <p-progressSpinner #spinner [hidden]="isSpinnerHidden" ariaLabel="loading"></p-progressSpinner>
+        <div class="progress-spinner" *ngIf="!isSpinnerHidden">
+            <div class="spinner"></div>
+        </div>
     </div>
 
     <!-- Prompt Window -->
