@@ -10,7 +10,7 @@
     <div class="results-window">
         <div class="message" *ngFor="let message of messages">
             <div [ngClass]="{'user-message': message.isUser, 'ai-message': !message.isUser}">
-                <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="AI Icon" class="ai-icon">
+                <img *ngIf="!message.isUser" src="assets/wintap.ico" alt="AI Icon" class="ai-icon">
                 <p>{{ message.text }}</p>
                 <span class="timestamp">{{ message.timestamp | date:'shortTime' }}</span>
             </div>
@@ -28,6 +28,10 @@
         </button>
         <button type="button" class="refresh-button" (click)="performSetup()">
             <i class="pi pi-refresh"></i>
+        </button>
+        <input type="file" (change)="onFileSelected($event)" style="display: none;" #fileInput>
+        <button type="button" class="upload-button" (click)="fileInput.click()">
+            <i class="pi pi-upload"></i>
         </button>
     </div>
 </div>

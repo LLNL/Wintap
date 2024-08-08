@@ -137,4 +137,23 @@ export class ChatComponent implements OnInit {
                 console.log(JSON.stringify(this.errorMessage));
             });
     }
+
+    onFileSelected(event: any) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e: any) => {
+                const fileContent = e.target.result;
+                // Process the file content as needed
+                console.log(fileContent);
+                // You can add the file content to the messages array or handle it as needed
+                this.messages.push({
+                    text: `Uploaded file: ${file.name}`,
+                    isUser: true,
+                    timestamp: new Date()
+                });
+            };
+            reader.readAsText(file);
+        }
+    }
 }

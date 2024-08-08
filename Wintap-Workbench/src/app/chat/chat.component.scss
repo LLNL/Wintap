@@ -65,8 +65,8 @@
 }
 
 .ai-icon {
-    width: 48px;
-    height: 48px;
+    width: 24px;
+    height: 24px;
     margin-right: 10px;
 }
 
@@ -93,14 +93,14 @@ textarea {
     padding: 10px;
 }
 
-.send-button, .refresh-button {
+.send-button, .refresh-button, .upload-button {
     background: none;
     border: none;
     cursor: pointer;
     margin-left: 10px;
 }
 
-.send-button i, .refresh-button i {
+.send-button i, .refresh-button i, .upload-button i {
     font-size: 1.5em;
     color: #007bff;
 }
