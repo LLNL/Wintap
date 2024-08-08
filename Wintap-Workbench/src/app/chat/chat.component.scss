@@ -83,6 +83,9 @@
     padding: 10px;
     background-color: #fff;
     border-top: 1px solid #ddd;
+    position: sticky;
+    bottom: 0;
+    width: 100%;
 }
 
 textarea {
