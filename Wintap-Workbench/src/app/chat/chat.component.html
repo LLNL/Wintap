@@ -1,0 +1,40 @@
+<!-- Header -->
+<header>
+</header>
+
+<!-- Chat Container -->
+<div class="chat-container">
+    <!-- Results Window -->
+    <div class="results-window">
+        <div class="message" *ngFor="let message of messages">
+            <div [ngClass]="{'user-message': message.isUser, 'ai-message': !message.isUser}">
+                <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="AI Icon" class="ai-icon">
+                <p>{{ message.text }}</p>
+                <span class="timestamp">{{ message.timestamp | date:'shortTime' }}</span>
+            </div>
+        </div>
+        <div class="progress-spinner" *ngIf="!isSpinnerHidden">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <!-- Prompt Window -->
+    <div class="prompt-window">
+        <textarea #prompt id="float-input" rows="1" pInputTextarea (keydown.enter)="sendPrompt(); $event.preventDefault()" [disabled]="isPromptDisabled" (input)="adjustTextareaHeight($event)" style="width: 100%;"></textarea>
+        <button type="button" class="send-button" (click)="sendPrompt()">
+            <i class="pi pi-send"></i>
+        </button>
+        <button type="button" class="refresh-button" (click)="performSetup()">
+            <i class="pi pi-refresh"></i>
+        </button>
+        <input type="file" (change)="onFileSelected($event)" style="display: none;" #fileInput>
+        <button type="button" class="upload-button" (click)="fileInput.click()">
+            <i class="pi pi-upload"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Error Message -->
+<div class="error-message" *ngIf="errorMessage !== ''">
+    {{ errorMessage }}
+</div>

@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Timers;
 
 namespace gov.llnl.wintap.core.infrastructure
@@ -56,8 +57,11 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             wintapRunning = true;
             runMethodRunning = false;
-            WintapLogger.Log.Append("Setting up Wintap Service Manager...", LogLevel.Always);
-            setupSvcMgr();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                WintapLogger.Log.Append("Setting up Wintap Service Manager...", LogLevel.Always);
+                setupSvcMgr();
+            }
             WintapLogger.Log.Append("Wintap profile: " + WintapProfile.Name, LogLevel.Always);
             WintapLogger.Log.Append("Max Memory: " + WintapProfile.MaxMem, LogLevel.Always);
             if (WintapProfile.Name != WintapProfile.ProfileEnum.Developer)

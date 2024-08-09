@@ -4,25 +4,59 @@ VisualStudioVersion = 17.2.32516.85
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wintap", "wintap\Wintap.csproj", "{225F7EEB-8D75-4921-922F-AA0354EC8289}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapSvcMgr", "WintapSvcMgr\WintapSvcMgr.csproj", "{E307F7BE-A7AF-4818-91C7-E4A3EFE9E520}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapSvcMgr", "platform\windows\WintapSvcMgr\WintapSvcMgr.csproj", "{E307F7BE-A7AF-4818-91C7-E4A3EFE9E520}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapAPI", "WintapAPI\WintapAPI.csproj", "{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapAPI", "WintapAPI\WintapAPI.csproj", "{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MergeHelper", "MergeHelper\MergeHelper.csproj", "{D8516370-E5E4-4002-915D-3245F5B259D6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapRecorder", "platform\windows\WintapRecorder\WintapRecorder.csproj", "{4FE36182-60AA-4483-982F-821F67D4CEB5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapETL", "WintapETL\WintapETL.csproj", "{CC904063-6532-44B4-8FB3-73FBA4012CB4}"
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "platform\windows\WintapSetup\WintapSetup.vdproj", "{BD252ABA-2A5B-4F56-9413-3174AA9CD895}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WintapRecorder", "WintapRecorder\WintapRecorder.csproj", "{4FE36182-60AA-4483-982F-821F67D4CEB5}"
-EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "WintapSetup\WintapSetup.vdproj", "{BD252ABA-2A5B-4F56-9413-3174AA9CD895}"
-EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapETLSetup", "WintapETLSetup\WintapETLSetup\WintapETLSetup.vdproj", "{CA4A1320-48B8-479B-9EF8-FBED03BC3629}"
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapETLSetup", "platform\windows\WintapETLSetup\WintapETLSetup\WintapETLSetup.vdproj", "{CA4A1320-48B8-479B-9EF8-FBED03BC3629}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "utilities", "utilities", "{D3644633-5670-4050-8E1D-465A966F45E1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocIndexer", "Utilities\DocIndexer\DocIndexer.csproj", "{C34C2A8C-2C33-45B3-9BD4-91FD123D890E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocIndexer", "platform\windows\Utilities\DocIndexer\DocIndexer.csproj", "{C34C2A8C-2C33-45B3-9BD4-91FD123D890E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalInference", "Utilities\LocalInference\LocalInference.csproj", "{84D53A62-053A-492D-96AA-FFCF30CD756A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LocalInference", "platform\windows\Utilities\LocalInference\LocalInference.csproj", "{84D53A62-053A-492D-96AA-FFCF30CD756A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "platform", "platform", "{94CDA401-4A90-4F82-B851-262342674E31}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "windows", "windows", "{F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{39BB107A-F80C-49B8-BCDA-11C080592E99}"
+	ProjectSection(SolutionItems) = preProject
+		CONTRIBUTIONS.md = CONTRIBUTIONS.md
+		LICENSE = LICENSE
+		NOTICE.txt = NOTICE.txt
+		README.md = README.md
+		Wintap 6 Developer's Guide.pdf = Wintap 6 Developer's Guide.pdf
+		wintap.ico = wintap.ico
+		Wintap.png = Wintap.png
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Wintap-Workbench", "Wintap-Workbench", "{66763ED6-F638-4936-A82B-ADAB21030A27}"
+EndProject
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench(1)", "Wintap-Workbench\", "{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}"
+	ProjectSection(WebsiteProperties) = preProject
+		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
+		Debug.AspNetCompiler.VirtualPath = "/localhost_55868"
+		Debug.AspNetCompiler.PhysicalPath = "Wintap-Workbench\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_55868\"
+		Debug.AspNetCompiler.Updateable = "true"
+		Debug.AspNetCompiler.ForceOverwrite = "true"
+		Debug.AspNetCompiler.FixedNames = "false"
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.VirtualPath = "/localhost_55868"
+		Release.AspNetCompiler.PhysicalPath = "Wintap-Workbench\"
+		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_55868\"
+		Release.AspNetCompiler.Updateable = "true"
+		Release.AspNetCompiler.ForceOverwrite = "true"
+		Release.AspNetCompiler.FixedNames = "false"
+		Release.AspNetCompiler.Debug = "False"
+		VWDPort = "55868"
+		SlnRelativePath = "Wintap-Workbench\"
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -84,38 +118,6 @@ Global
 		{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}.Release|x64.Build.0 = Release|Any CPU
 		{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}.Release|x86.ActiveCfg = Release|Any CPU
 		{C2A9826A-1DDE-44C9-8B82-9CE124E027E9}.Release|x86.Build.0 = Release|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|ARM64.ActiveCfg = Debug|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|ARM64.Build.0 = Debug|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|x64.ActiveCfg = Debug|x64
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|x64.Build.0 = Debug|x64
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Debug|x86.Build.0 = Debug|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|Any CPU.ActiveCfg = Debug|x64
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|Any CPU.Build.0 = Debug|x64
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|ARM64.ActiveCfg = Release|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|ARM64.Build.0 = Release|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|x64.ActiveCfg = Release|x64
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|x64.Build.0 = Release|x64
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|x86.ActiveCfg = Release|Any CPU
-		{D8516370-E5E4-4002-915D-3245F5B259D6}.Release|x86.Build.0 = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|ARM64.ActiveCfg = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|ARM64.Build.0 = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x64.ActiveCfg = Debug|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x64.Build.0 = Debug|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Debug|x86.Build.0 = Debug|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|ARM64.ActiveCfg = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|ARM64.Build.0 = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x64.ActiveCfg = Release|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x64.Build.0 = Release|x64
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x86.ActiveCfg = Release|Any CPU
-		{CC904063-6532-44B4-8FB3-73FBA4012CB4}.Release|x86.Build.0 = Release|Any CPU
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4FE36182-60AA-4483-982F-821F67D4CEB5}.Debug|ARM64.ActiveCfg = Debug|Any CPU
@@ -187,13 +189,36 @@ Global
 		{84D53A62-053A-492D-96AA-FFCF30CD756A}.Release|x64.Build.0 = Release|Any CPU
 		{84D53A62-053A-492D-96AA-FFCF30CD756A}.Release|x86.ActiveCfg = Release|Any CPU
 		{84D53A62-053A-492D-96AA-FFCF30CD756A}.Release|x86.Build.0 = Release|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|x64.Build.0 = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Debug|x86.Build.0 = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|Any CPU.Build.0 = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|ARM64.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|ARM64.Build.0 = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|x64.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|x64.Build.0 = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|x86.ActiveCfg = Debug|Any CPU
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}.Release|x86.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{E307F7BE-A7AF-4818-91C7-E4A3EFE9E520} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
+		{4FE36182-60AA-4483-982F-821F67D4CEB5} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
+		{BD252ABA-2A5B-4F56-9413-3174AA9CD895} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
+		{CA4A1320-48B8-479B-9EF8-FBED03BC3629} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
+		{D3644633-5670-4050-8E1D-465A966F45E1} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
 		{C34C2A8C-2C33-45B3-9BD4-91FD123D890E} = {D3644633-5670-4050-8E1D-465A966F45E1}
 		{84D53A62-053A-492D-96AA-FFCF30CD756A} = {D3644633-5670-4050-8E1D-465A966F45E1}
+		{F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD} = {94CDA401-4A90-4F82-B851-262342674E31}
+		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A} = {66763ED6-F638-4936-A82B-ADAB21030A27}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B820FE25-5EEE-4E31-A6AE-C417551BE27C}

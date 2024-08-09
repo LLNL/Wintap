@@ -6,11 +6,6 @@
 
 using com.espertech.esper.client;
 using com.espertech.esper.compat.collections;
-using com.espertech.esper.epl.generated;
-using com.espertech.esper.epl.join.plan;
-using com.espertech.esper.events;
-using com.espertech.esper.events.bean;
-using com.espertech.esper.events.map;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
@@ -25,7 +20,10 @@ using System.ComponentModel.Composition.Hosting;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
+using gov.llnl.wintap.core.etl;
 using static gov.llnl.wintap.Interfaces;
+using com.espertech.esper.runtime.client;
+using com.espertech.esper.common.client;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -37,11 +35,8 @@ namespace gov.llnl.wintap.core.infrastructure
     {
         public static int PluginCount = 0;
         internal static List<string> DynamicEtwProviderList = new List<string>();
-        //debug
-        private int activityEventCounter;
-        private int processEventCounter;
-        // end debug
-
+        private WintapETL etl;
+        private bool doETL = false;
         private WintapLogger log;
         private Watchdog watchdog;
         private ConcurrentQueue<Runnable> runQueue;   
@@ -61,8 +56,12 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal PluginManager()
         {
+            WintapLogger.Log.Append("Plugin manager is starting ", LogLevel.Always);
             runQueue = new ConcurrentQueue<Runnable>();
-            WintapLogger.Log.Append("Plugin manager is started", LogLevel.Always);
+            etl = new WintapETL();
+            doETL = etl.Start();
+
+            WintapLogger.Log.Append("Parquet serialization for this session: " + doETL, LogLevel.Always);
             
         }
 
@@ -74,7 +73,6 @@ namespace gov.llnl.wintap.core.infrastructure
         /// <returns></returns>
         internal void RegisterPlugins(Watchdog _watchdog)
         {
-            EPServiceProvider epProvider = EventChannel.Esper;
             watchdog = _watchdog;
             watchdog.Start();
             WintapLogger.Log.Append("Loading plugins...", LogLevel.Always);
@@ -128,19 +126,20 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
             // QUERIES: Esper Query Plugins
-            foreach (Lazy<IQuery, IQueryData> queryPlugin in queryPlugins)
-            {
-                WintapLogger.Log.Append("loading query plugin: " + queryPlugin.Metadata.Name, LogLevel.Always);
-                try
-                {
-                    List<EventQuery> queries = queryPlugin.Value.Startup();
-                    registerQueries(queries, queryPlugin.Metadata.Name);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("Error loading Query plugin " + queryPlugin.Metadata.Name + ": " + ex.Message, LogLevel.Always);
-                }
-            }
+            //  TODO:  esper 8 removed userData from EPStatements - need to rethink this.
+            //foreach (Lazy<IQuery, IQueryData> queryPlugin in queryPlugins)
+            //{
+            //    WintapLogger.Log.Append("loading query plugin: " + queryPlugin.Metadata.Name, LogLevel.Always);
+            //    try
+            //    {
+            //        List<EventQuery> queries = queryPlugin.Value.Startup();
+            //        registerQueries(queries, queryPlugin.Metadata.Name);
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        WintapLogger.Log.Append("Error loading Query plugin " + queryPlugin.Metadata.Name + ": " + ex.Message, LogLevel.Always);
+            //    }
+            //}
             // PROVIDERS: data generating plugins
             foreach (Lazy<IProvide, IProvideData> provider in providers)
             {
@@ -156,12 +155,12 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
             // Hook up event delivery from Esper to Subscribers
-            if (subscribers.Count() > 0)
+            if (subscribers.Count() > 0 || doETL)
             {
                 try
                 {
                     WintapLogger.Log.Append("Creating Subscriber EPL", LogLevel.Always);
-                    EPStatement processEvents = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'");
+                    EPStatement processEvents = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'").Statements[0];
                     processEvents.Events += All_Events;
                 }
                 catch (Exception ex)
@@ -174,7 +173,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 try
                 {
                     // do not route plugin provided GenericMessages to ISubscribeEtw plugins
-                    EPStatement allWintapMsgs = epProvider.EPAdministrator.CreateEPL("SELECT * FROM WintapMessage WHERE MessageType = 'GenericMessage' AND GenericMessage.Provider != 'Plugin'");               
+                    EPStatement allWintapMsgs = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT * FROM WintapMessage WHERE MessageType = 'GenericMessage' AND GenericMessage.Provider != 'Plugin'").Statements[0];               
                     allWintapMsgs.Events += AllGeneric_Events;
                 }
                 catch (Exception ex)
@@ -197,32 +196,24 @@ namespace gov.llnl.wintap.core.infrastructure
         private void All_Events(object sender, UpdateEventArgs e)
         {
             EventBean[] newEvents = e.NewEvents;
-            try
+            WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
+            for (int i = 0; i < newEvents.Count(); i++)
             {
-                WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
-                for (int i = 0; i < newEvents.Count(); i++)
+                wmArray[i] = (WintapMessage)newEvents[i].Underlying;
+            }
+            foreach (Lazy<ISubscribe, ISubscribeData> consumer in subscribers)
+            {
+                foreach (WintapMessage msg in wmArray)
                 {
-                    wmArray[i] = (WintapMessage)newEvents[i].Underlying;
-                }
-                foreach (Lazy<ISubscribe, ISubscribeData> consumer in subscribers)
-                {
-                    foreach (WintapMessage msg in wmArray)
+                    try
                     {
-                        try
-                        {
-                            processEventCounter++;
-                            consumer.Value.Subscribe(msg);
-                        }
-                        catch (Exception ex)
-                        {
-                            WintapLogger.Log.Append("could not deliver PROCESS event to subscriber because: " + ex.Message, LogLevel.Debug);
-                        }
+                        consumer.Value.Subscribe(msg);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append("could not deliver event to subscriber because: " + ex.Message, LogLevel.Debug);
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR passing PROCESS event to etw subscriber: " + ex.Message + "  " + ex.InnerException, LogLevel.Debug);
             }
         }
 
@@ -239,65 +230,6 @@ namespace gov.llnl.wintap.core.infrastructure
             catch(Exception ex) 
             {
                 WintapLogger.Log.Append("Error on plugin event: " + ex.Message, LogLevel.Debug);
-            }
-        }
-
-        private void registerQueries(List<EventQuery> queries, string pluginName)
-        {
-            foreach(EventQuery query in queries)
-            {
-                try
-                {
-                    EPStatement statement = EventChannel.Esper.EPAdministrator.CreateEPL(query.Query, query.Name, pluginName);
-                    statement.Events += pluginEventHandler;
-                }
-                catch(Exception ex)
-                {
-                    WintapLogger.Log.Append("Error registering IQuery query: " +  query, LogLevel.Always);  
-                }
-            }
-        }
-
-        private void pluginEventHandler(object sender, UpdateEventArgs e)
-        {
-            string pluginHandler = e.Statement.UserObject as string;
-            string queryName = e.Statement.Name;
-            foreach (Lazy<IQuery, IQueryData> queryPlugin in queryPlugins)
-            {
-                if(queryPlugin.Metadata.Name == pluginHandler)
-                {
-                    int lastEventNumber = e.NewEvents.Count();
-                    List<WintapMessage> results = new List<WintapMessage>();
-                    QueryResult qr = new QueryResult() { Name = queryName };
-                    foreach (EventBean eb in e.NewEvents)
-                    {
-                        try
-                        {
-                            WintapMessage resultmsg = (WintapMessage)eb.Underlying;
-                            results.Add(resultmsg);
-                        }
-                        catch(InvalidCastException ice)
-                        {
-                            IDictionary<string, object> bebList = eb.Underlying.UnwrapStringDictionary();
-                            foreach (string eventName in bebList.Keys)
-                            {
-                                object wmAsObj;
-                                bebList.TryGetValue(eventName, out wmAsObj);
-                                KeyValuePair<string, string> resultPair = new KeyValuePair<string, string>(eventName, wmAsObj.ToString());
-                                qr.EventDetails.Add(resultPair);
-                            }
-                        }
-                        catch(Exception ex)
-                        {
-
-                        }
-                    }
-                    if(results.Count >0)
-                    {
-                        qr.Activity = results;
-                    }    
-                    queryPlugin.Value.Process(qr);
-                }
             }
         }
 

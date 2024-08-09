@@ -30,6 +30,8 @@ using Newtonsoft.Json;
 using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.Properties;
 using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
+using Microsoft.AspNetCore.Http;
+using System.IO;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -59,7 +61,7 @@ namespace gov.llnl.wintap.core.api
         private ChatHistory chat;
         private IChatCompletionService ai;
 
-    public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai)
+        public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai)
         {
             this.hubContext = _hubContext;
             memory = _memory;
@@ -81,7 +83,7 @@ namespace gov.llnl.wintap.core.api
         public async Task Put([FromBody] PromptModel promptModel)
         {
             WintapLogger.Log.Append($"Got inference request", LogLevel.Always);
-            string collectionName = "wintap2";
+            string collectionName = "contextData";
             string question = promptModel.Prompt;
             StringBuilder builder = new StringBuilder();
             double minRel = Settings.Default.MinRelevance;
@@ -134,6 +136,64 @@ namespace gov.llnl.wintap.core.api
             chat.RemoveRange(0, chat.Count);
             string systemPrompt = Settings.Default.SystemPrompt;
             chat = new ChatHistory(systemPrompt);
+        }
+
+        [HttpPost("Upload")]
+        public async Task<IActionResult> Upload(IFormFile file)
+        {
+            WintapLogger.Log.Append($"Document embeddings request received", LogLevel.Always);
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest("No file uploaded.");
+            }
+
+            string collectionName = "contextData";
+
+            WintapLogger.Log.Append("LLM Upload is attempting to read file", LogLevel.Always);
+            using (var stream = new MemoryStream())
+            {
+                await file.CopyToAsync(stream);
+                stream.Position = 0;
+                using (var reader = new StreamReader(stream))
+                {
+                    string fileContent = await reader.ReadToEndAsync();
+                    WintapLogger.Log.Append($"Got file text, Splitting lines...", LogLevel.Always);
+                    List<string> lines = TextChunker.SplitPlainTextLines(fileContent, 128);
+                    int chunkSize = 1500;
+                    int overlapSize = 100;
+                    WintapLogger.Log.Append($"Line count: {lines.Count}, Splitting paragraphs...", LogLevel.Always);
+                    List<string> paragraphs = TextChunker.SplitPlainTextParagraphs(lines, chunkSize, overlapSize, " ");
+                    try
+                    {
+                        for (int i = 0; i < paragraphs.Count; i++)
+                        {
+                            if (!string.IsNullOrEmpty(paragraphs[i]))
+                            {
+                                try
+                                {
+                                    await memory.SaveInformationAsync(collectionName, paragraphs[i], $"paragraph{i}");
+
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"ERROR get embeddings failed on paragraph {i}, msg: {ex.Message}");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Skipping empty paragraph!");
+                            }
+                        }
+                        WintapLogger.Log.Append($"RAG embeddings successfully saved.", LogLevel.Always);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error saving embeddings: " + ex.Message);
+                    }
+                }
+            }
+
+            return Ok();
         }
     }
 

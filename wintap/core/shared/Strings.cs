@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -79,7 +80,7 @@ namespace gov.llnl.wintap.core.shared
         {
             get
             {
-                return Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap";
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap");
             }
         }
     }

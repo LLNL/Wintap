@@ -4,7 +4,6 @@
  * All rights reserved.
  */
 
-using gov.llnl.wintap.collect.shared;
 using gov.llnl.wintap.core.shared;
 using Newtonsoft.Json;
 using System;
@@ -13,6 +12,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using System.Threading.Tasks;
+using gov.llnl.wintap.platform.windows.collect.shared;
 
 namespace gov.llnl.wintap.core.api
 {

@@ -15,16 +15,6 @@ using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.core.api
 {
-    // SignalR (websockets) Hub
-    public class WorkbenchHub : Hub
-    {
-
-        public async Task Send(string queryResult)
-        {
-            StateManager.LastWorkbenchActivity = DateTime.Now;
-            await Clients.All.SendAsync("ReceiveMessage", queryResult);
-        }
-    }
 
     // meta data controller for the esper engine
     public class EsperServiceController : ControllerBase
@@ -64,7 +54,7 @@ namespace gov.llnl.wintap.core.api
             bool wintapLogOK = false;
             try
             {
-                wintapLogOK = ReadTail(Strings.FileDataRoot + "\\Logs\\Wintap.log");
+                wintapLogOK = ReadTail(Path.Combine(Strings.FileDataRoot, "Logs", "Wintap.log"));
             }
             catch(Exception ex)
             {
@@ -79,7 +69,7 @@ namespace gov.llnl.wintap.core.api
             bool collectorOK = false;
             try
             {
-                collectorOK = ReadTail(Strings.FileDataRoot + "\\Logs\\WintapETL.log");
+                collectorOK = ReadTail(Path.Combine(Strings.FileDataRoot, "Logs", "WintapETL.log"));
             }
             catch (Exception ex)
             {

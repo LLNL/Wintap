@@ -29,7 +29,6 @@ namespace gov.llnl.wintap.core.infrastructure
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            System.Diagnostics.Debugger.Launch();
 
             if (env.IsDevelopment())
             {

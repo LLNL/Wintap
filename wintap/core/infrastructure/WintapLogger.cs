@@ -16,7 +16,7 @@ namespace gov.llnl.wintap.core.infrastructure
 {
     public enum Status
     {
-        OK, Important, Warning, Critical
+        OK, Warning, Critical
     }
 
 
@@ -44,8 +44,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private string logName;
         private LogType logType = LogType.Overwrite;
         private LogLevel verbosity;
-        //private string logDir = Environment.GetEnvironmentVariable("temp");
-        private string logDir = Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Logs";
+        private string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "Logs");
         private string userName;
         private string logPath;
         DateTime startTime;
@@ -58,7 +57,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private Status status;
         private string author = "not set";
         private string codeVersion;
-        private string clientName = Environment.GetEnvironmentVariable("COMPUTERNAME");
+        private string clientName = Environment.MachineName;
         private ConcurrentQueue<LogEntry> pendingEntries;
         private BackgroundWorker loggingThread;
         private bool logIsOpen;
@@ -69,8 +68,6 @@ namespace gov.llnl.wintap.core.infrastructure
             this.LogType = LogType.Overwrite;
             this.MaxSize = 3000000;
             this.Verbosity = LogLevel.Always;
-            //this.LogDir = Environment.GetEnvironmentVariable("WINDIR") + "\\Temp";
-            this.logDir = Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Logs";
             this.LogName = "Wintap";
             this.Init();
 
@@ -119,27 +116,9 @@ namespace gov.llnl.wintap.core.infrastructure
             // set prelim values
             status = Status.OK;
             statusMsg = "n/a";
-            // user might not be logged in, so try this
-            try
-            {
-                userName = Environment.GetEnvironmentVariable("username");
-            }
-            catch
-            {
-                userName = "N/A";
-            }
-            // Make sure the path ends consistently
-            if (!logDir.Trim().EndsWith("\\"))
-            {
-                logDir = logDir.Insert(logDir.Length, "\\");
-            }
+
             // Contat the path
-            StringBuilder pathBld = new StringBuilder();
-            pathBld.Append(logDir);
-            //pathBld.Append("\\");
-            pathBld.Append(logName);
-            pathBld.Append(".log");
-            logPath = pathBld.ToString();
+            logPath = Path.Combine(logDir, logName + ".log");
             // Record the start time
             startTime = DateTime.Now;
             switch (LogType)
