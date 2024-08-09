@@ -115,5 +115,12 @@ namespace gov.llnl.wintap.core.shared
             WintapLogger.Log.Append($"Permissions for {directoryPath} have been successfully updated.", LogLevel.Always);
         }
 
+        public static DateTime FromSysdigTime(long nanoseconds)
+        {
+            long milliseconds = nanoseconds / 1000000;
+            DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(milliseconds);
+            return dateTime;
+        }
+
     }
 }

@@ -63,6 +63,7 @@ namespace gov.llnl.wintap.collect.models
         public MicrosoftWindowsBitLockerAPIData MicrosoftWindowsBitLockerAPI { get; set; }
         public KernelApiCallData KernelApiCall { get; set; }
         public MemoryMapData MemoryMap { get; set; }
+        public SysdigEventData SysdigEvent { get; set; }
 
         /// <summary>
         /// General purpose error reporting for Wintap
@@ -442,6 +443,25 @@ namespace gov.llnl.wintap.collect.models
             public string PageType { get; set; }
 
             public bool MZHeaderPresent { get; set; }
+        }
+
+        public class SysdigEventData
+        {
+            public int evt_cpu { get; set; }
+
+            public string evt_dir { get; set; }
+
+            public string evt_info { get; set; }
+
+            public int evt_num { get; set; }
+
+            public long evt_outputtime { get; set; }
+
+            public string evt_type { get; set; }
+
+            public string proc_name { get; set; }
+
+            public int thread_tid { get; set; }
         }
 
         public abstract class WintapBase

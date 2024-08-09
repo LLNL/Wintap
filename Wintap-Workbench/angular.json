@@ -32,6 +32,7 @@
                         ],
                         "styles": [
                             "src/styles.scss",
+                            "node_modules/prismjs/themes/prism.css",
                             "node_modules/codemirror/addon/hint/show-hint.css",
                             {
                                 "input": "node_modules/codemirror/lib/codemirror.css",
@@ -41,8 +42,9 @@
                         "scripts": [
                             "node_modules/jquery/dist/jquery.min.js",
                             "node_modules/signalr/jquery.signalR.min.js",
-                            "node_modules/codemirror/addon/hint/show-hint.js"
-                          ]
+                            "node_modules/codemirror/addon/hint/show-hint.js",
+                            "node_modules/prismjs/prism.js"
+                        ]
                     },
                     "configurations": {
                         "production": {

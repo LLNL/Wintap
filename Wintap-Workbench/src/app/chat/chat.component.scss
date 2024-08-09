@@ -142,3 +142,58 @@ textarea {
         transform: rotate(360deg);
     }
 }
+
+.results-window {
+    overflow-y: auto;
+    padding-bottom: 100px; /* Ensure there's space for the fixed prompt input */
+}
+
+.prompt-container {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: white; /* Ensure the background matches your design */
+    padding: 10px;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.prompt-window {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Ensure the buttons stay within the viewport */
+}
+
+.p-float-label {
+    flex-grow: 1;
+    margin-right: 10px; /* Add some space between the textarea and buttons */
+}
+
+.button-group {
+    display: flex;
+    gap: 5px; /* Add some space between the buttons */
+}
+
+.p-button-success,
+.p-button-warning {
+    padding-left: 5px;
+}
+
+.llm-output {
+    margin-top: 20px;
+}
+
+.error-message {
+    color: red;
+    margin-top: 10px;
+}
+
+pre {
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+}
+
+code {
+    font-family: 'Courier New', Courier, monospace;
+}

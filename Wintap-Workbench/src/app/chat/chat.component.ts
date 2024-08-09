@@ -1,10 +1,12 @@
 import {
-    Component, ViewChild, AfterViewInit, OnInit, ElementRef, QueryList
+    Component, AfterViewChecked, ViewChild, AfterViewInit, OnInit, ElementRef, QueryList
 } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { ChangeDetectorRef } from '@angular/core';
 import * as signalR from '@microsoft/signalr';
 import { HubConnectionBuilder } from '@microsoft/signalr';
+// @ts-ignore
+import * as Prism from 'prismjs';
 
 interface ChatMessage {
     text: string;
@@ -27,7 +29,7 @@ interface ChatHistory {
     templateUrl: './chat.component.html',
     styleUrls: ['./chat.component.scss']
 })
-export class ChatComponent implements OnInit {
+export class ChatComponent implements OnInit, AfterViewChecked {
     userPrompt: string;
     messages: ChatMessage[] = [];
     llmOutput: string = '';
@@ -40,6 +42,7 @@ export class ChatComponent implements OnInit {
     isPromptDisabled: boolean = false;
     tokensUsed: string = "0";
     connection: any;
+    results: string[] = []; 
 
     constructor(private http: HttpClient, private cd: ChangeDetectorRef, private elementRef: ElementRef) {
         this.userPrompt = '';
@@ -72,6 +75,10 @@ export class ChatComponent implements OnInit {
             this.appendOrAddMessage(message.response);
             //this.tokensUsed = message.tokensUsed.toString();
         });
+    }
+
+    ngAfterViewChecked() {
+        Prism.highlightAll(); // Highlight all code blocks after the view has been checked
     }
 
     sendPrompt(): void {

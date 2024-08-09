@@ -15,7 +15,10 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
             // start process collector first for process attribution
             ProcessCollector pc = new ProcessCollector();
             pc.Start();
+            SysdigCollector sysdig = new SysdigCollector("ygm-class-long-99.json");
+            sysdig.Start();
             baseCollectors.Add(pc);
+            baseCollectors.Add(sysdig);
 
             return baseCollectors;
         }

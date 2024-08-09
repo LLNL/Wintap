@@ -73,15 +73,8 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
             //}
 
-            PcapCollector pcapCollector = new PcapCollector(@"c:\data\pcap\ygm-class-long.scap99");
-            //PcapCollector pcapCollector = new PcapCollector(@"c:\data\pcap\mesa.pcap");
-            pcapCollector.Emit += PcapCollector_Emit;
-            pcapCollector.Start();
+
         }
 
-        private void PcapCollector_Emit(object sender, PcapEventArgs e)
-        {
-            WintapLogger.Log.Append("Got PCAP Event!  Packet Index: " + e.PacketIndex, LogLevel.Always);
-        }
     }
 }
