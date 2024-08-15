@@ -51,15 +51,11 @@ namespace gov.llnl.wintap.core.etl.load.adapters.baseclass
             string objectPrefix = "v3";
             string uploadDPK = DateTime.UtcNow.Year + DateTime.UtcNow.ToString("MM") + DateTime.UtcNow.ToString("dd");
             string uploadHPK = DateTime.UtcNow.ToString("HH");
-            //  WP1, dataFile: process_sensor.parquet   ???
-            WintapLogger.Log.Append("WP1, dataFile: " + dataFile, LogLevel.Always);
             string timeSegment = dataFile.Split('+')[2].Split(new char[] { '.' })[0];
             string dataFileEventType = dataFile.Split('+')[1];
-            WintapLogger.Log.Append("WP2", LogLevel.Always);
             string[] disgardedSuffix = new string[1];
             disgardedSuffix[0] = "_sensor";
             dataFileEventType = dataFileEventType.Split(disgardedSuffix, StringSplitOptions.None)[0];
-            WintapLogger.Log.Append("WP3", LogLevel.Always);
             long dataFileMergeTime = Int64.Parse(timeSegment);
             DateTime mergeTimeUtc = DateTime.FromFileTimeUtc(dataFileMergeTime);
             long collectTimeAsUnix = ((System.DateTimeOffset)mergeTimeUtc).ToUnixTimeSeconds();
