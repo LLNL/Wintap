@@ -1,1 +1,2 @@
-﻿SELECT * FROM WintapMessage
+﻿SELECT * FROM WintapMessage 
+WHERE MessageType NOT IN ('Process','TcpConnection','UdpPacket','File','Registry', 'FocusChange')

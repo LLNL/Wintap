@@ -24,7 +24,7 @@ namespace gov.llnl.wintap.core.etl.load.interfaces
         /// </summary>
         /// <param name="localFile"></param>
         /// <returns></returns>
-        bool Upload(string localFile, Dictionary<string, string> parameters);
+        Task<bool> Upload(string localFile, Dictionary<string, string> parameters);
         /// <summary>
         /// Post upload tasks, if any
         /// </summary>

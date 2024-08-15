@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using gov.llnl.wintap.platform.linux.collect.test;
 using gov.llnl.wintap.core.collect;
+using System.IO;
+using System;
 
 namespace gov.llnl.wintap.platform.linux.infrastructure
 {
@@ -15,7 +17,7 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
             // start process collector first for process attribution
             ProcessCollector pc = new ProcessCollector();
             pc.Start();
-            SysdigCollector sysdig = new SysdigCollector("ygm-class-long-99.json");
+            SysdigCollector sysdig = new SysdigCollector(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "Sysdig", "ygm-class-long-99.json"));
             sysdig.Start();
             baseCollectors.Add(pc);
             baseCollectors.Add(sysdig);

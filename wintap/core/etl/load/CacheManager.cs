@@ -177,7 +177,7 @@ namespace gov.llnl.wintap.core.etl.load
                         try
                         {
                             WintapLogger.Log.Append("Calling upload: " + uploader.Name, LogLevel.Always);
-                            if (uploader.Upload(dataFile.FullName, etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties))
+                            if (uploader.Upload(dataFile.FullName, etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties).Result)
                             {
                                 successfulUpload = true; // any success = all success, for now.
                             }

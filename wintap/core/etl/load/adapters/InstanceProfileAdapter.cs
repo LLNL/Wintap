@@ -7,6 +7,7 @@ using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.core.etl.load.adapters
 {
@@ -35,33 +36,54 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             return true;
         }
 
-        public bool Upload(string localFile, Dictionary<string, string> parameters)
+        public async Task<bool> Upload(string localFile, Dictionary<string, string> parameters)
         {
             WintapLogger.Log.Append(this.Name + " upload method called", LogLevel.Always);
             bool fileSent = false;
-            PutObjectRequest req = new PutObjectRequest();
-            req.BucketName = parameters["Bucket"];
-            WintapLogger.Log.Append("Bucket: " + req.BucketName, LogLevel.Always);
-            
-            FileInfo localFileInfo = new FileInfo(localFile);
-            string objectKey = getS3ObjectNameForFile(localFileInfo.Name);
-            WintapLogger.Log.Append("s3 object key: " + objectKey, LogLevel.Always);
-            if (req.BucketName != "NONE")
-            {
-                req.Key = objectKey;
-                WintapLogger.Log.Append("attempting S3 upload: " + req.Key, LogLevel.Always);
-                req.FilePath = localFile;
-                req.Metadata.Add("ComputerName", Environment.MachineName);
-                req.Metadata.Add("Timestamp", DateTime.Now.ToFileTimeUtc().ToString());
-                req.CannedACL = S3CannedACL.BucketOwnerFullControl;
-                //PutObjectResponse resp = await client.PutObjectAsync(req);
-                fileSent = true;
-                //WintapLogger.Log.Append("  upload http status code:  " + resp.HttpStatusCode, LogLevel.Always);
-            }
-            else
+
+            if (!parameters.ContainsKey("Bucket"))
             {
                 throw new Exception("NO_BUCKET_SPECIFIED");
             }
+
+            string bucketName = parameters["Bucket"];
+            WintapLogger.Log.Append("Bucket: " + bucketName, LogLevel.Always);
+
+            FileInfo localFileInfo = new FileInfo(localFile);
+            if (!localFileInfo.Exists)
+            {
+                throw new FileNotFoundException("Local file does not exist", localFile);
+            }
+
+            string objectKey = getS3ObjectNameForFile(localFileInfo.Name);
+            WintapLogger.Log.Append("s3 object key: " + objectKey, LogLevel.Always);
+
+            if (bucketName != "NONE")
+            {
+                PutObjectRequest req = new PutObjectRequest
+                {
+                    BucketName = bucketName,
+                    Key = objectKey,
+                    FilePath = localFile
+                };
+
+                req.Metadata.Add("ComputerName", Environment.MachineName);
+                req.Metadata.Add("Timestamp", DateTime.Now.ToFileTimeUtc().ToString());
+                req.CannedACL = S3CannedACL.BucketOwnerFullControl;
+
+                try
+                {
+                    PutObjectResponse resp = await client.PutObjectAsync(req);
+                    fileSent = true;
+                    WintapLogger.Log.Append("Upload HTTP status code: " + resp.HttpStatusCode, LogLevel.Always);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("Upload failed: " + ex.Message, LogLevel.Always);
+                    fileSent = false;
+                }
+            }
+
             return fileSent;
         }
     }

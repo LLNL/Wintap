@@ -44,7 +44,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             return preUploadSuccess;
         }
 
-        public bool Upload(string localFile, Dictionary<string, string> parameters)
+        public async Task<bool> Upload(string localFile, Dictionary<string, string> parameters)
         {
             bool uploadSuccess = true;
             try

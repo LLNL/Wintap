@@ -42,18 +42,19 @@ namespace gov.llnl.wintap.core.etl.load
                     sensorName = renameSensor(sensorName);  // e.g. tcp/udp
                     using (var duckDBConnection = new DuckDBConnection("Data Source=:memory:"))
                     {
+                        // duckdb doesn't like the '+' character in table names, so name the table as  sensorName and then rename the file on disk to our expected format
                         duckDBConnection.Open();
                         var command = duckDBConnection.CreateCommand();
                         string parquetDir = Path.Combine(Strings.ParquetDataPath, "merged");
                         string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("_sensor", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
                         string tempFileName = sensorName;
                         command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";
+                        WintapLogger.Log.Append("Duck db command: " + command.CommandText, LogLevel.Always);
                         var executeNonQuery = command.ExecuteNonQuery();
                         command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
                         executeNonQuery = command.ExecuteNonQuery();
-                        // duckdb is doing character substitution in the file name during export, so working around this for now
-                        FileInfo tempFile = new FileInfo(Path.Combine(parquetDir,tempFileName, ".parquet"));
-                        FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir,mergeFileName,".parquet"));
+                        FileInfo tempFile = new FileInfo(Path.Combine(parquetDir,tempFileName + ".parquet"));
+                        FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir,mergeFileName + ".parquet"));
                         tempFile.MoveTo(mergeFile.FullName);
                         // WintapRecorder support - todo:  not sure how I want to handle this just yet...
                         //if (RecordingSession.NowRecording(log))

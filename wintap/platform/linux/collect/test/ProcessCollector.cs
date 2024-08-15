@@ -30,6 +30,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
             CollectorName = "Process";
             idGen = new ProcessHash();
             processDictionary = new ConcurrentDictionary<string, WintapMessage>();  // pidhash, wintapmessage of process
+
         }
 
         public override bool Start()
@@ -38,16 +39,34 @@ namespace gov.llnl.wintap.platform.linux.collect.test
             BackgroundWorker eventGenThread = new BackgroundWorker();
             eventGenThread.DoWork += EventGenThread_DoWork;
             eventGenThread.RunWorkerAsync();
+
+            // placeholder Process event to which we will assign all data until we get real process collection working
+            Process currentProcess = Process.GetCurrentProcess();
+            string processName = currentProcess.ProcessName;
+            string processPath = currentProcess.MainModule.FileName;
+            int processId = currentProcess.Id + 1; // defeat wintap self-event filtering
+
+            WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = ProcessActivityEnum.refresh.ToString() };
+            msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
+            msg.ProcessName = processName;
+            msg.MessageType = "Process";
+            msg.PidHash = idGen.GenPidHash(msg.PID, msg.EventTime);
+            processDictionary.TryAdd(msg.PidHash, msg);
+
+            EventChannel.Send(msg);
+
             return true;
         }
 
-        // TODO:  Process and PidHash lookup needs to be general purpose, if we get serious about linux
-        // support within Wintap, we should extract out the ProcessPidhash management code from the 
-        // windows collector and make it general purpose.
         public WintapMessage GetOwningProcess(WintapMessage msg)
         {
-            //  returns the most recent process matching msg PID
-            return processDictionary.Where(p => p.Value.PID == msg.PID && p.Value.EventTime <= msg.EventTime).OrderBy(p => p.Value.EventTime).Last().Value;
+            WintapMessage owningProcess = processDictionary.FirstOrDefault().Value;  // for now, our dictionary has just one entry
+            //  in the future: find the most recent process matching msg PID
+            if(processDictionary.Where(p => p.Value.PID == msg.PID && p.Value.EventTime <= msg.EventTime).Any())
+            {
+                owningProcess = processDictionary.Where(p => p.Value.PID == msg.PID && p.Value.EventTime <= msg.EventTime).OrderBy(p => p.Value.EventTime).Last().Value;
+            }
+            return owningProcess; 
         }
 
         private void EventGenThread_DoWork(object sender, DoWorkEventArgs e)

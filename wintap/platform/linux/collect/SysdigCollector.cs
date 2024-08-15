@@ -49,15 +49,16 @@ namespace gov.llnl.wintap.core.collect
                         wintapMsg.SysdigEvent.evt_dir = sysDigEvent.evt_dir;
                         wintapMsg.SysdigEvent.proc_name = sysDigEvent.proc_name;
                         wintapMsg.SysdigEvent.thread_tid = sysDigEvent.thread_tid;
-                        EventChannel.Send(wintapMsg);
+                        wintapMsg.PidHash = "fake_pidhash";
+                        //EventChannel.Send(wintapMsg);
+                        EventChannel.EsperRuntime.EventService.SendEventBean(wintapMsg, "WintapMessage");
                     }
                 }
+                System.Threading.Thread.Sleep(5000);
             }
-            System.Threading.Thread.Sleep(5000);
         }
-
-
     }
+
 
     public class SysdigEvent
     {
