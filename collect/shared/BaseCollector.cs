@@ -401,10 +401,10 @@ namespace gov.llnl.wintap.collect.shared
             {
 
                 if (volumeNumber <= diskVolumes.Count)
-                {   
+                {
                     var diskInfo = from disk in diskVolumes where disk.VolumeNumber == volumeNumber select disk;
                     DiskVolume dv = diskInfo.FirstOrDefault();
-                    if(dv != null)
+                    if (dv != null)
                     {
                         if (diskVolumes.Count() == 1 && originalPath.StartsWith("\\device\\harddiskvolume1"))
                         {
@@ -414,7 +414,8 @@ namespace gov.llnl.wintap.collect.shared
                     }
                     else
                     {
-                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}", LogLevel.Always); 
+                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}, hardcoding drive assignment to C:", LogLevel.Always);
+                        newPath = originalPath.Replace(nativePrefix + volumeNumber, "c:");
                     }
                 }
                 else
@@ -423,11 +424,11 @@ namespace gov.llnl.wintap.collect.shared
                     newPath = originalPath.Replace(nativePrefix + volumeNumber, "c:");
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 try
                 {
-                    newPath = originalPath.Replace("\\device\\harddiskvolume1", "c:");  
+                    newPath = originalPath.Replace("\\device\\harddiskvolume1", "c:");
 
                 }
                 catch (Exception ex2)
