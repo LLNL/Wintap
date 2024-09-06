@@ -37,7 +37,6 @@ namespace gov.llnl.wintap
         protected override void OnStart(string[] args)
         {
             WintapLogger.Log.Append("Creating startup thread.", LogLevel.Always);
-            System.Diagnostics.Debugger.Launch();
             BackgroundWorker startupWorker = new BackgroundWorker();
             startupWorker.DoWork += startupWorker_DoWork;
             startupWorker.RunWorkerAsync();

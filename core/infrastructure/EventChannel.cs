@@ -32,7 +32,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private static ConcurrentQueue<WintapMessage> eventBuffer;
         private static Stopwatch bufferProcessingInterval;
         private static int droppedEventCount;
-        private static int MAX_BUFFER_SIZE;
+        private static int MAX_BUFFER_SIZE = 5000;
 
         public static long EventsPerSecond
         {
@@ -84,7 +84,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 if (eventBuffer.Count >= MAX_BUFFER_SIZE)
                 {
                     eventBuffer.TryDequeue(out _);  // Discard oldest event
-                    WintapLogger.Log.Append("ERROR Buffer full, discarding oldest event", LogLevel.Always);
+                    WintapLogger.Log.Append($"ERROR esper event Buffer full!  current size: {eventBuffer.Count} max size: {MAX_BUFFER_SIZE}, discarding oldest event", LogLevel.Always);
                 }
 
                 while (eventBuffer.Count > 0)
