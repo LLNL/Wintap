@@ -29,6 +29,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
         private List<TreeNode> forest = new List<TreeNode>();
         //  dedicated data holder for doing 'most recent' parent lookup
         private static ConcurrentDictionary<string, WintapMessage> processStack = new ConcurrentDictionary<string, WintapMessage>();
+        private int MAX_DICT_SIZE = 2000;
         private ProcessTrace processTracer;
         private ProcessHash idGen;
         private ProcessHash.Hasher hasher;
@@ -183,7 +184,14 @@ namespace gov.llnl.wintap.collect.etw.helpers
             foreach(TreeNode prunable in prunables)
             {
                 WintapMessage pruned;
-                //processStack.Remove(prunable.Data.PidHash, out pruned);  // todo: fix null pidhash process activity association here
+                if (processStack.TryRemove(prunable.Data.PidHash, out pruned))
+                {
+                    WintapLogger.Log.Append($"Process removed from stack: {prunable.Data.PidHash}", core.infrastructure.LogLevel.Always);
+                }
+            }
+            if(processStack.Count >= MAX_DICT_SIZE)
+            {
+                WintapLogger.Log.Append($"WARN ProcessTree:  processStack has reached size limit, current size {processStack.Count} max size: {MAX_DICT_SIZE}.", LogLevel.Always);
             }
         }
 
@@ -363,33 +371,35 @@ namespace gov.llnl.wintap.collect.etw.helpers
 
         internal string GetProcessUser(Process process)
         {
-            IntPtr processHandle = IntPtr.Zero;
-            try
-            {
-                //8 represents an access mask of READ_ONLY_EA
-                Winapi.OpenProcessToken(process.Handle, 8, out processHandle);
-                using (WindowsIdentity wi = new WindowsIdentity(processHandle))
-                {
-                    return wi.Name;
-                }
-            }
-            catch (Win32Exception ex)
-            {
-                //This occurs, when there is an access denied error...
-                //Attempt to get the information via WMI
-                return GetProcessOwnerByPID(process.Id);
-            }
-            catch (Exception ex)
-            {
-                return "NA";
-            }
-            finally
-            {
-                if (processHandle != IntPtr.Zero)
-                {
-                    Winapi.CloseHandle(processHandle);
-                }
-            }
+            return "NA";
+
+            //IntPtr processHandle = IntPtr.Zero;
+            //try
+            //{
+            //    //8 represents an access mask of READ_ONLY_EA
+            //    Winapi.OpenProcessToken(process.Handle, 8, out processHandle);
+            //    using (WindowsIdentity wi = new WindowsIdentity(processHandle))
+            //    {
+            //        return wi.Name;
+            //    }
+            //}
+            //catch (Win32Exception ex)
+            //{
+            //    //This occurs, when there is an access denied error...
+            //    //Attempt to get the information via WMI
+            //    return GetProcessOwnerByPID(process.Id);
+            //}
+            //catch (Exception ex)
+            //{
+            //    return "NA";
+            //}
+            //finally
+            //{
+            //    if (processHandle != IntPtr.Zero)
+            //    {
+            //        Winapi.CloseHandle(processHandle);
+            //    }
+            //}
         }
 
         internal string GetProcessOwnerByPID(int pid)
