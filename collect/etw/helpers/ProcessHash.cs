@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using Org.BouncyCastle.Crypto;
 using System;
@@ -92,6 +93,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             private Dictionary<string, string> sha2Lookup = new Dictionary<string, string>();
             // ageOfHash-to-path
             private Dictionary<DateTime, string> hashAge = new Dictionary<DateTime, string>();
+            private int MAX_DICT_SIZE = 1000;
 
             public Hasher()
             {
@@ -121,6 +123,18 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 foreach (DateTime key in keysToRemove)
                 {
                     hashAge.Remove(key);
+                }
+                if(md5Lookup.Count >= MAX_DICT_SIZE)
+                {
+                    WintapLogger.Log.Append($"WARN Process Hasher: Max size reached on md5Lookup dictionary.  Current size: {md5Lookup.Count}, max size: {MAX_DICT_SIZE}.  clearing dictionary...", LogLevel.Always);
+                    md5Lookup = new Dictionary<string, string>();
+                    WintapLogger.Log.Append($"Process Hasher: md5Lookup dictionary.  Current size: {md5Lookup.Count}, max size: {MAX_DICT_SIZE}.", LogLevel.Always);
+                }
+                if (hashAge.Count >= MAX_DICT_SIZE)
+                {
+                    WintapLogger.Log.Append($"WARN Process Hasher: Max size reached on hashAge dictionary.  Current size: {hashAge.Count}, max size: {MAX_DICT_SIZE}.  clearing dictionary...", LogLevel.Always);
+                    hashAge = new Dictionary<DateTime, string>();
+                    WintapLogger.Log.Append($"Process Hasher: md5Lookup dictionary.  Current size: {hashAge.Count}, max size: {MAX_DICT_SIZE}.", LogLevel.Always);
                 }
             }
 
@@ -167,6 +181,19 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 catch(Exception e)
                 {
 
+                }
+
+                if (sha2Lookup.Count >= MAX_DICT_SIZE)
+                {
+                    WintapLogger.Log.Append($"WARN Process Hasher: Max size reached on sha2Lookup dictionary.  Current size: {sha2Lookup.Count}, max size: {MAX_DICT_SIZE}.  clearing dictionary...", LogLevel.Always);
+                    sha2Lookup = new Dictionary<string, string>();
+                    WintapLogger.Log.Append($"Process Hasher: sha2Lookup dictionary.  Current size: {sha2Lookup.Count}, max size: {MAX_DICT_SIZE}.", LogLevel.Always);
+                }
+                if (hashAge.Count >= MAX_DICT_SIZE)
+                {
+                    WintapLogger.Log.Append($"WARN Process Hasher: Max size reached on hashAge dictionary.  Current size: {hashAge.Count}, max size: {MAX_DICT_SIZE}.  clearing dictionary...", LogLevel.Always);
+                    hashAge = new Dictionary<DateTime, string>();
+                    WintapLogger.Log.Append($"Process Hasher: md5Lookup dictionary.  Current size: {hashAge.Count}, max size: {MAX_DICT_SIZE}.", LogLevel.Always);
                 }
 
                 return hash;

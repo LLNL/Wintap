@@ -60,6 +60,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private string codeVersion;
         private string clientName = Environment.GetEnvironmentVariable("COMPUTERNAME");
         private ConcurrentQueue<LogEntry> pendingEntries;
+        private int MAX_PENDING_ENTRIES = 1000;
         private BackgroundWorker loggingThread;
         private bool logIsOpen;
 
@@ -222,6 +223,13 @@ namespace gov.llnl.wintap.core.infrastructure
             while (logIsOpen)
             {
                 int entryCount = pendingEntries.Count;
+                if (entryCount >= MAX_PENDING_ENTRIES) 
+                {
+                    logWriter.WriteLine($"Too many entries in WintapLogger queue.  max allowed: {MAX_PENDING_ENTRIES}, currently queued: {entryCount}.  Clearing queue... ");
+                    while (pendingEntries.TryDequeue(out _)) { }
+                    logWriter.WriteLine($"WintapLogger queue cleared.  max allowed: {MAX_PENDING_ENTRIES}, currently queued: {entryCount}.");
+                }
+
                 for (int i = 0; i < entryCount; i++)
                 {
                     LogEntry entry;
