@@ -458,7 +458,9 @@
     </None>
     <None Include="CONTRIBUTIONS.md" />
     <None Include="core\infrastructure\packages.config" />
+    <None Include="Installers\Debug\WintapETLSetup.msi" />
     <None Include="Installers\Debug\WintapSetup.msi" />
+    <None Include="Installers\Release\WintapETLSetup.msi" />
     <None Include="Installers\Release\WintapSetup.msi" />
     <None Include="LICENSE.md" />
     <None Include="packages.config" />
