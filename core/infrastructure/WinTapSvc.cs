@@ -75,6 +75,7 @@ namespace gov.llnl.wintap
 
         private void startupWorker_DoWork(object sender, DoWorkEventArgs e)
         {
+
             try
             {
                 Utilities.SetDirectoryPermissions(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));

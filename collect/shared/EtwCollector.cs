@@ -37,15 +37,24 @@ namespace gov.llnl.wintap.collect.shared
 
         public override bool Start()
         {
-            droppedEventsCounter = new PerformanceCounter("Event Tracing for Windows Session", "Events Lost", EtwSessionName);
-            eventsPerSecondCounter = new PerformanceCounter("Event Tracing for Windows Session", "Events Logged per sec", EtwSessionName);
-            droppedEventsCounter.NextValue();
-            eventsPerSecondCounter.NextValue();
-            Timer statsCollectionTimer = new Timer();
-            statsCollectionTimer.Interval = 60000;
-            statsCollectionTimer.AutoReset = true;
-            statsCollectionTimer.Elapsed += StatsCollectionTimer_Elapsed;
-            statsCollectionTimer.Start();
+            try
+            {
+                droppedEventsCounter = new PerformanceCounter("Event Tracing for Windows Session", "Events Lost", EtwSessionName);
+                eventsPerSecondCounter = new PerformanceCounter("Event Tracing for Windows Session", "Events Logged per sec", EtwSessionName);
+                droppedEventsCounter.NextValue();
+                eventsPerSecondCounter.NextValue();
+                Timer statsCollectionTimer = new Timer();
+                statsCollectionTimer.Interval = 60000;
+                statsCollectionTimer.AutoReset = true;
+                statsCollectionTimer.Elapsed += StatsCollectionTimer_Elapsed;
+                statsCollectionTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"WARN: Cannot start performance monitor on etw session: {this.EtwSessionName}, lost/logged event stats will be 0 for this session.  Wintap will not be able to be able to recover from event overrun/underrun for this session.", LogLevel.Always);
+            }
+
+
             return true;
         }
 
