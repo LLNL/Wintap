@@ -18,7 +18,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "utilities", "utilities", "{
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocIndexer", "platform\windows\Utilities\DocIndexer\DocIndexer.csproj", "{C34C2A8C-2C33-45B3-9BD4-91FD123D890E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LocalInference", "platform\windows\Utilities\LocalInference\LocalInference.csproj", "{84D53A62-053A-492D-96AA-FFCF30CD756A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TenableHelper", "platform\windows\Utilities\LocalInference\TenableHelper.csproj", "{84D53A62-053A-492D-96AA-FFCF30CD756A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "platform", "platform", "{94CDA401-4A90-4F82-B851-262342674E31}"
 EndProject

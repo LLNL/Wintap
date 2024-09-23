@@ -29,6 +29,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
         private List<TreeNode> forest = new List<TreeNode>();
         //  dedicated data holder for doing 'most recent' parent lookup
         private static ConcurrentDictionary<string, WintapMessage> processStack = new ConcurrentDictionary<string, WintapMessage>();
+        private int MAX_DICT_SIZE = 2000;
         private ProcessTrace processTracer;
         private ProcessHash idGen;
         private ProcessHash.Hasher hasher;
@@ -183,7 +184,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             foreach (TreeNode prunable in prunables)
             {
                 WintapMessage pruned;
-                //processStack.Remove(prunable.Data.PidHash, out pruned);  // todo: fix null pidhash process activity association here
+                if (processStack.TryRemove(prunable.Data.PidHash, out pruned))
+                {
+                    WintapLogger.Log.Append($"Process removed from stack: {prunable.Data.PidHash}", core.infrastructure.LogLevel.Always);
+                }
+            }
+            if (processStack.Count >= MAX_DICT_SIZE)
+            {
+                WintapLogger.Log.Append($"WARN ProcessTree:  processStack has reached size limit, current size {processStack.Count} max size: {MAX_DICT_SIZE}.", LogLevel.Always);
             }
         }
 

@@ -11,12 +11,15 @@ internal class Program
 {
     private static async Task Main(string[] args)
     {
-        if(args.Count() !=1)
-        {
-            Console.WriteLine("Parameter missing: collection name, example: DocIndexer.exe wintap");
-            return;
-        }
-        string collectionName = args[0];
+        //if(args.Count() !=1)
+        //{
+        //    Console.WriteLine("Parameter missing: collection name, example: DocIndexer.exe wintap");
+        //    return;
+        //}
+        //string collectionName = args[0];
+
+        string collectionName = "BCB";
+
         Console.WriteLine("  *****************");
         Console.WriteLine("Document Indexer utility");
         Console.WriteLine($"     collection name for this indexing session: {collectionName}");
@@ -42,14 +45,24 @@ internal class Program
             .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
             .Build();
 
+        //var collections = await memory.GetCollectionsAsync();
+        //Console.WriteLine("Collections in Chroma database:");
+        //foreach (var collection in collections)
+        //{
+        //    Console.WriteLine(collection);
+        //    var data = await memory.GetAsync(collection);
+        //}
+
+
+
         DirectoryInfo indexDir = new DirectoryInfo(docPath);
-        foreach(FileInfo doc in indexDir.GetFiles())
+        foreach (FileInfo doc in indexDir.GetFiles())
         {
             Console.WriteLine($"Chunking data: {docPath}");
             string s = File.ReadAllText(doc.FullName);
             List<string> lines = TextChunker.SplitPlainTextLines(s, 128);
             int chunkSize = 1500;
-            int overlapSize = 100; 
+            int overlapSize = 100;
             List<string> paragraphs = TextChunker.SplitPlainTextParagraphs(lines, chunkSize, overlapSize, " ");
             try
             {
@@ -61,7 +74,8 @@ internal class Program
                     {
                         try
                         {
-                            await memory.SaveInformationAsync(collectionName, paragraphs[i], $"paragraph{i}");
+                            string docId = Guid.NewGuid().ToString();
+                            Console.WriteLine("Doc ID: " + await memory.SaveInformationAsync(collectionName, paragraphs[i], docId));
                         }
                         catch (Exception ex)
                         {
