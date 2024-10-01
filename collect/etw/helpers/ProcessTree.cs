@@ -186,7 +186,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
                 WintapMessage pruned;
                 if (processStack.TryRemove(prunable.Data.PidHash, out pruned))
                 {
-                    WintapLogger.Log.Append($"Process removed from stack: {prunable.Data.PidHash}", core.infrastructure.LogLevel.Always);
+                    WintapLogger.Log.Append($"Process removed from stack: {prunable.Data.PidHash}", core.infrastructure.LogLevel.Debug);
                 }
             }
             if(processStack.Count >= MAX_DICT_SIZE)
