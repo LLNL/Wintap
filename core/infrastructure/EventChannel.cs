@@ -108,7 +108,7 @@ namespace gov.llnl.wintap.core.infrastructure
                         catch (Exception ex)
                         {
                             droppedEventCount++;
-                            WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message +  ",  total dropped event count: " + droppedEventCount, LogLevel.Always);
+                            WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message +  ",  total dropped event count: " + droppedEventCount, LogLevel.Debug);
                         }
                     }
                 }
