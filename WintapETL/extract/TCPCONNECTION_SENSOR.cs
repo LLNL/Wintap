@@ -51,7 +51,7 @@ namespace gov.llnl.wintap.etl.extract
                 pci.MinPacketSize = minPktSize;
                 pci.MaxPacketSize = maxPktSize;
                 pci.PacketSizeSquared = pktSizeSquared;
-                pci.EventTime = GetUnixNowTime();
+                pci.EventTime = Convert.ToInt64(sensorEvent["FirstSeen"]);
                 dynamic flatMsg = (ExpandoObject)pci.ToDynamic();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.ActivityType = pci.IpEvent;

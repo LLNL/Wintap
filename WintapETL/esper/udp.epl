@@ -12,8 +12,8 @@ context Every10Seconds select istream
   ProcessName,
   activityType,
   sum(udpPacket.packetSize) as packetSize,
-  min(receiveTime) as firstSeen,
-  max(receiveTime) as lastSeen,
+  min(eventTime) as firstSeen,
+  max(eventTime) as lastSeen,
   count(*) as eventCount,
   'UdpPacket' as MessageType,
   AgentId
