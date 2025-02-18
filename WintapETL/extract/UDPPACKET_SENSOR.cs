@@ -43,7 +43,7 @@ namespace gov.llnl.wintap.etl.extract
                 ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, sensorEvent["PidHash"].ToString(), activeNics);
                 pci.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
                 pci.MessageType = "PROCESS_CONN_INCR";
-                pci.EventTime = GetUnixNowTime();
+                pci.EventTime = Convert.ToInt64(sensorEvent["FirstSeen"]);
                 dynamic flatMsg = (ExpandoObject)pci.ToDynamic();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.ActivityType = pci.IpEvent;

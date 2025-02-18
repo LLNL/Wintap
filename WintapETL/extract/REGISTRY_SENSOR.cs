@@ -41,7 +41,7 @@ namespace gov.llnl.wintap.etl.extract
                 flatMsg.LastSeenMs = (long)sensorEvent["lastSeen"];
                 flatMsg.PID = Int32.Parse(sensorEvent["PID"].ToString());
                 flatMsg.PidHash = sensorEvent["PidHash"].ToString();
-                flatMsg.HostHame = HOST_SENSOR.Instance.HostId.Hostname;
+                flatMsg.HostName = HOST_SENSOR.Instance.HostId.Hostname;
                 flatMsg.Reg_Path = sensorEvent["path"].ToString().ToLower();
                 flatMsg.Reg_Value = sensorEvent["valueName"].ToString();
                 flatMsg.Reg_Id_Hash = idGen.GenKeyForRegistry_Entry(transform.Transformer.context, HOST_SENSOR.Instance.HostId.Hostname, flatMsg.AgentId, flatMsg.Reg_Path, flatMsg.Reg_Value);

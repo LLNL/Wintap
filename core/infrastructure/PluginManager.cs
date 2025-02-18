@@ -430,29 +430,28 @@ namespace gov.llnl.wintap.core.infrastructure
                 for (int i = 0; i < runQueue.Count; i++)
                 {
                     WintapLogger.Log.Append("Run Plug-in Scheduler is awake and looking for work", LogLevel.Always);
-                    Runnable runnable;
-                    runQueue.TryDequeue(out runnable);
-                    RegistryKey pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name);
-                    runnable.PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
-                    WintapLogger.Log.Append("Plugin manager is checking conditions for: " + runnable.RunPlugin.Metadata.Name + " last ran: " + runnable.LastRan + "  interval: " +
-                        ((runnable.PollRunIntervalRegistry.TotalMilliseconds == 0 || runnable.RunInterval.TotalMilliseconds < runnable.PollRunIntervalRegistry.TotalMilliseconds) &&
-                         runnable.RunInterval.TotalMilliseconds > 0 ?
-                         runnable.RunInterval : runnable.PollRunIntervalRegistry), LogLevel.Always);
-                    if (checkConditions(runnable))
+                    try
                     {
-                        try
+                        Runnable runnable;
+                        runQueue.TryDequeue(out runnable);
+                        RegistryKey pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name);
+                        runnable.PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
+                        WintapLogger.Log.Append("Plugin manager is checking conditions for: " + runnable.RunPlugin.Metadata.Name + " last ran: " + runnable.LastRan, LogLevel.Always);
+                        if (checkConditions(runnable))
                         {
                             runnable.LastRan = persistLastRan(runnable);  // record it first, failed RUN attempts will retry at thier next scheduled time
                             watchdog.ProtectedRun(runnable);
                         }
-                        catch (Exception ex)
-                        {
-                            WintapLogger.Log.Append("Error in plugin: " + ex.Message + "  wintap restart expected.  Run scheduler is aborting", LogLevel.Always);
-                            schedulerLoopAlive = false;
-                            break;
-                        }
+                        runQueue.Enqueue(runnable);
                     }
-                    runQueue.Enqueue(runnable);
+                    catch(Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error starting IRun plugin: {ex.Message}", LogLevel.Always);
+                        if (ex.InnerException != null)
+                        {
+                            WintapLogger.Log.Append($"   inner exception: {ex.InnerException.Message}", LogLevel.Always);
+                        }
+                    }    
                 }
                 WintapLogger.Log.Append("Run Plug-in Scheduler is going back to sleep", LogLevel.Always);
                 System.Threading.Thread.Sleep(60000);

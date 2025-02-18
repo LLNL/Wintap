@@ -46,7 +46,17 @@ namespace gov.llnl.wintap.collect.etw.helpers
         {
             WintapLogger.Log.Append("Generating process tree.", core.infrastructure. LogLevel.Always);
             DateTime lastProcessEventTime = DateTime.Now;
-            publishUntracedProcesses();
+            try
+            {
+                WintapLogger.Log.Append("Attempting to generate non-logged process events.", core.infrastructure.LogLevel.Always);
+                publishNonLoggedProcesses();
+                WintapLogger.Log.Append("Done generating non-logged process events.", core.infrastructure.LogLevel.Always);
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append($"ERROR in generating non-logged processes: {ex.Message} ", core.infrastructure.LogLevel.Always);
+            }
+
             try
             {
                 if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
@@ -91,9 +101,10 @@ namespace gov.llnl.wintap.collect.etw.helpers
         }
 
         // hand craft the set of processes that do not get captured in the boot trace
-        private void publishUntracedProcesses()
+        private void publishNonLoggedProcesses()
         {
             // notoskrnl not captured through the etw boot trace.
+            WintapLogger.Log.Append("generating kernel process event", core.infrastructure.LogLevel.Always);
             WintapMessage kernelProcess = new WintapMessage(StateManager.MachineBootTime, 4, "Process");
             kernelProcess.ActivityType = "refresh";
             kernelProcess.PidHash = idGen.GenPidHash(4, StateManager.MachineBootTime.ToFileTimeUtc());
@@ -101,8 +112,10 @@ namespace gov.llnl.wintap.collect.etw.helpers
             kernelProcess.Process = new WintapMessage.ProcessObject() { CommandLine = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", Name = kernelProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", User = "system" };
             kernelProcess.Process.Arguments = "";
             PublishProcess(kernelProcess);
+            WintapLogger.Log.Append("done generating kernel process event", core.infrastructure.LogLevel.Always);
 
             // idle not captured through the etw boot trace.
+            WintapLogger.Log.Append("generating idle process event", core.infrastructure.LogLevel.Always);
             WintapMessage idleProcess = new WintapMessage(StateManager.MachineBootTime, 0, "Process");
             idleProcess.ActivityType = "refresh";
             idleProcess.PidHash = idGen.GenPidHash(0, StateManager.MachineBootTime.ToFileTimeUtc());
@@ -110,8 +123,29 @@ namespace gov.llnl.wintap.collect.etw.helpers
             idleProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "idle", Name = idleProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "idle", User = "system" };
             idleProcess.Process.Arguments = "";
             PublishProcess(idleProcess);
+            WintapLogger.Log.Append("done generating idle process event", core.infrastructure.LogLevel.Always);
+
+            //  REGISTRY process not get captured in the boot trace but is always running
+            WintapLogger.Log.Append("generating registry process event", core.infrastructure.LogLevel.Always);
+            try
+            {
+                System.Diagnostics.Process reg = System.Diagnostics.Process.GetProcessesByName("registry").First();
+                WintapMessage registryProcess = new WintapMessage(StateManager.MachineBootTime, reg.Id, "Process");
+                registryProcess.ActivityType = "refresh";
+                registryProcess.PidHash = idGen.GenPidHash(reg.Id, StateManager.MachineBootTime.ToFileTimeUtc());
+                registryProcess.ProcessName = reg.ProcessName.ToLower();
+                registryProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = registryProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
+                registryProcess.Process.Arguments = "";
+                PublishProcess(registryProcess);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("WARN:  could not generate the Registry process: " + ex.Message, core.infrastructure.LogLevel.Always);
+            }
+            WintapLogger.Log.Append("done generating registry process event", core.infrastructure.LogLevel.Always);
 
             //  UNKOWN process as the faux root for processes with no available parent.  
+            WintapLogger.Log.Append("generating default process event", core.infrastructure.LogLevel.Always);
             WintapMessage unknownProcess = new WintapMessage(StateManager.MachineBootTime, 1, "Process");
             unknownProcess.ActivityType = "refresh";
             unknownProcess.PidHash = idGen.GenPidHash(1, StateManager.MachineBootTime.ToFileTimeUtc());
@@ -119,16 +153,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             unknownProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = unknownProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
             unknownProcess.Process.Arguments = "";
             PublishProcess(unknownProcess);
-
-            //  REGISTRY process not get captured in the boot trace but is always running
-            System.Diagnostics.Process reg = System.Diagnostics.Process.GetProcessesByName("registry").First();
-            WintapMessage registryProcess = new WintapMessage(StateManager.MachineBootTime, reg.Id, "Process");
-            registryProcess.ActivityType = "refresh";
-            registryProcess.PidHash = idGen.GenPidHash(reg.Id, StateManager.MachineBootTime.ToFileTimeUtc());
-            registryProcess.ProcessName = reg.ProcessName.ToLower();
-            registryProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = registryProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
-            registryProcess.Process.Arguments = "";
-            PublishProcess(registryProcess);
+            WintapLogger.Log.Append("done generating default process event", core.infrastructure.LogLevel.Always);
         }
 
         /// <summary>
@@ -278,8 +303,7 @@ namespace gov.llnl.wintap.collect.etw.helpers
             {
                 if (!nodeLookup.Keys.Contains(msg.PidHash))
                 {
-                    WintapLogger.Log.Append("Adding SYSTEM root. ", core.infrastructure. LogLevel.Always);
-                    nodeLookup.Add(newNode.Data.PidHash, newNode);
+                     nodeLookup.Add(newNode.Data.PidHash, newNode);
                 }
             }
             else
