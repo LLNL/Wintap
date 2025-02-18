@@ -130,16 +130,16 @@ namespace gov.llnl.wintap
 
 
             System.Threading.Thread.Sleep(5000);  // allow plugins to init
-            WintapLogger.Log.Append("Starting Wintap collectors", LogLevel.Always);
-            subscriptionMgr = new SubscriptionManager();
-            subscriptionMgr.Start();
+
             try
             {
-
+                WintapLogger.Log.Append("Starting Wintap event collectors", LogLevel.Always);
+                subscriptionMgr = new SubscriptionManager();
+                subscriptionMgr.Start();
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR starting event subscription manager: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR starting event collectors: " + ex.Message, LogLevel.Always);
             }
 
             WintapLogger.Log.Append("Startup complete.", LogLevel.Always);

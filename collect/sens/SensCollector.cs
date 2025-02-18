@@ -42,9 +42,14 @@ namespace gov.llnl.wintap.collect
             {
                 WintapLogger.Log.Append("error registering SENS events: " + ex.Message, LogLevel.Always);
             }
-
-            WintapLogger.Log.Append("Releasing COM object for SENS", LogLevel.Always);
-            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(comAdmin);
+            finally
+            {    
+                if (comAdmin != null)
+                {
+                    WintapLogger.Log.Append("Releasing COM object for SENS", LogLevel.Always);
+                    System.Runtime.InteropServices.Marshal.FinalReleaseComObject(comAdmin);
+                }
+            }
         }
 
         public void DisplayLock(string userName)
