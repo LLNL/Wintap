@@ -434,8 +434,12 @@ namespace gov.llnl.wintap.core.infrastructure
                     {
                         Runnable runnable;
                         runQueue.TryDequeue(out runnable);
-                        RegistryKey pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name);
-                        runnable.PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
+                        RegistryKey pluginKey = Registry.LocalMachine.CreateSubKey(Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name);
+                        runnable.PollRunIntervalRegistry = TimeSpan.Zero;
+                        if (pluginKey != null && pluginKey.GetValue("RunInterval") != null)
+                        {
+                            runnable.PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
+                        }
                         WintapLogger.Log.Append("Plugin manager is checking conditions for: " + runnable.RunPlugin.Metadata.Name + " last ran: " + runnable.LastRan, LogLevel.Always);
                         if (checkConditions(runnable))
                         {
