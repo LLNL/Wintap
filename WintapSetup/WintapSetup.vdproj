@@ -58,19 +58,13 @@
         "Entry"
         {
         "MsmKey" = "8:_0C0A046910E55372DB5CEEDF49648868"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
-        "OwnerKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_11AFE015B28361D04486FE816156FA42"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -94,13 +88,13 @@
         "Entry"
         {
         "MsmKey" = "8:_208A81F7448016FCAC693B3E2EB7FCB7"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_21445F47FDC5C55D0CED6DE03BA9A2BC"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -148,7 +142,7 @@
         "Entry"
         {
         "MsmKey" = "8:_39D861B616385EDDEFEF2594FD73DA00"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -244,7 +238,7 @@
         "Entry"
         {
         "MsmKey" = "8:_60F6CB2F8AB0DCCFB50D477C719E6721"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -274,7 +268,7 @@
         "Entry"
         {
         "MsmKey" = "8:_699EEE2B1551067D3B3F3D249874FC7C"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -346,7 +340,7 @@
         "Entry"
         {
         "MsmKey" = "8:_79E5A55B33CE261358ECE3083E8FE2FE"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -364,13 +358,13 @@
         "Entry"
         {
         "MsmKey" = "8:_86BFC53ECCFB7D861557A3B5C44958BA"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_9227961BFA6F7E7B759EFD2C8CD01658"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -407,6 +401,12 @@
         {
         "MsmKey" = "8:_994E2BE190E564C6CCBB24E016EEBDF9"
         "OwnerKey" = "8:_ECEC4B50474486829E5D88A743099062"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -460,7 +460,7 @@
         "Entry"
         {
         "MsmKey" = "8:_AB77587D3B3A996C70EA2C9AC0DF23EF"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -520,7 +520,7 @@
         "Entry"
         {
         "MsmKey" = "8:_C0001AF5FD25447E2E2B068DF4E73A9F"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -598,13 +598,13 @@
         "Entry"
         {
         "MsmKey" = "8:_CE76455C34090D6BA048B77D5AE91572"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_D24986459AA35156D1E477BA0920BC81"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -628,7 +628,7 @@
         "Entry"
         {
         "MsmKey" = "8:_DFCD470286BD6FD295FBA765C4E7042B"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -688,7 +688,7 @@
         "Entry"
         {
         "MsmKey" = "8:_E512B60E9E8F92D2706091631F9A41BB"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -736,7 +736,7 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_0F66DB3DE74F4230BE5A0436C7BABB43"
+        "OwnerKey" = "8:_9985760C683D4887AA2E180F3F24FCAD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -1288,37 +1288,6 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_0F66DB3DE74F4230BE5A0436C7BABB43"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.1.0.6, Culture=neutral, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_0F66DB3DE74F4230BE5A0436C7BABB43"
-                    {
-                    "Name" = "8:Wintap.exe"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:..\\bin\\Debug\\Wintap.exe"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_01F0FB8860BD42B8924A6621D8FB24EF"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_11AFE015B28361D04486FE816156FA42"
@@ -2457,6 +2426,37 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_9985760C683D4887AA2E180F3F24FCAD"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:Wintap, Version=6.1.0.6, Culture=neutral, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_9985760C683D4887AA2E180F3F24FCAD"
+                    {
+                    "Name" = "8:Wintap.exe"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:..\\bin\\Debug\\Wintap.exe"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_01F0FB8860BD42B8924A6621D8FB24EF"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_9EE672DF080245AE99586B0BDA944C4D"
             {
             "SourcePath" = "8:..\\wintap.ico"
@@ -3402,7 +3402,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Wintap"
         "ProductCode" = "8:{265560BD-28E2-4D81-BEDD-246B86812EC3}"
-        "PackageCode" = "8:{259E5CF2-CB86-42D8-8ED3-848E82EB23E2}"
+        "PackageCode" = "8:{37B144C8-BBE5-473A-B72A-B26F323350A7}"
         "UpgradeCode" = "8:{673CB19A-491A-4013-9C64-69573A0F8B4D}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
