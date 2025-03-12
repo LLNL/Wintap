@@ -66,7 +66,15 @@ namespace gov.llnl.wintap.collect
         private void sendEvent(EventRecord entry)
         {
             this.Counter++;
-            int pid = entry.ProcessId.Value;
+            int pid = 0; // default value for older OSes that don't support the ProcessId record property.
+            try
+            {
+                pid = entry.ProcessId.Value;
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append($"Could not get PID for event log record, defaulting to {pid}   error: " + ex.Message, LogLevel.Debug);
+            }
             WintapMessage msg = new WintapMessage(entry.TimeCreated.Value, pid, "EventLogEvent");
             msg.ActivityType = "EntryWritten";
             msg.EventLogEvent = new WintapMessage.EventlogEventObject();
