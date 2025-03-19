@@ -18,63 +18,17 @@ internal class Program
             Console.WriteLine("usage: LocalInference.exe <collectionName> <relevanceThreshold> <question>");
         }
         var kernelBuilder = Kernel.CreateBuilder();
-        var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "phi3", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434"))
+        var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "llama3.1:8b-instruct-q2_K", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434"))
             .Build();
 
-        string systemPrompt = "You are a helpful AI assistant that helps people understand the software installed on their machines";
+        string systemPrompt = "You are a helpful AI";
         ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
 
         IChatCompletionService ai = kernel.GetRequiredService<IChatCompletionService>();
 
-        HttpClient httpClient = new HttpClient();
-        httpClient.Timeout = new TimeSpan(0, 5, 0);
-
-        string collectionName = args[0];
-        StringBuilder q = new StringBuilder();
-        for (int i = 2; i < args.Length; i++)
-        {
-            q.Append(args[i] + " ");
-
-        }
-        string question = "Do I have any Cisco products installed?";
-        question = q.ToString();
+        string question = "Why is the sky blue?";
 
         StringBuilder builder = new StringBuilder();
-        double minRel = Convert.ToDouble(args[1]);
-
-        Console.WriteLine($"collection: {collectionName} relevance: {minRel} question: {q}");
-
-        var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
-        // then use chromaMemoryStore in WithMemoryStore
-
-        ISemanticTextMemory memory = new MemoryBuilder()
-            .WithLoggerFactory(kernel.LoggerFactory)
-            .WithMemoryStore(chromaMemoryStore)
-            .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory))
-            .Build();
-
-        try
-        {
-            await foreach (MemoryQueryResult result in memory.SearchAsync(collectionName, question, 3, minRel, withEmbeddings: true))
-            {
-                builder.AppendLine(result.Metadata.Text);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"ERROR in RAG inference request: {ex.Message}");
-        }
-
-
-        int contextToRemove = -1;
-
-        if (builder.Length != 0)
-        {
-            builder.Insert(0, "Here's some additional information: ");
-            contextToRemove = chat.Count;
-            chat.AddUserMessage(builder.ToString());
-
-        }
 
         chat.AddUserMessage(question);
         builder.Clear();
@@ -86,12 +40,8 @@ internal class Program
         Console.WriteLine("Inference: " + builder.ToString());
 
         chat.AddAssistantMessage(builder.ToString());
-        if (contextToRemove >= 0)
-        {
-            chat.RemoveAt(contextToRemove);
-        }
 
-        Console.WriteLine("All Done!");
+        Console.WriteLine("All Done! " + builder.ToString());
     }
 
 }

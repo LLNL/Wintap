@@ -133,6 +133,7 @@ namespace gov.llnl.wintap.core.api
         [HttpPost("Clear")]
         public void Post()
         {
+            WintapLogger.Log.Append($"LLM Clear method called", LogLevel.Always);
             chat.RemoveRange(0, chat.Count);
             string systemPrompt = Settings.Default.SystemPrompt;
             chat = new ChatHistory(systemPrompt);

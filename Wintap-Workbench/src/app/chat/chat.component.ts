@@ -151,7 +151,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
             const formData = new FormData();
             formData.append('file', file);
 
-            this.http.post('/api/LLM/upload', formData).subscribe(
+            this.http.post('/api/LLM/Upload', formData).subscribe(
                 (response) => {
                     console.log('File uploaded successfully');
                     this.messages.push({
