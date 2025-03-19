@@ -34,7 +34,7 @@ namespace gov.llnl.wintap.core.etl.extract
             try
             {
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
-                if (wintapMessage.MessageType == "Process" && wintapMessage.ActivityType == "stop")
+                if (wintapMessage.MessageType == WintapMessage.MessageTypeEnum.Process && wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Stop)
                 {
                     handleStopEvent(wintapMessage);
                 }
@@ -64,7 +64,7 @@ namespace gov.llnl.wintap.core.etl.extract
             ProcessTerminateData procWD = new ProcessTerminateData(endedProcess.Process.ParentPidHash);
             procWD.MessageType = "PROCESS";
             procWD.ProcessName = endedProcess.ProcessName;
-            procWD.ActivityType = endedProcess.ActivityType;
+            procWD.ActivityType = endedProcess.ActivityType.ToString();
             procWD.PID = endedProcess.PID;
             procWD.PidHash = endedProcess.PidHash;
             procWD.Hostname = host.Hostname;

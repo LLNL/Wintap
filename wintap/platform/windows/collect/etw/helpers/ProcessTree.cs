@@ -94,8 +94,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
         private void publishUntracedProcesses()
         {
             // notoskrnl not captured through the etw boot trace.
-            WintapMessage kernelProcess = new WintapMessage(StateManager.MachineBootTime, 4, "Process");
-            kernelProcess.ActivityType = "refresh";
+            WintapMessage kernelProcess = new WintapMessage(StateManager.MachineBootTime, 4, WintapMessage.MessageTypeEnum.Process);
+            kernelProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             kernelProcess.PidHash = idGen.GenPidHash(4, StateManager.MachineBootTime.ToFileTimeUtc());
             kernelProcess.ProcessName = "ntoskrnl.exe";
             kernelProcess.Process = new WintapMessage.ProcessObject() { CommandLine = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", Name = kernelProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = Environment.GetEnvironmentVariable("WINDIR").ToLower() + "\\system32\\ntoskrnl.exe", User = "system" };
@@ -103,8 +103,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             PublishProcess(kernelProcess);
 
             // idle not captured through the etw boot trace.
-            WintapMessage idleProcess = new WintapMessage(StateManager.MachineBootTime, 0, "Process");
-            idleProcess.ActivityType = "refresh";
+            WintapMessage idleProcess = new WintapMessage(StateManager.MachineBootTime, 0, WintapMessage.MessageTypeEnum.Process);
+            idleProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             idleProcess.PidHash = idGen.GenPidHash(0, StateManager.MachineBootTime.ToFileTimeUtc());
             idleProcess.ProcessName = "idle";
             idleProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "idle", Name = idleProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "idle", User = "system" };
@@ -112,8 +112,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             PublishProcess(idleProcess);
 
             //  UNKOWN process as the faux root for processes with no available parent.  
-            WintapMessage unknownProcess = new WintapMessage(StateManager.MachineBootTime, 1, "Process");
-            unknownProcess.ActivityType = "refresh";
+            WintapMessage unknownProcess = new WintapMessage(StateManager.MachineBootTime, 1, WintapMessage.MessageTypeEnum.Process);
+            unknownProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             unknownProcess.PidHash = idGen.GenPidHash(1, StateManager.MachineBootTime.ToFileTimeUtc());
             unknownProcess.ProcessName = "unknown";
             unknownProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = unknownProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
@@ -122,8 +122,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
 
             //  REGISTRY process not get captured in the boot trace but is always running
             Process reg = Process.GetProcessesByName("registry").First();
-            WintapMessage registryProcess = new WintapMessage(StateManager.MachineBootTime, reg.Id, "Process");
-            registryProcess.ActivityType = "refresh";
+            WintapMessage registryProcess = new WintapMessage(StateManager.MachineBootTime, reg.Id, WintapMessage.MessageTypeEnum.Process);
+            registryProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             registryProcess.PidHash = idGen.GenPidHash(reg.Id, StateManager.MachineBootTime.ToFileTimeUtc());
             registryProcess.ProcessName = reg.ProcessName.ToLower();
             registryProcess.Process = new WintapMessage.ProcessObject() { CommandLine = "na", Name = registryProcess.ProcessName, ParentPID = 4, ParentPidHash = kernelProcess.PidHash, Path = "na" };
@@ -209,8 +209,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             Process wintapProcess = Process.GetCurrentProcess();
             // get the previous instance of wintap since it will have the same parent process info.
             WintapMessage previousWintapProcess = processStack.Where(p => p.Value.ProcessName == "wintap.exe").OrderBy(p => p.Value.EventTime).LastOrDefault().Value;
-            WintapMessage newWintapProcess = new WintapMessage(StateManager.MachineBootTime, wintapProcess.Id, "Process");
-            newWintapProcess.ActivityType = "refresh";
+            WintapMessage newWintapProcess = new WintapMessage(StateManager.MachineBootTime, wintapProcess.Id, WintapMessage.MessageTypeEnum.Process);
+            newWintapProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             newWintapProcess.PidHash = idGen.GenPidHash(wintapProcess.Id, DateTime.Now.ToFileTimeUtc());
             newWintapProcess.ProcessName = "wintap.exe";
             newWintapProcess.Process = new WintapMessage.ProcessObject() { CommandLine = wintapProcess.MainModule.FileName, Name = newWintapProcess.ProcessName, ParentPID = previousWintapProcess.Process.ParentPID, ParentPidHash = previousWintapProcess.Process.ParentPidHash, Path = wintapProcess.MainModule.FileName, User = "system" };
@@ -232,8 +232,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                     node.Parent = allNodes.Where(p => p.Data.PidHash == node.Data.ParentPidHash).First();
                 }
 
-                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(node.Data.EventTimeUTC), node.Data.Pid, "Process");
-                msg.ActivityType = "refresh";
+                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(node.Data.EventTimeUTC), node.Data.Pid, WintapMessage.MessageTypeEnum.Process);
+                msg.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
                 msg.PidHash = node.Data.PidHash;
                 msg.ProcessName = node.Data.ProcessName;
                 msg.Process = new WintapMessage.ProcessObject() { CommandLine = node.Data.ProcessPath, Name = node.Data.ProcessName, ParentPID = node.Data.ParentPid, ParentPidHash = node.Data.ParentPidHash, Path = node.Data.ProcessPath };

@@ -43,7 +43,7 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
 
-                if (wintapMessage.MessageType == "Process" && (wintapMessage.ActivityType == "start" || wintapMessage.ActivityType == "refresh"))
+                if (wintapMessage.MessageType == WintapMessage.MessageTypeEnum.Process && (wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Start || wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Refresh))
                 {
                     handleStartEvent(wintapMessage);
                 }
@@ -56,7 +56,7 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private void handleStartEvent(WintapMessage wintapMessage)
         {
-            ProcessStartData procWD = createProcessObject(wintapMessage.PID, wintapMessage.Process.ParentPID, wintapMessage.EventTime, wintapMessage.Process.Path, wintapMessage.Process.CommandLine, wintapMessage.Process.User, wintapMessage.Process.MD5, wintapMessage.Process.SHA2, wintapMessage.MessageType, wintapMessage.Process.Arguments, wintapMessage.Process.CommandLine, wintapMessage.Process.UniqueProcessKey, wintapMessage.PidHash, wintapMessage.Process.ParentPidHash, wintapMessage.ActivityType, wintapMessage.AgentId);
+            ProcessStartData procWD = createProcessObject(wintapMessage.PID, wintapMessage.Process.ParentPID, wintapMessage.EventTime, wintapMessage.Process.Path, wintapMessage.Process.CommandLine, wintapMessage.Process.User, wintapMessage.Process.MD5, wintapMessage.Process.SHA2, wintapMessage.MessageType.ToString(), wintapMessage.Process.Arguments, wintapMessage.Process.CommandLine, wintapMessage.Process.UniqueProcessKey, wintapMessage.PidHash, wintapMessage.Process.ParentPidHash, wintapMessage.ActivityType.ToString(), wintapMessage.AgentId);
             procWD.Hostname = host.Hostname;
             try
             {

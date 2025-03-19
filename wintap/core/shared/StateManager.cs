@@ -112,7 +112,8 @@ namespace gov.llnl.wintap.core.shared
             WintapLogger.Log.Append($"StateManager is registering for user change notifications...", infrastructure.LogLevel.Always);
             try
             {
-                EPStatement userChangeQuery = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT * FROM WintapMessage WHERE MessageType='SessionChange'").Statements[0];
+                EPStatement userChangeQuery = EventChannel.compileDeploy(EventChannel.EsperRuntime,
+                    "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = 'SessionChange'").Statements[0];
                 //TODO :  userChangeQuery.Events += UserChangeQuery_Events;
             }
             catch(Exception ex)

@@ -11,6 +11,7 @@ using System;
 using gov.llnl.wintap.collect.models;
 using System.Linq;
 using gov.llnl.wintap.platform.windows.collect.shared;
+using System.ComponentModel.DataAnnotations;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -42,8 +43,17 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 // todo:
                 // base.UpdateStatistics(obj.Source.EventsLost);
-                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "UdpPacket");
-                wintapMsg.ActivityType = obj.EventName;
+                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UdpPacket);
+                if (Enum.TryParse(obj.EventName, true, out WintapMessage.ActivityTypeEnum parsedActivityType))
+                {
+                    wintapMsg.ActivityType = parsedActivityType;
+                }
+                else
+                {
+                    throw new ArgumentException($"Invalid registry activity type: {obj.EventName}");
+                }
+
+
                 WintapMessage.FailureCodeType failEnum = (WintapMessage.FailureCodeType)Enum.Parse(wintapMsg.UdpPacket.FailureCode.GetType(), obj.FailureCode.ToString(), true);
                 wintapMsg.UdpPacket.FailureCode = failEnum;
                 EventChannel.Send(wintapMsg);
@@ -60,30 +70,22 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 // todo:
                 // base.UpdateStatistics(obj.Source.EventsLost);
-                WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "UdpPacket");
-                //if (obj.PayloadNames.ToList().Contains("CorrelationId"))
-                //{
-                //    wintapBuilder.CorrelationId = obj.PayloadStringByName("CorrelationId");
-                //}
-                //if (obj.PayloadNames.Contains("ActivityId"))
-                //{
-                //    wintapBuilder.ActivityId = obj.PayloadStringByName("ActivityId");
-                //}
-                wintapBuilder.ActivityType = obj.EventName;
-                wintapBuilder.UdpPacket = new WintapMessage.UdpPacketObject();
-                wintapBuilder.UdpPacket.SourceAddress = obj.saddr.ToString();
-                wintapBuilder.UdpPacket.SourcePort = obj.sport;
-                wintapBuilder.UdpPacket.DestinationAddress = obj.daddr.ToString();
-                wintapBuilder.UdpPacket.DestinationPort = obj.dport;
-                wintapBuilder.UdpPacket.PacketSize = obj.size;
-                if (reversibles.Contains(wintapBuilder.ActivityType))
+                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UdpPacket);
+                if (Enum.TryParse(obj.EventName, true, out WintapMessage.ActivityTypeEnum parsedActivityType))
                 {
-                    wintapBuilder.UdpPacket.SourceAddress = obj.daddr.ToString();
-                    wintapBuilder.UdpPacket.SourcePort = obj.dport;
-                    wintapBuilder.UdpPacket.DestinationAddress = obj.saddr.ToString();
-                    wintapBuilder.UdpPacket.DestinationPort = obj.sport;
+                    wintapMsg.ActivityType = parsedActivityType;
                 }
-                EventChannel.Send(wintapBuilder);
+                else
+                {
+                    throw new ArgumentException($"Invalid registry activity type: {obj.EventName}");
+                }
+                wintapMsg.UdpPacket = new WintapMessage.UdpPacketObject();
+                wintapMsg.UdpPacket.SourceAddress = obj.saddr.ToString();
+                wintapMsg.UdpPacket.SourcePort = obj.sport;
+                wintapMsg.UdpPacket.DestinationAddress = obj.daddr.ToString();
+                wintapMsg.UdpPacket.DestinationPort = obj.dport;
+                wintapMsg.UdpPacket.PacketSize = obj.size;
+                EventChannel.Send(wintapMsg);
             }
             catch (Exception ex)
             {

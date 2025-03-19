@@ -161,7 +161,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private void sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum alertType, string description)
         {
             StateManager.DroppedEventsDetected = true;
-            WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, System.Diagnostics.Process.GetCurrentProcess().Id, "WintapAlert");
+            WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, System.Diagnostics.Process.GetCurrentProcess().Id, WintapMessage.MessageTypeEnum.WintapAlert);
             alertMsg.WintapAlert = new WintapMessage.WintapAlertData();
             alertMsg.WintapAlert.AlertName = alertType;
             alertMsg.WintapAlert.AlertDescription = description;

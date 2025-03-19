@@ -40,20 +40,20 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 genericEvent.EventName = obj.EventName;
                 genericEvent.EventTime = obj.TimeStamp;
                 genericEvent.Payload = obj.ToString();
-                genericEvent.Provider = obj.ProviderGuid.ToString();
+                genericEvent.ProviderId = obj.ProviderGuid.ToString();
                 genericEvent.ProviderName = obj.ProviderName;
 
 
 
                 // 2.) Create a WintapMessage and attach your event to it
-                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "GenericMessage");
+                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, MessageTypeEnum.GenericMessage);
                 try
                 {
                     wintapMsg.ActivityId = obj.ActivityID.ToString();
                     wintapMsg.CorrelationId = obj.PayloadStringByName("CorrelationId");
                 }
                 catch (Exception ex) { }
-                wintapMsg.ActivityType = obj.ProviderName;
+                wintapMsg.ActivityType = ActivityTypeEnum.Other;
                 wintapMsg.GenericMessage = genericEvent;
 
                 // 3.) Send your event into the Wintap event pipeline

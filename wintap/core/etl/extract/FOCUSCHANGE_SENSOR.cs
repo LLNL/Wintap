@@ -32,7 +32,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 //dynamic wd = (ExpandoObject)wintapMessage.GetType().GetProperty(wintapMessage.MessageType).GetValue(wintapMessage).ToDynamic();
                 dynamic wd = null;
                 // Use reflection to get the property that matches MessageType
-                var propertyInfo = wintapMessage.GetType().GetProperty(wintapMessage.MessageType);
+                var propertyInfo = wintapMessage.GetType().GetProperty(wintapMessage.MessageType.ToString());
 
                 if (propertyInfo != null)
                 {

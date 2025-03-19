@@ -64,7 +64,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             try
             {
                 int pid = Convert.ToInt32(obj.PayloadStringByName("ProcessID").Replace(",", ""));
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, CollectorName) { MessageType = "Process", ActivityType = "stop" };
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Process) { MessageType = WintapMessage.MessageTypeEnum.Process, ActivityType = WintapMessage.ActivityTypeEnum.Stop };
                 msg.Process = new WintapMessage.ProcessObject();
                 msg.Process.Name = obj.PayloadStringByName("ImageName");
                 long exitCode = Convert.ToInt64(obj.PayloadStringByName("ExitCode").Replace(",", ""));

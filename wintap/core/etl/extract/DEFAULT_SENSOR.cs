@@ -32,11 +32,11 @@ namespace gov.llnl.wintap.core.etl.extract
                 base.HandleSensorEvent(sensorEvent);
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
                 // get the nested object as a dynamic so we can append the parent object fields
-                string msgType = wintapMessage.MessageType;
+                string msgType = wintapMessage.MessageType.ToString();
                 //  dynamic resolution detail: wintapmessage MessageType MUST match the underlying class name
                 dynamic flatMsg = null;
                 // Use reflection to get the property that matches MessageType
-                var propertyInfo = wintapMessage.GetType().GetProperty(wintapMessage.MessageType);
+                var propertyInfo = wintapMessage.GetType().GetProperty(wintapMessage.MessageType.ToString());
                 if (propertyInfo != null)
                 {
                     var propertyValue = propertyInfo.GetValue(wintapMessage);

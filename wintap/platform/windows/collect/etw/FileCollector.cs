@@ -204,12 +204,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 return;
             }
-            WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, CollectorName);
-            wintapBuilder.FileActivity = new WintapMessage.FileActivityObject();
-            wintapBuilder.MessageType = CollectorName;
-            wintapBuilder.ActivityType = opName.ToString();
-            wintapBuilder.FileActivity.Path = filePath.ToLower();
-            wintapBuilder.FileActivity.BytesRequested = bytesRequested;
+            WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, WintapMessage.MessageTypeEnum.File);
+            wintapBuilder.File = new WintapMessage.FileActivityObject();
+            wintapBuilder.ActivityType = WintapMessage.ActivityTypeEnum.Write;
+            wintapBuilder.File.Path = filePath.ToLower();
+            wintapBuilder.File.BytesRequested = bytesRequested;
             wintapBuilder.ActivityId = activityId;
             wintapBuilder.CorrelationId = correlationId;
             EventChannel.Send(wintapBuilder);

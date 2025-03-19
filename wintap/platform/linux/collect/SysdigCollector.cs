@@ -39,18 +39,17 @@ namespace gov.llnl.wintap.core.collect
                     SysdigEvent sysDigEvent = JsonConvert.DeserializeObject<SysdigEvent>(jsonLine);
                     if(sysDigEvent.evt_num > currentEventNum)
                     {
-                        WintapMessage wintapMsg = new WintapMessage(gov.llnl.wintap.core.shared.Utilities.FromSysdigTime(sysDigEvent.evt_outputtime), sysDigEvent.thread_tid, "sysdig");
-                        wintapMsg.SysdigEvent = new WintapMessage.SysdigEventData();
-                        wintapMsg.SysdigEvent.evt_info = sysDigEvent.evt_info;
-                        wintapMsg.SysdigEvent.evt_outputtime = sysDigEvent.evt_outputtime;
-                        wintapMsg.SysdigEvent.evt_type = sysDigEvent.evt_type;
-                        wintapMsg.SysdigEvent.evt_cpu = sysDigEvent.evt_cpu;
-                        wintapMsg.SysdigEvent.evt_num = sysDigEvent.evt_num;
-                        wintapMsg.SysdigEvent.evt_dir = sysDigEvent.evt_dir;
-                        wintapMsg.SysdigEvent.proc_name = sysDigEvent.proc_name;
-                        wintapMsg.SysdigEvent.thread_tid = sysDigEvent.thread_tid;
+                        WintapMessage wintapMsg = new WintapMessage(gov.llnl.wintap.core.shared.Utilities.FromSysdigTime(sysDigEvent.evt_outputtime), sysDigEvent.thread_tid, WintapMessage.MessageTypeEnum.SysDig);
+                        wintapMsg.Sysdig = new WintapMessage.SysdigEventData();
+                        wintapMsg.Sysdig.evt_info = sysDigEvent.evt_info;
+                        wintapMsg.Sysdig.evt_outputtime = sysDigEvent.evt_outputtime;
+                        wintapMsg.Sysdig.evt_type = sysDigEvent.evt_type;
+                        wintapMsg.Sysdig.evt_cpu = sysDigEvent.evt_cpu;
+                        wintapMsg.Sysdig.evt_num = sysDigEvent.evt_num;
+                        wintapMsg.Sysdig.evt_dir = sysDigEvent.evt_dir;
+                        wintapMsg.Sysdig.proc_name = sysDigEvent.proc_name;
+                        wintapMsg.Sysdig.thread_tid = sysDigEvent.thread_tid;
                         wintapMsg.PidHash = "fake_pidhash";
-                        //EventChannel.Send(wintapMsg);
                         EventChannel.EsperRuntime.EventService.SendEventBean(wintapMsg, "WintapMessage");
                     }
                 }

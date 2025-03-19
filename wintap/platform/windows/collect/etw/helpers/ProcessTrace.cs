@@ -63,7 +63,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                                     int processId = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
                                     DateTime createTime = DateTime.Parse(data.PayloadByName("CreateTime").ToString());
                                     int parentProcessId = Convert.ToInt32(data.PayloadByName("ParentProcessID").ToString());
-                                    WintapMessage processPartial = new WintapMessage(createTime.ToUniversalTime(), processId, "ProcessPartial") { ActivityType = data.EventName };
+                                    WintapMessage processPartial = new WintapMessage(createTime.ToUniversalTime(), processId, WintapMessage.MessageTypeEnum.ProcessPartial) { ActivityType = WintapMessage.ActivityTypeEnum.Rundown };
                                     processPartial.Process = new WintapMessage.ProcessObject() { ParentPID = parentProcessId };
                                     EventChannel.Send(processPartial);
                                 }
@@ -72,7 +72,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                                     //int processId = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
                                     int processId = data.ProcessID;
                                     string processName = TranslateFilePath(data.PayloadByName("ImageName").ToString().ToLower()).ToLower();
-                                    WintapMessage processPartial = new WintapMessage(DateTime.UtcNow, processId, "ProcessPartial") { ActivityType = data.EventName };
+                                    WintapMessage processPartial = new WintapMessage(DateTime.UtcNow, processId, WintapMessage.MessageTypeEnum.ProcessPartial) { ActivityType = WintapMessage.ActivityTypeEnum.Rundown };
                                     processPartial.Process = new WintapMessage.ProcessObject() { Path = processName.ToLower() };
                                     FileInfo processInfo = new FileInfo(processName);
                                     processPartial.Process.Path = processInfo.FullName.ToLower();

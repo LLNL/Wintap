@@ -89,39 +89,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         }
 
 
-        [Flags]
-        public enum AllocationProtectEnum : uint
-        {
-            PAGE_EXECUTE = 0x00000010,
-            PAGE_EXECUTE_READ = 0x00000020,
-            PAGE_EXECUTE_READWRITE = 0x00000040,
-            PAGE_EXECUTE_WRITECOPY = 0x00000080,
-            PAGE_NOACCESS = 0x00000001,
-            PAGE_READONLY = 0x00000002,
-            PAGE_READWRITE = 0x00000004,
-            PAGE_WRITECOPY = 0x00000008,
-            PAGE_TARGETS_INVALID = 0x40000000,
-            PAGE_TARGETS_NO_UPDATE = 0x40000000,
-            PAGE_GUARD = 0x00000100,
-            PAGE_NOCACHE = 0x00000200,
-            PAGE_WRITECOMBINE = 0x00000400
-        }
-
-        public enum StateEnum : uint
-        {
-            MEM_COMMIT = 0x1000,
-            MEM_FREE = 0x10000,
-            MEM_RESERVE = 0x2000
-        }
-
-        public enum TypeEnum : uint
-        {
-            MEM_IMAGE = 0x1000000,
-            MEM_MAPPED = 0x40000,
-            MEM_PRIVATE = 0x20000
-        }
-
-
         public MemoryMapCollector() : base()
         {
             CollectorName = "Microsoft-Windows-Kernel-Memory";
@@ -284,7 +251,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             DateTime startScanTime = DateTime.Now;
             Process process = Process.GetProcessById(_owningProcess.PID);
             nint baseAddress = new nint(0);
-            WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.PID, "MemoryMap");
+            WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.PID, MessageTypeEnum.MemoryMap);
             MEMORY_BASIC_INFORMATION memInfo = new MEMORY_BASIC_INFORMATION();
             while (true)
             {
@@ -298,17 +265,18 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     }
                     wm.PidHash = _owningProcess.PidHash;
                     wm.ProcessName = _owningProcess.ProcessName;
-                    wm.ActivityType = ((StateEnum)memInfo.State).ToString();
+                    //wm.ActivityType = ((StateEnum)memInfo.State);
+                    wm.ActivityType = ((ActivityTypeEnum)memInfo.State);
                     wm.MemoryMap = new MemoryMapData();
                     wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
-                    wm.MemoryMap.AllocationProtect = ((AllocationProtectEnum)memInfo.AllocationProtect).ToString();
-                    wm.MemoryMap.PageType = ((TypeEnum)memInfo.Type).ToString();
+                    wm.MemoryMap.PageProtect = ((WintapMessage.PageProtectEnum)memInfo.AllocationProtect);
+                    wm.MemoryMap.PageType = ((WintapMessage.PageTypeEnum)memInfo.Type);
                     wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
                     wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
-                    wm.MemoryMap.PageProtect = ((AllocationProtectEnum)memInfo.Protect).ToString();
+                    wm.MemoryMap.PageProtect = ((PageProtectEnum)memInfo.Protect);
                     wm.MemoryMap.MZHeaderPresent = false;
 
-                    if ((TypeEnum)memInfo.Type == TypeEnum.MEM_IMAGE)
+                    if ((PageTypeEnum)memInfo.Type == PageTypeEnum.MEM_IMAGE)
                     {
                         StringBuilder path = new StringBuilder(1024);
                         uint size = GetModuleFileNameEx(process.Handle, memInfo.BaseAddress, path, 1024);

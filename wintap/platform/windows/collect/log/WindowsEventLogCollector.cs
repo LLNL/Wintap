@@ -61,8 +61,8 @@ namespace gov.llnl.wintap.platform.windows.collect.log
         {
             Counter++;
             int pid = entry.ProcessId.Value;
-            WintapMessage msg = new WintapMessage(entry.TimeCreated.Value, pid, "EventLogEvent");
-            msg.ActivityType = "EntryWritten";
+            WintapMessage msg = new WintapMessage(entry.TimeCreated.Value, pid, WintapMessage.MessageTypeEnum.EventLogEvent);
+            msg.ActivityType = WintapMessage.ActivityTypeEnum.EventWritten;
             msg.EventLogEvent = new WintapMessage.EventlogEventObject();
             msg.EventLogEvent.EventId = entry.Id;
             msg.EventLogEvent.EventMessage = ConvertXmlToJson(entry.ToXml());

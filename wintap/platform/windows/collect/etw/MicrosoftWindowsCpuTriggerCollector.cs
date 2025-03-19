@@ -66,8 +66,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         metric.AppCpuPercentageOneCore = Convert.ToInt32(obj.PayloadByName("ProcessCpuPercentage" + i));
 
                         // 3.) Create a WintapMessage and attach your event to it
-                        WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, metric.PID, "MicrosoftWindowsCpuTrigger");
-                        wintapMsg.ActivityType = obj.EventName;
+                        WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, metric.PID, WintapMessage.MessageTypeEnum.MicrosoftWindowsCpuTrigger);
+                        wintapMsg.ActivityType = ActivityTypeEnum.HighCpuUsage;
                         wintapMsg.MicrosoftWindowsCpuTrigger = metric;
 
                         // 4.) Send your event into the Wintap event pipeline

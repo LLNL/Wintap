@@ -221,9 +221,9 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             try
             {
-                WintapMessage pluginEventData = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, "GenericMessage");
+                WintapMessage pluginEventData = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, WintapMessage.MessageTypeEnum.GenericMessage);
                 pluginEventData.GenericMessage = e.GenericEvent;
-                pluginEventData.ActivityType = e.Name; 
+                pluginEventData.ActivityType = WintapMessage.ActivityTypeEnum.Other; 
                 //EventChannel.Esper.EPRuntime.SendEvent(pluginEventData);
                 EventChannel.Send(pluginEventData);
             }

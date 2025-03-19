@@ -36,7 +36,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         // only valid for SystemTraceControlGuid providers
         public KernelTraceEventParser.Keywords KernelTraceEventFlags { get; set; }
 
-        protected List<string> reversibles = new List<string>() { "TcpIp/Accept", "TcpIp/Recv", "TcpIp/TCPCopy" };
+        protected List<string> reversibles = new List<string>() { "TcpIpAccept", "TcpIpRecv", "TcpIpTCPCopy" };
 
         public EtwProviderCollector() : base()
         {

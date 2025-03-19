@@ -252,13 +252,36 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private void sendRegEventToEsper(string activityType, string path, string value, string data, string dataType, int pid, long eventTime, long eventTimeMS, DateTime eventTimeDT)
         {
 
-            WintapMessage msg = new WintapMessage(eventTimeDT, pid, CollectorName);
-            msg.RegActivity = new WintapMessage.RegActivityObject();
-            msg.RegActivity.Path = path;
-            msg.RegActivity.ValueName = value;
-            msg.RegActivity.Data = data;
-            msg.RegActivity.DataType = dataType;
-            msg.ActivityType = activityType.ToUpper();
+            WintapMessage msg = new WintapMessage(eventTimeDT, pid, WintapMessage.MessageTypeEnum.Registry);
+            msg.Registry = new WintapMessage.RegActivityObject();
+            msg.Registry.Path = path;
+            msg.Registry.ValueName = value;
+            msg.Registry.Data = data;
+
+            if (Enum.TryParse(activityType, true, out WintapMessage.ActivityTypeEnum parsedActivityType))
+            {
+                msg.ActivityType = parsedActivityType;
+            }
+            else
+            {
+                // Handle the case where the dataType string does not match any enum value
+                // You can set a default value or throw an exception
+                throw new ArgumentException($"Invalid registry activity type: {dataType}");
+            }
+
+            // Parse the dataType string to the DataTypeEnum
+            if (Enum.TryParse(dataType, true, out WintapMessage.DataTypeEnum parsedDataType))
+            {
+                msg.Registry.DataType = parsedDataType;
+            }
+            else
+            {
+                // Handle the case where the dataType string does not match any enum value
+                // You can set a default value or throw an exception
+                throw new ArgumentException($"Invalid registry data type: {dataType}");
+            }
+
+
             EventChannel.Send(msg);
         }
     }

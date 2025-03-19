@@ -1,27 +1,59 @@
-﻿/*
- * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
- * Produced at the Lawrence Livermore National Laboratory.
- * All rights reserved.
- */
-
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
 using System.Dynamic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Security.Policy;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.collect.models
 {
     public class WintapMessage
     {
-        public enum FailureCodeType { ERROR_INSUFFICIENT_RESOURCES, ERROR_TOO_MANY_ADDRESSES, ERROR_ADDRESS_EXISTS, ERROR_INVALUD_ADDRESS, ERROR_OTHER, ERROR_TIMEWAIT_ADDRESS_EXIST };
+        public enum FailureCodeType { ERROR_INSUFFICIENT_RESOURCES, ERROR_TOO_MANY_ADDRESSES, ERROR_ADDRESS_EXISTS, ERROR_INVALID_ADDRESS, ERROR_OTHER, ERROR_TIMEWAIT_ADDRESS_EXIST };
+        public enum MessageTypeEnum { Process, ProcessPartial, TcpConnection, UdpPacket, File, Registry, ImageLoad, FocusChange, SessionChange, WaitCursor, Wmi, Thread, GenericMessage, MicrosoftWindowsCpuTrigger, MicrosoftWindowsGroupPolicy, MemoryMap, KernelApiCall, EventLogEvent, SysDig, WintapAlert };
+        public enum ActivityTypeEnum { Start, Stop, Refresh, Rundown, Load, Unload, PsSetLoadImageNotifyRoutine, TerminateProcess, CreateSymbolicLink, SetThreadContext, OpenProcess, OpenThread, Read, Write, DeleteValue, CreateKey, DeleteKey, EventWritten, HighCpuUsage, TcpIpAccept, TcpIpRecv, TcpIpTCPCopy, TcpIpReconnect, TcpIpRetransmit, TcpIpDisconnect, TcpIpARPCopy, TcpIpDupACK, TcpIpFullACK, TcpIpPartACK, TcpIpConnect, TcpIpSend, TcpIpFail, UdpIpFail, UdpIpSend, UdpIpRecv, Other }; 
+        public enum DirectionEnum { INBOUND, OUTBOUND };
+        public enum StateEnum { ESTABLISHED, SYN_SENT, SYN_RECEIVED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSED, CLOSE_WAIT, LAST_ACK, LISTEN, CLOSING };
+        public enum DataTypeEnum { STRING, DWORD, BINARY, MULTI_SZ, EXPAND_SZ };
+        // public enum AllocationProtectEnum { PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY, PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY };
 
-        public WintapMessage(DateTime eventTime, int processId, string eventSourceName)
+        [Flags]
+        public enum PageProtectEnum : uint
+        {
+            PAGE_EXECUTE = 0x00000010,
+            PAGE_EXECUTE_READ = 0x00000020,
+            PAGE_EXECUTE_READWRITE = 0x00000040,
+            PAGE_EXECUTE_WRITECOPY = 0x00000080,
+            PAGE_NOACCESS = 0x00000001,
+            PAGE_READONLY = 0x00000002,
+            PAGE_READWRITE = 0x00000004,
+            PAGE_WRITECOPY = 0x00000008,
+            PAGE_TARGETS_INVALID = 0x40000000,
+            PAGE_TARGETS_NO_UPDATE = 0x40000000,
+            PAGE_GUARD = 0x00000100,
+            PAGE_NOCACHE = 0x00000200,
+            PAGE_WRITECOMBINE = 0x00000400
+        }
+
+        public enum PageStateEnum : uint
+        {
+            MEM_COMMIT = 0x1000,
+            MEM_FREE = 0x10000,
+            MEM_RESERVE = 0x2000
+        }
+
+        public enum PageTypeEnum : uint
+        {
+            MEM_IMAGE = 0x1000000,
+            MEM_MAPPED = 0x40000,
+            MEM_PRIVATE = 0x20000
+        }
+
+        //public enum PageProtectEnum { PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY, PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY };
+        //public enum PageTypeEnum { MEM_IMAGE, MEM_MAPPED, MEM_PRIVATE };
+        //public enum EvtDirEnum { IN, OUT };
+        //public enum EvtTypeEnum { TYPE1, TYPE2, TYPE3 }; // Define actual event types
+
+        public WintapMessage(DateTime eventTime, int processId, MessageTypeEnum eventSourceName)
         {
             this.EventTime = eventTime.ToFileTimeUtc();
             this.PID = processId;
@@ -31,45 +63,36 @@ namespace gov.llnl.wintap.collect.models
             this.CorrelationId = "";
         }
 
-        public string MessageType { get; set; }
+        public MessageTypeEnum MessageType { get; set; }
         public long EventTime { get; set; }
         public long ReceiveTime { get; set; }
         public int PID { get; set; }
         public string PidHash { get; set; }
         public string ProcessName { get; set; }
         public string ProcessPath { get; set; }
-        public string ActivityType { get; set; }
+        public ActivityTypeEnum ActivityType { get; set; }
         public string CorrelationId { get; set; }
         public string ActivityId { get; set; }
         public string AgentId { get; set; }
-
         public ProcessObject Process { get; set; }
         public TcpConnectionObject TcpConnection { get; set; }
         public UdpPacketObject UdpPacket { get; set; }
         public ImageLoadObject ImageLoad { get; set; }
-        public FileActivityObject FileActivity { get; set; }
-        public RegActivityObject RegActivity { get; set; }
+        public FileActivityObject File { get; set; }
+        public RegActivityObject Registry { get; set; }
         public FocusChangeObject FocusChange { get; set; }
         public SessionChangeObject SessionChange { get; set; }
         public WaitCursorData WaitCursor { get; set; }
         public GenericMessageObject GenericMessage { get; set; }
-        public WmiActivityObject WmiActivity { get; set; }
-        public ThreadStartObject ThreadStart { get; set; } 
+        public WmiActivityObject Wmi { get; set; }
+        public ThreadStartObject Thread { get; set; }
         public EventlogEventObject EventLogEvent { get; set; }
         public MicrosoftWindowsCpuTriggerData MicrosoftWindowsCpuTrigger { get; set; }
-        public MemoryEventData MemoryEvent { get; set; }
-        public WebActivityData WebActivity { get; set; }
         public MicrosoftWindowsGroupPolicyData MicrosoftWindowsGroupPolicy { get; set; }
-        public MicrosoftWindowsBitLockerAPIData MicrosoftWindowsBitLockerAPI { get; set; }
         public KernelApiCallData KernelApiCall { get; set; }
         public MemoryMapData MemoryMap { get; set; }
-        public SysdigEventData SysdigEvent { get; set; }
-
-        /// <summary>
-        /// General purpose error reporting for Wintap
-        /// </summary>
+        public SysdigEventData Sysdig { get; set; }
         public WintapAlertData WintapAlert { get; set; }
-        
 
         public class ProcessObject : WintapBase
         {
@@ -92,7 +115,7 @@ namespace gov.llnl.wintap.collect.models
             public long WriteTransferKiloBytes { get; set; }
             public int HardFaultCount { get; set; }
             public int TokenElevationType { get; set; }
-            public int PID { get; set; } 
+            public int PID { get; set; }
             public string UniqueProcessKey { get; set; }
             public string MD5 { get; set; }
             public string SHA2 { get; set; }
@@ -100,12 +123,12 @@ namespace gov.llnl.wintap.collect.models
 
         public class TcpConnectionObject : WintapBase
         {
-            public string Direction { get; set; }
+            public DirectionEnum Direction { get; set; }
             public string SourceAddress { get; set; }
             public int SourcePort { get; set; }
             public string DestinationAddress { get; set; }
             public int DestinationPort { get; set; }
-            public string State { get; set; }
+            public StateEnum State { get; set; }
             public int MaxSegSize { get; set; }
             public int RcvWin { get; set; }
             public int RcvWinScale { get; set; }
@@ -154,7 +177,7 @@ namespace gov.llnl.wintap.collect.models
         public class RegActivityObject : WintapBase
         {
             public string Path { get; set; }
-            public string DataType { get; set; }
+            public DataTypeEnum DataType { get; set; }
             public string ValueName { get; set; }
             public string Data { get; set; }
             public int PID { get; set; }
@@ -183,8 +206,8 @@ namespace gov.llnl.wintap.collect.models
 
         public class GenericMessageObject : WintapBase
         {
+            public string ProviderId { get; set; }
             public string ProviderName { get; set; }
-            public string Provider { get; set; }
             public string EventName { get; set; }
             public int PID { get; set; }
             public DateTime EventTime { get; set; }
@@ -195,15 +218,9 @@ namespace gov.llnl.wintap.collect.models
         public class WmiActivityObject : WintapBase
         {
             public int ClientProcessId { get; set; }
-            public int CreatedProcessId {  get; set; }
+            public int CreatedProcessId { get; set; }
             public string CommandLine { get; set; }
-            /// <summary>
-            /// appears to correlate events related to a single WMI logical activity
-            /// </summary>
             public int OperationId { get; set; }
-            /// <summary>
-            /// The query payload
-            /// </summary>
             public string Operation { get; set; }
             public string User { get; set; }
             public bool IsLocal { get; set; }
@@ -297,9 +314,6 @@ namespace gov.llnl.wintap.collect.models
             public int AppCpuPercentageOneCore { get; set; }
         }
 
-        /// <summary>
-        /// from Microsoft-Windows-Kernel-Memory, eventName: MemInfoWS
-        /// </summary>
         public class MemInfoWSData : WintapBase
         {
             public long WorkingSetPageCount { get; set; }
@@ -308,7 +322,7 @@ namespace gov.llnl.wintap.collect.models
             public long PrivateWorkingSetPageCount { get; set; }
             public long StoreSizePageCount { get; set; }
             public long StoredPageCount { get; set; }
-            public long CommitDebtInPages { get; set; } 
+            public long CommitDebtInPages { get; set; }
             public long SharedCommitInPages { get; set; }
             public string Flags { get; set; }
             public string BaseAddress { get; set; }
@@ -327,14 +341,6 @@ namespace gov.llnl.wintap.collect.models
             public string Payload { get; set; }
         }
 
-        public class WebActivityData : WintapBase
-        {
-            public string Browser { get; set; }
-            public string TabTitle { get; set; }
-            public string Url { get; set; }
-            public string UserName { get; set; }
-        }
-
         public class MicrosoftWindowsGroupPolicyData : WintapBase
         {
             public string FormattedMessage { get; set; }
@@ -344,24 +350,17 @@ namespace gov.llnl.wintap.collect.models
         {
             public string FormattedMessage { get; set; }
             public string IdentificationGUID { get; set; }
-            public string VolumeName { get; set;}
+            public string VolumeName { get; set; }
             public string VolumeMountPoint { get; set; }
         }
 
-        /// <summary>
-        /// General purpose error reporting mechanism for Wintap
-        /// </summary>
         public class WintapAlertData : WintapBase
         {
             public enum AlertNameEnum { EVENT_DROP, SYSTEM_UTILIZATION, PROCESS_TREE, OTHER }
             public AlertNameEnum AlertName { get; set; }
-
             public string AlertDescription { get; set; }
         }
 
-        /// <summary>
-        /// collector for the Microsoft-Windows-Kernel-Audit-API-Calls ETW provider
-        /// </summary>
         public class KernelApiCallData : WintapBase
         {
             private string providerName;
@@ -374,7 +373,7 @@ namespace gov.llnl.wintap.collect.models
             private long? notifyRoutineAddress;
             private uint? targetThreatId;
 
-            public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId) 
+            public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId)
             {
                 providerName = _providerName;
                 targetPid = _targetPid;
@@ -386,81 +385,78 @@ namespace gov.llnl.wintap.collect.models
                 targetThreatId = _targetThreatId;
                 threadId = _threadId;
             }
+
             public string ProviderName
             {
                 get { return providerName; }
             }
+
             public int? TargetPid
-            { get { return targetPid; } }
+            {
+                get { return targetPid; }
+            }
+
             public string TargetProcessName { get; set; }
+
             public uint? DesiredAccess
-            { get { return desiredAccess; } }
+            {
+                get { return desiredAccess; }
+            }
+
             public uint ReturnCode
-            { get { return  returnCode; } }
+            {
+                get { return returnCode; }
+            }
+
             public string LinkSourceName
-            { get { return linkSourceName; } }
+            {
+                get { return linkSourceName; }
+            }
+
             public string LinkTargetName
-            { get {  return linkTargetName; } }
+            {
+                get { return linkTargetName; }
+            }
+
             public long? NotifyRoutineAddress
-            { get { return notifyRoutineAddress; } }
+            {
+                get { return notifyRoutineAddress; }
+            }
+
             public uint? TargetThreatId
-            { get { return targetThreatId; } }
+            {
+                get { return targetThreatId; }
+            }
+
             public int ThreadId
-            { get { return threadId; } }
+            {
+                get { return threadId; }
+            }
+
             public string DesiredAccessString { get; set; }
         }
 
-        //  summary descriptors taken from:  https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-memory_basic_information
         public class MemoryMapData : WintapBase
         {
-            /// <summary>
-            /// For image backed regions, the full path name to the file.
-            /// </summary>
             public string Description { get; set; }
-
-            /// <summary>
-            /// A pointer to the base address of the region of pages.
-            /// </summary>
             public string BaseAddress { get; set; }
-
-            /// <summary>
-            /// A pointer to the base address of a range of pages allocated by the VirtualAlloc function. The page pointed to by the BaseAddress member is contained within this allocation range.
-            /// </summary>
             public string AllocationBaseAddress { get; set; }
-
-            /// <summary>
-            /// The memory protection option when the region was initially allocated. This member can be one of the memory protection constants or 0 if the caller does not have access.
-            /// </summary>
-            public string AllocationProtect { get; set; }
-
+            public PageProtectEnum AllocationProtect { get; set; }
             public long RegionSize { get; set; }
-
-            /// <summary>
-            /// The access protection of the pages in the region. This member is one of the values listed for the AllocationProtect member.
-            /// </summary>
-            public string PageProtect { get; set; }
-
-            public string PageType { get; set; }
-
+            public PageProtectEnum PageProtect { get; set; }
+            public PageTypeEnum PageType { get; set; }
             public bool MZHeaderPresent { get; set; }
         }
 
-        public class SysdigEventData
+        public class SysdigEventData : WintapBase
         {
             public int evt_cpu { get; set; }
-
             public string evt_dir { get; set; }
-
             public string evt_info { get; set; }
-
             public int evt_num { get; set; }
-
             public long evt_outputtime { get; set; }
-
             public string evt_type { get; set; }
-
             public string proc_name { get; set; }
-
             public int thread_tid { get; set; }
         }
 
@@ -470,16 +466,13 @@ namespace gov.llnl.wintap.collect.models
             {
                 var expando = new ExpandoObject();
                 var expandoDic = (IDictionary<string, object>)expando;
-
                 foreach (PropertyInfo propertyInfo in this.GetType().GetProperties())
                 {
                     var value = propertyInfo.GetValue(this, null);
                     expandoDic.Add(propertyInfo.Name, value);
                 }
-
                 return expando;
             }
         }
-          
     }
 }

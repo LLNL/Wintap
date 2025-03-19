@@ -21,9 +21,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     /// <summary>
     /// WMI events from user mode logger
     /// </summary>
-    internal class MicrosoftWindowsWMIActivityCollector : EtwProviderCollector
+    internal class MicrosoftWindowsWmiCollector : EtwProviderCollector
     {
-        public MicrosoftWindowsWMIActivityCollector() : base()
+        public MicrosoftWindowsWmiCollector() : base()
         {
             CollectorName = "Microsoft-Windows-WMI-Activity";
             EtwProviderId = "1418EF04-B0B4-4623-BF7E-D74AB47BBDAA";
@@ -32,7 +32,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
-            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "WmiActivity");
+            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Wmi);
             if (obj.PayloadNames.Contains("CorrelationId"))
             {
                 msg.CorrelationId = obj.PayloadStringByName("CorrelationId");
@@ -41,40 +41,40 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 msg.ActivityId = obj.PayloadStringByName("ActivityId");
             }
-            msg.WmiActivity = new WintapMessage.WmiActivityObject();
+            msg.Wmi = new WintapMessage.WmiActivityObject();
             try
             {
                 if (obj.PayloadNames.Contains("Operation"))
                 {
-                    msg.WmiActivity.Operation = obj.PayloadByName("Operation").ToString();
+                    msg.Wmi.Operation = obj.PayloadByName("Operation").ToString();
                 }
                 if (obj.PayloadNames.Contains("User"))
                 {
-                    msg.WmiActivity.Operation = obj.PayloadByName("User").ToString();
+                    msg.Wmi.Operation = obj.PayloadByName("User").ToString();
                 }
                 if (obj.PayloadNames.Contains("IsLocal"))
                 {
-                    msg.WmiActivity.IsLocal = bool.Parse(obj.PayloadByName("IsLocal").ToString());
+                    msg.Wmi.IsLocal = bool.Parse(obj.PayloadByName("IsLocal").ToString());
                 }
                 if (obj.PayloadNames.Contains("ClientProcessId"))
                 {
-                    msg.WmiActivity.ClientProcessId = Convert.ToInt32(obj.PayloadByName("ClientProcessId").ToString().Replace(",", ""));
+                    msg.Wmi.ClientProcessId = Convert.ToInt32(obj.PayloadByName("ClientProcessId").ToString().Replace(",", ""));
                 }
                 if (obj.PayloadNames.Contains("OperationId"))
                 {
-                    msg.WmiActivity.OperationId = Convert.ToInt32(obj.PayloadByName("OperationId").ToString().Replace(",", ""));
+                    msg.Wmi.OperationId = Convert.ToInt32(obj.PayloadByName("OperationId").ToString().Replace(",", ""));
                 }
                 if (obj.PayloadNames.Contains("ResultCode"))
                 {
-                    msg.WmiActivity.ResultCode = Convert.ToInt32(obj.PayloadByName("ResultCode"));
+                    msg.Wmi.ResultCode = Convert.ToInt32(obj.PayloadByName("ResultCode"));
                 }
                 if (obj.PayloadNames.Contains("Commandline"))
                 {
-                    msg.WmiActivity.CommandLine = obj.PayloadStringByName("Commandline");
+                    msg.Wmi.CommandLine = obj.PayloadStringByName("Commandline");
                 }
                 if (obj.PayloadNames.Contains("CreatedProcessId"))
                 {
-                    msg.WmiActivity.CreatedProcessId = Convert.ToInt32(obj.PayloadStringByName("CreatedProcessId").Replace(",", ""));
+                    msg.Wmi.CreatedProcessId = Convert.ToInt32(obj.PayloadStringByName("CreatedProcessId").Replace(",", ""));
                 }
             }
             catch (Exception ex)
@@ -88,28 +88,28 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "WmiActivity");
-                msg.WmiActivity = new WintapMessage.WmiActivityObject();
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Wmi);
+                msg.Wmi = new WintapMessage.WmiActivityObject();
                 if (eventId == 11)
                 {
-                    msg.WmiActivity.Operation = obj.PayloadByName("Operation").ToString();
-                    msg.WmiActivity.User = obj.PayloadByName("User").ToString();
-                    msg.WmiActivity.IsLocal = bool.Parse(obj.PayloadStringByName("IsLocal"));
+                    msg.Wmi.Operation = obj.PayloadByName("Operation").ToString();
+                    msg.Wmi.User = obj.PayloadByName("User").ToString();
+                    msg.Wmi.IsLocal = bool.Parse(obj.PayloadStringByName("IsLocal"));
                     msg.PID = Convert.ToInt32(obj.PayloadByName("ClientProcessId"));
                 }
 
-                msg.WmiActivity.OperationId = Convert.ToInt32(obj.PayloadByName("OperationId"));
-                msg.ActivityType = "Start";
+                msg.Wmi.OperationId = Convert.ToInt32(obj.PayloadByName("OperationId"));
+                msg.ActivityType = WintapMessage.ActivityTypeEnum.Start;
                 if (eventId == 13)
                 {
-                    msg.ActivityType = "Stop";
-                    msg.WmiActivity.ResultCode = Convert.ToInt32(obj.PayloadByName("ResultCode"));
+                    msg.ActivityType = WintapMessage.ActivityTypeEnum.Stop;
+                    msg.Wmi.ResultCode = Convert.ToInt32(obj.PayloadByName("ResultCode"));
                 }
 
-                msg.WmiActivity.ProcessName = "NA";
+                msg.Wmi.ProcessName = "NA";
                 try
                 {
-                    msg.WmiActivity.ProcessName = Process.GetProcessById(msg.PID).ProcessName;
+                    msg.Wmi.ProcessName = Process.GetProcessById(msg.PID).ProcessName;
                 }
                 catch (Exception ex) { }
                 EventChannel.Send(msg);

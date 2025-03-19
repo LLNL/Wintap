@@ -42,40 +42,40 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
-            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "KernelApiCall");
+            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.KernelApiCall);
             try
             {
                 if (obj.EventName.Contains("EventID(1)"))
                 {
-                    msg.ActivityType = "PsSetLoadImageNotifyRoutine";
+                    msg.ActivityType = WintapMessage.ActivityTypeEnum.PsSetLoadImageNotifyRoutine;
                     msg.KernelApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, 0, 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", Convert.ToInt64(obj.PayloadByName("NotifyRoutineAddress")), 0, obj.ThreadID);
                 }
                 else if (obj.EventName.Contains("EventID(2)"))
                 {
-                    msg.ActivityType = "TerminateProcess";
+                    msg.ActivityType = WintapMessage.ActivityTypeEnum.TerminateProcess;
                     msg.KernelApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID);
                 }
                 else if (obj.EventName.Contains("EventID(3)"))
                 {
-                    msg.ActivityType = "CreateSymbolicLink";
+                    msg.ActivityType = WintapMessage.ActivityTypeEnum.CreateSymbolicLink;
                     msg.KernelApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, 0, Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), obj.PayloadByName("LinkSourceName").ToString(), obj.PayloadByName("LinkTargetName").ToString(), 0, 0, obj.ThreadID);
                 }
                 else if (obj.EventName.Contains("EventID(4)"))
                 {
-                    msg.ActivityType = "SetThreadContext";
+                    msg.ActivityType = WintapMessage.ActivityTypeEnum.SetThreadContext;
                     msg.KernelApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, 0, 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID);
                 }
                 else if (obj.EventName.Contains("EventID(5)"))
                 {
-                    msg.ActivityType = "OpenProcess";
+                    msg.ActivityType = WintapMessage.ActivityTypeEnum.OpenProcess;
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID);
                     msg.KernelApiCall.DesiredAccessString = translateDesiredAccessToEnum(msg.KernelApiCall.DesiredAccess);
@@ -90,7 +90,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 }
                 else if (obj.EventName.Contains("EventID(6)"))
                 {
-                    msg.ActivityType = "OpenThread";
+                    msg.ActivityType = WintapMessage.ActivityTypeEnum.OpenThread;
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     msg.KernelApiCall = new WintapMessage.KernelApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, Convert.ToUInt32(obj.PayloadByName("TargetThreatId")), obj.ThreadID);
                 }

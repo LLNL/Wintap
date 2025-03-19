@@ -46,10 +46,9 @@ namespace gov.llnl.wintap.platform.linux.collect.test
             string processPath = currentProcess.MainModule.FileName;
             int processId = currentProcess.Id + 1; // defeat wintap self-event filtering
 
-            WintapMessage msg = new WintapMessage(DateTime.Now, processId, "Process") { ActivityType = ProcessActivityEnum.refresh.ToString() };
+            WintapMessage msg = new WintapMessage(DateTime.Now, processId, WintapMessage.MessageTypeEnum.Process) { ActivityType =  WintapMessage.ActivityTypeEnum.Refresh };
             msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
             msg.ProcessName = processName;
-            msg.MessageType = "Process";
             msg.PidHash = idGen.GenPidHash(msg.PID, msg.EventTime);
             processDictionary.TryAdd(msg.PidHash, msg);
 

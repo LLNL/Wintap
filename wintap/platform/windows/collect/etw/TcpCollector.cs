@@ -69,7 +69,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 // TODO:  SeqNo needs more investigation, seems to only return null....
                 msg.TcpConnection.SeqNo = obj.seqnum;
                 // TODO: Grant to verify that this is still valid by comparing with pcap.
-                if (reversibles.Contains(msg.ActivityType))
+                if (reversibles.Contains(msg.ActivityType.ToString()))
                 {
                     msg.TcpConnection.SourceAddress = obj.daddr.ToString();
                     msg.TcpConnection.SourcePort = obj.dport;
@@ -134,7 +134,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 msg.TcpConnection.TimestampOption = obj.tsopt;
                 msg.TcpConnection.WinScaleOption = obj.wsopt;
                 msg.TcpConnection.PacketSize = obj.size;
-                if (reversibles.Contains(msg.ActivityType))
+                if (reversibles.Contains(msg.ActivityType.ToString()))
                 {
                     msg.TcpConnection.SourceAddress = obj.daddr.ToString();
                     msg.TcpConnection.SourcePort = obj.dport;
@@ -190,16 +190,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private WintapMessage getWintapTCPBuilder(dynamic etwObj, string msgType)
         {
-            WintapMessage wintapBuilder = new WintapMessage(etwObj.TimeStamp, etwObj.ProcessID, CollectorName);
+            WintapMessage wintapBuilder = new WintapMessage(etwObj.TimeStamp, etwObj.ProcessID, WintapMessage.MessageTypeEnum.TcpConnection);
             wintapBuilder.ActivityType = etwObj.EventName;
-            //if (etwObj.PayloadNames.ToList().Contains("CorrelationId"))
-            //{
-            //    wintapBuilder.CorrelationId = etwObj.PayloadStringByName("CorrelationId");
-            //}
-            //if (etwObj.PayloadNames.Contains("ActivityId"))
-            //{
-            //    wintapBuilder.ActivityId = Guid.Parse(etwObj.PayloadStringByName("ActivityId"));
-            //}
+            
             return wintapBuilder;
         }
 

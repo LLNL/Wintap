@@ -48,9 +48,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             try
             {
                 base.Process_Event(obj);
-                WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "ImageLoad");
+                WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.ImageLoad);
                 wintapBuilder.ImageLoad = new WintapMessage.ImageLoadObject();
-                wintapBuilder.ActivityType = obj.OpcodeName;
+                wintapBuilder.ActivityType = WintapMessage.ActivityTypeEnum.Load;
                 wintapBuilder.ImageLoad.BuildTime = obj.BuildTime.ToFileTimeUtc();
                 wintapBuilder.ImageLoad.FileName = obj.FileName.ToLower();
                 wintapBuilder.ImageLoad.ImageChecksum = obj.ImageChecksum;

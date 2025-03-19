@@ -63,7 +63,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, "FocusChange");
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.FocusChange);
                 msg.FocusChange = new WintapMessage.FocusChangeObject();
                 msg.FocusChange.OldProcessId = Convert.ToInt32(obj.PayloadByName("OldProcessId"));
                 msg.FocusChange.FocusChangeSessionId = Convert.ToInt32(obj.PayloadByName("SessionId"));
@@ -88,9 +88,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                WintapMessage wmBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, "WaitCursor");
+                WintapMessage wmBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.WaitCursor);
                 wmBuilder.WaitCursor = new WintapMessage.WaitCursorData();
-                wmBuilder.ActivityType = "WaitCursor";
+                wmBuilder.ActivityType = WintapMessage.ActivityTypeEnum.Other;
                 wmBuilder.WaitCursor.SessionId = Convert.ToInt32(obj.PayloadByName("SessionId"));
                 wmBuilder.WaitCursor.DisplayTimeMS = Convert.ToInt32(obj.PayloadByName("DisplayTimeMs"));
                 EventChannel.Send(wmBuilder);
