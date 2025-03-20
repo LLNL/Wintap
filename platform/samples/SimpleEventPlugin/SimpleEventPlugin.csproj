@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>SimpleEventPlugin</AssemblyName>
+		<RootNamespace>SimpleEventPlugin</RootNamespace>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Reference to the Wintap interfaces -->
+
+		<!-- Plugin-specific version of Newtonsoft.Json -->
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
+		<!-- System.ComponentModel.Composition is required for MEF -->
+		<PackageReference Include="System.ComponentModel.Composition" Version="8.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\..\WintapAPI\WintapAPI.csproj" />
+	</ItemGroup>
+
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="md &quot;$(SolutionDir)\..\Wintap\Plugins\SimpleEventPlugin&quot; 2&gt; nul&#xD;&#xA;copy &quot;$(TargetDir)*.dll&quot; &quot;$(SolutionDir)\..\Wintap\Plugins\SimpleEventPlugin\&quot;" />
+	</Target>
+</Project>

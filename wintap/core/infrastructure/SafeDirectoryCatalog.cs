@@ -17,6 +17,139 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace gov.llnl.wintap
 {
+
+    public class IsolatedPluginCatalog : ComposablePartCatalog
+    {
+        private readonly AggregateCatalog _catalog;
+        private readonly List<PluginLoadContext> _loadContexts = new List<PluginLoadContext>();
+        private readonly Dictionary<string, Assembly> _loadedPlugins = new Dictionary<string, Assembly>();
+
+        public IsolatedPluginCatalog(string directory)
+        {
+            _catalog = new AggregateCatalog();
+            System.Diagnostics.Debugger.Launch();
+            // Scan for plugin directories
+            foreach (var pluginDir in Directory.GetDirectories(directory))
+            {
+                try
+                {
+                    // Look for a main plugin assembly (assuming it has the same name as the directory)
+                    string pluginName = new DirectoryInfo(pluginDir).Name;
+                    string mainAssemblyPath = Path.Combine(pluginDir, $"{pluginName}.dll");
+
+                    // If main assembly doesn't exist by convention, look for any DLL in the root
+                    if (!File.Exists(mainAssemblyPath))
+                    {
+                        var dlls = Directory.GetFiles(pluginDir, "*.dll");
+                        if (dlls.Length > 0)
+                        {
+                            // Use the first DLL found as the main assembly
+                            mainAssemblyPath = dlls[0];
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"No assemblies found for plugin: {pluginName}", LogLevel.Always);
+                            continue;
+                        }
+                    }
+
+                    if (IsSignedAndTrusted(mainAssemblyPath))
+                    {
+                        // Create a load context for this plugin
+                        var loadContext = new PluginLoadContext(mainAssemblyPath);
+                        _loadContexts.Add(loadContext);
+
+                        // Load the plugin assembly in its isolated context
+                        Assembly pluginAssembly = loadContext.LoadFromAssemblyPath(mainAssemblyPath);
+                        _loadedPlugins[pluginName] = pluginAssembly;
+
+                        // Create a catalog for this assembly
+                        var asmCat = new AssemblyCatalog(pluginAssembly);
+
+                        // Verify the assembly contains exports
+                        if (asmCat.Parts.ToList().Count > 0)
+                        {
+                            _catalog.Catalogs.Add(asmCat);
+                            WintapLogger.Log.Append($"Successfully loaded plugin: {pluginName} in isolated context", LogLevel.Always);
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"Plugin {pluginName} has no MEF exports", LogLevel.Always);
+                        }
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append($"Plugin {pluginName} is not signed or not trusted", LogLevel.Always);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Failed to load plugin from directory {pluginDir}: {ex.Message}", LogLevel.Always);
+                }
+            }
+        }
+
+        public override IQueryable<ComposablePartDefinition> Parts
+        {
+            get { return _catalog.Parts; }
+        }
+
+        public Assembly GetPluginAssembly(string pluginName)
+        {
+            if (_loadedPlugins.TryGetValue(pluginName, out var assembly))
+            {
+                return assembly;
+            }
+            return null;
+        }
+
+        private bool IsSignedAndTrusted(string filePath)
+        {
+            WintapLogger.Log.Append($"Checking signature for: {filePath}", LogLevel.Always);
+
+            // For development purposes, bypass signature verification
+#if DEBUG
+            WintapLogger.Log.Append("DEBUG mode - bypassing signature verification", LogLevel.Always);
+            return true;
+#endif
+
+            try
+            {
+                // Attempt to load assembly to verify strong name
+                AssemblyName assemblyName = AssemblyName.GetAssemblyName(filePath);
+
+                // If the assembly has a public key token, it's signed with a strong name
+                byte[] publicKeyToken = assemblyName.GetPublicKeyToken();
+                if (publicKeyToken != null && publicKeyToken.Length > 0)
+                {
+                    string token = BitConverter.ToString(publicKeyToken).Replace("-", "").ToLower();
+                    WintapLogger.Log.Append($"Assembly has strong name with token: {token}", LogLevel.Always);
+
+                    // For now, accept any strong-named assembly as trusted
+                    return true;
+                }
+                else
+                {
+                    WintapLogger.Log.Append("Assembly does not have a strong name", LogLevel.Always);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error verifying assembly signature: {ex.Message}", LogLevel.Always);
+
+                // In development, we might want to bypass verification errors
+#if DEBUG
+                return true;
+#else
+        return false;
+#endif
+            }
+        }
+    }
+
+
+
     // workaround for MEF loading exceptions
     // see:  https://stackoverflow.com/a/4475117
     public class SafeDirectoryCatalog : ComposablePartCatalog

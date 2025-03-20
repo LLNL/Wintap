@@ -75,12 +75,10 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             watchdog = _watchdog;
             watchdog.Start();
-            WintapLogger.Log.Append("Loading plugins...", LogLevel.Always);
-            SafeDirectoryCatalog safeCatalog = new SafeDirectoryCatalog(Strings.FilePluginPath);
-            var catalog = new AggregateCatalog();
-            catalog.Catalogs.Add(safeCatalog);
-            mefContainer = new CompositionContainer(catalog);
-            mefContainer.ComposeParts(catalog, this);
+            WintapLogger.Log.Append($"Loading plugins from: {Strings.FilePluginPath}", LogLevel.Always);
+            IsolatedPluginCatalog isolatedCatalog = new IsolatedPluginCatalog(Strings.FilePluginPath);
+            mefContainer = new CompositionContainer(isolatedCatalog);
+            mefContainer.ComposeParts(this);
             PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
             // SUBSCRIBERS
             foreach (Lazy<ISubscribe, ISubscribeData> subscriber in subscribers)

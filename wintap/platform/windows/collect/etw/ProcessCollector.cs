@@ -38,8 +38,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
             WintapLogger.Log.Append("Assembling boot trace process events.", LogLevel.Always);
             WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Always);
-            EPStatement etlToEsperPattern = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name FROM pattern[every PartA=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ProcessStart/Start') -> PartB=WintapMessage(MessageType='ProcessPartial' AND ActivityType='ImageLoad' AND PID=PartA.PID) where timer:within(3 sec)]").Statements[0];
-            etlToEsperPattern.Events += etlToEsperPattern_Events;
+            EPStatement etlToEsperPattern = EventChannel.compileDeploy(EventChannel.EsperRuntime,
+                $"SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name " +
+                $"FROM pattern[every PartA=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ProcessPartial.ToString()}' " +
+                $"AND  CAST(ActivityType, string)='{WintapMessage.ActivityTypeEnum.Rundown.ToString()}'" +
+                $") -> PartB=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ImageLoad}' " +
+                "AND PID=PartA.PID) where timer:within(3 sec)]").Statements[0];
 
             WintapLogger.Log.Append("Building process tree.", LogLevel.Always);
             processTree = new ProcessTree();
