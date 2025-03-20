@@ -4,13 +4,13 @@
  * All rights reserved.
  */
 
-
 using System;
 using System.Text;
 using System.IO;
 using System.Reflection;
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -18,7 +18,6 @@ namespace gov.llnl.wintap.core.infrastructure
     {
         OK, Warning, Critical
     }
-
 
     public enum LogType
     {
@@ -35,7 +34,7 @@ namespace gov.llnl.wintap.core.infrastructure
     }
 
     /// <summary>
-    /// a simple logging class
+    /// A simple logging class
     /// </summary>
     public sealed class WintapLogger
     {
@@ -62,10 +61,9 @@ namespace gov.llnl.wintap.core.infrastructure
         private BackgroundWorker loggingThread;
         private bool logIsOpen;
 
-
         private WintapLogger()
         {
-            this.LogType = LogType.Overwrite;
+            this.logType = LogType.Overwrite;
             this.MaxSize = 3000000;
             this.Verbosity = LogLevel.Always;
             this.LogName = "Wintap";
@@ -78,7 +76,7 @@ namespace gov.llnl.wintap.core.infrastructure
             verbosity = LogLevel.Always;
             try
             {
-                if(Properties.Settings.Default.LoggingLevel.ToUpper() == "DEBUG")
+                if (Properties.Settings.Default.LoggingLevel.ToUpper() == "DEBUG")
                 {
                     verbosity = LogLevel.Debug;
                 }
@@ -100,18 +98,16 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-
         public void Init()
         {
             DirectoryInfo logDirInfo = new DirectoryInfo(logDir);
             if (!logDirInfo.Exists)
             {
-                if(!logDirInfo.Parent.Exists)
+                if (!logDirInfo.Parent.Exists)
                 {
                     logDirInfo.Parent.Create();
                 }
                 logDirInfo.Create();
-
             }
             // set prelim values
             status = Status.OK;
@@ -121,7 +117,7 @@ namespace gov.llnl.wintap.core.infrastructure
             logPath = Path.Combine(logDir, logName + ".log");
             // Record the start time
             startTime = DateTime.Now;
-            switch (LogType)
+            switch (logType)
             {
                 case LogType.Overwrite:
                     try
@@ -187,12 +183,24 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        public void Append(string entry, LogLevel targetVerbosity)
+        // Modified to capture caller information directly with compiler attributes
+        public void Append(string entry, LogLevel targetVerbosity,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string sourceFilePath = "")
         {
             LogEntry le = new LogEntry();
             le.Entry = entry;
             le.Time = DateTime.Now;
             le.Level = targetVerbosity;
+
+            // Extract just the file name without path or extension for the class name
+            if (!string.IsNullOrEmpty(sourceFilePath))
+            {
+                string fileName = Path.GetFileName(sourceFilePath);
+                string className = Path.GetFileNameWithoutExtension(fileName);
+                le.CallerInfo = $"{className}.{memberName}";
+            }
+
             pendingEntries.Enqueue(le);
         }
 
@@ -205,7 +213,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     LogEntry entry;
                     pendingEntries.TryDequeue(out entry);
-                    if ((int)this.Verbosity >= (int)entry.Level)
+                    if (entry != null && (int)this.Verbosity >= (int)entry.Level)
                     {
                         FileInfo logInfo = new FileInfo(logPath);
                         if (logInfo.Length > maxSize)
@@ -227,7 +235,12 @@ namespace gov.llnl.wintap.core.infrastructure
                         }
                         try
                         {
-                            logWriter.WriteLine(entry.Time + " >>   " + entry.Entry);
+                            // Format log entry with caller info if available
+                            string logLine = !string.IsNullOrEmpty(entry.CallerInfo)
+                                ? $"{entry.Time} [{entry.CallerInfo}] >>   {entry.Entry}"
+                                : $"{entry.Time} >>   {entry.Entry}";
+
+                            logWriter.WriteLine(logLine);
                             logWriter.Flush();
                         }
                         catch
@@ -297,7 +310,6 @@ namespace gov.llnl.wintap.core.infrastructure
                     logDir = value;
                 }
             }
-
         }
 
         /// <summary>
@@ -413,7 +425,6 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-
         public DateTime StartTime
         {
             get
@@ -425,7 +436,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 startTime = value;
             }
         }
-
 
         public DateTime EndTime
         {
@@ -516,25 +526,9 @@ namespace gov.llnl.wintap.core.infrastructure
 
     class LogEntry
     {
-        private DateTime time;
-        public DateTime Time
-        {
-            get { return time; }
-            set { time = value; }
-        }
-
-        private string entry;
-        public string Entry
-        {
-            get { return entry; }
-            set { entry = value; }
-        }
-
-        private LogLevel level;
-        public LogLevel Level
-        {
-            get { return level; }
-            set { level = value; }
-        }
+        public DateTime Time { get; set; }
+        public string Entry { get; set; }
+        public LogLevel Level { get; set; }
+        public string CallerInfo { get; set; } // New field for storing caller information
     }
 }
