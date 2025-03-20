@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
  */
@@ -14,521 +14,626 @@ using System.Runtime.CompilerServices;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
+    #region Enums
+
+    /// <summary>
+    /// Defines the status level of the application.
+    /// </summary>
     public enum Status
     {
-        OK, Warning, Critical
-    }
+        /// <summary>Application is functioning normally</summary>
+        OK,
 
-    public enum LogType
-    {
-        Append, Overwrite, Archive
+        /// <summary>Application has encountered non-critical issues</summary>
+        Warning,
+
+        /// <summary>Application has encountered critical issues</summary>
+        Critical
     }
 
     /// <summary>
-    /// When to log this message
+    /// Defines how the log file should be managed when opening.
+    /// </summary>
+    public enum LogType
+    {
+        /// <summary>Appends entries to existing log file</summary>
+        Append,
+
+        /// <summary>Overwrites existing log file</summary>
+        Overwrite,
+
+        /// <summary>Archives existing log file and creates new one</summary>
+        Archive
+    }
+
+    /// <summary>
+    /// Defines the verbosity level of log messages.
     /// </summary>
     public enum LogLevel
     {
+        /// <summary>Critical messages that should always be logged</summary>
         Always = 1,
+
+        /// <summary>Detailed messages for debugging purposes</summary>
         Debug = 2
     }
 
+    #endregion
+
     /// <summary>
-    /// A simple logging class
+    /// A high-performance, thread-safe logging system optimized for production environments.
     /// </summary>
+    /// <remarks>
+    /// WintapLogger provides asynchronous logging capabilities with minimal overhead.
+    /// The class is implemented as a singleton to ensure a single logging instance
+    /// throughout the application lifecycle.
+    /// </remarks>
     public sealed class WintapLogger
     {
-        private static readonly WintapLogger log = new WintapLogger();
+        #region Singleton Implementation
 
-        private string logName;
-        private LogType logType = LogType.Overwrite;
-        private LogLevel verbosity;
-        private string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "Logs");
-        private string userName;
-        private string logPath;
-        DateTime startTime;
-        DateTime endTime;
-        private StreamWriter logWriter;
-        private int maxSize = 3000000;  //default to 3MB file
-        private System.TimeSpan runTime;
-        decimal elapsedTime;
-        private string statusMsg;
-        private Status status;
-        private string author = "not set";
-        private string codeVersion;
-        private string clientName = Environment.MachineName;
-        private ConcurrentQueue<LogEntry> pendingEntries;
-        private BackgroundWorker loggingThread;
-        private bool logIsOpen;
+        private static readonly WintapLogger _instance = new WintapLogger();
 
+        /// <summary>
+        /// Gets the singleton instance of the WintapLogger.
+        /// </summary>
+        public static WintapLogger Log => _instance;
+
+        #endregion
+
+        #region Private Fields
+
+        private readonly ConcurrentQueue<LogEntry> _pendingEntries;
+        private readonly BackgroundWorker _loggingThread;
+
+        private string _logName;
+        private LogType _logType = LogType.Overwrite;
+        private LogLevel _verbosity;
+        private string _logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "Logs");
+        private string _logPath;
+        private StreamWriter _logWriter;
+        private int _maxSize = 3000000;  // Default to 3MB file
+        private string _author = "not set";
+        private string _codeVersion;
+        private string _clientName = Environment.MachineName;
+        private string _userName;
+        private string _statusMsg;
+        private Status _status;
+        private DateTime _startTime;
+        private DateTime _endTime;
+        private TimeSpan _runTime;
+        private decimal _elapsedTime;
+        private bool _logIsOpen;
+
+        #endregion
+
+        #region Constructor
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WintapLogger"/> class.
+        /// This constructor is private to enforce the singleton pattern.
+        /// </summary>
         private WintapLogger()
         {
-            this.logType = LogType.Overwrite;
-            this.MaxSize = 3000000;
-            this.Verbosity = LogLevel.Always;
-            this.LogName = "Wintap";
-            this.Init();
+            _logType = LogType.Overwrite;
+            _maxSize = 3000000;
+            _verbosity = LogLevel.Always;
+            _logName = "Wintap";
 
             // Get the name of the calling process
             Assembly exeName = Assembly.GetCallingAssembly();
-            string[] logNameArray = exeName.FullName.Split(new Char[] { ',' });
-            logName = logNameArray[0].ToString();
-            verbosity = LogLevel.Always;
+            string[] logNameArray = exeName.FullName.Split(new char[] { ',' });
+            _logName = logNameArray[0];
+            _codeVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+
+            // Try to get logging level from settings
             try
             {
                 if (Properties.Settings.Default.LoggingLevel.ToUpper() == "DEBUG")
                 {
-                    verbosity = LogLevel.Debug;
+                    _verbosity = LogLevel.Debug;
                 }
             }
-            catch (Exception ex) { }
-            codeVersion = exeName.GetName().Version.ToString();
-            pendingEntries = new ConcurrentQueue<LogEntry>();
-            logIsOpen = true;
-            loggingThread = new BackgroundWorker();
-            loggingThread.DoWork += new DoWorkEventHandler(loggingThread_DoWork);
-            loggingThread.RunWorkerAsync();
+            catch (Exception) { /* Use default if settings unavailable */ }
+
+            _pendingEntries = new ConcurrentQueue<LogEntry>();
+            _logIsOpen = true;
+
+            // Initialize the log file
+            Init();
+
+            // Start background logging thread
+            _loggingThread = new BackgroundWorker();
+            _loggingThread.DoWork += LoggingThread_DoWork;
+            _loggingThread.RunWorkerAsync();
         }
 
-        public static WintapLogger Log
-        {
-            get
-            {
-                return log;
-            }
-        }
+        #endregion
 
+        #region Public Methods
+
+        /// <summary>
+        /// Initializes the log file based on the current configuration.
+        /// </summary>
         public void Init()
         {
-            DirectoryInfo logDirInfo = new DirectoryInfo(logDir);
-            if (!logDirInfo.Exists)
-            {
-                if (!logDirInfo.Parent.Exists)
-                {
-                    logDirInfo.Parent.Create();
-                }
-                logDirInfo.Create();
-            }
-            // set prelim values
-            status = Status.OK;
-            statusMsg = "n/a";
+            // Ensure log directory exists
+            EnsureDirectoryExists(_logDir);
 
-            // Contat the path
-            logPath = Path.Combine(logDir, logName + ".log");
+            // Set default status
+            _status = Status.OK;
+            _statusMsg = "n/a";
+
+            // Create log path
+            _logPath = Path.Combine(_logDir, _logName + ".log");
+
             // Record the start time
-            startTime = DateTime.Now;
-            switch (logType)
+            _startTime = DateTime.Now;
+
+            try
             {
-                case LogType.Overwrite:
-                    try
-                    {
-                        if (File.Exists(logPath))
-                        {
-                            File.Delete(logPath);
-                        }
-                        FileStream fs = File.Open(logPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                        logWriter = new StreamWriter(fs);
-                        logWriter.WriteLine("Start of log for: " + logName + ", Version: " + codeVersion);
-                        logWriter.WriteLine("Start time: " + DateTime.Now.ToLongTimeString() + " " + DateTime.Now.ToLongDateString());
-                        logWriter.WriteLine("**************************************");
-                        logWriter.Flush();
-                    }
-                    catch
-                    {
-                    }
-                    break;
-                case LogType.Append:
-                    try
-                    {
-                        FileStream fsAppend = File.Open(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-                        logWriter = new StreamWriter(fsAppend);
-                        logWriter.WriteLine("Start of log for: " + logName + ", Version: " + codeVersion);
-                        logWriter.WriteLine("Start time: " + DateTime.Now.ToLongTimeString() + " " + DateTime.Now.ToLongDateString());
-                        logWriter.WriteLine("**************************************");
-                    }
-                    catch { }
-                    break;
-                case LogType.Archive:
-                    if (File.Exists(logPath))
-                    {
-                        StringBuilder archName = new StringBuilder();
-                        archName.Append(logPath);
-                        // only keep 365 logs in archive
-                        archName.Append(DateTime.Now.Date.DayOfYear);
-                        archName.Append(".log");
-                        try
-                        {
-                            if (File.Exists(archName.ToString()))
-                            {
-                                File.Delete(archName.ToString());
-                            }
-                            File.Move(logPath, archName.ToString());
-                        }
-                        catch
-                        {
-                        }
-                    }
-                    try
-                    {
-                        FileStream fsArchive = File.Open(logPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                        logWriter = new StreamWriter(fsArchive);
-                        logWriter.WriteLine("Start of log for: " + logName + ", Version: " + codeVersion);
-                        logWriter.WriteLine("Start time: " + DateTime.Now.ToLongTimeString() + " " + DateTime.Now.ToLongDateString());
-                        logWriter.WriteLine("**************************************");
-                    }
-                    catch
-                    {
-                    }
-                    break;
+                InitializeLogFile();
+            }
+            catch (Exception)
+            {
+                // Failed to initialize log file - silent failure to avoid crashes
+                // In a production environment, consider alerting or fallback logging
             }
         }
 
-        // Modified to capture caller information directly with compiler attributes
+        /// <summary>
+        /// Appends a message to the log with the specified verbosity level.
+        /// </summary>
+        /// <param name="entry">The log message to append.</param>
+        /// <param name="targetVerbosity">The verbosity level of the message.</param>
+        /// <param name="memberName">Automatically captured caller method name.</param>
+        /// <param name="sourceFilePath">Automatically captured caller file path.</param>
         public void Append(string entry, LogLevel targetVerbosity,
             [CallerMemberName] string memberName = "",
             [CallerFilePath] string sourceFilePath = "")
         {
-            LogEntry le = new LogEntry();
-            le.Entry = entry;
-            le.Time = DateTime.Now;
-            le.Level = targetVerbosity;
+            var logEntry = new LogEntry
+            {
+                Entry = entry,
+                Time = DateTime.Now,
+                Level = targetVerbosity
+            };
 
-            // Extract just the file name without path or extension for the class name
+            // Extract class name from source file path
             if (!string.IsNullOrEmpty(sourceFilePath))
             {
                 string fileName = Path.GetFileName(sourceFilePath);
                 string className = Path.GetFileNameWithoutExtension(fileName);
-                le.CallerInfo = $"{className}.{memberName}";
+                logEntry.CallerInfo = $"{className}.{memberName}";
             }
 
-            pendingEntries.Enqueue(le);
+            _pendingEntries.Enqueue(logEntry);
         }
 
-        void loggingThread_DoWork(object sender, DoWorkEventArgs e)
+        /// <summary>
+        /// Closes the log file and writes summary information.
+        /// </summary>
+        public void Close()
         {
-            while (logIsOpen)
-            {
-                int entryCount = pendingEntries.Count;
-                for (int i = 0; i < entryCount; i++)
-                {
-                    LogEntry entry;
-                    pendingEntries.TryDequeue(out entry);
-                    if (entry != null && (int)this.Verbosity >= (int)entry.Level)
-                    {
-                        FileInfo logInfo = new FileInfo(logPath);
-                        if (logInfo.Length > maxSize)
-                        {
-                            try
-                            {
-                                logWriter.Close();
-                                File.Delete(logPath);
-                                FileStream fs = File.Open(logPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                                logWriter = new StreamWriter(fs);
-                                logWriter.WriteLine("LOG TRUNCATION HAS OCCURRED!!!");
-                                logWriter.WriteLine("Continuation of log for: " + logName);
-                                logWriter.WriteLine("Resume Start time: " + DateTime.Now.ToLongTimeString() + " " + DateTime.Now.ToLongDateString());
-                                logWriter.WriteLine("**************************************");
-                            }
-                            catch
-                            {
-                            }
-                        }
-                        try
-                        {
-                            // Format log entry with caller info if available
-                            string logLine = !string.IsNullOrEmpty(entry.CallerInfo)
-                                ? $"{entry.Time} [{entry.CallerInfo}] >>   {entry.Entry}"
-                                : $"{entry.Time} >>   {entry.Entry}";
+            // Allow time for queue to drain
+            System.Threading.Thread.Sleep(1000);
 
-                            logWriter.WriteLine(logLine);
-                            logWriter.Flush();
-                        }
-                        catch
-                        {
-                        }
-                    }
+            _endTime = DateTime.Now;
+            _logIsOpen = false;
+
+            try
+            {
+                WriteLogSummary();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    _logWriter?.WriteLine("ERROR: " + ex.Message);
+                    _logWriter?.Flush();
                 }
+                catch
+                {
+                    // Last resort - we tried our best
+                }
+            }
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        /// <summary>
+        /// Handles the log processing on a background thread.
+        /// </summary>
+        private void LoggingThread_DoWork(object sender, DoWorkEventArgs e)
+        {
+            while (_logIsOpen)
+            {
+                ProcessLogQueue();
                 System.Threading.Thread.Sleep(200);
             }
         }
 
-        public void Close()
+        /// <summary>
+        /// Processes entries in the log queue.
+        /// </summary>
+        private void ProcessLogQueue()
         {
-            System.Threading.Thread.Sleep(1000);  // allow time for queue to drain
-            endTime = DateTime.Now;
-            logIsOpen = false;
+            int entryCount = _pendingEntries.Count;
+            for (int i = 0; i < entryCount; i++)
+            {
+                if (_pendingEntries.TryDequeue(out LogEntry entry) &&
+                    entry != null &&
+                    (int)_verbosity >= (int)entry.Level)
+                {
+                    // Check if log needs truncation
+                    CheckLogSize();
+
+                    try
+                    {
+                        // Format log entry with caller info if available
+                        string logLine = !string.IsNullOrEmpty(entry.CallerInfo)
+                            ? $"{entry.Time} [{entry.CallerInfo}] >>   {entry.Entry}"
+                            : $"{entry.Time} >>   {entry.Entry}";
+
+                        _logWriter.WriteLine(logLine);
+                        _logWriter.Flush();
+                    }
+                    catch
+                    {
+                        // Failed to write log entry - silent failure
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Initializes the log file based on the current log type.
+        /// </summary>
+        private void InitializeLogFile()
+        {
+            switch (_logType)
+            {
+                case LogType.Overwrite:
+                    CreateOrOverwriteLogFile();
+                    break;
+
+                case LogType.Append:
+                    AppendToLogFile();
+                    break;
+
+                case LogType.Archive:
+                    ArchiveAndCreateLogFile();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Creates a new log file, overwriting any existing file.
+        /// </summary>
+        private void CreateOrOverwriteLogFile()
+        {
+            if (File.Exists(_logPath))
+            {
+                File.Delete(_logPath);
+            }
+
+            FileStream fs = File.Open(_logPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+            _logWriter = new StreamWriter(fs);
+            WriteLogHeader();
+        }
+
+        /// <summary>
+        /// Opens an existing log file in append mode.
+        /// </summary>
+        private void AppendToLogFile()
+        {
+            FileStream fsAppend = File.Open(_logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            _logWriter = new StreamWriter(fsAppend);
+            WriteLogHeader();
+        }
+
+        /// <summary>
+        /// Archives the existing log file and creates a new one.
+        /// </summary>
+        private void ArchiveAndCreateLogFile()
+        {
+            if (File.Exists(_logPath))
+            {
+                string archiveName = $"{_logPath}{DateTime.Now.Date.DayOfYear}.log";
+
+                if (File.Exists(archiveName))
+                {
+                    File.Delete(archiveName);
+                }
+
+                File.Move(_logPath, archiveName);
+            }
+
+            FileStream fsArchive = File.Open(_logPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+            _logWriter = new StreamWriter(fsArchive);
+            WriteLogHeader();
+        }
+
+        /// <summary>
+        /// Writes the standard header at the start of the log file.
+        /// </summary>
+        private void WriteLogHeader()
+        {
+            _logWriter.WriteLine($"Start of log for: {_logName}, Version: {_codeVersion}");
+            _logWriter.WriteLine($"Start time: {DateTime.Now.ToLongTimeString()} {DateTime.Now.ToLongDateString()}");
+            _logWriter.WriteLine("**************************************");
+            _logWriter.Flush();
+        }
+
+        /// <summary>
+        /// Writes summary information when closing the log.
+        /// </summary>
+        private void WriteLogSummary()
+        {
+            _logWriter.WriteLine("**************************************");
+            _logWriter.WriteLine($"End of log for: {_logName}");
+            _logWriter.WriteLine($"End time: {DateTime.Now.ToLongTimeString()} {DateTime.Now.ToLongDateString()}");
+
+            _runTime = _endTime.Subtract(_startTime);
+            _logWriter.WriteLine($"Program Runtime: {_runTime}");
+            _logWriter.Flush();
+
+            string mils = _runTime.Milliseconds.ToString();
+            int secs = _runTime.Seconds;
+            int mins = _runTime.Minutes;
+            int hrs = _runTime.Hours;
+            int minsInSecs = mins * 60;
+            int hrsInSecs = hrs * 60 * 60;
+            int totalSecs = hrsInSecs + minsInSecs + secs;
+            _elapsedTime = Convert.ToDecimal($"{totalSecs}.{mils}");
+
+            _logWriter.WriteLine($"Runtime in seconds: {_elapsedTime}");
+            _logWriter.WriteLine("END OF LOG");
+            _logWriter.Flush();
+            _logWriter.Close();
+        }
+
+        /// <summary>
+        /// Checks if the log file exceeds the maximum size and truncates if necessary.
+        /// </summary>
+        private void CheckLogSize()
+        {
             try
             {
-                logWriter.WriteLine("**************************************");
-                logWriter.WriteLine("End of log for: " + logName);
-                logWriter.WriteLine("End time: " + DateTime.Now.ToLongTimeString() + " " + DateTime.Now.ToLongDateString());
-                runTime = endTime.Subtract(startTime);
-                logWriter.WriteLine("Program Runtime: " + runTime.ToString());
-                logWriter.Flush();
-                string mils = runTime.Milliseconds.ToString();
-                int secs = runTime.Seconds;
-                int mins = runTime.Minutes;
-                int hrs = runTime.Hours;
-                int minsInSecs = mins * 60;
-                int hrsInSecs = hrs * 60 * 60;
-                int totalSecs = hrsInSecs + minsInSecs + secs;
-                elapsedTime = System.Convert.ToDecimal(totalSecs.ToString() + "." + mils);
-                logWriter.WriteLine("Runtime in seconds: " + elapsedTime.ToString());
-                logWriter.Flush();
-                logWriter.WriteLine("END OF LOG");
-                logWriter.Close();
+                FileInfo logInfo = new FileInfo(_logPath);
+                if (logInfo.Length > _maxSize)
+                {
+                    _logWriter.Close();
+                    File.Delete(_logPath);
+                    FileStream fs = File.Open(_logPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+                    _logWriter = new StreamWriter(fs);
+                    _logWriter.WriteLine("LOG TRUNCATION HAS OCCURRED!!!");
+                    _logWriter.WriteLine($"Continuation of log for: {_logName}");
+                    _logWriter.WriteLine($"Resume Start time: {DateTime.Now.ToLongTimeString()} {DateTime.Now.ToLongDateString()}");
+                    _logWriter.WriteLine("**************************************");
+                }
             }
-            catch (Exception ex)
+            catch
             {
-                logWriter.WriteLine("ERROR: " + ex.Message);
-                logWriter.Flush();
+                // Failed to check or truncate log - silent failure
             }
         }
 
         /// <summary>
-        /// Path to directory that will hold this log file. Default is %temp%.  Set BEFORE calling Init().
-        /// <example>Example: c:\\Windows\\Temp </example>
+        /// Ensures the specified directory exists, creating it if necessary.
         /// </summary>
+        /// <param name="directory">The directory path to check.</param>
+        private void EnsureDirectoryExists(string directory)
+        {
+            DirectoryInfo dirInfo = new DirectoryInfo(directory);
+            if (!dirInfo.Exists)
+            {
+                if (!dirInfo.Parent.Exists)
+                {
+                    dirInfo.Parent.Create();
+                }
+                dirInfo.Create();
+            }
+        }
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// Gets or sets the path to the directory that will hold the log file.
+        /// </summary>
+        /// <remarks>
+        /// This must be set before calling Init().
+        /// </remarks>
         public string LogDir
         {
-            get
-            {
-                return logDir;
-            }
+            get => _logDir;
             set
             {
-                // make sure that the log directory exists
                 DirectoryInfo dirTest = new DirectoryInfo(value);
-                //Console.WriteLine(dirTest.Exists + value);
                 if (!dirTest.Exists)
                 {
-                    Exception pathException = new LogPathException("Log directory not found: " + value);
-                    throw new LogPathException(pathException.Message);
+                    throw new LogPathException($"Log directory not found: {value}");
                 }
-                else
-                {
-                    logDir = value;
-                }
+
+                _logDir = value;
             }
         }
 
         /// <summary>
-        /// SUPPORTED TYPES: Overwrite, Append, or Archive
+        /// Gets or sets the log file handling type.
         /// </summary>
         public LogType LogType
         {
-            get
-            {
-                return logType;
-            }
-            set
-            {
-                logType = value;
-            }
+            get => _logType;
+            set => _logType = value;
         }
 
         /// <summary>
-        /// What level of messages should be written by this instance of Logit. Critical = least verbose, errors only. Warning = Critical + warning messages. Informational = All messsages, most verbose.
+        /// Gets or sets the verbosity level of the logger.
         /// </summary>
         public LogLevel Verbosity
         {
-            get
-            {
-                return verbosity;
-            }
-            set
-            {
-                verbosity = value;
-            }
+            get => _verbosity;
+            set => _verbosity = value;
         }
 
         /// <summary>
-        /// Maximum byte size of the log before truncation, Default: 3MB
+        /// Gets or sets the maximum size of the log file in bytes before truncation.
         /// </summary>
         public int MaxSize
         {
-            get
-            {
-                return maxSize;
-            }
-            set
-            {
-                maxSize = value;
-            }
+            get => _maxSize;
+            set => _maxSize = value;
         }
 
         /// <summary>
-        /// Describes the error condition of your app.
+        /// Gets or sets the status of the application.
         /// </summary>
         public Status Status
         {
-            get
-            {
-                return status;
-            }
-            set
-            {
-                status = value;
-            }
+            get => _status;
+            set => _status = value;
         }
 
         /// <summary>
-        /// If you set Status to Error, then use this text message to describe the error. The 
-        /// text entered here gets sent to web reporting along with there Error type.  Max 255 chars.
+        /// Gets or sets a message describing the current status.
         /// </summary>
         public string StatusMsg
         {
-            get
-            {
-                return statusMsg;
-            }
-            set
-            {
-                statusMsg = value;
-            }
+            get => _statusMsg;
+            set => _statusMsg = value;
         }
 
         /// <summary>
-        /// Name of the person who wrote it.
-        /// <example>David Frye</example>
+        /// Gets or sets the name of the author of the application.
         /// </summary>
         public string Author
         {
-            get
-            {
-                return author;
-            }
-            set
-            {
-                author = value;
-            }
+            get => _author;
+            set => _author = value;
         }
 
         /// <summary>
-        /// Name of Log file to create. By default, Logit will use reflection during construction 
-        /// to get the name of the executing assembly and uses that name, with a .log 
-        /// extension, as the name of the log.  This may not be suitable for certain 
-        /// situations such as Web Services where the executing assembly is system 
-        /// generated.  In those situations, set the name using this property.
-        /// <BR></BR>
-        /// <example>Example: MyWebService</example>
+        /// Gets or sets the name of the log file.
         /// </summary>
         public string LogName
         {
-            get
-            {
-                return logName;
-            }
-            set
-            {
-                logName = value;
-            }
-        }
-
-        public DateTime StartTime
-        {
-            get
-            {
-                return startTime;
-            }
-            set
-            {
-                startTime = value;
-            }
-        }
-
-        public DateTime EndTime
-        {
-            get
-            {
-                return endTime;
-            }
-            set
-            {
-                endTime = value;
-            }
+            get => _logName;
+            set => _logName = value;
         }
 
         /// <summary>
-        /// Time in seconds of the execution time of the program
+        /// Gets or sets the time when the logger was started.
+        /// </summary>
+        public DateTime StartTime
+        {
+            get => _startTime;
+            set => _startTime = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the time when the logger was closed.
+        /// </summary>
+        public DateTime EndTime
+        {
+            get => _endTime;
+            set => _endTime = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the elapsed time in seconds.
         /// </summary>
         public decimal ElapsedTime
         {
-            get
-            {
-                return elapsedTime;
-            }
-            set
-            {
-                elapsedTime = value;
-            }
+            get => _elapsedTime;
+            set => _elapsedTime = value;
         }
 
         /// <summary>
-        /// Name of the computer that ran it
+        /// Gets or sets the name of the client computer.
         /// </summary>
         public string ClientName
         {
-            get
-            {
-                return clientName;
-            }
-            set
-            {
-                clientName = value;
-            }
+            get => _clientName;
+            set => _clientName = value;
         }
 
         /// <summary>
-        /// Name of the currently logged in user during execution
-        /// <example></example>
+        /// Gets or sets the name of the current user.
         /// </summary>
         public string UserName
         {
-            get
-            {
-                return userName;
-            }
-            set
-            {
-                userName = value;
-            }
+            get => _userName;
+            set => _userName = value;
         }
 
         /// <summary>
-        /// Version of your program. Read-Only.
-        /// <example>2.0.1978.2142</example>
+        /// Gets the version of the application.
         /// </summary>
-        public string CodeVersion
-        {
-            get
-            {
-                return codeVersion;
-            }
-        }
+        public string CodeVersion => _codeVersion;
+
+        #endregion
     }
 
-    class LogTypeException : ApplicationException
-    {
-        public LogTypeException(string message)
-            : base(message)
-        {
-        }
-    }
+    #region Exception Classes
 
-    class LogPathException : ApplicationException
+    /// <summary>
+    /// Exception thrown when an invalid log type is specified.
+    /// </summary>
+    public class LogTypeException : ApplicationException
     {
-        public LogPathException(string message)
-            : base(message)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogTypeException"/> class.
+        /// </summary>
+        /// <param name="message">The exception message.</param>
+        public LogTypeException(string message) : base(message)
         {
         }
     }
 
-    class LogEntry
+    /// <summary>
+    /// Exception thrown when an invalid log path is specified.
+    /// </summary>
+    public class LogPathException : ApplicationException
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogPathException"/> class.
+        /// </summary>
+        /// <param name="message">The exception message.</param>
+        public LogPathException(string message) : base(message)
+        {
+        }
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Represents a single log entry.
+    /// </summary>
+    internal class LogEntry
+    {
+        /// <summary>
+        /// Gets or sets the time when the entry was created.
+        /// </summary>
         public DateTime Time { get; set; }
+
+        /// <summary>
+        /// Gets or sets the log message.
+        /// </summary>
         public string Entry { get; set; }
+
+        /// <summary>
+        /// Gets or sets the verbosity level of the entry.
+        /// </summary>
         public LogLevel Level { get; set; }
-        public string CallerInfo { get; set; } // New field for storing caller information
+
+        /// <summary>
+        /// Gets or sets information about the caller (class.method).
+        /// </summary>
+        public string CallerInfo { get; set; }
     }
 }

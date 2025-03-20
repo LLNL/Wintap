@@ -235,7 +235,7 @@
     <PostBuildEvent>reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy /v Enabled /t REG_DWORD /d 1 /f</PostBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <StartupObject></StartupObject>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <AssemblyVersion>7.0.0.0</AssemblyVersion>
