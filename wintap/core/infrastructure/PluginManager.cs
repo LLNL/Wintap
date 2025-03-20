@@ -43,6 +43,8 @@ namespace gov.llnl.wintap.core.infrastructure
         private WintapLogger log;
         private Watchdog watchdog;
         private ConcurrentQueue<Runnable> runQueue;
+        private readonly HashSet<string> loadedPluginNames = new HashSet<string>();
+        private IsolatedPluginCatalog isolatedCatalog;
 
         // MEF schema
         private CompositionContainer mefContainer;
@@ -88,6 +90,23 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 WintapLogger.Log.Append($"Fatal error in plugin registration: {ex.Message}", LogLevel.Always);
                 throw;
+            }
+        }
+
+        private void UnloadPluginDomain(string pluginName)
+        {
+            try
+            {
+                if (isolatedCatalog != null)
+                {
+                    isolatedCatalog.UnloadPlugin(pluginName);
+                    loadedPluginNames.Remove(pluginName);
+                    WintapLogger.Log.Append($"Successfully unloaded plugin domain for {pluginName}", LogLevel.Always);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error unloading plugin domain for {pluginName}: {ex.Message}", LogLevel.Always);
             }
         }
 
@@ -471,26 +490,81 @@ namespace gov.llnl.wintap.core.infrastructure
             watchdog.Stop();
             try
             {
-                foreach (var subscriber in subscribersEtw)
+                // Shutdown plugins in reverse order
+                foreach (var provider in providers.Reverse())
                 {
-                    UnregisterPlugin(subscriber.Value, subscriber.Metadata.Name, "ETW Subscriber");
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down provider plugin: {provider.Metadata.Name}", LogLevel.Always);
+                        provider.Value.Shutdown();
+                        UnloadPluginDomain(provider.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down provider {provider.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
                 }
 
-                foreach (var runner in runners)
+                foreach (var runner in runners.Reverse())
                 {
-                    UnregisterPlugin(runner.Value, runner.Metadata.Name, "Runner", r => r.RunShutdown());
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down runner: {runner.Metadata.Name}", LogLevel.Always);
+                        runner.Value.RunShutdown();
+                        UnloadPluginDomain(runner.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down runner {runner.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
                 }
 
-                foreach (var subscriber in subscribers)
+                foreach (var subscriber in subscribers.Reverse())
                 {
-                    UnregisterPlugin(subscriber.Value, subscriber.Metadata.Name, "Subscriber", s => s.Shutdown());
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down subscriber: {subscriber.Metadata.Name}", LogLevel.Always);
+                        subscriber.Value.Shutdown();
+                        UnloadPluginDomain(subscriber.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down subscriber {subscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
                 }
+
+                foreach (var etwSubscriber in subscribersEtw.Reverse())
+                {
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down ETW subscriber: {etwSubscriber.Metadata.Name}", LogLevel.Always);
+                        etwSubscriber.Value.Shutdown();
+                        UnloadPluginDomain(etwSubscriber.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down ETW subscriber {etwSubscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
+                }
+
+                // Unload any remaining plugin domains
+                foreach (var pluginName in loadedPluginNames.ToList())
+                {
+                    UnloadPluginDomain(pluginName);
+                }
+
+                loadedPluginNames.Clear();
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error during plugin unregistration: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error during plugin cleanup: {ex.Message}", LogLevel.Always);
             }
+
         }
+
+
+
+
 
         private void UnregisterPlugin<T>(T plugin, string name, string type, Action<T> shutdownAction = null)
         {
