@@ -1,10 +1,4 @@
-﻿/*
- * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
- * Produced at the Lawrence Livermore National Laboratory.
- * All rights reserved.
- */
-
-using com.espertech.esper.client;
+﻿using com.espertech.esper.client;
 using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
@@ -24,13 +18,22 @@ using gov.llnl.wintap.core.etl;
 using static gov.llnl.wintap.Interfaces;
 using com.espertech.esper.runtime.client;
 using com.espertech.esper.common.client;
+using System.Threading.Tasks;
+using System.Reflection;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
-    /// <summary>
-    /// lifecycle management of Wintap plugins.  
-    /// Based on the Managed Extensibilty Framework:  https://docs.microsoft.com/en-us/dotnet/framework/mef/
-    /// </summary>
+    public class Runnable
+    {
+        public Lazy<IRun, IRunData> RunPlugin { get; set; }
+        public TimeSpan RunInterval { get; set; }
+        public DateTime LastRan { get; set; }
+        public string RequiredHost { get; set; }
+        public bool IsRunning { get; set; }
+        public TimeSpan MaxTTL { get; set; }
+        public TimeSpan PollRunIntervalRegistry { get; set; }
+    }
+
     public class PluginManager
     {
         public static int PluginCount = 0;
@@ -39,7 +42,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private bool doETL = false;
         private WintapLogger log;
         private Watchdog watchdog;
-        private ConcurrentQueue<Runnable> runQueue;   
+        private ConcurrentQueue<Runnable> runQueue;
 
         // MEF schema
         private CompositionContainer mefContainer;
@@ -56,160 +59,327 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal PluginManager()
         {
-            WintapLogger.Log.Append("Plugin manager is starting ", LogLevel.Always);
+            WintapLogger.Log.Append("Plugin manager is starting", LogLevel.Always);
             runQueue = new ConcurrentQueue<Runnable>();
             etl = new WintapETL();
             doETL = etl.Start();
 
-            WintapLogger.Log.Append("Parquet serialization for this session: " + doETL, LogLevel.Always);
-            
+            // Initialize the exception handler
+            PluginExceptionHandler.Instance.Initialize();
+
+            WintapLogger.Log.Append($"Parquet serialization for this session: {doETL}", LogLevel.Always);
         }
 
-        /// <summary>
-        /// Lazy loads DLLs from the Plugins directory 
-        /// </summary>
-        /// <param name="config"></param>
-        /// <param name="epProvider"></param>
-        /// <returns></returns>
         internal void RegisterPlugins(Watchdog _watchdog)
         {
-            watchdog = _watchdog;
-            watchdog.Start();
-            WintapLogger.Log.Append($"Loading plugins from: {Strings.FilePluginPath}", LogLevel.Always);
-            IsolatedPluginCatalog isolatedCatalog = new IsolatedPluginCatalog(Strings.FilePluginPath);
-            mefContainer = new CompositionContainer(isolatedCatalog);
-            mefContainer.ComposeParts(this);
-            PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
-            // SUBSCRIBERS
-            foreach (Lazy<ISubscribe, ISubscribeData> subscriber in subscribers)
+            try
             {
-                WintapLogger.Log.Append("loading Wintap subscriber: " + subscriber.Metadata.Name, LogLevel.Always);
-                try
+                watchdog = _watchdog;
+                watchdog.Start();
+                WintapLogger.Log.Append($"Loading plugins from: {Strings.FilePluginPath}", LogLevel.Always);
+
+                LoadPluginAssemblies();
+                RegisterEventHandlers();
+                StartPluginScheduler();
+
+                WintapLogger.Log.Append($"PluginManager: done registering plugins. Total plugin count: {PluginCount}", LogLevel.Always);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Fatal error in plugin registration: {ex.Message}", LogLevel.Always);
+                throw;
+            }
+        }
+
+        private void LoadPluginAssemblies()
+        {
+            try
+            {
+                IsolatedPluginCatalog isolatedCatalog = new IsolatedPluginCatalog(Strings.FilePluginPath);
+                mefContainer = new CompositionContainer(isolatedCatalog);
+                mefContainer.ComposeParts(this);
+                PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                foreach (Exception loaderException in ex.LoaderExceptions)
+                {
+                    WintapLogger.Log.Append($"Loader exception: {loaderException}", LogLevel.Always);
+                }
+                throw;
+            }
+        }
+
+        private void RegisterEventHandlers()
+        {
+            // Register subscribers
+            foreach (var subscriber in subscribers)
+            {
+                RegisterSubscriber(subscriber);
+            }
+
+            // Register ETW subscribers
+            foreach (var consumer in subscribersEtw)
+            {
+                RegisterEtwSubscriber(consumer);
+            }
+
+            // Register runners
+            foreach (var runner in runners)
+            {
+                RegisterRunner(runner);
+            }
+
+            // Register providers
+            foreach (var provider in providers)
+            {
+                RegisterProvider(provider);
+            }
+
+            // Register queries if enabled
+            if (queryPlugins?.Any() == true)
+            {
+                foreach (var queryPlugin in queryPlugins)
+                {
+                    RegisterQueryPlugin(queryPlugin);
+                }
+            }
+
+            // Set up Esper event routing
+            ConfigureEsperEventRouting();
+        }
+
+        private void RegisterSubscriber(Lazy<ISubscribe, ISubscribeData> subscriber)
+        {
+            var pluginName = subscriber.Metadata.Name;
+            WintapLogger.Log.Append($"Loading Wintap subscriber: {pluginName}", LogLevel.Always);
+
+            try
+            {
+                PluginExceptionHandler.Instance.WrapPluginMethod(() =>
                 {
                     EventFlags eventFlags = subscriber.Value.Startup();
                     enableEventFlags(eventFlags);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("Error loading subscriber " + subscriber.Metadata.Name + ":  " + ex.Message, LogLevel.Always);
-                }
+                }, pluginName);
             }
-            // ETW Subscribers
-            foreach (Lazy<ISubscribeEtw, ISubscribeEtwData> consumer in subscribersEtw)
+            catch (Exception ex)
             {
-                WintapLogger.Log.Append("loading ETW subscriber: " + consumer.Metadata.Name, LogLevel.Always);
-                try
+                WintapLogger.Log.Append($"Error loading subscriber {pluginName}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void RegisterEtwSubscriber(Lazy<ISubscribeEtw, ISubscribeEtwData> consumer)
+        {
+            var pluginName = consumer.Metadata.Name;
+            WintapLogger.Log.Append($"Loading ETW subscriber: {pluginName}", LogLevel.Always);
+
+            try
+            {
+                PluginExceptionHandler.Instance.WrapPluginMethod(() =>
                 {
                     List<string> etwProviders = consumer.Value.Startup();
                     enableDynamicEtwProviders(etwProviders);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("Error loading ETW subsriber " + consumer.Metadata.Name + ": " + ex.Message, LogLevel.Always);
-                }
+                }, pluginName);
             }
-            // RUNNERS
-            foreach (Lazy<IRun, IRunData> runner in runners)
+            catch (Exception ex)
             {
-                WintapLogger.Log.Append("loading runner: " + runner.Metadata.Name, LogLevel.Always);
-                try
+                WintapLogger.Log.Append($"Error loading ETW subscriber {pluginName}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void RegisterRunner(Lazy<IRun, IRunData> runner)
+        {
+            var pluginName = runner.Metadata.Name;
+            WintapLogger.Log.Append($"Loading runner: {pluginName}", LogLevel.Always);
+
+            try
+            {
+                PluginExceptionHandler.Instance.WrapPluginMethod(() =>
                 {
-                    RunManifest runManifest = runner.Value.RunStartup();
-                    Runnable runnable = new Runnable(runner, runManifest);
+                    var runManifest = runner.Value.RunStartup();
+                    var maxTTL = runManifest.MaxRuntime;
+                    var requiredHost = runManifest.RequiredHost;
+                    var interval = runManifest.Interval;
+                    var runnable = CreateRunnable(runner, maxTTL, requiredHost, interval);
                     runQueue.Enqueue(runnable);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("Error loading RUnner " + runner.Metadata.Name + ": " + ex.Message, LogLevel.Always);
-                }
+                }, pluginName);
             }
-            // QUERIES: Esper Query Plugins
-            //  TODO:  esper 8 removed userData from EPStatements - need to rethink this.
-            //foreach (Lazy<IQuery, IQueryData> queryPlugin in queryPlugins)
-            //{
-            //    WintapLogger.Log.Append("loading query plugin: " + queryPlugin.Metadata.Name, LogLevel.Always);
-            //    try
-            //    {
-            //        List<EventQuery> queries = queryPlugin.Value.Startup();
-            //        registerQueries(queries, queryPlugin.Metadata.Name);
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        WintapLogger.Log.Append("Error loading Query plugin " + queryPlugin.Metadata.Name + ": " + ex.Message, LogLevel.Always);
-            //    }
-            //}
-            // PROVIDERS: data generating plugins
-            foreach (Lazy<IProvide, IProvideData> provider in providers)
+            catch (Exception ex)
             {
-                WintapLogger.Log.Append("loading provider plugin: " + provider.Metadata.Name, LogLevel.Always);
-                try
+                WintapLogger.Log.Append($"Error loading Runner {pluginName}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void RegisterProvider(Lazy<IProvide, IProvideData> provider)
+        {
+            var pluginName = provider.Metadata.Name;
+            WintapLogger.Log.Append($"Loading provider plugin: {pluginName}", LogLevel.Always);
+
+            try
+            {
+                PluginExceptionHandler.Instance.WrapPluginMethod(() =>
                 {
                     provider.Value.Startup();
                     provider.Value.Events += Plugin_Events;
-                }
-                catch (Exception ex)
+                }, pluginName);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error loading provider plugin {pluginName}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void RegisterQueryPlugin(Lazy<IQuery, IQueryData> queryPlugin)
+        {
+            var pluginName = queryPlugin.Metadata.Name;
+            WintapLogger.Log.Append($"Loading query plugin: {pluginName}", LogLevel.Always);
+
+            try
+            {
+                PluginExceptionHandler.Instance.WrapPluginMethod(() =>
                 {
-                    WintapLogger.Log.Append("Error loading provider plugin " + provider.Metadata.Name + ": " + ex.Message, LogLevel.Always);
+                    List<EventQuery> queries = queryPlugin.Value.Startup();
+                    foreach (var query in queries)
+                    {
+                        RegisterEsperQuery(query, pluginName);
+                    }
+                }, pluginName);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error loading Query plugin {pluginName}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void RegisterEsperQuery(EventQuery query, string pluginName)
+        {
+            try
+            {
+                EPDeployment deployment = EventChannel.compileDeploy(EventChannel.EsperRuntime, query.Query);
+                deployment.Statements[0].Events += (sender, e) =>
+                {
+                    PluginExceptionHandler.Instance.WrapPluginMethod(() =>
+                    {
+                        HandleQueryEvent(sender, e, query, pluginName);
+                    }, pluginName);
+                };
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error registering Esper query for {pluginName}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void HandleQueryEvent(object sender, UpdateEventArgs e, EventQuery query, string pluginName)
+        {
+            QueryResult result = new QueryResult
+            {
+                Name = query.Name,
+                EventDetails = new List<KeyValuePair<string, string>>(),
+                Activity = new List<WintapMessage>()
+            };
+
+            foreach (var newEvent in e.NewEvents)
+            {
+                // Add event details
+                foreach (var propName in newEvent.EventType.PropertyNames)
+                {
+                    result.EventDetails.Add(new KeyValuePair<string, string>(
+                        propName,
+                        newEvent[propName]?.ToString() ?? "null"
+                    ));
+                }
+
+                // Add activity if it's a WintapMessage
+                if (newEvent.Underlying is WintapMessage msg)
+                {
+                    result.Activity.Add(msg);
                 }
             }
-            // Hook up event delivery from Esper to Subscribers
-            if (subscribers.Count() > 0 || doETL)
+
+            // Find the query plugin and process the result
+            var plugin = queryPlugins.FirstOrDefault(p => p.Metadata.Name == pluginName);
+            if (plugin != null)
+            {
+                plugin.Value.Process(result);
+            }
+        }
+
+        private void ConfigureEsperEventRouting()
+        {
+            if (subscribers.Any() || doETL)
             {
                 try
                 {
                     WintapLogger.Log.Append("Creating Subscriber EPL", LogLevel.Always);
-                    EPStatement processEvents = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'").Statements[0];
+                    EPStatement processEvents = EventChannel.compileDeploy(
+                        EventChannel.EsperRuntime,
+                        "SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'"
+                    ).Statements[0];
                     processEvents.Events += All_Events;
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("error creating epl: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append($"Error creating EPL: {ex.Message}", LogLevel.Always);
                 }
             }
-            if (subscribersEtw.Count() > 0)
+
+            if (subscribersEtw.Any())
             {
                 try
                 {
-                    // do not route plugin provided GenericMessages to ISubscribeEtw plugins
-                    EPStatement allWintapMsgs = EventChannel.compileDeploy(EventChannel.EsperRuntime, "SELECT * FROM WintapMessage WHERE MessageType = 'GenericMessage' AND GenericMessage.Provider != 'Plugin'").Statements[0];               
+                    EPStatement allWintapMsgs = EventChannel.compileDeploy(
+                        EventChannel.EsperRuntime,
+                        "SELECT * FROM WintapMessage WHERE MessageType = 'GenericMessage' AND GenericMessage.Provider != 'Plugin'"
+                    ).Statements[0];
                     allWintapMsgs.Events += AllGeneric_Events;
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("error creating epl: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append($"Error creating EPL: {ex.Message}", LogLevel.Always);
                 }
             }
-            // If Runners exist, create the background worker to schedule them
-            if (runQueue.Count > 0)
-            {
-                WintapLogger.Log.Append("Starting Run scheduler", LogLevel.Always);
-                BackgroundWorker scheduler = new BackgroundWorker();
-                scheduler.DoWork += Scheduler_DoWork;
-                scheduler.RunWorkerAsync();
-            }
-
-            WintapLogger.Log.Append("PluginManager: done registering plugins.  total plugin count: " + PluginCount, LogLevel.Always);
         }
 
         private void All_Events(object sender, UpdateEventArgs e)
         {
-            EventBean[] newEvents = e.NewEvents;
-            WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
-            for (int i = 0; i < newEvents.Count(); i++)
+            foreach (var consumer in subscribers)
             {
-                wmArray[i] = (WintapMessage)newEvents[i].Underlying;
-            }
-            foreach (Lazy<ISubscribe, ISubscribeData> consumer in subscribers)
-            {
-                foreach (WintapMessage msg in wmArray)
+                foreach (var newEvent in e.NewEvents)
                 {
                     try
                     {
-                        consumer.Value.Subscribe(msg);
+                        var msg = (WintapMessage)newEvent.Underlying;
+                        PluginExceptionHandler.Instance.WrapPluginMethod(() =>
+                        {
+                            consumer.Value.Subscribe(msg);
+                        }, consumer.Metadata.Name);
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append("could not deliver event to subscriber because: " + ex.Message, LogLevel.Debug);
+                        WintapLogger.Log.Append($"Could not deliver event to subscriber: {ex.Message}", LogLevel.Debug);
+                    }
+                }
+            }
+        }
+
+        private void AllGeneric_Events(object sender, UpdateEventArgs e)
+        {
+            foreach (var consumer in subscribersEtw)
+            {
+                foreach (var newEvent in e.NewEvents)
+                {
+                    try
+                    {
+                        var msg = (WintapMessage)newEvent.Underlying;
+                        PluginExceptionHandler.Instance.WrapPluginMethod(() =>
+                        {
+                            consumer.Value.Subscribe(msg);
+                        }, consumer.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Could not deliver GENERIC ETW event to subscriber: {ex.Message}", LogLevel.Debug);
                     }
                 }
             }
@@ -219,288 +389,275 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             try
             {
-                WintapMessage pluginEventData = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, WintapMessage.MessageTypeEnum.GenericMessage);
-                pluginEventData.GenericMessage = e.GenericEvent;
-                pluginEventData.ActivityType = WintapMessage.ActivityTypeEnum.Other; 
-                //EventChannel.Esper.EPRuntime.SendEvent(pluginEventData);
-                EventChannel.Send(pluginEventData);
+                var msg = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, WintapMessage.MessageTypeEnum.GenericMessage)
+                {
+                    GenericMessage = e.GenericEvent,
+                    ActivityType = WintapMessage.ActivityTypeEnum.Other
+                };
+                EventChannel.Send(msg);
             }
-            catch(Exception ex) 
+            catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error on plugin event: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append($"Error on plugin event: {ex.Message}", LogLevel.Debug);
             }
         }
 
-        private void enableDynamicEtwProviders(List<string> etwProviders)
+        private void StartPluginScheduler()
         {
-            foreach(string etwProvider in etwProviders)
+            if (runQueue.Count > 0)
             {
-                if(!DynamicEtwProviderList.Contains(etwProvider))
-                {
-                    DynamicEtwProviderList.Add(etwProvider);
-                }
+                WintapLogger.Log.Append("Starting Run scheduler", LogLevel.Always);
+                BackgroundWorker scheduler = new BackgroundWorker();
+                scheduler.DoWork += Scheduler_DoWork;
+                scheduler.RunWorkerAsync();
             }
         }
 
-        private void enableEventFlags(EventFlags eventFlags)
-        {
-
-            if(eventFlags.ToString().Contains("Process"))
-            {
-                Properties.Settings.Default.ProcessCollector = true;
-            }
-            if (eventFlags.ToString().Contains("FileActivity"))
-            {
-                Properties.Settings.Default.FileCollector = true;
-            }
-            if (eventFlags.ToString().Contains("RegistryActivity"))
-            {
-                Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector = true;
-            }
-            if (eventFlags.ToString().Contains("UdpPacket"))
-            {
-                Properties.Settings.Default.UdpCollector = true;
-            }
-            if (eventFlags.ToString().Contains("TcpConnection"))
-            {
-                Properties.Settings.Default.TcpCollector = true;
-            }
-            if (eventFlags.ToString().Contains("SessionChange"))
-            {
-                Properties.Settings.Default.SensCollector = true;
-            }
-            if (eventFlags.ToString().Contains("FocusChange"))
-            {
-                Properties.Settings.Default.MicrosoftWindowsWin32kCollector = true;
-            }
-            if(eventFlags.ToString().Contains("ImageLoad"))
-            {
-                Properties.Settings.Default.ImageLoadCollector = true;
-            }
-            if(eventFlags.ToString().Contains("WaitCursor"))
-            {
-                Properties.Settings.Default.MicrosoftWindowsWin32kCollector = true;
-            }
-        }
-
-        internal void UnregisterPlugins()
-        {
-            // TODO:  error handle per plugin.  Trap and log the exception message.
-            watchdog.Stop();
-            try
-            {
-                foreach (Lazy<ISubscribeEtw, ISubscribeEtwData> c in subscribersEtw)
-                {
-                    WintapLogger.Log.Append("Shutting down consumer: " + c.Metadata.Name, LogLevel.Always);
-                    c.Value.Shutdown();
-                }
-                foreach (Lazy<IRun, IRunData> r in runners)
-                {
-                    WintapLogger.Log.Append("Shutting down runner: " + r.Metadata.Name, LogLevel.Always);
-                    r.Value.RunShutdown();
-                }
-                foreach (Lazy<ISubscribe, ISubscribeData> s in subscribers)
-                {
-                    WintapLogger.Log.Append("Shutting down subscriber: " + s.Metadata.Name, LogLevel.Always);
-                    s.Value.Shutdown();
-                }
-            }
-            catch
-            {
-                WintapLogger.Log.Append("error shutting down one or more plugins", LogLevel.Always);
-            }
-        }
-
-        /// <summary>
-        /// Esper event handler for generic WintapMessage events, passes events to all ISubscriberEtw subscribers
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void AllGeneric_Events(object sender, UpdateEventArgs e)
-        {
-            EventBean[] newEvents = e.NewEvents;
-            try
-            {
-                WintapMessage[] wmArray = new WintapMessage[newEvents.Count()];
-                for (int i = 0; i < newEvents.Count(); i++)
-                {
-                    wmArray[i] = (WintapMessage)newEvents[i].Underlying;
-                }
-                foreach (Lazy<ISubscribeEtw, ISubscribeEtwData> consumer in subscribersEtw)
-                {
-                    foreach (WintapMessage msg in wmArray)
-                    {
-                        try
-                        {
-                            consumer.Value.Subscribe(msg);
-                        }
-                        catch(Exception ex)
-                        {
-                            WintapLogger.Log.Append("could not deliver GENERIC ETW event to subscriber because: " + ex.Message, LogLevel.Debug);
-                        }
-                    }
-                }
-            }
-            catch(Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR passing generic event to etw subscriber: " + ex.Message + "  " + ex.InnerException, LogLevel.Debug);
-            }
-        }
-
-        /// <summary>
-        /// Worker thread that executes Runnables
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void Scheduler_DoWork(object sender, DoWorkEventArgs e)
         {
             bool schedulerLoopAlive = true;
-            while (schedulerLoopAlive)
+            while (schedulerLoopAlive && !e.Cancel)
             {
-                for (int i = 0; i < runQueue.Count; i++)
-                {
-                    WintapLogger.Log.Append("Run Plug-in Scheduler is awake and looking for work", LogLevel.Always);
-                    Runnable runnable;
-                    runQueue.TryDequeue(out runnable);
-                    RegistryKey pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name);
-                    runnable.PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
-                    WintapLogger.Log.Append("Plugin manager is checking conditions for: " + runnable.RunPlugin.Metadata.Name + " last ran: " + runnable.LastRan + "  interval: " +
-                        ((runnable.PollRunIntervalRegistry.TotalMilliseconds == 0 || runnable.RunInterval.TotalMilliseconds < runnable.PollRunIntervalRegistry.TotalMilliseconds) &&
-                         runnable.RunInterval.TotalMilliseconds > 0 ?
-                         runnable.RunInterval : runnable.PollRunIntervalRegistry), LogLevel.Always);
-                    if (checkConditions(runnable))
-                    {
-                        try
-                        {
-                            runnable.LastRan = persistLastRan(runnable);  // record it first, failed RUN attempts will retry at thier next scheduled time
-                            watchdog.ProtectedRun(runnable);
-                        }
-                        catch (Exception ex)
-                        {
-                            WintapLogger.Log.Append("Error in plugin: " + ex.Message + "  wintap restart expected.  Run scheduler is aborting", LogLevel.Always);
-                            schedulerLoopAlive = false;
-                            break;
-                        }
-                    }
-                    runQueue.Enqueue(runnable);
-                }
-                WintapLogger.Log.Append("Run Plug-in Scheduler is going back to sleep", LogLevel.Always);
+                ProcessRunQueue(ref schedulerLoopAlive);
                 System.Threading.Thread.Sleep(60000);
             }
             WintapLogger.Log.Append("Plugin run scheduler is quitting", LogLevel.Always);
         }
 
+        private void ProcessRunQueue(ref bool schedulerLoopAlive)
+        {
+            for (int i = 0; i < runQueue.Count && schedulerLoopAlive; i++)
+            {
+                Runnable runnable;
+                if (runQueue.TryDequeue(out runnable))
+                {
+                    try
+                    {
+                        var pluginName = runnable.RunPlugin.Metadata.Name;
+                        PluginExceptionHandler.Instance.WrapPluginMethod(() =>
+                        {
+                            if (checkConditions(runnable))
+                            {
+                                ExecuteRunnable(runnable);
+                            }
+                        }, pluginName);
+                        runQueue.Enqueue(runnable);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error in plugin scheduler: {ex.Message}. Run scheduler is aborting", LogLevel.Always);
+                        schedulerLoopAlive = false;
+                    }
+                }
+            }
+        }
+
+        private void ExecuteRunnable(Runnable runnable)
+        {
+            try
+            {
+                runnable.LastRan = persistLastRan(runnable);
+                watchdog.ProtectedRun(runnable);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error executing runnable: {ex.Message}", LogLevel.Always);
+                throw;
+            }
+        }
+
+        internal void UnregisterPlugins()
+        {
+            watchdog.Stop();
+            try
+            {
+                foreach (var subscriber in subscribersEtw)
+                {
+                    UnregisterPlugin(subscriber.Value, subscriber.Metadata.Name, "ETW Subscriber");
+                }
+
+                foreach (var runner in runners)
+                {
+                    UnregisterPlugin(runner.Value, runner.Metadata.Name, "Runner", r => r.RunShutdown());
+                }
+
+                foreach (var subscriber in subscribers)
+                {
+                    UnregisterPlugin(subscriber.Value, subscriber.Metadata.Name, "Subscriber", s => s.Shutdown());
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error during plugin unregistration: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void UnregisterPlugin<T>(T plugin, string name, string type, Action<T> shutdownAction = null)
+        {
+            try
+            {
+                WintapLogger.Log.Append($"Shutting down {type}: {name}", LogLevel.Always);
+                if (shutdownAction != null)
+                {
+                    PluginExceptionHandler.Instance.WrapPluginMethod(() =>
+                    {
+                        shutdownAction(plugin);
+                    }, name);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error shutting down {type} {name}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        private void enableEventFlags(EventFlags eventFlags)
+        {
+            var flagsStr = eventFlags.ToString();
+
+            if (flagsStr.Contains("Process"))
+                Properties.Settings.Default.ProcessCollector = true;
+            if (flagsStr.Contains("FileActivity"))
+                Properties.Settings.Default.FileCollector = true;
+            if (flagsStr.Contains("RegistryActivity"))
+                Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector = true;
+            if (flagsStr.Contains("UdpPacket"))
+                Properties.Settings.Default.UdpCollector = true;
+            if (flagsStr.Contains("TcpConnection"))
+                Properties.Settings.Default.TcpCollector = true;
+            if (flagsStr.Contains("SessionChange"))
+                Properties.Settings.Default.SensCollector = true;
+            if (flagsStr.Contains("FocusChange"))
+                Properties.Settings.Default.MicrosoftWindowsWin32kCollector = true;
+            if (flagsStr.Contains("ImageLoad"))
+                Properties.Settings.Default.ImageLoadCollector = true;
+            if (flagsStr.Contains("WaitCursor"))
+                Properties.Settings.Default.MicrosoftWindowsWin32kCollector = true;
+        }
+
+        private void enableDynamicEtwProviders(List<string> etwProviders)
+        {
+            foreach (string provider in etwProviders)
+            {
+                if (!DynamicEtwProviderList.Contains(provider))
+                {
+                    DynamicEtwProviderList.Add(provider);
+                }
+            }
+        }
+
         private bool checkConditions(Runnable runnable)
         {
-            bool timeCondtionToRun = false;
-            bool clearToRun = false;
-            if ((runnable.PollRunIntervalRegistry.TotalMilliseconds == 0 || runnable.RunInterval.TotalMilliseconds < runnable.PollRunIntervalRegistry.TotalMilliseconds)
-                && runnable.RunInterval.TotalMilliseconds > 0)
-            {
-                if (DateTime.Now - runnable.LastRan >= runnable.RunInterval)
-                {
-                    timeCondtionToRun = true;
+            var timeConditionToRun = CheckTimeCondition(runnable);
+            var hostConditionMet = CheckHostCondition(runnable);
+            return timeConditionToRun && hostConditionMet;
+        }
 
-                }
-            }
-            else
-            {
-                if (runnable.PollRunIntervalRegistry.TotalMilliseconds > 0 && DateTime.Now - runnable.LastRan >= runnable.PollRunIntervalRegistry)
-                {
-                    timeCondtionToRun = true;
-                }
-            }
-            if (timeCondtionToRun)
-            {
-                if (runnable.RequiredHost == "NONE")
-                {
-                    clearToRun = true;  // no network accessible host required
-                }
-                else if (pingHost(runnable.RequiredHost))
-                {
-                    clearToRun = true;  // time to run, we need a host and host is available
-                }
-                else
-                {
-                    WintapLogger.Log.Append("Plugin " + runnable.RunPlugin.Metadata.Name + " is scheduled to run but failed eligibilty checks.", LogLevel.Always);
-                }
-            }
-            return clearToRun;
+        private bool CheckTimeCondition(Runnable runnable)
+        {
+            var useConfigInterval = runnable.PollRunIntervalRegistry.TotalMilliseconds > 0;
+            var interval = useConfigInterval ? runnable.PollRunIntervalRegistry : runnable.RunInterval;
+
+            return interval.TotalMilliseconds > 0 &&
+                   DateTime.Now - runnable.LastRan >= interval;
+        }
+
+        private bool CheckHostCondition(Runnable runnable)
+        {
+            if (runnable.RequiredHost == "NONE")
+                return true;
+
+            return pingHost(runnable.RequiredHost);
         }
 
         private DateTime persistLastRan(Runnable runnable)
         {
-            DateTime lastRan = DateTime.Now;
+            var lastRan = DateTime.Now;
             try
             {
-                RegistryKey pluginKey = Registry.LocalMachine.CreateSubKey(Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name, RegistryKeyPermissionCheck.ReadWriteSubTree);
-                pluginKey.SetValue("LastRan", lastRan.ToString());
-                pluginKey.Flush();
-                pluginKey.Close();
-                pluginKey.Dispose();
+                using (var pluginKey = Registry.LocalMachine.CreateSubKey(
+                    Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name,
+                    RegistryKeyPermissionCheck.ReadWriteSubTree))
+                {
+                    pluginKey.SetValue("LastRan", lastRan.ToString());
+                    pluginKey.Flush();
+                }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error updating LastRan registry key: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append($"Error updating LastRan registry key: {ex.Message}", LogLevel.Always);
             }
             return lastRan;
         }
 
+        private Runnable CreateRunnable(Lazy<IRun, IRunData> runPlugin, TimeSpan maxTTL, string requiredHost, TimeSpan interval)
+        {
+            try
+            {
+                var runnable = new Runnable
+                {
+                    RunPlugin = runPlugin,
+                    MaxTTL = maxTTL,
+                    RequiredHost = requiredHost,
+                    RunInterval = interval,
+                    LastRan = DateTime.Now - new TimeSpan(24, 0, 0), // Default to time expiry on all plugins
+                    IsRunning = false
+                };
 
-        // attribution: https://msdn.microsoft.com/en-us/library/system.net.networkinformation.ping%28v=vs.110%29.aspx?f=255&MSPPError=-2147217396
+                // Try to get last run time from registry
+                try
+                {
+                    using (var pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + runPlugin.Metadata.Name))
+                    {
+                        if (pluginKey != null)
+                        {
+                            var lastRanStr = pluginKey.GetValue("LastRan")?.ToString();
+                            if (!string.IsNullOrEmpty(lastRanStr))
+                            {
+                                runnable.LastRan = DateTime.Parse(lastRanStr);
+                            }
+
+                            var runIntervalStr = pluginKey.GetValue("RunInterval")?.ToString();
+                            if (!string.IsNullOrEmpty(runIntervalStr))
+                            {
+                                runnable.PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(runIntervalStr));
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Error reading plugin registry settings: {ex.Message}", LogLevel.Always);
+                }
+
+                return runnable;
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error creating runnable: {ex.Message}", LogLevel.Always);
+                throw;
+            }
+        }
+
         private bool pingHost(string hostname)
         {
-            bool result = false;
-            Ping pingSender = new Ping();
-            PingOptions options = new PingOptions();
-            options.DontFragment = true;
-            string data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-            byte[] buffer = Encoding.ASCII.GetBytes(data);
-            int timeout = 120;
-            try
+            using (var pingSender = new Ping())
             {
-                PingReply reply = pingSender.Send(hostname, timeout, buffer, options);
-                if (reply.Status == IPStatus.Success)
+                try
                 {
-                    result = true;
+                    var options = new PingOptions { DontFragment = true };
+                    var data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+                    var buffer = Encoding.ASCII.GetBytes(data);
+                    var timeout = 120;
+
+                    var reply = pingSender.Send(hostname, timeout, buffer, options);
+                    return reply.Status == IPStatus.Success;
+                }
+                catch (Exception)
+                {
+                    return false;
                 }
             }
-            catch (Exception ex) { }
-            pingSender.Dispose();
-            return result;
-        }
-    }
-
-    public class Runnable
-    {
-        public Lazy<IRun, IRunData> RunPlugin { get; }
-        public TimeSpan RunInterval { get; set; }
-        public DateTime LastRan { get; set; }
-        public string RequiredHost { get; set; }
-        public bool IsRunning { get; set; }
-        public TimeSpan MaxTTL { get; set; }
-        public TimeSpan PollRunIntervalRegistry { get; set; }
-
-        public Runnable(Lazy<IRun, IRunData> runnable, RunManifest runManifest)
-        {
-            RequiredHost = runManifest.RequiredHost;
-            RunInterval = runManifest.Interval;
-            RunPlugin = runnable;
-            try
-            {
-                MaxTTL = runManifest.MaxRuntime;
-            }
-            catch (Exception ex) { }
-            LastRan = DateTime.Now - new TimeSpan(24, 0, 0);  // default to time expiry on all plugins.
-            try
-            {
-                RegistryKey pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + this.RunPlugin.Metadata.Name);
-                LastRan = DateTime.Parse(pluginKey.GetValue("LastRan").ToString());
-                PollRunIntervalRegistry = TimeSpan.FromSeconds(Convert.ToInt32(pluginKey.GetValue("RunInterval")));
-                pluginKey.Close();
-                pluginKey.Dispose();
-            }
-            catch (Exception ex) { }
         }
     }
 }
