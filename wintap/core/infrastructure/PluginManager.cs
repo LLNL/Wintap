@@ -34,44 +34,76 @@ namespace gov.llnl.wintap.core.infrastructure
         public TimeSpan PollRunIntervalRegistry { get; set; }
     }
 
+    /// <summary>
+    /// Manages the loading, execution, and lifecycle of Wintap plugins.
+    /// Provides MEF-based plugin discovery and isolated plugin execution.
+    /// </summary>
     public class PluginManager
     {
-        public static int PluginCount = 0;
-        internal static List<string> DynamicEtwProviderList = new List<string>();
-        private WintapETL etl;
-        private bool doETL = false;
-        private WintapLogger log;
-        private Watchdog watchdog;
-        private ConcurrentQueue<Runnable> runQueue;
-        private readonly HashSet<string> loadedPluginNames = new HashSet<string>();
+        #region Fields and Properties
+
+        // Static fields
+        public static int PluginCount { get; private set; }
+        internal static List<string> DynamicEtwProviderList { get; } = new List<string>();
+
+        // Private fields
+        private readonly WintapETL etl;
+        private readonly bool doETL;
+        private readonly ConcurrentQueue<Runnable> runQueue;
+        private readonly HashSet<string> loadedPluginNames;
         private IsolatedPluginCatalog isolatedCatalog;
+        private Watchdog watchdog;
 
-        // MEF schema
+        // MEF container
         private CompositionContainer mefContainer;
-        [ImportMany]
-        IEnumerable<Lazy<ISubscribe, ISubscribeData>> subscribers;
-        [ImportMany]
-        IEnumerable<Lazy<ISubscribeEtw, ISubscribeEtwData>> subscribersEtw;
-        [ImportMany]
-        IEnumerable<Lazy<IRun, IRunData>> runners;
-        [ImportMany]
-        IEnumerable<Lazy<IQuery, IQueryData>> queryPlugins;
-        [ImportMany]
-        IEnumerable<Lazy<IProvide, IProvideData>> providers;
 
+        // MEF imports
+        [ImportMany]
+        private IEnumerable<Lazy<ISubscribe, ISubscribeData>> subscribers;
+
+        [ImportMany]
+        private IEnumerable<Lazy<ISubscribeEtw, ISubscribeEtwData>> subscribersEtw;
+
+        [ImportMany]
+        private IEnumerable<Lazy<IRun, IRunData>> runners;
+
+        [ImportMany]
+        private IEnumerable<Lazy<IQuery, IQueryData>> queryPlugins;
+
+        [ImportMany]
+        private IEnumerable<Lazy<IProvide, IProvideData>> providers;
+
+        #endregion
+
+        #region Constructor
+
+        /// <summary>
+        /// Initializes a new instance of the PluginManager class.
+        /// </summary>
         internal PluginManager()
         {
             WintapLogger.Log.Append("Plugin manager is starting", LogLevel.Always);
+
             runQueue = new ConcurrentQueue<Runnable>();
+            loadedPluginNames = new HashSet<string>();
+
             etl = new WintapETL();
             doETL = etl.Start();
 
-            // Initialize the exception handler
+            // Initialize exception handler
             PluginExceptionHandler.Instance.Initialize();
 
             WintapLogger.Log.Append($"Parquet serialization for this session: {doETL}", LogLevel.Always);
         }
 
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Registers and initializes all discovered plugins.
+        /// </summary>
+        /// <param name="_watchdog">The watchdog instance to monitor plugin execution.</param>
         internal void RegisterPlugins(Watchdog _watchdog)
         {
             try
@@ -93,28 +125,98 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        private void UnloadPluginDomain(string pluginName)
+        /// <summary>
+        /// Unregisters and performs cleanup for all plugins.
+        /// </summary>
+        internal void UnregisterPlugins()
         {
+            watchdog.Stop();
+
             try
             {
-                if (isolatedCatalog != null)
+                // Unregister providers
+                foreach (var provider in providers.Reverse())
                 {
-                    isolatedCatalog.UnloadPlugin(pluginName);
-                    loadedPluginNames.Remove(pluginName);
-                    WintapLogger.Log.Append($"Successfully unloaded plugin domain for {pluginName}", LogLevel.Always);
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down provider plugin: {provider.Metadata.Name}", LogLevel.Always);
+                        provider.Value.Shutdown();
+                        UnloadPluginDomain(provider.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down provider {provider.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
                 }
+
+                // Unregister runners
+                foreach (var runner in runners.Reverse())
+                {
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down runner: {runner.Metadata.Name}", LogLevel.Always);
+                        runner.Value.RunShutdown();
+                        UnloadPluginDomain(runner.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down runner {runner.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
+                }
+
+                // Unregister subscribers
+                foreach (var subscriber in subscribers.Reverse())
+                {
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down subscriber: {subscriber.Metadata.Name}", LogLevel.Always);
+                        subscriber.Value.Shutdown();
+                        UnloadPluginDomain(subscriber.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down subscriber {subscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
+                }
+
+                // Unregister ETW subscribers
+                foreach (var etwSubscriber in subscribersEtw.Reverse())
+                {
+                    try
+                    {
+                        WintapLogger.Log.Append($"Shutting down ETW subscriber: {etwSubscriber.Metadata.Name}", LogLevel.Always);
+                        etwSubscriber.Value.Shutdown();
+                        UnloadPluginDomain(etwSubscriber.Metadata.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Error shutting down ETW subscriber {etwSubscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                    }
+                }
+
+                // Unload remaining plugin domains
+                foreach (var pluginName in loadedPluginNames.ToList())
+                {
+                    UnloadPluginDomain(pluginName);
+                }
+
+                loadedPluginNames.Clear();
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error unloading plugin domain for {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error during plugin cleanup: {ex.Message}", LogLevel.Always);
             }
         }
+
+        #endregion
+
+        #region Plugin Registration Methods
 
         private void LoadPluginAssemblies()
         {
             try
             {
-                IsolatedPluginCatalog isolatedCatalog = new IsolatedPluginCatalog(Strings.FilePluginPath);
+                isolatedCatalog = new IsolatedPluginCatalog(Strings.FilePluginPath);
                 mefContainer = new CompositionContainer(isolatedCatalog);
                 mefContainer.ComposeParts(this);
                 PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
@@ -164,7 +266,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
 
-            // Set up Esper event routing
             ConfigureEsperEventRouting();
         }
 
@@ -289,41 +390,6 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        private void HandleQueryEvent(object sender, UpdateEventArgs e, EventQuery query, string pluginName)
-        {
-            QueryResult result = new QueryResult
-            {
-                Name = query.Name,
-                EventDetails = new List<KeyValuePair<string, string>>(),
-                Activity = new List<WintapMessage>()
-            };
-
-            foreach (var newEvent in e.NewEvents)
-            {
-                // Add event details
-                foreach (var propName in newEvent.EventType.PropertyNames)
-                {
-                    result.EventDetails.Add(new KeyValuePair<string, string>(
-                        propName,
-                        newEvent[propName]?.ToString() ?? "null"
-                    ));
-                }
-
-                // Add activity if it's a WintapMessage
-                if (newEvent.Underlying is WintapMessage msg)
-                {
-                    result.Activity.Add(msg);
-                }
-            }
-
-            // Find the query plugin and process the result
-            var plugin = queryPlugins.FirstOrDefault(p => p.Metadata.Name == pluginName);
-            if (plugin != null)
-            {
-                plugin.Value.Process(result);
-            }
-        }
-
         private void ConfigureEsperEventRouting()
         {
             if (subscribers.Any() || doETL)
@@ -359,6 +425,10 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
         }
+
+        #endregion
+
+        #region Event Handlers
 
         private void All_Events(object sender, UpdateEventArgs e)
         {
@@ -420,6 +490,66 @@ namespace gov.llnl.wintap.core.infrastructure
                 WintapLogger.Log.Append($"Error on plugin event: {ex.Message}", LogLevel.Debug);
             }
         }
+
+        private void HandleQueryEvent(object sender, UpdateEventArgs e, EventQuery query, string pluginName)
+        {
+            QueryResult result = new QueryResult
+            {
+                Name = query.Name,
+                EventDetails = new List<KeyValuePair<string, string>>(),
+                Activity = new List<WintapMessage>()
+            };
+
+            foreach (var newEvent in e.NewEvents)
+            {
+                // Add event details
+                foreach (var propName in newEvent.EventType.PropertyNames)
+                {
+                    result.EventDetails.Add(new KeyValuePair<string, string>(
+                        propName,
+                        newEvent[propName]?.ToString() ?? "null"
+                    ));
+                }
+
+                // Add activity if it's a WintapMessage
+                if (newEvent.Underlying is WintapMessage msg)
+                {
+                    result.Activity.Add(msg);
+                }
+            }
+
+            // Find the query plugin and process the result
+            var plugin = queryPlugins.FirstOrDefault(p => p.Metadata.Name == pluginName);
+            if (plugin != null)
+            {
+                plugin.Value.Process(result);
+            }
+        }
+
+        #endregion
+
+        #region Plugin Domain Management
+
+        private void UnloadPluginDomain(string pluginName)
+        {
+            try
+            {
+                if (isolatedCatalog != null)
+                {
+                    isolatedCatalog.UnloadPlugin(pluginName);
+                    loadedPluginNames.Remove(pluginName);
+                    WintapLogger.Log.Append($"Successfully unloaded plugin domain for {pluginName}", LogLevel.Always);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error unloading plugin domain for {pluginName}: {ex.Message}", LogLevel.Always);
+            }
+        }
+
+        #endregion
+
+        #region Plugin Execution Methods
 
         private void StartPluginScheduler()
         {
@@ -485,105 +615,9 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        internal void UnregisterPlugins()
-        {
-            watchdog.Stop();
-            try
-            {
-                // Shutdown plugins in reverse order
-                foreach (var provider in providers.Reverse())
-                {
-                    try
-                    {
-                        WintapLogger.Log.Append($"Shutting down provider plugin: {provider.Metadata.Name}", LogLevel.Always);
-                        provider.Value.Shutdown();
-                        UnloadPluginDomain(provider.Metadata.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        WintapLogger.Log.Append($"Error shutting down provider {provider.Metadata.Name}: {ex.Message}", LogLevel.Always);
-                    }
-                }
+        #endregion
 
-                foreach (var runner in runners.Reverse())
-                {
-                    try
-                    {
-                        WintapLogger.Log.Append($"Shutting down runner: {runner.Metadata.Name}", LogLevel.Always);
-                        runner.Value.RunShutdown();
-                        UnloadPluginDomain(runner.Metadata.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        WintapLogger.Log.Append($"Error shutting down runner {runner.Metadata.Name}: {ex.Message}", LogLevel.Always);
-                    }
-                }
-
-                foreach (var subscriber in subscribers.Reverse())
-                {
-                    try
-                    {
-                        WintapLogger.Log.Append($"Shutting down subscriber: {subscriber.Metadata.Name}", LogLevel.Always);
-                        subscriber.Value.Shutdown();
-                        UnloadPluginDomain(subscriber.Metadata.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        WintapLogger.Log.Append($"Error shutting down subscriber {subscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
-                    }
-                }
-
-                foreach (var etwSubscriber in subscribersEtw.Reverse())
-                {
-                    try
-                    {
-                        WintapLogger.Log.Append($"Shutting down ETW subscriber: {etwSubscriber.Metadata.Name}", LogLevel.Always);
-                        etwSubscriber.Value.Shutdown();
-                        UnloadPluginDomain(etwSubscriber.Metadata.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        WintapLogger.Log.Append($"Error shutting down ETW subscriber {etwSubscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
-                    }
-                }
-
-                // Unload any remaining plugin domains
-                foreach (var pluginName in loadedPluginNames.ToList())
-                {
-                    UnloadPluginDomain(pluginName);
-                }
-
-                loadedPluginNames.Clear();
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error during plugin cleanup: {ex.Message}", LogLevel.Always);
-            }
-
-        }
-
-
-
-
-
-        private void UnregisterPlugin<T>(T plugin, string name, string type, Action<T> shutdownAction = null)
-        {
-            try
-            {
-                WintapLogger.Log.Append($"Shutting down {type}: {name}", LogLevel.Always);
-                if (shutdownAction != null)
-                {
-                    PluginExceptionHandler.Instance.WrapPluginMethod(() =>
-                    {
-                        shutdownAction(plugin);
-                    }, name);
-                }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error shutting down {type} {name}: {ex.Message}", LogLevel.Always);
-            }
-        }
+        #region Helper Methods
 
         private void enableEventFlags(EventFlags eventFlags)
         {
@@ -733,5 +767,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
         }
+
+        #endregion
     }
 }
