@@ -269,6 +269,12 @@ namespace gov.llnl.wintap.core.infrastructure
             ConfigureEsperEventRouting();
         }
 
+        /// <summary>
+        /// Registers a Wintap subscriber plugin by initializing it and enabling its requested event collectors. 
+        /// The plugin specifies which events it wants to monitor (Process, File, Registry, etc.) via EventFlags,
+        /// and the corresponding collectors are automatically enabled in Wintap's settings.
+        /// </summary>
+        /// <param name="subscriber">The lazy-loaded subscriber plugin with its metadata</param>
         private void RegisterSubscriber(Lazy<ISubscribe, ISubscribeData> subscriber)
         {
             var pluginName = subscriber.Metadata.Name;
