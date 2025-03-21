@@ -82,18 +82,18 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         internal PluginManager()
         {
-            WintapLogger.Log.Append("Plugin manager is starting", LogLevel.Always);
+            WintapLogger.Log.Append("Plugin manager is starting", LogLevel.Info);
+
 
             runQueue = new ConcurrentQueue<Runnable>();
             loadedPluginNames = new HashSet<string>();
-
             etl = new WintapETL();
             doETL = etl.Start();
 
             // Initialize exception handler
             PluginExceptionHandler.Instance.Initialize();
 
-            WintapLogger.Log.Append($"Parquet serialization for this session: {doETL}", LogLevel.Always);
+            WintapLogger.Log.Append($"Parquet serialization for this session: {doETL}", LogLevel.Info);
         }
 
         #endregion
@@ -110,17 +110,17 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 watchdog = _watchdog;
                 watchdog.Start();
-                WintapLogger.Log.Append($"Loading plugins from: {Strings.FilePluginPath}", LogLevel.Always);
+                WintapLogger.Log.Append($"Loading plugins from: {Strings.FilePluginPath}", LogLevel.Info);
 
                 LoadPluginAssemblies();
                 RegisterEventHandlers();
                 StartPluginScheduler();
 
-                WintapLogger.Log.Append($"PluginManager: done registering plugins. Total plugin count: {PluginCount}", LogLevel.Always);
+                WintapLogger.Log.Append($"PluginManager: done registering plugins. Total plugin count: {PluginCount}", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Fatal error in plugin registration: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Fatal error in plugin registration: {ex.Message}", LogLevel.Info);
                 throw;
             }
         }
@@ -139,13 +139,13 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     try
                     {
-                        WintapLogger.Log.Append($"Shutting down provider plugin: {provider.Metadata.Name}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Shutting down provider plugin: {provider.Metadata.Name}", LogLevel.Info);
                         provider.Value.Shutdown();
                         UnloadPluginDomain(provider.Metadata.Name);
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append($"Error shutting down provider {provider.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Error shutting down provider {provider.Metadata.Name}: {ex.Message}", LogLevel.Info);
                     }
                 }
 
@@ -154,13 +154,13 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     try
                     {
-                        WintapLogger.Log.Append($"Shutting down runner: {runner.Metadata.Name}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Shutting down runner: {runner.Metadata.Name}", LogLevel.Info);
                         runner.Value.RunShutdown();
                         UnloadPluginDomain(runner.Metadata.Name);
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append($"Error shutting down runner {runner.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Error shutting down runner {runner.Metadata.Name}: {ex.Message}", LogLevel.Info);
                     }
                 }
 
@@ -169,13 +169,13 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     try
                     {
-                        WintapLogger.Log.Append($"Shutting down subscriber: {subscriber.Metadata.Name}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Shutting down subscriber: {subscriber.Metadata.Name}", LogLevel.Info);
                         subscriber.Value.Shutdown();
                         UnloadPluginDomain(subscriber.Metadata.Name);
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append($"Error shutting down subscriber {subscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Error shutting down subscriber {subscriber.Metadata.Name}: {ex.Message}", LogLevel.Info);
                     }
                 }
 
@@ -184,13 +184,13 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     try
                     {
-                        WintapLogger.Log.Append($"Shutting down ETW subscriber: {etwSubscriber.Metadata.Name}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Shutting down ETW subscriber: {etwSubscriber.Metadata.Name}", LogLevel.Info);
                         etwSubscriber.Value.Shutdown();
                         UnloadPluginDomain(etwSubscriber.Metadata.Name);
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append($"Error shutting down ETW subscriber {etwSubscriber.Metadata.Name}: {ex.Message}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Error shutting down ETW subscriber {etwSubscriber.Metadata.Name}: {ex.Message}", LogLevel.Info);
                     }
                 }
 
@@ -204,7 +204,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error during plugin cleanup: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error during plugin cleanup: {ex.Message}", LogLevel.Info);
             }
         }
 
@@ -225,7 +225,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 foreach (Exception loaderException in ex.LoaderExceptions)
                 {
-                    WintapLogger.Log.Append($"Loader exception: {loaderException}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Loader exception: {loaderException}", LogLevel.Info);
                 }
                 throw;
             }
@@ -278,7 +278,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private void RegisterSubscriber(Lazy<ISubscribe, ISubscribeData> subscriber)
         {
             var pluginName = subscriber.Metadata.Name;
-            WintapLogger.Log.Append($"Loading Wintap subscriber: {pluginName}", LogLevel.Always);
+            WintapLogger.Log.Append($"Loading Wintap subscriber: {pluginName}", LogLevel.Info);
 
             try
             {
@@ -290,14 +290,14 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading subscriber {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error loading subscriber {pluginName}: {ex.Message}", LogLevel.Info);
             }
         }
 
         private void RegisterEtwSubscriber(Lazy<ISubscribeEtw, ISubscribeEtwData> consumer)
         {
             var pluginName = consumer.Metadata.Name;
-            WintapLogger.Log.Append($"Loading ETW subscriber: {pluginName}", LogLevel.Always);
+            WintapLogger.Log.Append($"Loading ETW subscriber: {pluginName}", LogLevel.Info);
 
             try
             {
@@ -309,14 +309,14 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading ETW subscriber {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error loading ETW subscriber {pluginName}: {ex.Message}", LogLevel.Info);
             }
         }
 
         private void RegisterRunner(Lazy<IRun, IRunData> runner)
         {
             var pluginName = runner.Metadata.Name;
-            WintapLogger.Log.Append($"Loading runner: {pluginName}", LogLevel.Always);
+            WintapLogger.Log.Append($"Loading runner: {pluginName}", LogLevel.Info);
 
             try
             {
@@ -332,14 +332,14 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading Runner {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error loading Runner {pluginName}: {ex.Message}", LogLevel.Info);
             }
         }
 
         private void RegisterProvider(Lazy<IProvide, IProvideData> provider)
         {
             var pluginName = provider.Metadata.Name;
-            WintapLogger.Log.Append($"Loading provider plugin: {pluginName}", LogLevel.Always);
+            WintapLogger.Log.Append($"Loading provider plugin: {pluginName}", LogLevel.Info);
 
             try
             {
@@ -351,14 +351,14 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading provider plugin {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error loading provider plugin {pluginName}: {ex.Message}", LogLevel.Info);
             }
         }
 
         private void RegisterQueryPlugin(Lazy<IQuery, IQueryData> queryPlugin)
         {
             var pluginName = queryPlugin.Metadata.Name;
-            WintapLogger.Log.Append($"Loading query plugin: {pluginName}", LogLevel.Always);
+            WintapLogger.Log.Append($"Loading query plugin: {pluginName}", LogLevel.Info);
 
             try
             {
@@ -373,7 +373,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading Query plugin {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error loading Query plugin {pluginName}: {ex.Message}", LogLevel.Info);
             }
         }
 
@@ -392,7 +392,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error registering Esper query for {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error registering Esper query for {pluginName}: {ex.Message}", LogLevel.Info);
             }
         }
 
@@ -402,7 +402,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 try
                 {
-                    WintapLogger.Log.Append("Creating Subscriber EPL", LogLevel.Always);
+                    WintapLogger.Log.Append("Creating Subscriber EPL", LogLevel.Info);
                     EPStatement processEvents = EventChannel.compileDeploy(
                         EventChannel.EsperRuntime,
                         "SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'"
@@ -411,7 +411,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Error creating EPL: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Error creating EPL: {ex.Message}", LogLevel.Info);
                 }
             }
 
@@ -427,7 +427,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Error creating EPL: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Error creating EPL: {ex.Message}", LogLevel.Info);
                 }
             }
         }
@@ -544,12 +544,12 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     isolatedCatalog.UnloadPlugin(pluginName);
                     loadedPluginNames.Remove(pluginName);
-                    WintapLogger.Log.Append($"Successfully unloaded plugin domain for {pluginName}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Successfully unloaded plugin domain for {pluginName}", LogLevel.Info);
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error unloading plugin domain for {pluginName}: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error unloading plugin domain for {pluginName}: {ex.Message}", LogLevel.Info);
             }
         }
 
@@ -561,7 +561,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             if (runQueue.Count > 0)
             {
-                WintapLogger.Log.Append("Starting Run scheduler", LogLevel.Always);
+                WintapLogger.Log.Append("Starting Run scheduler", LogLevel.Info);
                 BackgroundWorker scheduler = new BackgroundWorker();
                 scheduler.DoWork += Scheduler_DoWork;
                 scheduler.RunWorkerAsync();
@@ -576,7 +576,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 ProcessRunQueue(ref schedulerLoopAlive);
                 System.Threading.Thread.Sleep(60000);
             }
-            WintapLogger.Log.Append("Plugin run scheduler is quitting", LogLevel.Always);
+            WintapLogger.Log.Append("Plugin run scheduler is quitting", LogLevel.Info);
         }
 
         private void ProcessRunQueue(ref bool schedulerLoopAlive)
@@ -600,7 +600,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append($"Error in plugin scheduler: {ex.Message}. Run scheduler is aborting", LogLevel.Always);
+                        WintapLogger.Log.Append($"Error in plugin scheduler: {ex.Message}. Run scheduler is aborting", LogLevel.Info);
                         schedulerLoopAlive = false;
                     }
                 }
@@ -616,7 +616,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error executing runnable: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error executing runnable: {ex.Message}", LogLevel.Info);
                 throw;
             }
         }
@@ -699,7 +699,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error updating LastRan registry key: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error updating LastRan registry key: {ex.Message}", LogLevel.Info);
             }
             return lastRan;
         }
@@ -741,14 +741,14 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Error reading plugin registry settings: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Error reading plugin registry settings: {ex.Message}", LogLevel.Info);
                 }
 
                 return runnable;
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error creating runnable: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error creating runnable: {ex.Message}", LogLevel.Info);
                 throw;
             }
         }

@@ -59,14 +59,14 @@ namespace gov.llnl.wintap.core.infrastructure
             runMethodRunning = false;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                WintapLogger.Log.Append("Setting up Wintap Service Manager...", LogLevel.Always);
+                WintapLogger.Log.Append("Setting up Wintap Service Manager...", LogLevel.Info);
                 setupSvcMgr();
             }
-            WintapLogger.Log.Append("Wintap profile: " + WintapProfile.Name, LogLevel.Always);
-            WintapLogger.Log.Append("Max Memory: " + WintapProfile.MaxMem, LogLevel.Always);
+            WintapLogger.Log.Append("Wintap profile: " + WintapProfile.Name, LogLevel.Info);
+            WintapLogger.Log.Append("Max Memory: " + WintapProfile.MaxMem, LogLevel.Info);
             if (WintapProfile.Name != WintapProfile.ProfileEnum.Developer)
             {
-                WintapLogger.Log.Append("Max CPU: " + WintapProfile.MaxCPU, LogLevel.Always);
+                WintapLogger.Log.Append("Max CPU: " + WintapProfile.MaxCPU, LogLevel.Info);
             }
 
             BackgroundWorker perfCheckWorker = new BackgroundWorker();
@@ -123,7 +123,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 float cpu = getCpu();
                 long mem = getMem();
-                WintapLogger.Log.Append("Wintap usage stats.  CPU: " + cpu + " MEM: " + mem, LogLevel.Always);
+                WintapLogger.Log.Append("Wintap usage stats.  CPU: " + cpu + " MEM: " + mem, LogLevel.Info);
                 if (WintapProfile.Name == WintapProfile.ProfileEnum.Production && (cpu > WintapProfile.MaxCPU || mem > WintapProfile.MaxMem))
                 {
                     WintapProfile.BreachCount++;
@@ -136,7 +136,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 if (WintapProfile.BreachCount >= WintapProfile.MaxBreachCount)
                 {
                     string alertMsg = "wintap has exceeded maximum performance thresholds. cpu: " + cpu + "  memory: " + mem + "  hitcount: " + WintapProfile.BreachCount;
-                    WintapLogger.Log.Append(alertMsg, LogLevel.Always);
+                    WintapLogger.Log.Append(alertMsg, LogLevel.Info);
                     sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.SYSTEM_UTILIZATION, alertMsg);
                     Utilities.RestartWintap(alertMsg);
                 }
@@ -144,7 +144,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     if (DateTime.Now.Subtract(StateManager.LastWorkbenchActivity) > workbenchIdleTimeout)
                     {
-                        WintapLogger.Log.Append("Workbench idle time threshold exceeded, disabling workbench...", LogLevel.Always);
+                        WintapLogger.Log.Append("Workbench idle time threshold exceeded, disabling workbench...", LogLevel.Info);
                         sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.OTHER, "Workbench idle timeout expired");
                         Dictionary<string, bool> disableWorkbenchSetting = new Dictionary<string, bool>();
                         disableWorkbenchSetting.Add("EnableWorkbench", false);
@@ -166,7 +166,7 @@ namespace gov.llnl.wintap.core.infrastructure
             alertMsg.WintapAlert.AlertName = alertType;
             alertMsg.WintapAlert.AlertDescription = description;
             EventChannel.Send(alertMsg);
-            WintapLogger.Log.Append(alertMsg.WintapAlert.AlertDescription, LogLevel.Always);
+            WintapLogger.Log.Append(alertMsg.WintapAlert.AlertDescription, LogLevel.Info);
         }
 
         private long getMem()
@@ -189,7 +189,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private void logEvent(int eventID, string v)
         {
-            WintapLogger.Log.Append(v, LogLevel.Always);
+            WintapLogger.Log.Append(v, LogLevel.Info);
             EventLog appLog = new EventLog("Application", ".", "Wintap");
             appLog.WriteEntry(v, EventLogEntryType.Warning, eventID);
            
@@ -198,7 +198,7 @@ namespace gov.llnl.wintap.core.infrastructure
         //  monitor the runtime of a plugin's 'Run' method, restart Wintap if the plugin hangs
         protected internal void ProtectedRun(Runnable runnable)
         {
-            WintapLogger.Log.Append("Watchdog is attempting a protected run of: " + runnable.RunPlugin.Metadata.Name, LogLevel.Always);
+            WintapLogger.Log.Append("Watchdog is attempting a protected run of: " + runnable.RunPlugin.Metadata.Name, LogLevel.Info);
             TimeSpan runTTL = new TimeSpan(0, 2, 0);  // max protectedRun duration, todo: config
             runTTL = runnable.MaxTTL;
             runMethodRunning = true;
@@ -210,7 +210,7 @@ namespace gov.llnl.wintap.core.infrastructure
             TimeSpan executeTime = new TimeSpan();
             while (runMethodRunning)
             {
-                WintapLogger.Log.Append("Runnable invoked.  Waiting on " + runnable.RunPlugin.Metadata.Name, LogLevel.Always);
+                WintapLogger.Log.Append("Runnable invoked.  Waiting on " + runnable.RunPlugin.Metadata.Name, LogLevel.Info);
                 executeTime = executeTime.Add(TimeSpan.FromSeconds(1));
                 if (executeTime > runTTL)
                 {
@@ -220,12 +220,12 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 System.Threading.Thread.Sleep(1000);
             }
-            WintapLogger.Log.Append("Watchdog has completed protected run, run time: " + executeTime, LogLevel.Always);
+            WintapLogger.Log.Append("Watchdog has completed protected run, run time: " + executeTime, LogLevel.Info);
         }
 
         private void RunWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            WintapLogger.Log.Append("Protected run complete", LogLevel.Always);
+            WintapLogger.Log.Append("Protected run complete", LogLevel.Info);
             runMethodRunning = false;
         }
 
@@ -239,7 +239,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("WARN:  problem with runnable: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("WARN:  problem with runnable: " + ex.Message, LogLevel.Info);
             }
         }
     }

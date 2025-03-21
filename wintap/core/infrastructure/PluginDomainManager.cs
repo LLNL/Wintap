@@ -60,7 +60,7 @@ namespace gov.llnl.wintap.core.infrastructure
         /// <param name="obj">The assembly load context being unloaded.</param>
         private void OnUnloading(AssemblyLoadContext obj)
         {
-            WintapLogger.Log.Append($"Unloading plugin domain for {_pluginId}", LogLevel.Always);
+            WintapLogger.Log.Append($"Unloading plugin domain for {_pluginId}", LogLevel.Info);
         }
 
         /// <summary>
@@ -129,12 +129,12 @@ namespace gov.llnl.wintap.core.infrastructure
                 try
                 {
                     pluginDomain.LoadPlugin();
-                    WintapLogger.Log.Append($"Successfully loaded plugin {pluginId} in isolated domain", LogLevel.Always);
+                    WintapLogger.Log.Append($"Successfully loaded plugin {pluginId} in isolated domain", LogLevel.Info);
                     return pluginDomain;
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Failed to load plugin {pluginId}: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Failed to load plugin {pluginId}: {ex.Message}", LogLevel.Info);
                     _pluginDomains.TryRemove(pluginId, out _);
                     pluginDomain.Dispose();
                     throw;
@@ -153,7 +153,7 @@ namespace gov.llnl.wintap.core.infrastructure
             if (_pluginDomains.TryRemove(pluginId, out var pluginDomain))
             {
                 pluginDomain.Dispose();
-                WintapLogger.Log.Append($"Unloaded plugin {pluginId}", LogLevel.Always);
+                WintapLogger.Log.Append($"Unloaded plugin {pluginId}", LogLevel.Info);
             }
         }
 

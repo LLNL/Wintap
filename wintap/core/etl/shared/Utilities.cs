@@ -43,7 +43,7 @@ namespace gov.llnl.wintap.core.etl.shared
                 if (netCollection.Where(n => n.Hash == macIP.Hash).Count() == 0)
                 {
                     netCollection.Add(macIP);
-                    WintapLogger.Log.Append("Adding NIC info object: " + nic.IPAddess, LogLevel.Always);
+                    WintapLogger.Log.Append("Adding NIC info object: " + nic.IPAddess, LogLevel.Info);
                 }
             }
             return netCollection;
@@ -131,10 +131,10 @@ namespace gov.llnl.wintap.core.etl.shared
 
             if (nicList.Count == 0)
             {
-                WintapLogger.Log.Append("No NIC found", LogLevel.Always);
+                WintapLogger.Log.Append("No NIC found", LogLevel.Info);
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    WintapLogger.Log.Append("Attempting to get NIC info from WMI...", LogLevel.Always);
+                    WintapLogger.Log.Append("Attempting to get NIC info from WMI...", LogLevel.Info);
                     nicList = getNICsFromWMI();
                 }
             }
@@ -143,7 +143,7 @@ namespace gov.llnl.wintap.core.etl.shared
 
         private static List<NIC> getNICsFromWMI()
         {
-            WintapLogger.Log.Append("Attempting alternate method for NIC retrieval using WMI ", LogLevel.Always);
+            WintapLogger.Log.Append("Attempting alternate method for NIC retrieval using WMI ", LogLevel.Info);
             List<NIC> nicList = new List<NIC>();
             NIC nic = new NIC();
             string mac = null;
@@ -359,7 +359,7 @@ namespace gov.llnl.wintap.core.etl.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error getting Processor Speed: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error getting Processor Speed: " + ex.Message, LogLevel.Info);
             }
             return speed * 1000000;
         }
@@ -373,7 +373,7 @@ namespace gov.llnl.wintap.core.etl.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error getting processor count: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error getting processor count: " + ex.Message, LogLevel.Info);
             }
             return procCount;
         }

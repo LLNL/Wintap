@@ -62,7 +62,7 @@ namespace gov.llnl.wintap.core.etl
                 processObjectModelWorker.RunWorkerAsync();
 
                 BackgroundWorker cacheManagerThread = new BackgroundWorker();
-                cacheManagerThread.DoWork += cacheManager_DoWork;
+                cacheManagerThread.DoWork += cacheManager_DoWork;  
                 cacheManagerThread.RunWorkerCompleted += cacheManager_RunWorkerCompleted;
                 cacheManagerThread.RunWorkerAsync();
 
@@ -76,7 +76,7 @@ namespace gov.llnl.wintap.core.etl
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Could not start ETL: " + ex.Message, gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("Could not start ETL!!!: " + ex.Message, LogLevel.Info);
             }
             
             return etlLoaded;
@@ -88,7 +88,7 @@ namespace gov.llnl.wintap.core.etl
         {
             cacheMgr.Stop();
             processSensor.Stop();
-            WintapLogger.Log.Append("shutdown complete", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("shutdown complete", LogLevel.Info);
             WintapLogger.Log.Close();
         }
 
@@ -98,7 +98,7 @@ namespace gov.llnl.wintap.core.etl
 
         private void ProcessObjectModelWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            WintapLogger.Log.Append("Creating sensors", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("Creating sensors", LogLevel.Info);
             defaultSensor = new DEFAULT_SENSOR(esperNameSpacePrefix + "default.epl");
             fileSensor = new FILE_SENSOR(esperNameSpacePrefix + "file.epl");
             fcSensor = new FOCUSCHANGE_SENSOR(esperNameSpacePrefix + "focuschange.epl");
@@ -114,12 +114,12 @@ namespace gov.llnl.wintap.core.etl
             sensors.Add(udpSensor);
             sensors.Add(regSensor);
             sensors.Add(fcSensor);
-            WintapLogger.Log.Append("All sensors created.  Sensor serialization interval (msec): " + etlConfig.SerializationIntervalSec, gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("All sensors created.  Sensor serialization interval (msec): " + etlConfig.SerializationIntervalSec, LogLevel.Info);
         }
 
         private void ProcessObjectModelWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            WintapLogger.Log.Append("Creating process sensors", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("Creating process sensors", LogLevel.Info);
 
             processSensor = new PROCESS_SENSOR(esperNameSpacePrefix + "process.epl");
             processStopSensor = new PROCESSSTOP_SENSOR(esperNameSpacePrefix + "process-stop.epl");
@@ -127,17 +127,17 @@ namespace gov.llnl.wintap.core.etl
 
         private void StatsUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-                WintapLogger.Log.Append("Total wintap messages received: " + totalMessageCount, gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("Total wintap messages received: " + totalMessageCount, LogLevel.Info);
         }
 
         private void cacheManager_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            WintapLogger.Log.Append("initialization complete",    gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("initialization complete",    LogLevel.Info);
         }
 
         private void cacheManager_DoWork(object sender, DoWorkEventArgs e)
         {
-            WintapLogger.Log.Append("creating wintap data cache manager", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("creating wintap data cache manager", LogLevel.Info);
             List<IUpload> uploaders = new List<IUpload>();
             try
             {
@@ -146,11 +146,11 @@ namespace gov.llnl.wintap.core.etl
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error initializing cache manager: " + ex.Message + ", startup will NOT complete", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("Error initializing cache manager: " + ex.Message + ", startup will NOT complete", LogLevel.Info);
                 throw new Exception("CacheManager not initialized");
             }
 
-            WintapLogger.Log.Append("init complete", gov.llnl.wintap.core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("init complete", LogLevel.Info);
         }
 
         private void FileWorker_DoWork(object sender, DoWorkEventArgs e)

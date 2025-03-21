@@ -378,7 +378,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
                     }
                     else
                     {
-                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}", LogLevel.Always);
+                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}", LogLevel.Info);
                     }
                 }
                 else
@@ -396,7 +396,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
                 }
                 catch (Exception ex2)
                 {
-                    WintapLogger.Log.Append("Error translating, path: " + originalPath + "   error: " + ex2.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("Error translating, path: " + originalPath + "   error: " + ex2.Message, LogLevel.Info);
                 }
             }
             return newPath;

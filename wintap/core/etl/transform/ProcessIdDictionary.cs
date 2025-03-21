@@ -80,7 +80,7 @@ namespace gov.llnl.wintap.core.etl.transform
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Exception in addProcessKey: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Exception in addProcessKey: " + ex.Message, LogLevel.Info);
             }
         }
     }

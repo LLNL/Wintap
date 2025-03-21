@@ -40,10 +40,10 @@
 //            }
 //            catch (Exception ex)
 //            {
-//                WintapLogger.Log.Append("error registering SENS events: " + ex.Message, LogLevel.Always);
+//                WintapLogger.Log.Append("error registering SENS events: " + ex.Message, LogLevel.Info);
 //            }
 
-//            WintapLogger.Log.Append("Releasing COM object for SENS", LogLevel.Always);
+//            WintapLogger.Log.Append("Releasing COM object for SENS", LogLevel.Info);
 //            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(comAdmin);
 //        }
 
@@ -94,7 +94,7 @@
 //            msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
 //            msg.SessionChange = new WintapMessage.SessionChangeObject() { UserName = userName, Description = description };
 //            EventChannel.Send(msg);
-//            WintapLogger.Log.Append("    User: " + userName + "  description: " + description, LogLevel.Always);
+//            WintapLogger.Log.Append("    User: " + userName + "  description: " + description, LogLevel.Info);
 //        }
 
 //    }

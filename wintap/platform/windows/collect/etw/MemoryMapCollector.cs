@@ -98,7 +98,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public override bool Start()
         {
-            WintapLogger.Log.Append(CollectorName + " is starting...", LogLevel.Always);
+            WintapLogger.Log.Append(CollectorName + " is starting...", LogLevel.Info);
             base.Start();
             refreshTimer = new Stopwatch();
             refreshTimer.Start();
@@ -110,7 +110,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             var epQuery = EventChannel.compileDeploy(EventChannel.EsperRuntime, sql).Statements[0];
             epQuery.Events += EpQuery_Events;
 
-            WintapLogger.Log.Append(CollectorName + " started", LogLevel.Always);
+            WintapLogger.Log.Append(CollectorName + " started", LogLevel.Info);
 
             return status;
         }
@@ -143,11 +143,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                             //    {
                             //        refreshTimer.Restart();
                             //        isStarting = false;
-                            //        WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Always);
+                            //        WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Info);
                             //        string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
                             //        List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
                             //        detectChanges(commitInfos, obj.TimeStamp);
-                            //        WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY   err count: " + scanErrors + " --------", LogLevel.Always);
+                            //        WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY   err count: " + scanErrors + " --------", LogLevel.Info);
                             //    }
                             //}                         
                         }
@@ -158,7 +158,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("WARN problem parsing user mode event: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("WARN problem parsing user mode event: " + ex.Message, LogLevel.Info);
                 scanInProgress = false;
             }
         }
@@ -173,7 +173,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("WARN problem scanning memory for new process: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("WARN problem scanning memory for new process: " + ex.Message, LogLevel.Info);
             }
         }
         private bool processRunning(int pid)
@@ -230,7 +230,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("WARN problem scanning memory:  " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("WARN problem scanning memory:  " + ex.Message, LogLevel.Info);
                 }
             }
             scanInProgress = false;
@@ -304,7 +304,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 catch
                 {
                     scanErrors++;
-                    WintapLogger.Log.Append("WARN problem performing memory scan of: " + _owningProcess.ProcessName, LogLevel.Always);
+                    WintapLogger.Log.Append("WARN problem performing memory scan of: " + _owningProcess.ProcessName, LogLevel.Info);
                     baseAddress = new nint(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
                     if (baseAddress.ToInt64() == 0) { break; }
                 }

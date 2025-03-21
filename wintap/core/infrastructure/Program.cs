@@ -38,6 +38,7 @@ using static System.Net.Mime.MediaTypeNames;
 using System.ComponentModel;
 using Microsoft.SemanticKernel.Connectors.Chroma;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -47,7 +48,7 @@ builder.Services.AddControllers();
 //    configuration.RootPath = @"C:\Program Files\Wintap\Workbench";
 //});
 
-WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Always);
+WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
 var kernelBuilder = Kernel.CreateBuilder();
 var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "llama3.1:8b", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
@@ -56,7 +57,7 @@ HttpClient httpClient = new HttpClient();
 httpClient.Timeout = new TimeSpan(0, 5, 0);
 
 //string rag_data = "C:\\programdata\\wintap\\ragdata.txt";
-//WintapLogger.Log.Append($"Attempting to load RAG data from file: {rag_data}", LogLevel.Always);
+//WintapLogger.Log.Append($"Attempting to load RAG data from file: {rag_data}", LogLevel.Info);
 
 
 // use use with in-memory vector store

@@ -89,7 +89,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error sending UDP event: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error sending UDP event: " + ex.Message, LogLevel.Info);
             }
         }
         

@@ -51,7 +51,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             // typegroup fail
             KernelParser.Instance.EtwParser.TcpIpFail += Kernel_TcpIpFail;
             CacheStatistics();
-            WintapLogger.Log.Append("Kernel Tcp/Ip provider is be enabled.", LogLevel.Always);
+            WintapLogger.Log.Append("Kernel Tcp/Ip provider is be enabled.", LogLevel.Info);
             CacheStatistics();
             enabled = true;
             return enabled;

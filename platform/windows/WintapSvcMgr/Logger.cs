@@ -68,7 +68,7 @@ namespace gov.llnl.wintap
         {
             this.LogType = LogType.Append;
             this.MaxSize = 3000000;
-            this.Verbosity = LogLevel.Always;
+            this.Verbosity = LogLevel.Info;
             //this.LogDir = Environment.GetEnvironmentVariable("WINDIR") + "\\Temp";
             this.logDir = Environment.GetEnvironmentVariable("PROGRAMDATA") + "\\Wintap\\Logs";
             this.LogName = "WintapSvcMgr";
@@ -78,7 +78,7 @@ namespace gov.llnl.wintap
             Assembly exeName = Assembly.GetCallingAssembly();
             string[] logNameArray = exeName.FullName.Split(new Char[] { ',' });
             logName = logNameArray[0].ToString();
-            verbosity = LogLevel.Always;
+            verbosity = LogLevel.Info;
             codeVersion = exeName.GetName().Version.ToString();
             pendingEntries = new ConcurrentQueue<LogEntry>();
             logIsOpen = true;
@@ -205,7 +205,7 @@ namespace gov.llnl.wintap
             LogEntry le = new LogEntry();
             le.Entry = entry;
             le.Time = DateTime.Now;
-            le.Level = LogLevel.Always;
+            le.Level = LogLevel.Info;
             pendingEntries.Enqueue(le);
             Console.WriteLine(entry);
         }

@@ -36,13 +36,13 @@
 
 //        public bool PreUpload(Dictionary<string, string> parameters)
 //        {
-//            WintapLogger.Log.Append("Initiating MQTT session", LogLevel.Always);
+//            WintapLogger.Log.Append("Initiating MQTT session", LogLevel.Info);
 //            bool preUploadSuccess = false;
 //            try
 //            {
 //                pendingUploadCounter = 0;
 //                certificateManager = new CertificateManager(parameters["CertificateStore"], parameters["DeviceCertificateName"]);
-//                WintapLogger.Log.Append("Connecting with subject: " + certificateManager.deviceCertificate.Subject, LogLevel.Always);
+//                WintapLogger.Log.Append("Connecting with subject: " + certificateManager.deviceCertificate.Subject, LogLevel.Info);
 
 //                client = new MqttClient(parameters["EndPoint"], Convert.ToInt32(parameters["Port"]), true, null, certificateManager.deviceCertificate, MqttSslProtocols.TLSv1_2);
 
@@ -51,18 +51,18 @@
 
 //                clientId = Environment.MachineName.ToLower();
 
-//                WintapLogger.Log.Append("Attempting MQTT client connect with clientId: " + clientId, LogLevel.Always);
+//                WintapLogger.Log.Append("Attempting MQTT client connect with clientId: " + clientId, LogLevel.Info);
 //                client.Connect(clientId);
-//                WintapLogger.Log.Append("   Connected.  creating topic subscription.", LogLevel.Always);
+//                WintapLogger.Log.Append("   Connected.  creating topic subscription.", LogLevel.Info);
 
 //                string topic = "wintap/" + clientId + "/response";
 //                client.Subscribe(new string[] { topic }, new byte[] { MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE });
 //                preUploadSuccess = true;
-//                WintapLogger.Log.Append("MQTT session created.", LogLevel.Always);
+//                WintapLogger.Log.Append("MQTT session created.", LogLevel.Info);
 //            }
 //            catch(Exception ex)
 //            {
-//                WintapLogger.Log.Append("ERROR in PreUpload: " + ex.Message, LogLevel.Always);
+//                WintapLogger.Log.Append("ERROR in PreUpload: " + ex.Message, LogLevel.Info);
 //            }
 //            return preUploadSuccess;
 //        }
@@ -73,7 +73,7 @@
 //            bool uploadSuccess = false;
 //            try
 //            {
-//                WintapLogger.Log.Append("starting upload on file: " + localFile, LogLevel.Always);
+//                WintapLogger.Log.Append("starting upload on file: " + localFile, LogLevel.Info);
 //                string s3Path = getS3ObjectNameForFile(localFile);
 //                WintapLogger.Log.Append("  converted s3 path: " + s3Path, LogLevel.Debug);
 //                //send url request
@@ -85,14 +85,14 @@
 //            }
 //            catch (Exception ex)
 //            {
-//                WintapLogger.Log.Append("Upload error: " + ex.Message, LogLevel.Always);
+//                WintapLogger.Log.Append("Upload error: " + ex.Message, LogLevel.Info);
 //            }
 //            return uploadSuccess;
 //        }
 
 //        public bool PostUpload()
 //        {
-//            WintapLogger.Log.Append("PostUpload method called on SignedS3UrlUploader", LogLevel.Always);
+//            WintapLogger.Log.Append("PostUpload method called on SignedS3UrlUploader", LogLevel.Info);
 //            BackgroundWorker uploadWaitWorker = new BackgroundWorker();
 //            uploadWaitWorker.WorkerSupportsCancellation = true;
 //            uploadWaitWorker.DoWork += UploadWaitWorker_DoWork;
@@ -113,26 +113,26 @@
 //            {
 //                while(pendingUploadCounter > 0)
 //                {
-//                    WintapLogger.Log.Append("Awaiting async upload to complete. Files pending upload: " + pendingUploadCounter, LogLevel.Always);
+//                    WintapLogger.Log.Append("Awaiting async upload to complete. Files pending upload: " + pendingUploadCounter, LogLevel.Info);
 //                    System.Threading.Thread.Sleep(1000);
 //                    if(uploadTimer.Elapsed.TotalMinutes > 1)
 //                    {
-//                        WintapLogger.Log.Append("Timeout execeeded on upload worker.  Files dropped " + pendingUploadCounter, LogLevel.Always);
+//                        WintapLogger.Log.Append("Timeout execeeded on upload worker.  Files dropped " + pendingUploadCounter, LogLevel.Info);
 //                        break;
 //                    }
 //                }
-//                WintapLogger.Log.Append("Disconnecting MQTT client.  Total files NOT uploaded: " + pendingUploadCounter, LogLevel.Always);
+//                WintapLogger.Log.Append("Disconnecting MQTT client.  Total files NOT uploaded: " + pendingUploadCounter, LogLevel.Info);
 //                client.Disconnect();
 //            }
 //            catch (Exception ex)
 //            {
-//                WintapLogger.Log.Append("ERROR in postUpload: " + ex.Message, LogLevel.Always);
+//                WintapLogger.Log.Append("ERROR in postUpload: " + ex.Message, LogLevel.Info);
 //            }
 //        }
 
 //        private void Client_MqttMsgSubscribed(object sender, MqttMsgSubscribedEventArgs e)
 //        {
-//            WintapLogger.Log.Append("MQTT topic subscription established.", LogLevel.Always);
+//            WintapLogger.Log.Append("MQTT topic subscription established.", LogLevel.Info);
 //        }
 
 //        private void Client_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
@@ -179,14 +179,14 @@
 //                var contentToUpload = new ByteArrayContent(File.ReadAllBytes(localPath));
 //                using (var httpClient = new HttpClient())
 //                {
-//                    WintapLogger.Log.Append("attempting to send: " + localPath + " to : " + signedUrl, LogLevel.Always);
+//                    WintapLogger.Log.Append("attempting to send: " + localPath + " to : " + signedUrl, LogLevel.Info);
 //                    var response = await httpClient.PutAsync(signedUrl, contentToUpload);
-//                    WintapLogger.Log.Append("    HTTP PUT response: " + response.StatusCode.ToString() + " on file: " + localPath, LogLevel.Always);
+//                    WintapLogger.Log.Append("    HTTP PUT response: " + response.StatusCode.ToString() + " on file: " + localPath, LogLevel.Info);
 //                }
 //            }
 //            catch(Exception ex)
 //            {
-//                WintapLogger.Log.Append("ERROR in upload of file: " + localPath + "  msg: " + ex.Message, LogLevel.Always);
+//                WintapLogger.Log.Append("ERROR in upload of file: " + localPath + "  msg: " + ex.Message, LogLevel.Info);
 //            }
 //            pendingUploadCounter--;
 //        }

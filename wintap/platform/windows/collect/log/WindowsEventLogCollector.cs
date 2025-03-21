@@ -47,7 +47,7 @@ namespace gov.llnl.wintap.platform.windows.collect.log
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Problem starting collector: " + CollectorName + ", error: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Problem starting collector: " + CollectorName + ", error: " + ex.Message, LogLevel.Info);
             }
             return enabled;
         }

@@ -13,7 +13,6 @@ using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using System;
-using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -36,8 +35,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public override bool Start()
         {
             //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
-            WintapLogger.Log.Append("Assembling boot trace process events.", LogLevel.Always);
-            WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Always);
+            WintapLogger.Log.Append("Assembling boot trace process events.", LogLevel.Info);
+            WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Info);
             EPStatement etlToEsperPattern = EventChannel.compileDeploy(EventChannel.EsperRuntime,
                 $"SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name " +
                 $"FROM pattern[every PartA=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ProcessPartial.ToString()}' " +
@@ -45,14 +44,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 $") -> PartB=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ImageLoad}' " +
                 "AND PID=PartA.PID) where timer:within(3 sec)]").Statements[0];
 
-            WintapLogger.Log.Append("Building process tree.", LogLevel.Always);
+            WintapLogger.Log.Append("Building process tree.", LogLevel.Info);
             processTree = new ProcessTree();
             processTree.GenProcessTree();
 
-            WintapLogger.Log.Append("Enabling real-time ETW process handling", LogLevel.Always);
+            WintapLogger.Log.Append("Enabling real-time ETW process handling", LogLevel.Info);
             KernelParser.Instance.EtwParser.ProcessStart += new Action<ProcessTraceData>(Kernel_ProcessStart);
 
-            WintapLogger.Log.Append("Process collection startup complete.", LogLevel.Always);
+            WintapLogger.Log.Append("Process collection startup complete.", LogLevel.Info);
             return true;
         }
 
@@ -72,8 +71,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     path = "NA";
                 }
                 if (path == "NA") { path = GetProcessPathFromPID(obj.ProcessID); }
-                if (string.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Always); }
-                if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Always); }
+                if (string.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Info); }
+                if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Info); }
 
                 WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Start };
                 msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments, UniqueProcessKey = obj.UniqueProcessKey.ToString() };

@@ -53,7 +53,7 @@ namespace gov.llnl.wintap
                     var allDlls = Directory.GetFiles(pluginDir, "*.dll");
                     if (allDlls.Length == 0)
                     {
-                        WintapLogger.Log.Append($"No assemblies found for plugin: {pluginName}", LogLevel.Always);
+                        WintapLogger.Log.Append($"No assemblies found for plugin: {pluginName}", LogLevel.Info);
                         continue;
                     }
 
@@ -92,12 +92,12 @@ namespace gov.llnl.wintap
 
                     if (!foundValidPlugin)
                     {
-                        WintapLogger.Log.Append($"No valid plugin assembly with MEF exports found for: {pluginName}", LogLevel.Always);
+                        WintapLogger.Log.Append($"No valid plugin assembly with MEF exports found for: {pluginName}", LogLevel.Info);
                     }
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Failed to load plugin from directory {pluginDir}: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Failed to load plugin from directory {pluginDir}: {ex.Message}", LogLevel.Info);
                 }
             }
         }
@@ -124,7 +124,7 @@ namespace gov.llnl.wintap
 
             if (isDebugBuild && !IsSignedAndTrusted(assemblyPath))
             {
-                WintapLogger.Log.Append($"[DEBUG BUILD] Loading unsigned assembly {Path.GetFileName(assemblyPath)} for plugin {pluginName}", LogLevel.Always);
+                WintapLogger.Log.Append($"[DEBUG BUILD] Loading unsigned assembly {Path.GetFileName(assemblyPath)} for plugin {pluginName}", LogLevel.Info);
             }
 
             try
@@ -141,7 +141,7 @@ namespace gov.llnl.wintap
                     // Assembly has MEF exports, add it to our catalog
                     _loadedPlugins[pluginName] = pluginDomain;
                     _catalog.Catalogs.Add(asmCat);
-                    WintapLogger.Log.Append($"Successfully loaded plugin: {pluginName} from {Path.GetFileName(assemblyPath)} in isolated domain", LogLevel.Always);
+                    WintapLogger.Log.Append($"Successfully loaded plugin: {pluginName} from {Path.GetFileName(assemblyPath)} in isolated domain", LogLevel.Info);
                     return true;
                 }
                 else
@@ -194,10 +194,10 @@ namespace gov.llnl.wintap
 
         private bool IsSignedAndTrusted(string filePath)
         {
-            WintapLogger.Log.Append($"Checking signature for: {filePath}", LogLevel.Always);
+            WintapLogger.Log.Append($"Checking signature for: {filePath}", LogLevel.Info);
 
 #if DEBUG
-            WintapLogger.Log.Append("DEBUG mode - bypassing signature verification", LogLevel.Always);
+            WintapLogger.Log.Append("DEBUG mode - bypassing signature verification", LogLevel.Info);
             return true;
 #endif
 
@@ -209,18 +209,18 @@ namespace gov.llnl.wintap
                 if (publicKeyToken != null && publicKeyToken.Length > 0)
                 {
                     string token = BitConverter.ToString(publicKeyToken).Replace("-", "").ToLower();
-                    WintapLogger.Log.Append($"Assembly has strong name with token: {token}", LogLevel.Always);
+                    WintapLogger.Log.Append($"Assembly has strong name with token: {token}", LogLevel.Info);
                     return true;
                 }
                 else
                 {
-                    WintapLogger.Log.Append("Assembly does not have a strong name", LogLevel.Always);
+                    WintapLogger.Log.Append("Assembly does not have a strong name", LogLevel.Info);
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error verifying assembly signature: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error verifying assembly signature: {ex.Message}", LogLevel.Info);
 
 #if DEBUG
                 return true;

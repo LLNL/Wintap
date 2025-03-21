@@ -26,7 +26,7 @@ namespace gov.llnl.wintap.platform.windows.shared
             }
             catch (Exception ex)
             {
-                //WintapLogger.Log.Append("ERROR GETTING LAST BOOT TIME, using wintap start time as machine start time. " + ex.Message, infrastructure.LogLevel.Always);
+                //WintapLogger.Log.Append("ERROR GETTING LAST BOOT TIME, using wintap start time as machine start time. " + ex.Message, LogLevel.Info);
             }
             return lastBoot;
         }
@@ -43,10 +43,10 @@ namespace gov.llnl.wintap.platform.windows.shared
             psi.UseShellExecute = false;
             psi.RedirectStandardOutput = true;
             diskPart.StartInfo = psi;
-            //WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, infrastructure.LogLevel.Always);
+            //WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, LogLevel.Info);
             diskPart.Start();
             string diskConfig = diskPart.StandardOutput.ReadToEnd();
-            //WintapLogger.Log.Append("drive volumes: " + diskConfig, infrastructure.LogLevel.Always);
+            //WintapLogger.Log.Append("drive volumes: " + diskConfig, LogLevel.Info);
             string[] configLines = diskConfig.Split(new char[] { '\r' });
             diskPart.WaitForExit();
             foreach (string line in configLines)
@@ -58,13 +58,13 @@ namespace gov.llnl.wintap.platform.windows.shared
                     dv.VolumeNumber = Convert.ToInt32(lineArray[3].ToString());
                     dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString().ToLower());
                     driveMap.Add(dv);
-                    //WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, infrastructure.LogLevel.Always);
+                    //WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, LogLevel.Info);
                 }
                 catch (Exception ex) { }
             }
             if (driveMap.Count == 0)
             {
-                //WintapLogger.Log.Append("ERROR:  No drive map found! ", infrastructure.LogLevel.Always);
+                //WintapLogger.Log.Append("ERROR:  No drive map found! ", LogLevel.Info);
             }
             return driveMap;
         }
@@ -111,7 +111,7 @@ namespace gov.llnl.wintap.platform.windows.shared
             }
             catch (Exception ex)
             {
-                //WintapLogger.Log.Append("Could not read registry: " + ex.Message, infrastructure.LogLevel.Always);
+                //WintapLogger.Log.Append("Could not read registry: " + ex.Message, LogLevel.Info);
             }
             return ActiveUser;
         }

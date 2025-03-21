@@ -38,7 +38,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             catch(Exception ex)
             {
                 preUploadSuccess = false;
-                WintapLogger.Log.Append("Error in " + this.Name + "   could not parse UNCPath from config.  Verify the value is defined and is a parseable UNC path", LogLevel.Always);
+                WintapLogger.Log.Append("Error in " + this.Name + "   could not parse UNCPath from config.  Verify the value is defined and is a parseable UNC path", LogLevel.Info);
             }
             this.startSessionStats();
             return preUploadSuccess;
@@ -55,7 +55,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
             catch(Exception ex)
             {
-                WintapLogger.Log.Append("Error uploading file: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error uploading file: " + ex.Message, LogLevel.Info);
                 uploadSuccess = false;
             }
             return uploadSuccess;

@@ -25,7 +25,7 @@ namespace gov.llnl.wintap.core.infrastructure
         public void Initialize()
         {
             // Called when Wintap starts to ensure handler is registered
-            WintapLogger.Log.Append("Plugin Exception Handler initialized", LogLevel.Always);
+            WintapLogger.Log.Append("Plugin Exception Handler initialized", LogLevel.Info);
         }
 
         private void HandleUnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -45,12 +45,12 @@ namespace gov.llnl.wintap.core.infrastructure
             // If terminating, attempt graceful shutdown
             try
             {
-                WintapLogger.Log.Append($"Fatal unhandled exception in plugin. Attempting graceful shutdown: {exception?.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Fatal unhandled exception in plugin. Attempting graceful shutdown: {exception?.Message}", LogLevel.Info);
                 Utilities.RestartWintap($"Fatal plugin exception: {exception?.Message}");
             }
             catch (Exception shutdownEx)
             {
-                WintapLogger.Log.Append($"Error during shutdown after fatal plugin exception: {shutdownEx.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Error during shutdown after fatal plugin exception: {shutdownEx.Message}", LogLevel.Info);
             }
         }
 
@@ -71,7 +71,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 logMessage += $"\nInner Exception: {ex.InnerException.Message}\nInner Stack Trace: {ex.InnerException.StackTrace}";
             }
 
-            WintapLogger.Log.Append(logMessage, LogLevel.Always);
+            WintapLogger.Log.Append(logMessage, LogLevel.Info);
         }
 
         private string GetPluginNameFromStack(Exception ex)
@@ -121,7 +121,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception alertEx)
             {
-                WintapLogger.Log.Append($"Failed to send alert for plugin exception: {alertEx.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"Failed to send alert for plugin exception: {alertEx.Message}", LogLevel.Info);
             }
         }
 

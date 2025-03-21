@@ -59,7 +59,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error creating FocusChange data object on PID : " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error creating FocusChange data object on PID : " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Info);
             }
         }
     }

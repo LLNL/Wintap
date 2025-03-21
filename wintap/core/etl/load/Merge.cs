@@ -25,7 +25,7 @@ namespace gov.llnl.wintap.core.etl.load
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Could not start merge: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Could not start merge: " + ex.Message, LogLevel.Info);
                 return;
             }
 
@@ -38,7 +38,7 @@ namespace gov.llnl.wintap.core.etl.load
                 }
                 else
                 {
-                    WintapLogger.Log.Append("Attempting to query parquets at root: " + parquetSearchRoot, LogLevel.Always);
+                    WintapLogger.Log.Append("Attempting to query parquets at root: " + parquetSearchRoot, LogLevel.Info);
                     sensorName = renameSensor(sensorName);  // e.g. tcp/udp
                     using (var duckDBConnection = new DuckDBConnection("Data Source=:memory:"))
                     {
@@ -49,7 +49,7 @@ namespace gov.llnl.wintap.core.etl.load
                         string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("_sensor", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
                         string tempFileName = sensorName;
                         command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";
-                        WintapLogger.Log.Append("Duck db command: " + command.CommandText, LogLevel.Always);
+                        WintapLogger.Log.Append("Duck db command: " + command.CommandText, LogLevel.Info);
                         var executeNonQuery = command.ExecuteNonQuery();
                         command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
                         executeNonQuery = command.ExecuteNonQuery();
@@ -59,22 +59,22 @@ namespace gov.llnl.wintap.core.etl.load
                         // WintapRecorder support - todo:  not sure how I want to handle this just yet...
                         //if (RecordingSession.NowRecording(log))
                         //{
-                        //    WintapLogger.Log.Append("Mirroring merged parquet to recording directory: " + mergeFile, LogLevel.Always);
+                        //    WintapLogger.Log.Append("Mirroring merged parquet to recording directory: " + mergeFile, LogLevel.Info);
                         //    RecordingSession.Record(mergeFile.FullName, sensorName, log);
                         //}
                         command.CommandText = $"DROP TABLE IF EXISTS {tempFileName}";
                         command.ExecuteNonQuery();
-                        WintapLogger.Log.Append("Table dropped: " + tempFileName, LogLevel.Always);
+                        WintapLogger.Log.Append("Table dropped: " + tempFileName, LogLevel.Info);
                     }
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error in duckdb merge for: " + sensorName + " msg: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error in duckdb merge for: " + sensorName + " msg: " + ex.Message, LogLevel.Info);
             }
 
 
-            WintapLogger.Log.Append("Merge complete!", LogLevel.Always);
+            WintapLogger.Log.Append("Merge complete!", LogLevel.Info);
         }
 
         private static string renameSensor(string _sensorName)
@@ -102,16 +102,16 @@ namespace gov.llnl.wintap.core.etl.load
 
         private static void runCmdLine(string path, long eventTime)
         {
-            WintapLogger.Log.Append("Shelling out for parquet merge for sensor: " + path, LogLevel.Always);
+            WintapLogger.Log.Append("Shelling out for parquet merge for sensor: " + path, LogLevel.Info);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
             psi.Arguments = path + " " + eventTime;
             Process helperExe = new Process();
             helperExe.StartInfo = psi;
-            WintapLogger.Log.Append("Attempting to rerun parquet merger: " + psi.FileName + " " + psi.Arguments, LogLevel.Always);
+            WintapLogger.Log.Append("Attempting to rerun parquet merger: " + psi.FileName + " " + psi.Arguments, LogLevel.Info);
             helperExe.Start();
             helperExe.WaitForExit();
-            WintapLogger.Log.Append("MergeHelper complete on : " + path, LogLevel.Always);
+            WintapLogger.Log.Append("MergeHelper complete on : " + path, LogLevel.Info);
         }
 
         private static void processInputs(string[] args)
@@ -128,7 +128,7 @@ namespace gov.llnl.wintap.core.etl.load
             DirectoryInfo parquetSearchInfo = new DirectoryInfo(parquetSearchRoot);
             wintapDataRoot = parquetSearchInfo.Parent.FullName;
             sensorName = parquetSearchInfo.Name;
-            WintapLogger.Log.Append("Search root: " + parquetSearchRoot, LogLevel.Always);
+            WintapLogger.Log.Append("Search root: " + parquetSearchRoot, LogLevel.Info);
             if (parquetSearchInfo.GetFiles("*.parquet").Count() == 0)
             {
                 throw new Exception("No parquet files found at path: " + parquetSearchInfo.FullName);
@@ -137,7 +137,7 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 throw new Exception("invalid action: cannot merge the merge folder");
             }
-            WintapLogger.Log.Append("Parsing Merge time from command line args (all merged parquets in an upload batch share this value)", LogLevel.Always);
+            WintapLogger.Log.Append("Parsing Merge time from command line args (all merged parquets in an upload batch share this value)", LogLevel.Info);
             try
             {
                 mergeTime = DateTime.FromFileTimeUtc(Convert.ToInt64(args[1])).ToUniversalTime();
@@ -150,7 +150,7 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 throw new Exception(ex.Message);
             }
-            WintapLogger.Log.Append("Merge time: " + mergeTime, LogLevel.Always);
+            WintapLogger.Log.Append("Merge time: " + mergeTime, LogLevel.Info);
         }
     }
 }

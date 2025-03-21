@@ -54,16 +54,16 @@ namespace gov.llnl.wintap.core.etl.load
                         {
                             FileInfo flushedFile = new FileInfo(fileName);
                             flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
-                            WintapLogger.Log.Append($" ready for merge: {fileName}", LogLevel.Always);
+                            WintapLogger.Log.Append($" ready for merge: {fileName}", LogLevel.Info);
                         }
                         catch (Exception ex)
                         {
-                            WintapLogger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Always);
+                            WintapLogger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Info);
                         }
                     }
                     else
                     {
-                        WintapLogger.Log.Append($"{dataSet.CollectorName}: Call to async WRITE returned no parquet data file.", LogLevel.Always );
+                        WintapLogger.Log.Append($"{dataSet.CollectorName}: Call to async WRITE returned no parquet data file.", LogLevel.Info );
                     }
                 }
             }
@@ -103,7 +103,7 @@ namespace gov.llnl.wintap.core.etl.load
             }
             long timestamp = DateTime.UtcNow.ToFileTimeUtc() + Convert.ToInt32(applyOffset);
             string fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
-            WintapLogger.Log.Append($"{dataSet.CollectorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
+            WintapLogger.Log.Append($"{dataSet.CollectorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Info);
             try
             {
                 ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
@@ -116,13 +116,13 @@ namespace gov.llnl.wintap.core.etl.load
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error in ParquetWriter.Write: {ex.Message} ", LogLevel.Always);
+                WintapLogger.Log.Append($"Error in ParquetWriter.Write: {ex.Message} ", LogLevel.Info);
                 if(ex.Message.Contains("used by another process"))
                 {
-                    WintapLogger.Log.Append($"Retrying write operation...", LogLevel.Always);
+                    WintapLogger.Log.Append($"Retrying write operation...", LogLevel.Info);
                     timestamp = DateTime.UtcNow.ToFileTimeUtc() + 1;
                     fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
-                    WintapLogger.Log.Append($"{dataSet.CollectorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Always);
+                    WintapLogger.Log.Append($"{dataSet.CollectorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Info);
                     try
                     {
                         ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
@@ -135,7 +135,7 @@ namespace gov.llnl.wintap.core.etl.load
                     }
                     catch(Exception ex2)
                     {
-                        WintapLogger.Log.Append($"{SensorName} error on retry of WRITE operation: {ex2.Message}", LogLevel.Always);
+                        WintapLogger.Log.Append($"{SensorName} error on retry of WRITE operation: {ex2.Message}", LogLevel.Info);
                     }
                 }
             }

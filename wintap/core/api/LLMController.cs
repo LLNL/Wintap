@@ -17,7 +17,7 @@ using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel.Text;
 using Microsoft.SemanticKernel.Embeddings;
 using Codeblaze.SemanticKernel.Connectors.Ollama;
-using Microsoft.Extensions.Logging;
+// using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.Json;
@@ -29,7 +29,6 @@ using gov.llnl.wintap.core.infrastructure;
 using Newtonsoft.Json;
 using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.Properties;
-using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
 using Microsoft.AspNetCore.Http;
 using System.IO;
 
@@ -82,17 +81,17 @@ namespace gov.llnl.wintap.core.api
         [HttpPut("Inference")]
         public async Task Put([FromBody] PromptModel promptModel)
         {
-            WintapLogger.Log.Append($"Got inference request", LogLevel.Always);
+            WintapLogger.Log.Append($"Got inference request", LogLevel.Info);
             string collectionName = "contextData";
             string question = promptModel.Prompt;
             StringBuilder builder = new StringBuilder();
             double minRel = Settings.Default.MinRelevance;
             //minRel = 0.3;
 
-            WintapLogger.Log.Append($"attempting to retrieve RAG inference from ollama endpoint", LogLevel.Always);
+            WintapLogger.Log.Append($"attempting to retrieve RAG inference from ollama endpoint", LogLevel.Info);
             try
             {
-                WintapLogger.Log.Append($"collectionName: {collectionName}, question: {question}, minRel: {minRel}", LogLevel.Always);
+                WintapLogger.Log.Append($"collectionName: {collectionName}, question: {question}, minRel: {minRel}", LogLevel.Info);
                 await foreach (MemoryQueryResult result in memory.SearchAsync(collectionName, question, 3, minRel, withEmbeddings: true))
                 {
                     builder.AppendLine(result.Metadata.Text);
@@ -100,7 +99,7 @@ namespace gov.llnl.wintap.core.api
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"ERROR in RAG inference request: {ex.Message}", LogLevel.Always);
+                WintapLogger.Log.Append($"ERROR in RAG inference request: {ex.Message}", LogLevel.Info);
             }
             int contextToRemove = -1;
 
@@ -109,9 +108,9 @@ namespace gov.llnl.wintap.core.api
                 builder.Insert(0, "Here's some additional information: ");
                 contextToRemove = chat.Count;
                 chat.AddUserMessage(builder.ToString());
-                WintapLogger.Log.Append(builder.ToString(), LogLevel.Always);
+                WintapLogger.Log.Append(builder.ToString(), LogLevel.Info);
             }
-            WintapLogger.Log.Append($"Additional info from RAG: ${builder.Length}", LogLevel.Always);
+            WintapLogger.Log.Append($"Additional info from RAG: ${builder.Length}", LogLevel.Info);
             chat.AddUserMessage(question);
             builder.Clear();
             await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat))
@@ -127,13 +126,13 @@ namespace gov.llnl.wintap.core.api
             {
                 chat.RemoveAt(contextToRemove);
             }
-            WintapLogger.Log.Append($"inference complete", LogLevel.Always);
+            WintapLogger.Log.Append($"inference complete", LogLevel.Info);
         }
 
         [HttpPost("Clear")]
         public void Post()
         {
-            WintapLogger.Log.Append($"LLM Clear method called", LogLevel.Always);
+            WintapLogger.Log.Append($"LLM Clear method called", LogLevel.Info);
             chat.RemoveRange(0, chat.Count);
             string systemPrompt = Settings.Default.SystemPrompt;
             chat = new ChatHistory(systemPrompt);
@@ -142,7 +141,7 @@ namespace gov.llnl.wintap.core.api
         [HttpPost("Upload")]
         public async Task<IActionResult> Upload(IFormFile file)
         {
-            WintapLogger.Log.Append($"Document embeddings request received", LogLevel.Always);
+            WintapLogger.Log.Append($"Document embeddings request received", LogLevel.Info);
             if (file == null || file.Length == 0)
             {
                 return BadRequest("No file uploaded.");
@@ -150,7 +149,7 @@ namespace gov.llnl.wintap.core.api
 
             string collectionName = "contextData";
 
-            WintapLogger.Log.Append("LLM Upload is attempting to read file", LogLevel.Always);
+            WintapLogger.Log.Append("LLM Upload is attempting to read file", LogLevel.Info);
             using (var stream = new MemoryStream())
             {
                 await file.CopyToAsync(stream);
@@ -158,11 +157,11 @@ namespace gov.llnl.wintap.core.api
                 using (var reader = new StreamReader(stream))
                 {
                     string fileContent = await reader.ReadToEndAsync();
-                    WintapLogger.Log.Append($"Got file text, Splitting lines...", LogLevel.Always);
+                    WintapLogger.Log.Append($"Got file text, Splitting lines...", LogLevel.Info);
                     List<string> lines = TextChunker.SplitPlainTextLines(fileContent, 128);
                     int chunkSize = 1500;
                     int overlapSize = 100;
-                    WintapLogger.Log.Append($"Line count: {lines.Count}, Splitting paragraphs...", LogLevel.Always);
+                    WintapLogger.Log.Append($"Line count: {lines.Count}, Splitting paragraphs...", LogLevel.Info);
                     List<string> paragraphs = TextChunker.SplitPlainTextParagraphs(lines, chunkSize, overlapSize, " ");
                     try
                     {
@@ -185,7 +184,7 @@ namespace gov.llnl.wintap.core.api
                                 Console.WriteLine($"Skipping empty paragraph!");
                             }
                         }
-                        WintapLogger.Log.Append($"RAG embeddings successfully saved.", LogLevel.Always);
+                        WintapLogger.Log.Append($"RAG embeddings successfully saved.", LogLevel.Info);
                     }
                     catch (Exception ex)
                     {

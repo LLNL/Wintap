@@ -84,23 +84,23 @@ namespace gov.llnl.wintap.core.shared
 
         private StateManager()
         {
-            WintapLogger.Log.Append($"StateManager is sttarting", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager is starting", LogLevel.Info);
             LastWorkbenchActivity = DateTime.Now;
-            WintapLogger.Log.Append($"Getting Wintap settings from config", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"Getting Wintap settings from config", LogLevel.Info);
             WintapSettings = getWintapSettings();
             SessionId = Guid.NewGuid();
 
             WintapState wintapState = readState();
 
-            WintapLogger.Log.Append($"StateManager is getting AgentId", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager is getting AgentId", LogLevel.Info);
             AgentId = getAgentId(wintapState);
-            WintapLogger.Log.Append($"StateManager is refreshing active user info", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager is refreshing active user info", LogLevel.Info);
             ActiveUser = refreshActiveUser();
-            WintapLogger.Log.Append($"StateManager has active user: {ActiveUser}", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager has active user: {ActiveUser}", LogLevel.Info);
             OnBatteryPower = false;
             UserBusy = false;
             WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
-            WintapLogger.Log.Append($"StateManager has found wintap pid: {WintapPID}", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager has found wintap pid: {WintapPID}", LogLevel.Info);
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
             stateRefresh.Interval = 60000;
             stateRefresh.Enabled = true;
@@ -109,7 +109,7 @@ namespace gov.llnl.wintap.core.shared
             stateRefresh.Start();
 
             // sub to SessionChange and set ActiveUser
-            WintapLogger.Log.Append($"StateManager is registering for user change notifications...", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager is registering for user change notifications...", LogLevel.Info);
             try
             {
                 EPStatement userChangeQuery = EventChannel.compileDeploy(EventChannel.EsperRuntime,
@@ -118,9 +118,9 @@ namespace gov.llnl.wintap.core.shared
             }
             catch(Exception ex)
             {
-                WintapLogger.Log.Append($"StateManager encountered an error setting up user change notifications: {ex.Message}", infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append($"StateManager encountered an error setting up user change notifications: {ex.Message}", LogLevel.Info);
             }
-            WintapLogger.Log.Append($"StateManager has hooked user change event notification", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager has hooked user change event notification", LogLevel.Info);
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -130,7 +130,7 @@ namespace gov.llnl.wintap.core.shared
 
             writeState(wintapState);
 
-            WintapLogger.Log.Append($"StateManager is initialized.", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append($"StateManager is initialized.", LogLevel.Info);
         }
 
         private Dictionary<string, bool> getWintapSettings()
@@ -153,7 +153,7 @@ namespace gov.llnl.wintap.core.shared
             }
             catch(Exception ex)
             {
-                WintapLogger.Log.Append($"StateManager: ERROR reading event provider enablement state, could not build collectorSettings object: {ex.Message}", infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append($"StateManager: ERROR reading event provider enablement state, could not build collectorSettings object: {ex.Message}", LogLevel.Info);
             }
             return settings;
         }
@@ -233,19 +233,19 @@ namespace gov.llnl.wintap.core.shared
                         }
                         else
                         {
-                            WintapLogger.Log.Append($"Setting node '{settingName}' not found in app.config", infrastructure.LogLevel.Always);
+                            WintapLogger.Log.Append($"Setting node '{settingName}' not found in app.config", LogLevel.Info);
                         }
                     }
                     xmlDoc.Save(configFile);
                 }
                 else
                 {
-                    WintapLogger.Log.Append("userSettings section not found in app.config", infrastructure.LogLevel.Always);
+                    WintapLogger.Log.Append("userSettings section not found in app.config", LogLevel.Info);
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error modifying app.config: " + ex.Message, infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("Error modifying app.config: " + ex.Message, LogLevel.Info);
             }
         }
 
@@ -260,7 +260,7 @@ namespace gov.llnl.wintap.core.shared
 
             if(agentId == new Guid())
             {
-                WintapLogger.Log.Append("Generating new Agent Id for this sensor.", infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("Generating new Agent Id for this sensor.", LogLevel.Info);
                 agentId = Guid.NewGuid();
                 state.AgentId = agentId.ToString();
             }
@@ -277,7 +277,9 @@ namespace gov.llnl.wintap.core.shared
 
         internal static DateTime refreshLastBoot()
         {
-            DateTime lastBoot = WintapLogger.Log.StartTime;
+            //  todo: get service start time
+            //DateTime lastBoot = WintapLogger.Log.StartTime;
+            DateTime lastBoot = DateTime.Now;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 lastBoot = WindowsStateManager.GetLastBootTime();
@@ -345,20 +347,20 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR retrieving local IP address from .NET provider: " + ex.Message, infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("ERROR retrieving local IP address from .NET provider: " + ex.Message, LogLevel.Info);
             }
             if(localIp == "NA")
             {
                 localIp = getLocalIpAddressFromWMI();
             }
-            WintapLogger.Log.Append("Retrieved local IP address: " + localIp, infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("Retrieved local IP address: " + localIp, LogLevel.Info);
             return localIp;
         }
 
         private static string getLocalIpAddressFromWMI()
         {
             string localIp = "NA";
-            WintapLogger.Log.Append("Attempting to get local IP address from WMI...", infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("Attempting to get local IP address from WMI...", LogLevel.Info);
             try
             {
                 ManagementObjectSearcher mos = new ManagementObjectSearcher("select * from Win32_NetworkAdapterConfiguration WHERE IPEnabled = 'True'");
@@ -380,7 +382,7 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error enumerating NICs: from WMI " + ex.Message, infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("Error enumerating NICs: from WMI " + ex.Message, LogLevel.Info);
             }
             return localIp; ;
         }

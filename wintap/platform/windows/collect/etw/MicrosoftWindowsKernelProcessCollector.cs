@@ -92,7 +92,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("error handling user mode process STOP event: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("error handling user mode process STOP event: " + ex.Message, LogLevel.Info);
             }
         }
 

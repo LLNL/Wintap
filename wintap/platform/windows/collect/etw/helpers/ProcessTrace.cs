@@ -28,7 +28,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
         {
             stopBootTrace();
             FileInfo bootTraceInfo = new FileInfo(Strings.FileRootPath + "\\etl\\" + etlBootTraceLogFile + ".etl");
-            WintapLogger.Log.Append("boot trace file path: " + bootTraceInfo.FullName, LogLevel.Always);
+            WintapLogger.Log.Append("boot trace file path: " + bootTraceInfo.FullName, LogLevel.Info);
             FileInfo bootTraceInfoCopy = bootTraceInfo.CopyTo(bootTraceInfo.FullName + ".copy.etl", true);
             startBootTrace();
             DateTime bootTraceStart = DateTime.Now;
@@ -43,7 +43,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
         /// </summary>
         private DateTime etlToEsper(string etlFilePath, DateTime loadFrom)
         {
-            WintapLogger.Log.Append("Starting boot trace replay", LogLevel.Always);
+            WintapLogger.Log.Append("Starting boot trace replay", LogLevel.Info);
             DateTime lastEventTime = DateTime.MinValue;
 
             using (var source = new ETWTraceEventSource(etlFilePath))
@@ -83,19 +83,19 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                         }
                         catch (Exception ex)
                         {
-                            WintapLogger.Log.Append("ERROR in boot trace.  Could not parse event: " + ex.Message, LogLevel.Always);
+                            WintapLogger.Log.Append("ERROR in boot trace.  Could not parse event: " + ex.Message, LogLevel.Info);
                         }
                     }
                 };
                 source.Process(); // will breack at eof
             }
-            WintapLogger.Log.Append("Boot trace replay complete.", LogLevel.Always);
+            WintapLogger.Log.Append("Boot trace replay complete.", LogLevel.Info);
             return lastEventTime;
         }
 
         private void stopBootTrace()
         {
-            WintapLogger.Log.Append("stopping boot trace", LogLevel.Always);
+            WintapLogger.Log.Append("stopping boot trace", LogLevel.Info);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\System32\\logman.exe";
             psi.Arguments = "stop " + etlBootTraceLogFile + " -ets";
@@ -107,7 +107,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
 
         private void startBootTrace()
         {
-            WintapLogger.Log.Append("starting boot trace", LogLevel.Always);
+            WintapLogger.Log.Append("starting boot trace", LogLevel.Info);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\System32\\logman.exe";
             psi.Arguments = "start " + etlBootTraceLogFile + " -ets";

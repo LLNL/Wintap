@@ -34,7 +34,7 @@ namespace gov.llnl.wintap.core.etl.extract
 
         internal void Stop()
         {
-            WintapLogger.Log.Append("PROCESS_SENSOR Stop called.", LogLevel.Always);
+            WintapLogger.Log.Append("PROCESS_SENSOR Stop called.", LogLevel.Info);
         }
 
         protected override void HandleSensorEvent(EventBean sensorEvent)
@@ -73,7 +73,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR saving flattened START event:  " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR saving flattened START event:  " + ex.Message, LogLevel.Info);
             }
         }
 

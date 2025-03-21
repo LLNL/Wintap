@@ -34,9 +34,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIOInit;
             fileKeyToPath = new ConcurrentDictionary<ulong, string>();
 
-            WintapLogger.Log.Append("Processing rundown trace", LogLevel.Always);
+            WintapLogger.Log.Append("Processing rundown trace", LogLevel.Info);
             string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap\\etl\\kernelrundown.etl";
-            WintapLogger.Log.Append("processing rundown trace", LogLevel.Always);
+            WintapLogger.Log.Append("processing rundown trace", LogLevel.Info);
             int counter = 0;
             using (var source = new ETWTraceEventSource(etlFilePath))
             {
@@ -50,7 +50,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     }
                 };
                 source.Process(); // Invoke callbacks, will break at eof
-                WintapLogger.Log.Append("Rundown file event trace complete. total rundowns processed: " + counter, LogLevel.Always);
+                WintapLogger.Log.Append("Rundown file event trace complete. total rundowns processed: " + counter, LogLevel.Info);
             }
 
         }
@@ -97,7 +97,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("CLOSE handler error: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("CLOSE handler error: " + ex.Message, LogLevel.Info);
             }
         }
 
@@ -144,7 +144,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error handing Kernel_FileIoRead event: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error handing Kernel_FileIoRead event: " + ex.Message, LogLevel.Info);
             }
         }
 
@@ -172,7 +172,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error handing Kernel_FileIoWrite event: " + ex.Message + " " + obj.ToString(), LogLevel.Always);
+                WintapLogger.Log.Append("Error handing Kernel_FileIoWrite event: " + ex.Message + " " + obj.ToString(), LogLevel.Info);
             }
         }
 
@@ -251,7 +251,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("problem in Kernel_FileIoDelete event:  " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("problem in Kernel_FileIoDelete event:  " + ex.Message, LogLevel.Info);
             }
         }
     }

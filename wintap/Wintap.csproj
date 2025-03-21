@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <RootNamespace>gov.llnl.wintap</RootNamespace>
 	<EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
     <SccProjectName>SAK</SccProjectName>
@@ -236,7 +236,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <StartupObject></StartupObject>
+	  <StartupObject></StartupObject>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <AssemblyVersion>7.0.0.0</AssemblyVersion>
     <FileVersion>7.0.0.0</FileVersion>

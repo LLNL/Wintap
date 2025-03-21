@@ -54,14 +54,14 @@ namespace gov.llnl.wintap.core.collect
             }
             catch (Exception e)
             {
-                WintapLogger.Log.Append("Caught exception when opening file" + e.ToString(), LogLevel.Always);
+                WintapLogger.Log.Append("Caught exception when opening file" + e.ToString(), LogLevel.Info);
                 return;
             }
 
             // Register our handler function to the 'packet arrival' event
             device.OnPacketArrival += new PacketArrivalEventHandler(device_OnPacketArrival);
 
-            WintapLogger.Log.Append("-- Capturing from '{0}', hit 'Ctrl-C' to exit...",LogLevel.Always);
+            WintapLogger.Log.Append("-- Capturing from '{0}', hit 'Ctrl-C' to exit...",LogLevel.Info);
 
             var startTime = DateTime.Now;
 
@@ -72,10 +72,10 @@ namespace gov.llnl.wintap.core.collect
             // Close the pcap device
             device.Close();
             var endTime = DateTime.Now;
-            WintapLogger.Log.Append("-- End of file reached.", LogLevel.Always);
+            WintapLogger.Log.Append("-- End of file reached.", LogLevel.Info);
 
             var duration = endTime - startTime;
-            WintapLogger.Log.Append("Read {0} packets in {1}s", LogLevel.Always);
+            WintapLogger.Log.Append("Read {0} packets in {1}s", LogLevel.Info);
 
             Console.Write("Hit 'Enter' to exit...");
         }

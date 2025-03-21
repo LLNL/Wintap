@@ -31,7 +31,7 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private void NetworkEventTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            WintapLogger.Log.Append("ETW session provider has ceased to send network events for 60 seconds.  restart Wintap?", LogLevel.Always);
+            WintapLogger.Log.Append("ETW session provider has ceased to send network events for 60 seconds.  restart Wintap?", LogLevel.Info);
         }
 
         protected override void HandleSensorEvent(EventBean sensorEvent)
@@ -64,7 +64,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error creating TcpConnection object on pid: " + sensorEvent["PID"] + ",  exception: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error creating TcpConnection object on pid: " + sensorEvent["PID"] + ",  exception: " + ex.Message, LogLevel.Info);
             }
         }
     }

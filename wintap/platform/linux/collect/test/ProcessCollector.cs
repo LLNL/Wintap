@@ -35,7 +35,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
         public override bool Start()
         {
-            WintapLogger.Log.Append("Linux process collector has started.", LogLevel.Always);
+            WintapLogger.Log.Append("Linux process collector has started.", LogLevel.Info);
             BackgroundWorker eventGenThread = new BackgroundWorker();
             eventGenThread.DoWork += EventGenThread_DoWork;
             eventGenThread.RunWorkerAsync();
@@ -87,7 +87,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
             //    EventChannel.Send(msg);
 
-            //    WintapLogger.Log.Append($"Linux process event sent to esper!  ProcessName: {msg.ProcessName}, PidHash: {msg.PidHash}", LogLevel.Always);
+            //    WintapLogger.Log.Append($"Linux process event sent to esper!  ProcessName: {msg.ProcessName}, PidHash: {msg.PidHash}", LogLevel.Info);
 
             //}
 

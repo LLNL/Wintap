@@ -115,7 +115,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Problem sending WintapMessage event from: " + this.GetType().Name + ":" + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Problem sending WintapMessage event from: " + this.GetType().Name + ":" + ex.Message, LogLevel.Info);
             }
         }
 
@@ -142,14 +142,14 @@ namespace gov.llnl.wintap.core.etl.extract
         {
             try
             {
-                WintapLogger.Log.Append("Handing esper overrun condition in " + this.GetType().Name + "  suspending ETL data stream for: " + backoffTimer.Interval + "ms", LogLevel.Always);
+                WintapLogger.Log.Append("Handing esper overrun condition in " + this.GetType().Name + "  suspending ETL data stream for: " + backoffTimer.Interval + "ms", LogLevel.Info);
                 backoffTimer.Start();
                 this.Stop();
                 sendThrottleEvent("SUSPEND");
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Problem attempting to suspend esper processing in  " + this.GetType().Name + ": " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Problem attempting to suspend esper processing in  " + this.GetType().Name + ": " + ex.Message, LogLevel.Info);
             }
         }
 
@@ -229,12 +229,12 @@ namespace gov.llnl.wintap.core.etl.extract
                     }
                     else
                     {
-                        WintapLogger.Log.Append($"{this.SensorName}: WARNING - Failed to dequeue message at index {i}", LogLevel.Always);
+                        WintapLogger.Log.Append($"{this.SensorName}: WARNING - Failed to dequeue message at index {i}", LogLevel.Info);
                     }
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"{this.SensorName}: ERROR getting message from SendQueue at index {i}: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"{this.SensorName}: ERROR getting message from SendQueue at index {i}: {ex.Message}", LogLevel.Info);
                 }
             }
 
@@ -248,12 +248,12 @@ namespace gov.llnl.wintap.core.etl.extract
                     }
                     else
                     {
-                        WintapLogger.Log.Append($"{this.SensorName}: ERROR - temp queue not empty after serialize. Dropped event count: {tempQueue.Count}", LogLevel.Always);
+                        WintapLogger.Log.Append($"{this.SensorName}: ERROR - temp queue not empty after serialize. Dropped event count: {tempQueue.Count}", LogLevel.Info);
                     }
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"{this.SensorName}: ERROR writing event data to disk: {ex.Message}", LogLevel.Always);
+                    WintapLogger.Log.Append($"{this.SensorName}: ERROR writing event data to disk: {ex.Message}", LogLevel.Info);
                 }
             }
         }
@@ -294,7 +294,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR writing parquet: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR writing parquet: " + ex.Message, LogLevel.Info);
             }
             parquetWriter.Add(batch);
             return tempQueue;
@@ -331,7 +331,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("error registering EPL: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("error registering EPL: " + ex.Message, LogLevel.Info);
             }
 
 

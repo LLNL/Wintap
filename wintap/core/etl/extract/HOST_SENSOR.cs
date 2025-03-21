@@ -117,7 +117,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("error creating host record: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("error creating host record: " + ex.Message, LogLevel.Info);
             }
 
         }
@@ -159,7 +159,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error creatig MacIp: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error creatig MacIp: " + ex.Message, LogLevel.Info);
 
             }
         }

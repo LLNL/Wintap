@@ -54,7 +54,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             // in addition to publishing the metrics in props, have an event fire on dropped events eventargs holds the name of the session and dropped event count
             traceEventSession.EnableProvider(EtwProviderId, EventLevel, TraceEventFlags);
             traceEventSource = new ETWTraceEventSource(EtwSessionName, TraceEventSourceType.Session);
-            WintapLogger.Log.Append("attempting to enable provider: " + EtwProviderId + " from collector: " + CollectorName + ", trace flags: " + TraceEventFlags + ", trace level: " + EventLevel, LogLevel.Always);
+            WintapLogger.Log.Append("attempting to enable provider: " + EtwProviderId + " from collector: " + CollectorName + ", trace flags: " + TraceEventFlags + ", trace level: " + EventLevel, LogLevel.Info);
             RegisteredTraceEventParser traceEventParser = new RegisteredTraceEventParser(traceEventSource);
             traceEventParser.All += Process_Event;
 
@@ -80,7 +80,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             {
                 if (!ex.Message.EndsWith(" is not active."))
                 {
-                    WintapLogger.Log.Append("Error attempting to stop ETW session (session may need to be manually stopped). session Name:  " + etwSessionName + ", error: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("Error attempting to stop ETW session (session may need to be manually stopped). session Name:  " + etwSessionName + ", error: " + ex.Message, LogLevel.Info);
                 }
             }
         }
@@ -98,22 +98,22 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
         private void etwListenerThread_DoWork(object sender, DoWorkEventArgs e)
         {
-            WintapLogger.Log.Append("starting event handler for: " + EtwProviderId, LogLevel.Always);
+            WintapLogger.Log.Append("starting event handler for: " + EtwProviderId, LogLevel.Info);
             try
             {
-                WintapLogger.Log.Append("Starting ETW consumer on: " + CollectorName + ", privider id: " + EtwProviderId, LogLevel.Always);
+                WintapLogger.Log.Append("Starting ETW consumer on: " + CollectorName + ", privider id: " + EtwProviderId, LogLevel.Info);
                 traceEventSource.Process();  // this is a blocking call! 
-                WintapLogger.Log.Append("CRITICAL: etw listening thread has stopped for: " + CollectorName, LogLevel.Always);
+                WintapLogger.Log.Append("CRITICAL: etw listening thread has stopped for: " + CollectorName, LogLevel.Info);
             }
             catch (Exception ex)
             {
                 if (ex.Message.Contains("The instance name passed was not recognized as valid by a WMI data provider. (Exception from HRESULT: 0x80071069)"))
                 {
-                    WintapLogger.Log.Append("No user mode etw providers enabled.", LogLevel.Always);
+                    WintapLogger.Log.Append("No user mode etw providers enabled.", LogLevel.Info);
                 }
                 else
                 {
-                    WintapLogger.Log.Append("error starting user mode event handler: " + ex.Message + " " + ex.InnerException, LogLevel.Always);
+                    WintapLogger.Log.Append("error starting user mode event handler: " + ex.Message + " " + ex.InnerException, LogLevel.Info);
                 }
             }
         }

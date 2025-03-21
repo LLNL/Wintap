@@ -20,7 +20,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
 
         public bool PostUpload()
         {
-            WintapLogger.Log.Append(this.Name + " post upload method called", LogLevel.Always);
+            WintapLogger.Log.Append(this.Name + " post upload method called", LogLevel.Info);
             client.Dispose();
             this.stopSessionStats();
             return true;
@@ -28,17 +28,17 @@ namespace gov.llnl.wintap.core.etl.load.adapters
 
         public bool PreUpload(Dictionary<string, string> parameters)
         {
-            WintapLogger.Log.Append(" PreUpload method called", LogLevel.Always);
+            WintapLogger.Log.Append(" PreUpload method called", LogLevel.Info);
             instanceProfileAWSCredentials = new InstanceProfileAWSCredentials();            
             client = new AmazonS3Client(instanceProfileAWSCredentials, Amazon.RegionEndpoint.GetBySystemName(parameters["RegionEndpoint"]));
             this.startSessionStats();
-            WintapLogger.Log.Append(" PreUpload method complete", LogLevel.Always);
+            WintapLogger.Log.Append(" PreUpload method complete", LogLevel.Info);
             return true;
         }
 
         public async Task<bool> Upload(string localFile, Dictionary<string, string> parameters)
         {
-            WintapLogger.Log.Append(this.Name + " upload method called", LogLevel.Always);
+            WintapLogger.Log.Append(this.Name + " upload method called", LogLevel.Info);
             bool fileSent = false;
 
             if (!parameters.ContainsKey("Bucket"))
@@ -47,7 +47,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
 
             string bucketName = parameters["Bucket"];
-            WintapLogger.Log.Append("Bucket: " + bucketName, LogLevel.Always);
+            WintapLogger.Log.Append("Bucket: " + bucketName, LogLevel.Info);
 
             FileInfo localFileInfo = new FileInfo(localFile);
             if (!localFileInfo.Exists)
@@ -56,7 +56,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
 
             string objectKey = getS3ObjectNameForFile(localFileInfo.Name);
-            WintapLogger.Log.Append("s3 object key: " + objectKey, LogLevel.Always);
+            WintapLogger.Log.Append("s3 object key: " + objectKey, LogLevel.Info);
 
             if (bucketName != "NONE")
             {
@@ -75,11 +75,11 @@ namespace gov.llnl.wintap.core.etl.load.adapters
                 {
                     PutObjectResponse resp = await client.PutObjectAsync(req);
                     fileSent = true;
-                    WintapLogger.Log.Append("Upload HTTP status code: " + resp.HttpStatusCode, LogLevel.Always);
+                    WintapLogger.Log.Append("Upload HTTP status code: " + resp.HttpStatusCode, LogLevel.Info);
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("Upload failed: " + ex.Message, LogLevel.Always);
+                    WintapLogger.Log.Append("Upload failed: " + ex.Message, LogLevel.Info);
                     fileSent = false;
                 }
             }

@@ -59,7 +59,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("FILE Error creating WintapData object, exception: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("FILE Error creating WintapData object, exception: " + ex.Message, LogLevel.Info);
             }
 
         }

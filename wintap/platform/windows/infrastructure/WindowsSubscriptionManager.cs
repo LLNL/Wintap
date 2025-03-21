@@ -23,7 +23,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
             List<BaseWinCollector> baseCollectors = new List<BaseWinCollector>();
             // start process collector first for process attribution
-            WintapLogger.Log.Append("Starting Process collector", LogLevel.Always);
+            WintapLogger.Log.Append("Starting Process collector", LogLevel.Info);
             ProcessCollector pc = new ProcessCollector();
             pc.Start();
             kernelFlags = KernelTraceEventParser.Keywords.Process;
@@ -41,7 +41,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         continue;
                     }
                     string collectorName = nameSpace + "." + sp.Name;
-                    WintapLogger.Log.Append("Attempting to load collector with name: " + collectorName, LogLevel.Always);
+                    WintapLogger.Log.Append("Attempting to load collector with name: " + collectorName, LogLevel.Info);
                     try
                     {
                         Type type = Type.GetType(collectorName);
@@ -54,14 +54,14 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         try
                         {
                             // there can only be one kernel logger.  collectors that want to consume from NT Kernel Logger will declare this via kernel trace flags which we append to the global list.
-                            WintapLogger.Log.Append("Inspecting collector for Kernel trace flags: " + collectorName, LogLevel.Always);
+                            WintapLogger.Log.Append("Inspecting collector for Kernel trace flags: " + collectorName, LogLevel.Info);
                             PropertyInfo pi = type.GetProperty("KernelTraceEventFlags");
                             PropertyInfo pinfo = instance.GetType().GetProperty("KernelTraceEventFlags");
                             if (pinfo != null)  // only true for nt kernel logger collectors
                             {
                                 KernelTraceEventParser.Keywords newFlags = (KernelTraceEventParser.Keywords)pinfo.GetValue(instance, null);
                                 kernelFlags = kernelFlags | newFlags;
-                                WintapLogger.Log.Append("Found Kernel trace flags on " + collectorName + " flags: " + newFlags.ToString(), LogLevel.Always);
+                                WintapLogger.Log.Append("Found Kernel trace flags on " + collectorName + " flags: " + newFlags.ToString(), LogLevel.Info);
                             }
                         }
                         catch (Exception ex)
@@ -71,21 +71,21 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append(sp.Name + " error loading collector: " + ex.Message, LogLevel.Always);
+                        WintapLogger.Log.Append(sp.Name + " error loading collector: " + ex.Message, LogLevel.Info);
                     }
 
                 }
             }
-            WintapLogger.Log.Append("Done loading modelled collectors", LogLevel.Always);
+            WintapLogger.Log.Append("Done loading modelled collectors", LogLevel.Info);
 
             // Start unmodelled (aka generic) collectors
-            WintapLogger.Log.Append("loading unmodelled collectors", LogLevel.Always);
+            WintapLogger.Log.Append("loading unmodelled collectors", LogLevel.Info);
             int genericCounter = 0;
             foreach (string genericProvider in Properties.Settings.Default.GenericProviders)
             {
                 genericCounter++;
                 string etwCollectorName = genericProvider;
-                WintapLogger.Log.Append("Found generic etw provider in config: " + etwCollectorName, LogLevel.Always);
+                WintapLogger.Log.Append("Found generic etw provider in config: " + etwCollectorName, LogLevel.Info);
                 System.Threading.Thread.Sleep(1000);
                 GenericCollector gc = new GenericCollector() { CollectorName = etwCollectorName, EtwProviderId = genericProvider };
                 if (gc.Start())
@@ -93,10 +93,10 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     baseCollectors.Add((BaseWinCollector)gc);
                 }
             }
-            WintapLogger.Log.Append("Done loading unmodelled collectors", LogLevel.Always);
+            WintapLogger.Log.Append("Done loading unmodelled collectors", LogLevel.Info);
 
             // Create the shared Kernel logger session with the required event flags
-            WintapLogger.Log.Append("Creating Kernel event listening thread (ETW)...", LogLevel.Always);
+            WintapLogger.Log.Append("Creating Kernel event listening thread (ETW)...", LogLevel.Info);
             BackgroundWorker etwKernelModeListeningThread = new BackgroundWorker();
             etwKernelModeListeningThread.WorkerSupportsCancellation = true;
             etwKernelModeListeningThread.DoWork += new DoWorkEventHandler(etwKernelModeListeningThread_DoWork);
@@ -119,7 +119,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             try
             {
-                WintapLogger.Log.Append("starting kernel mode ETW event handler", LogLevel.Always);
+                WintapLogger.Log.Append("starting kernel mode ETW event handler", LogLevel.Info);
                 //TraceEventSession  kernelSession = new TraceEventSession("NT Kernel Logger", TraceEventSessionOptions.Create);
                 //kernelSession.BufferSizeMB = 250;
                 //if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
@@ -130,11 +130,11 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 KernelSession.Instance.Start();
                 ETWTraceEventSource source = KernelSource.Instance.EtwSource;
                 source.Process();  // this is a blocking call! 
-                WintapLogger.Log.Append("CRITICAL ERROR: Kernel mode etw listening thread has stopped", LogLevel.Always);
+                WintapLogger.Log.Append("CRITICAL ERROR: Kernel mode etw listening thread has stopped", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR starting ETW kernel mode session: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("ERROR starting ETW kernel mode session: " + ex.Message, LogLevel.Info);
             }
 
         }

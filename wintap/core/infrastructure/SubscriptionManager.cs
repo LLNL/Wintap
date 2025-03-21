@@ -38,7 +38,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                WintapLogger.Log.Append("Starting WindowsSubscriptionManager", LogLevel.Always);
+                WintapLogger.Log.Append("Starting WindowsSubscriptionManager", LogLevel.Info);
                 winCollectors = winSubMgr.Start();
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -52,14 +52,14 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             else
             {
-                WintapLogger.Log.Append("Running on an unsupported platform", LogLevel.Always);
+                WintapLogger.Log.Append("Running on an unsupported platform", LogLevel.Info);
             }
-            WintapLogger.Log.Append("Done loading collectors", LogLevel.Always);
+            WintapLogger.Log.Append("Done loading collectors", LogLevel.Info);
         }
 
         internal void Stop()
         {
-            WintapLogger.Log.Append("Sensor shutting down. ", LogLevel.Always);
+            WintapLogger.Log.Append("Sensor shutting down. ", LogLevel.Info);
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -77,7 +77,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 // stop Mac collectors
             }
 
-            WintapLogger.Log.Append("Sensor shutdown", LogLevel.Always);
+            WintapLogger.Log.Append("Sensor shutdown", LogLevel.Info);
         }     
     }
 }

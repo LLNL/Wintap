@@ -34,7 +34,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters.baseclass
         protected void stopSessionStats()
         {
             this.watch.Stop();
-            WintapLogger.Log.Append("Uploader: " + this.Name + " uploaded " + counter + " files in " + watch.Elapsed.TotalSeconds + " seconds", LogLevel.Always);
+            WintapLogger.Log.Append("Uploader: " + this.Name + " uploaded " + counter + " files in " + watch.Elapsed.TotalSeconds + " seconds", LogLevel.Info);
             this.watch.Reset();
             this.counter = 0;
         }
