@@ -82,20 +82,36 @@ namespace gov.llnl.wintap.core.api
         public async Task Put([FromBody] PromptModel promptModel)
         {
             WintapLogger.Log.Append($"Got inference request", LogLevel.Info);
-            string collectionName = "contextData";
+            string collectionName = "Wintap";
             string question = promptModel.Prompt;
             StringBuilder builder = new StringBuilder();
             double minRel = Settings.Default.MinRelevance;
-            //minRel = 0.3;
+            minRel = 0.3;
+
+            // You might need to check if the collection exists first
+            try
+            {
+                var collections = await memory.GetCollectionsAsync();
+                bool collectionExists = collections.Contains(collectionName);
+                WintapLogger.Log.Append($"Collection '{collectionName}' exists: {collectionExists}", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error checking collections: {ex.Message}", LogLevel.Error);
+            }
 
             WintapLogger.Log.Append($"attempting to retrieve RAG inference from ollama endpoint", LogLevel.Info);
             try
             {
                 WintapLogger.Log.Append($"collectionName: {collectionName}, question: {question}, minRel: {minRel}", LogLevel.Info);
+                int resultCount = 0;
                 await foreach (MemoryQueryResult result in memory.SearchAsync(collectionName, question, 3, minRel, withEmbeddings: true))
                 {
+                    resultCount++;
+                    WintapLogger.Log.Append($"Found match: Relevance={result.Relevance}", LogLevel.Info);
                     builder.AppendLine(result.Metadata.Text);
                 }
+                WintapLogger.Log.Append($"Search complete. Found {resultCount} results", LogLevel.Info);
             }
             catch (Exception ex)
             {
@@ -147,7 +163,8 @@ namespace gov.llnl.wintap.core.api
                 return BadRequest("No file uploaded.");
             }
 
-            string collectionName = "contextData";
+            // string collectionName = "contextData";
+            string collectionName = "Wintap";
 
             WintapLogger.Log.Append("LLM Upload is attempting to read file", LogLevel.Info);
             using (var stream = new MemoryStream())

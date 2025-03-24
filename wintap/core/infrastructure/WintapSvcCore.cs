@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Runtime.InteropServices;
+using Microsoft.AspNetCore.Hosting;
 
 namespace gov.llnl.wintap
 {
@@ -148,25 +149,95 @@ namespace gov.llnl.wintap
 
         private void startWorkbench(string[] args)
         {
-            WintapLogger.Log.Append("Extracting workbench", core.infrastructure.LogLevel.Info);
+            // Get the actual executing assembly directory rather than assuming the current directory
+            string wintapDir = Strings.FileRootPath;
+            WintapLogger.Log.Append("Using Wintap directory: " + wintapDir, core.infrastructure.LogLevel.Always);
+
+            WintapLogger.Log.Append("Extracting workbench", core.infrastructure.LogLevel.Always);
             try
             {
-                string wintapDir = Strings.FileRootPath + "\\";
-                DirectoryInfo workbenchInfo = new DirectoryInfo(wintapDir + "\\Workbench");
+                DirectoryInfo workbenchInfo = new DirectoryInfo(Path.Combine(wintapDir, "Workbench"));
                 if (!workbenchInfo.Exists)
                 {
                     workbenchInfo.Create();
-                    WintapLogger.Log.Append($"Extraction path: {wintapDir}", core.infrastructure.LogLevel.Info);
-                    System.IO.Compression.ZipFile.ExtractToDirectory(wintapDir + "workbench.zip", wintapDir);
+                    WintapLogger.Log.Append("Extraction path: " + workbenchInfo.FullName, core.infrastructure.LogLevel.Always);
+
+                    // Check if workbench.zip exists
+                    string zipPath = Path.Combine(wintapDir, "workbench.zip");
+                    if (File.Exists(zipPath))
+                    {
+                        WintapLogger.Log.Append("Found workbench.zip at: " + zipPath, core.infrastructure.LogLevel.Always);
+                        System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, wintapDir);
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append("ERROR: workbench.zip not found at: " + zipPath, core.infrastructure.LogLevel.Always);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error in workbench extraction: {ex.Message}", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("Error in workbench extraction: " + ex.Message, core.infrastructure.LogLevel.Always);
             }
 
-            string baseAddress = $"http://127.0.0.1:{Properties.Settings.Default.ApiPort}/";
-            WintapLogger.Log.Append($"Accepting connections at: {baseAddress}", core.infrastructure.LogLevel.Info);
+            string baseAddress = "http://127.0.0.1:" + Properties.Settings.Default.ApiPort + "/";
+
+            try
+            {
+                // Set current directory to the assembly location to ensure relative paths work
+                Directory.SetCurrentDirectory(wintapDir);
+                WintapLogger.Log.Append("Set current directory to: " + wintapDir, core.infrastructure.LogLevel.Always);
+
+                WintapLogger.Log.Append("Creating web host with WebHost.CreateDefaultBuilder", core.infrastructure.LogLevel.Always);
+
+                // Create the web host with explicit content root
+                var webHost = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(args)
+                    .UseContentRoot(wintapDir)
+                    .UseStartup<Startup>()
+                    .UseUrls(baseAddress)
+                    .Build();
+
+                // Start the web host in a background task
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        WintapLogger.Log.Append("Starting web host in background thread", core.infrastructure.LogLevel.Always);
+                        webHost.Run();
+                        WintapLogger.Log.Append("Web host stopped", core.infrastructure.LogLevel.Always);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append("Error in web host background thread: " + ex.Message, core.infrastructure.LogLevel.Always);
+                        WintapLogger.Log.Append("Full exception: " + ex.ToString(), core.infrastructure.LogLevel.Always);
+                    }
+                });
+
+                // Give more time for server to start
+                Thread.Sleep(3000);
+
+                // Check if server is listening
+                try
+                {
+                    using (var client = new System.Net.WebClient())
+                    {
+                        client.Headers.Add("user-agent", "Wintap");
+                        var response = client.DownloadString(baseAddress + "api/Test");
+                        WintapLogger.Log.Append("Web server response: " + response, core.infrastructure.LogLevel.Always);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append("Could not connect to web server: " + ex.Message, core.infrastructure.LogLevel.Always);
+                }
+
+                WintapLogger.Log.Append("Web server initialization process complete", core.infrastructure.LogLevel.Always);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error initializing web server: " + ex.Message, core.infrastructure.LogLevel.Always);
+                WintapLogger.Log.Append("Exception details: " + ex.ToString(), core.infrastructure.LogLevel.Always);
+            }
         }
 
         public override async Task StopAsync(CancellationToken cancellationToken)
@@ -209,5 +280,16 @@ namespace gov.llnl.wintap
 
             await base.StopAsync(cancellationToken);
         }
+
+        public static IHostBuilder CreateHostBuilder(string[] args) =>
+    Host.CreateDefaultBuilder(args)
+        .ConfigureWebHostDefaults(webBuilder =>
+        {
+            webBuilder.UseStartup<Startup>();
+        })
+        .UseWindowsService(options =>
+        {
+            options.ServiceName = "Wintap";
+        });
     }
 }

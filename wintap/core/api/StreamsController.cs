@@ -35,6 +35,18 @@ namespace gov.llnl.wintap.core.api
     }
 
 
+    [ApiController]
+    [Route("api/test")]
+    public class DiagnosticController : ControllerBase
+    {
+        [HttpGet]
+        public IActionResult Get()
+        {
+            WintapLogger.Log.Append("Diagnostic API endpoint called", core.infrastructure.LogLevel.Always);
+            return Ok(new { message = "API is working", timestamp = DateTime.Now });
+        }
+    }
+
     /// <summary>
     /// API for interfacing Esper with the Workbench
     /// </summary>
@@ -47,6 +59,8 @@ namespace gov.llnl.wintap.core.api
             hubContext = _hubContext;
             StateManager.LastWorkbenchActivity = DateTime.Now;
         }
+
+
 
         /// <summary>
         /// Activate, Stop or Delete handling

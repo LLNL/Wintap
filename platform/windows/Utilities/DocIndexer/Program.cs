@@ -18,7 +18,7 @@ internal class Program
         //}
         //string collectionName = args[0];
 
-        string collectionName = "BCB";
+        string collectionName = "Wintap";
 
         Console.WriteLine("  *****************");
         Console.WriteLine("Document Indexer utility");
@@ -26,11 +26,11 @@ internal class Program
         Console.WriteLine("  *****************");
         Console.WriteLine();
 
-        string docPath = @"C:\data\docs";
+        string docPath = @"C:\data\code\test";
 
 
         var kernelBuilder = Kernel.CreateBuilder();
-        var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "phi3", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
+        var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "gemma3:1b", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
 
         HttpClient httpClient = new HttpClient();
         httpClient.Timeout = new TimeSpan(0, 5, 0);

@@ -18,7 +18,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "utilities", "utilities", "{
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocIndexer", "platform\windows\Utilities\DocIndexer\DocIndexer.csproj", "{C34C2A8C-2C33-45B3-9BD4-91FD123D890E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TenableHelper", "platform\windows\Utilities\LocalInference\TenableHelper.csproj", "{84D53A62-053A-492D-96AA-FFCF30CD756A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LocalInference", "platform\windows\Utilities\LocalInference\LocalInference.csproj", "{84D53A62-053A-492D-96AA-FFCF30CD756A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "platform", "platform", "{94CDA401-4A90-4F82-B851-262342674E31}"
 EndProject
@@ -61,6 +61,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleEventPlugin", "platform\samples\SimpleEventPlugin\SimpleEventPlugin.csproj", "{3CC4F4DA-5D11-450B-B592-1BC6CE49D094}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalRAG", "platform\windows\Utilities\LocalRAG\LocalRAG.csproj", "{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -225,6 +227,22 @@ Global
 		{3CC4F4DA-5D11-450B-B592-1BC6CE49D094}.Release|x64.Build.0 = Release|Any CPU
 		{3CC4F4DA-5D11-450B-B592-1BC6CE49D094}.Release|x86.ActiveCfg = Release|Any CPU
 		{3CC4F4DA-5D11-450B-B592-1BC6CE49D094}.Release|x86.Build.0 = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|x64.Build.0 = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Debug|x86.Build.0 = Debug|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|ARM64.Build.0 = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|x64.ActiveCfg = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|x64.Build.0 = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|x86.ActiveCfg = Release|Any CPU
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -241,6 +259,7 @@ Global
 		{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A} = {66763ED6-F638-4936-A82B-ADAB21030A27}
 		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
 		{3CC4F4DA-5D11-450B-B592-1BC6CE49D094} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1} = {D3644633-5670-4050-8E1D-465A966F45E1}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B820FE25-5EEE-4E31-A6AE-C417551BE27C}

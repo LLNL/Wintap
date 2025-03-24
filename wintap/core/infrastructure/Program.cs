@@ -38,7 +38,6 @@ using static System.Net.Mime.MediaTypeNames;
 using System.ComponentModel;
 using Microsoft.SemanticKernel.Connectors.Chroma;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -51,7 +50,7 @@ builder.Services.AddControllers();
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
 var kernelBuilder = Kernel.CreateBuilder();
-var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "llama3.1:8b", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
+var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "gemma3:1b", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
 
 HttpClient httpClient = new HttpClient();
 httpClient.Timeout = new TimeSpan(0, 5, 0);
@@ -61,19 +60,19 @@ httpClient.Timeout = new TimeSpan(0, 5, 0);
 
 
 // use use with in-memory vector store
-ISemanticTextMemory memory = new MemoryBuilder()
-    .WithLoggerFactory(kernel.LoggerFactory)
-    .WithMemoryStore(new VolatileMemoryStore())
-    .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
-    .Build();
-
-// use a persistent memory store:
-//var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
 //ISemanticTextMemory memory = new MemoryBuilder()
 //    .WithLoggerFactory(kernel.LoggerFactory)
-//    .WithMemoryStore(chromaMemoryStore)
+//    .WithMemoryStore(new VolatileMemoryStore())
 //    .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
 //    .Build();
+
+// use a persistent memory store:
+var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
+ISemanticTextMemory memory = new MemoryBuilder()
+    .WithLoggerFactory(kernel.LoggerFactory)
+    .WithMemoryStore(chromaMemoryStore)
+    .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
+    .Build();
 
 builder.Services.AddSingleton<ISemanticTextMemory>(provider =>
 {
