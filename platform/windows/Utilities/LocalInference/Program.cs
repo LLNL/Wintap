@@ -18,7 +18,7 @@ internal class Program
             Console.WriteLine("usage: LocalInference.exe <collectionName> <relevanceThreshold> <question>");
         }
         var kernelBuilder = Kernel.CreateBuilder();
-        var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "llama3.1:8b-instruct-q2_K", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434"))
+        var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "gemma3:1b", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434"))
             .Build();
 
         string systemPrompt = "You are a helpful AI";

@@ -15,7 +15,7 @@ using Microsoft.Extensions.Hosting;
 using System.Text.Json;
 using System.Web.Services.Description;
 using System.Runtime.CompilerServices;
-using Codeblaze.SemanticKernel.Connectors.Ollama;
+// using Codeblaze.SemanticKernel.Connectors.Ollama;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel.Text;
@@ -30,7 +30,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel.Text;
 using Microsoft.SemanticKernel.Embeddings;
-using Codeblaze.SemanticKernel.Connectors.Ollama;
+//using Codeblaze.SemanticKernel.Connectors.Ollama;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.Properties;
 using System.Linq;
@@ -49,8 +49,17 @@ builder.Services.AddControllers();
 
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
-var kernelBuilder = Kernel.CreateBuilder();
-var kernel = kernelBuilder.AddOllamaChatCompletion(modelId: "gemma3:1b", baseUrl: new Uri("http://127.0.0.1:11434")).Build();
+// URL for your local Ollama instance
+string ollamaEndpoint = "http://localhost:11434";
+
+// The model name as configured in Ollama
+string modelName = "gemma3:1b";
+
+// Configure the kernel with Ollama
+var aiBuilder = Kernel.CreateBuilder();
+aiBuilder.AddOllamaTextGeneration(modelName, new Uri(ollamaEndpoint));
+var kernel = builder.Build();
+
 
 HttpClient httpClient = new HttpClient();
 httpClient.Timeout = new TimeSpan(0, 5, 0);

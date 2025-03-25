@@ -1,59 +1,61 @@
 ﻿#pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020, SKEXP0070;
-
-using Microsoft.SemanticKernel.Connectors.Chroma;
-using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel;
-using Codeblaze.SemanticKernel.Connectors.Ollama;
-using Microsoft.SemanticKernel.Text;
-using System.Collections;
+using Microsoft.SemanticKernel.Connectors.Ollama;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.TextGeneration;
+using System;
+using System.Threading.Tasks;
 
-namespace LocalRAG
+class Program
 {
-    internal class Program
+    static async Task Main(string[] args)
     {
-        private static async Task Main(string[] args)
+        // URL for your local Ollama instance
+        string ollamaEndpoint = "http://localhost:11434";
+
+        // The model name as configured in Ollama
+        string modelName = "gemma3:1b";
+
+        // Configure the kernel with Ollama
+        var builder = Kernel.CreateBuilder();
+        builder.AddOllamaTextGeneration(modelName, new Uri(ollamaEndpoint));
+        var kernel = builder.Build();
+
+        // Get the text generation service
+        var textService = kernel.GetRequiredService<ITextGenerationService>();
+
+        // Create OpenAI settings that Ollama will use
+        var openAISettings = new OpenAIPromptExecutionSettings
         {
-            Console.WriteLine("Hello, World!");
+            Temperature = 0.2,
+            MaxTokens = 500
+        };
 
-            string docPath = @"C:\data\code\test";
-            string collectionName = "Wintap";
+        Console.WriteLine("Gemma 3 Streaming Chat (Type 'exit' to quit)");
+        Console.WriteLine("-------------------------------------------");
 
-            var kernelBuilder = Kernel.CreateBuilder();
-            var kernel = kernelBuilder.AddOllamaChatCompletion(modelId: "gemma3:1b", endpoint: new Uri("http://127.0.0.1:11434")).Build();
+        while (true)
+        {
+            Console.Write("\nYour prompt: ");
+            string userPrompt = Console.ReadLine();
 
-            HttpClient httpClient = new HttpClient();
-            httpClient.Timeout = new TimeSpan(0, 5, 0);
+            if (userPrompt.ToLower() == "exit")
+                break;
 
-            //string rag_data = "C:\\programdata\\wintap\\ragdata.txt";
-            //WintapLogger.Log.Append($"Attempting to load RAG data from file: {rag_data}", LogLevel.Info);
+            Console.WriteLine("\nResponse:");
 
-            // use a persistent memory store:
-            var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
-            ISemanticTextMemory memory = new MemoryBuilder()
-                .WithLoggerFactory(kernel.LoggerFactory)
-                .WithMemoryStore(chromaMemoryStore)
-                .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
-                .Build();
-
-
-            IList<string> allCollections = await memory.GetCollectionsAsync();
-            Console.WriteLine(allCollections.Count);
-
-            var memoryResultCollection = memory.SearchAsync(collectionName, query: "What is Wintap?", limit: 1, minRelevanceScore: 0);
-            var doc = memoryResultCollection.ToBlockingEnumerable().SingleOrDefault();
-            foreach (var memResult in memoryResultCollection.ToBlockingEnumerable())
+            // Stream the response with OpenAI settings
+            await foreach (var chunk in textService.GetStreamingTextContentsAsync(
+                userPrompt,
+                openAISettings))
             {
-                Console.WriteLine(memResult.Metadata.Text);
+                Console.Write(chunk);
             }
-            
 
-            // 68a2cdf0-e634-4ae2-b557-9bf5eae1cf3b
-            int j = 0;
-
-
-
-            Console.WriteLine("all done!!");
-
+            Console.WriteLine("\n");
         }
+
+        Console.WriteLine("\nPress any key to exit...");
+        Console.ReadKey();
     }
 }
