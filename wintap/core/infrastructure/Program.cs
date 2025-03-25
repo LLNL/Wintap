@@ -50,7 +50,7 @@ builder.Services.AddControllers();
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
 var kernelBuilder = Kernel.CreateBuilder();
-var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "gemma3:1b", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
+var kernel = kernelBuilder.AddOllamaChatCompletion(modelId: "gemma3:1b", baseUrl: new Uri("http://127.0.0.1:11434")).Build();
 
 HttpClient httpClient = new HttpClient();
 httpClient.Timeout = new TimeSpan(0, 5, 0);

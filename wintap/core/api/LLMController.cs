@@ -31,6 +31,7 @@ using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Http;
 using System.IO;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -86,9 +87,11 @@ namespace gov.llnl.wintap.core.api
             string question = promptModel.Prompt;
             StringBuilder builder = new StringBuilder();
             double minRel = Settings.Default.MinRelevance;
-            minRel = 0.3;
+            minRel = 0;
 
-            // You might need to check if the collection exists first
+            OpenAIPromptExecutionSettings openAIPromptExecutionSettings = new OpenAIPromptExecutionSettings();
+            openAIPromptExecutionSettings.Temperature = .2;
+
             try
             {
                 var collections = await memory.GetCollectionsAsync();
@@ -119,29 +122,31 @@ namespace gov.llnl.wintap.core.api
             }
             int contextToRemove = -1;
 
+            chat.AddUserMessage(question);
+
             if (builder.Length != 0)
             {
-                builder.Insert(0, "Here's some additional information: ");
+                builder.Insert(0, $"Here's some additional information that may help you answer this question: ");
                 contextToRemove = chat.Count;
-                chat.AddUserMessage(builder.ToString());
-                WintapLogger.Log.Append(builder.ToString(), LogLevel.Info);
+                chat.AddSystemMessage(builder.ToString());
             }
             WintapLogger.Log.Append($"Additional info from RAG: ${builder.Length}", LogLevel.Info);
-            chat.AddUserMessage(question);
-            builder.Clear();
-            await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat))
+
+
+            //chat.AddUserMessage(question);
+
+            await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat, openAIPromptExecutionSettings))
             {
                 Inference inf = new Inference() { Prompt = question, Response = message.ToString(), TokensUsed = 0 };
                 string jsonString = JsonConvert.SerializeObject(inf);
                 await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
-                builder.Append(message.Content);
             }
 
-            chat.AddAssistantMessage(builder.ToString());
             if (contextToRemove >= 0)
             {
                 chat.RemoveAt(contextToRemove);
             }
+            builder.Clear();
             WintapLogger.Log.Append($"inference complete", LogLevel.Info);
         }
 

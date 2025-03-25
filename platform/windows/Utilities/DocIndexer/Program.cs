@@ -75,6 +75,7 @@ internal class Program
                         try
                         {
                             string docId = Guid.NewGuid().ToString();
+                            Console.WriteLine(docId);
                             Console.WriteLine("Doc ID: " + await memory.SaveInformationAsync(collectionName, paragraphs[i], docId));
                         }
                         catch (Exception ex)
