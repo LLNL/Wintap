@@ -16,7 +16,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel.Text;
 using Microsoft.SemanticKernel.Embeddings;
-using Codeblaze.SemanticKernel.Connectors.Ollama;
+//using Codeblaze.SemanticKernel.Connectors.Ollama;
 // using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -87,16 +87,28 @@ namespace gov.llnl.wintap.core.api
             string question = promptModel.Prompt;
             StringBuilder builder = new StringBuilder();
             double minRel = Settings.Default.MinRelevance;
-            minRel = 0;
+            minRel = 0.66;
+
 
             OpenAIPromptExecutionSettings openAIPromptExecutionSettings = new OpenAIPromptExecutionSettings();
             openAIPromptExecutionSettings.Temperature = .2;
+            openAIPromptExecutionSettings.MaxTokens = 2000;
 
             try
             {
+                // Add this debugging code
                 var collections = await memory.GetCollectionsAsync();
-                bool collectionExists = collections.Contains(collectionName);
-                WintapLogger.Log.Append($"Collection '{collectionName}' exists: {collectionExists}", LogLevel.Info);
+                foreach (var collection in collections)
+                {
+                    WintapLogger.Log.Append($"Found collection: {collection}", LogLevel.Info);
+                    // Optionally, get and log a sample of records to verify content
+                    var sample = await memory.SearchAsync(collection, "*", limit: 2, minRelevanceScore: 0.7).ToListAsync();
+                    foreach (var item in sample)
+                    {
+                        WintapLogger.Log.Append($"Sample record - ID: {item.Metadata.Id}, Text length: {item.Metadata.Text.Length}", LogLevel.Info);
+                    }
+                }
+
             }
             catch (Exception ex)
             {
@@ -122,22 +134,26 @@ namespace gov.llnl.wintap.core.api
             }
             int contextToRemove = -1;
 
-            chat.AddUserMessage(question);
+
 
             if (builder.Length != 0)
             {
-                builder.Insert(0, $"Here's some additional information that may help you answer this question: ");
+                string contextMessage = $" Here's some additional information that may help you answer this question: {builder.ToString()}";
+                WintapLogger.Log.Append($"Adding context to chat: {contextMessage}...", LogLevel.Info);
                 contextToRemove = chat.Count;
-                chat.AddSystemMessage(builder.ToString());
+                chat.AddUserMessage("USER QUERY: " + question + "\n\n" + " Retrieved data: " + contextMessage);
             }
-            WintapLogger.Log.Append($"Additional info from RAG: ${builder.Length}", LogLevel.Info);
+            else
+            {
+                chat.AddUserMessage("USER QUERY: " + question + "\n\n");
+            }
+            //WintapLogger.Log.Append($"Additional info from RAG: {builder.ToString()}", LogLevel.Info);
 
 
-            //chat.AddUserMessage(question);
 
             await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat, openAIPromptExecutionSettings))
             {
-                Inference inf = new Inference() { Prompt = question, Response = message.ToString(), TokensUsed = 0 };
+                Inference inf = new Inference() { Prompt = question, Response = message.Content, TokensUsed = 0 };
                 string jsonString = JsonConvert.SerializeObject(inf);
                 await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
             }

@@ -4,44 +4,26 @@
  * All rights reserved.
  */
 
-#pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020;
+#pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020, SKEXP0070;
 
 using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Text.Json;
-using System.Web.Services.Description;
-using System.Runtime.CompilerServices;
-// using Codeblaze.SemanticKernel.Connectors.Ollama;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Text;
 using Microsoft.SemanticKernel;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Text;
 using System;
-
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Text;
-using Microsoft.SemanticKernel.Embeddings;
-//using Codeblaze.SemanticKernel.Connectors.Ollama;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.Properties;
-using System.Linq;
-using static System.Net.Mime.MediaTypeNames;
-using System.ComponentModel;
-using Microsoft.SemanticKernel.Connectors.Chroma;
+// Remove Chroma and add SQLite import
+//using Microsoft.SemanticKernel.Connectors.Memory.Sqlite;
+using Microsoft.SemanticKernel.Embeddings;
+using Microsoft.SemanticKernel.Connectors.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
-
 builder.Services.AddControllers();
-
 //builder.Services.AddSpaStaticFiles(configuration =>
 //{
 //    configuration.RootPath = @"C:\Program Files\Wintap\Workbench";
@@ -49,38 +31,43 @@ builder.Services.AddControllers();
 
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
-// URL for your local Ollama instance
-string ollamaEndpoint = "http://localhost:11434";
+// Match the configuration settings from the embedding generator app
+string DatabasePath =  @"c:\program files\wintap7\embeddings.db";
+string CollectionName = "Wintap";
+string OllamaEndpoint = "http://localhost:11434";
+string EmbeddingModel = "mxbai-embed-large";
 
-// The model name as configured in Ollama
-string modelName = "gemma3:1b";
-
-// Configure the kernel with Ollama
+#pragma warning disable SKEXP0070, SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020
+// Create a builder with both chat completion and embedding services
 var aiBuilder = Kernel.CreateBuilder();
-aiBuilder.AddOllamaTextGeneration(modelName, new Uri(ollamaEndpoint));
-var kernel = builder.Build();
 
+// Add the Ollama chat completion service
+aiBuilder.AddOllamaChatCompletion(
+    modelId: "gemma3:1b",
+    endpoint: new Uri(OllamaEndpoint)
+);
 
-HttpClient httpClient = new HttpClient();
-httpClient.Timeout = new TimeSpan(0, 5, 0);
+// Add the Ollama embedding service - using the same model as in the embedding generator
+aiBuilder.AddOllamaTextEmbeddingGeneration(
+    modelId: EmbeddingModel,
+    endpoint: new Uri(OllamaEndpoint)
+);
 
-//string rag_data = "C:\\programdata\\wintap\\ragdata.txt";
-//WintapLogger.Log.Append($"Attempting to load RAG data from file: {rag_data}", LogLevel.Info);
+// Build the kernel with both services
+var kernel = aiBuilder.Build();
 
+// Now you can get both services
+var chatService = kernel.GetRequiredService<IChatCompletionService>();
+var embeddingService = kernel.GetRequiredService<ITextEmbeddingGenerationService>();
 
-// use use with in-memory vector store
-//ISemanticTextMemory memory = new MemoryBuilder()
-//    .WithLoggerFactory(kernel.LoggerFactory)
-//    .WithMemoryStore(new VolatileMemoryStore())
-//    .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
-//    .Build();
+// Create memory using the embedding service and SQLite
+// Use the same database path as the embedding generator
+var sqliteMemoryStore = SqliteMemoryStore.ConnectAsync(DatabasePath).GetAwaiter().GetResult();
 
-// use a persistent memory store:
-var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
 ISemanticTextMemory memory = new MemoryBuilder()
     .WithLoggerFactory(kernel.LoggerFactory)
-    .WithMemoryStore(chromaMemoryStore)
-    .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
+    .WithMemoryStore(sqliteMemoryStore)
+    .WithTextEmbeddingGeneration(embeddingService)
     .Build();
 
 builder.Services.AddSingleton<ISemanticTextMemory>(provider =>
@@ -88,11 +75,9 @@ builder.Services.AddSingleton<ISemanticTextMemory>(provider =>
     return memory;
 });
 
-
 builder.Services.AddSingleton<IChatCompletionService>(provider =>
 {
-    IChatCompletionService ai = kernel.GetRequiredService<IChatCompletionService>();
-    return ai;
+    return chatService;
 });
 
 builder.Services.AddSingleton<ChatHistory>(provider =>
@@ -101,9 +86,6 @@ builder.Services.AddSingleton<ChatHistory>(provider =>
     ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
     return chat;
 });
-
-// If you still need views along with APIs, use:
-// builder.Services.AddControllersWithViews();
 
 // Configuration for Windows Service and Hosted Service
 builder.Services.AddWindowsService();
@@ -135,6 +117,4 @@ app.UseEndpoints(endpoints =>
     endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });
 
-app.Run(); 
-
-
+app.Run();
