@@ -7,9 +7,9 @@
     <!-- Results Window -->
     <div class="results-window">
         <div class="message" *ngFor="let message of messages">
-            <div [ngClass]="{'user-message': message.isUser, 'ai-message': !message.isUser}">
+            <div [ngClass]="{'user-message': message.isUser, 'ai-message': !message.isUser, 'markdown-message': !message.isUser}">
                 <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="AI Icon" class="ai-icon">
-                <p>{{ message.text }}</p>
+                <div class="message-content code-highlighted" [innerHTML]="formatMessageText(message.text)"></div>
                 <span class="timestamp">{{ message.timestamp | date:'shortTime' }}</span>
             </div>
         </div>

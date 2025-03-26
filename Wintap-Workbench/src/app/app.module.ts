@@ -1,5 +1,7 @@
 import { NgModule } from '@angular/core';
 import { HashLocationStrategy, LocationStrategy } from '@angular/common';
+import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
 import { AppLayoutModule } from './layout/app.layout.module';
@@ -39,6 +41,8 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
         AppComponent, NotfoundComponent, QuerybuilderComponent, TreeviewComponent, EtwExplorerComponent, ChatComponent
     ],
     imports: [
+        BrowserModule,
+        BrowserAnimationsModule,
         AppRoutingModule,
         AppLayoutModule,
         HttpClientModule,
