@@ -111,7 +111,7 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 var pluginName = GetPluginNameFromStack(ex);
-                var msg = new WintapMessage(DateTime.UtcNow, Process.GetCurrentProcess().Id, WintapMessage.MessageTypeEnum.WintapAlert);
+                var msg = new WintapMessage(DateTime.UtcNow, Process.GetCurrentProcess().Id, WintapMessage.MessageTypeEnum.WINTAP_ALERT);
                 msg.WintapAlert = new WintapMessage.WintapAlertData
                 {
                     AlertName = WintapMessage.WintapAlertData.AlertNameEnum.OTHER,

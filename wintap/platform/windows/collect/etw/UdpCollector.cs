@@ -43,7 +43,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 // todo:
                 // base.UpdateStatistics(obj.Source.EventsLost);
-                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UdpPacket);
+                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UDP_PACKET);
                 if (Enum.TryParse(obj.EventName, true, out WintapMessage.ActivityTypeEnum parsedActivityType))
                 {
                     wintapMsg.ActivityType = parsedActivityType;
@@ -70,7 +70,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 // todo:
                 // base.UpdateStatistics(obj.Source.EventsLost);
-                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UdpPacket);
+                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UDP_PACKET);
                 if (Enum.TryParse(obj.EventName, true, out WintapMessage.ActivityTypeEnum parsedActivityType))
                 {
                     wintapMsg.ActivityType = parsedActivityType;

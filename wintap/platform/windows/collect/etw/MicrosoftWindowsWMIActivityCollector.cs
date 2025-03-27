@@ -32,7 +32,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
-            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Wmi);
+            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.WMI);
             if (obj.PayloadNames.Contains("CorrelationId"))
             {
                 msg.CorrelationId = obj.PayloadStringByName("CorrelationId");
@@ -88,7 +88,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Wmi);
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.WMI);
                 msg.Wmi = new WintapMessage.WmiActivityObject();
                 if (eventId == 11)
                 {

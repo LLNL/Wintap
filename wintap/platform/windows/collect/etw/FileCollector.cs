@@ -204,7 +204,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 return;
             }
-            WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, WintapMessage.MessageTypeEnum.File);
+            WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, WintapMessage.MessageTypeEnum.FILE);
             wintapBuilder.File = new WintapMessage.FileActivityObject();
             wintapBuilder.ActivityType = WintapMessage.ActivityTypeEnum.Write;
             wintapBuilder.File.Path = filePath.ToLower();

@@ -9,7 +9,7 @@ namespace gov.llnl.wintap.collect.models
     public class WintapMessage
     {
         public enum FailureCodeType { ERROR_INSUFFICIENT_RESOURCES, ERROR_TOO_MANY_ADDRESSES, ERROR_ADDRESS_EXISTS, ERROR_INVALID_ADDRESS, ERROR_OTHER, ERROR_TIMEWAIT_ADDRESS_EXIST };
-        public enum MessageTypeEnum { Process, ProcessPartial, TcpConnection, UdpPacket, File, Registry, ImageLoad, FocusChange, SessionChange, WaitCursor, Wmi, Thread, GenericMessage, MicrosoftWindowsCpuTrigger, MicrosoftWindowsGroupPolicy, MemoryMap, KernelApiCall, EventLogEvent, SysDig, WintapAlert };
+        public enum MessageTypeEnum { PROCESS, PROCESS_PARTIAL, TCP_CONNECTION, UDP_PACKET, FILE, REGISTRY, IMAGE_LOAD, FOCUS_CHANGE, SESSION_CHANGE, WAIT_CURSOR, WMI, THREAD, GENERIC_MESSAGE, MICROSOFT_WINDOWS_CPU_TRIGGER, MICROSOFT_WINDOWS_GROUP_POLICY, MEMORY_MAP, KERNEL_API_CALL, EVENT_LOG_EVENT, SYSDIG, WINTAP_ALERT };
         public enum ActivityTypeEnum { Start, Stop, Refresh, Rundown, Load, Unload, PsSetLoadImageNotifyRoutine, TerminateProcess, CreateSymbolicLink, SetThreadContext, OpenProcess, OpenThread, Read, Write, DeleteValue, CreateKey, DeleteKey, EventWritten, HighCpuUsage, TcpIpAccept, TcpIpRecv, TcpIpTCPCopy, TcpIpReconnect, TcpIpRetransmit, TcpIpDisconnect, TcpIpARPCopy, TcpIpDupACK, TcpIpFullACK, TcpIpPartACK, TcpIpConnect, TcpIpSend, TcpIpFail, UdpIpFail, UdpIpSend, UdpIpRecv, Other }; 
         public enum DirectionEnum { INBOUND, OUTBOUND };
         public enum StateEnum { ESTABLISHED, SYN_SENT, SYN_RECEIVED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSED, CLOSE_WAIT, LAST_ACK, LISTEN, CLOSING };

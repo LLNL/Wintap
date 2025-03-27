@@ -94,7 +94,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
         private void publishUntracedProcesses()
         {
             // notoskrnl not captured through the etw boot trace.
-            WintapMessage kernelProcess = new WintapMessage(StateManager.MachineBootTime, 4, WintapMessage.MessageTypeEnum.Process);
+            WintapMessage kernelProcess = new WintapMessage(StateManager.MachineBootTime, 4, WintapMessage.MessageTypeEnum.PROCESS);
             kernelProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             kernelProcess.PidHash = idGen.GenPidHash(4, StateManager.MachineBootTime.ToFileTimeUtc());
             kernelProcess.ProcessName = "ntoskrnl.exe";
@@ -103,7 +103,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             PublishProcess(kernelProcess);
 
             // idle not captured through the etw boot trace.
-            WintapMessage idleProcess = new WintapMessage(StateManager.MachineBootTime, 0, WintapMessage.MessageTypeEnum.Process);
+            WintapMessage idleProcess = new WintapMessage(StateManager.MachineBootTime, 0, WintapMessage.MessageTypeEnum.PROCESS);
             idleProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             idleProcess.PidHash = idGen.GenPidHash(0, StateManager.MachineBootTime.ToFileTimeUtc());
             idleProcess.ProcessName = "idle";
@@ -112,7 +112,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             PublishProcess(idleProcess);
 
             //  UNKOWN process as the faux root for processes with no available parent.  
-            WintapMessage unknownProcess = new WintapMessage(StateManager.MachineBootTime, 1, WintapMessage.MessageTypeEnum.Process);
+            WintapMessage unknownProcess = new WintapMessage(StateManager.MachineBootTime, 1, WintapMessage.MessageTypeEnum.PROCESS);
             unknownProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             unknownProcess.PidHash = idGen.GenPidHash(1, StateManager.MachineBootTime.ToFileTimeUtc());
             unknownProcess.ProcessName = "unknown";
@@ -122,7 +122,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
 
             //  REGISTRY process not get captured in the boot trace but is always running
             Process reg = Process.GetProcessesByName("registry").First();
-            WintapMessage registryProcess = new WintapMessage(StateManager.MachineBootTime, reg.Id, WintapMessage.MessageTypeEnum.Process);
+            WintapMessage registryProcess = new WintapMessage(StateManager.MachineBootTime, reg.Id, WintapMessage.MessageTypeEnum.PROCESS);
             registryProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             registryProcess.PidHash = idGen.GenPidHash(reg.Id, StateManager.MachineBootTime.ToFileTimeUtc());
             registryProcess.ProcessName = reg.ProcessName.ToLower();
@@ -209,7 +209,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             Process wintapProcess = Process.GetCurrentProcess();
             // get the previous instance of wintap since it will have the same parent process info.
             WintapMessage previousWintapProcess = processStack.Where(p => p.Value.ProcessName == "wintap.exe").OrderBy(p => p.Value.EventTime).LastOrDefault().Value;
-            WintapMessage newWintapProcess = new WintapMessage(StateManager.MachineBootTime, wintapProcess.Id, WintapMessage.MessageTypeEnum.Process);
+            WintapMessage newWintapProcess = new WintapMessage(StateManager.MachineBootTime, wintapProcess.Id, WintapMessage.MessageTypeEnum.PROCESS);
             newWintapProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
             newWintapProcess.PidHash = idGen.GenPidHash(wintapProcess.Id, DateTime.Now.ToFileTimeUtc());
             newWintapProcess.ProcessName = "wintap.exe";
@@ -232,7 +232,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                     node.Parent = allNodes.Where(p => p.Data.PidHash == node.Data.ParentPidHash).First();
                 }
 
-                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(node.Data.EventTimeUTC), node.Data.Pid, WintapMessage.MessageTypeEnum.Process);
+                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(node.Data.EventTimeUTC), node.Data.Pid, WintapMessage.MessageTypeEnum.PROCESS);
                 msg.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
                 msg.PidHash = node.Data.PidHash;
                 msg.ProcessName = node.Data.ProcessName;

@@ -484,7 +484,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             try
             {
-                var msg = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, WintapMessage.MessageTypeEnum.GenericMessage)
+                var msg = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, WintapMessage.MessageTypeEnum.GENERIC_MESSAGE)
                 {
                     GenericMessage = e.GenericEvent,
                     ActivityType = WintapMessage.ActivityTypeEnum.Other

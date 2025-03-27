@@ -118,7 +118,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         public static void Send(WintapMessage streamedEvent)
         {
-            if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.ProcessPartial)
+            if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.PROCESS_PARTIAL)
             {
                 try
                 {

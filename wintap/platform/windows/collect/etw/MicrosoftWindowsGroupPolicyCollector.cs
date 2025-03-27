@@ -29,7 +29,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             base.Process_Event(obj);
             try
             {
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.MicrosoftWindowsGroupPolicy);
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.MICROSOFT_WINDOWS_GROUP_POLICY);
                 msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                 msg.MicrosoftWindowsGroupPolicy = new WintapMessage.MicrosoftWindowsGroupPolicyData();
                 msg.MicrosoftWindowsGroupPolicy.FormattedMessage = obj.FormattedMessage;

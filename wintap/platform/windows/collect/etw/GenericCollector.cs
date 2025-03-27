@@ -46,7 +46,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
 
                 // 2.) Create a WintapMessage and attach your event to it
-                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, MessageTypeEnum.GenericMessage);
+                WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, MessageTypeEnum.GENERIC_MESSAGE);
                 try
                 {
                     wintapMsg.ActivityId = obj.ActivityID.ToString();

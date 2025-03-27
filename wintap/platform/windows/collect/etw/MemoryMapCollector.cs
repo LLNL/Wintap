@@ -251,7 +251,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             DateTime startScanTime = DateTime.Now;
             Process process = Process.GetProcessById(_owningProcess.PID);
             nint baseAddress = new nint(0);
-            WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.PID, MessageTypeEnum.MemoryMap);
+            WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.PID, MessageTypeEnum.MEMORY_MAP);
             MEMORY_BASIC_INFORMATION memInfo = new MEMORY_BASIC_INFORMATION();
             while (true)
             {

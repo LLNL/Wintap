@@ -43,7 +43,7 @@ var aiBuilder = Kernel.CreateBuilder();
 
 // Add the Ollama chat completion service
 aiBuilder.AddOllamaChatCompletion(
-    modelId: "gemma3:1b",
+    modelId: "Wintap",
     endpoint: new Uri(OllamaEndpoint)
 );
 

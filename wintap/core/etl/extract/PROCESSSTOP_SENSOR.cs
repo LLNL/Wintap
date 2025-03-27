@@ -34,7 +34,7 @@ namespace gov.llnl.wintap.core.etl.extract
             try
             {
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
-                if (wintapMessage.MessageType == WintapMessage.MessageTypeEnum.Process && wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Stop)
+                if (wintapMessage.MessageType == WintapMessage.MessageTypeEnum.PROCESS && wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Stop)
                 {
                     handleStopEvent(wintapMessage);
                 }

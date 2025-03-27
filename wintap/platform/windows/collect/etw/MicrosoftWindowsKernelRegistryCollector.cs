@@ -252,7 +252,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private void sendRegEventToEsper(string activityType, string path, string value, string data, string dataType, int pid, long eventTime, long eventTimeMS, DateTime eventTimeDT)
         {
 
-            WintapMessage msg = new WintapMessage(eventTimeDT, pid, WintapMessage.MessageTypeEnum.Registry);
+            WintapMessage msg = new WintapMessage(eventTimeDT, pid, WintapMessage.MessageTypeEnum.REGISTRY);
             msg.Registry = new WintapMessage.RegActivityObject();
             msg.Registry.Path = path;
             msg.Registry.ValueName = value;

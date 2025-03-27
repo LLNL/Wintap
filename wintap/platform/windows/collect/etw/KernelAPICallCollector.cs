@@ -42,7 +42,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
-            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.KernelApiCall);
+            WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.KERNEL_API_CALL);
             try
             {
                 if (obj.EventName.Contains("EventID(1)"))

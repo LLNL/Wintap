@@ -43,7 +43,7 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 WintapMessage wintapMessage = (WintapMessage)sensorEvent.Underlying;
 
-                if (wintapMessage.MessageType == WintapMessage.MessageTypeEnum.Process && (wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Start || wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Refresh))
+                if (wintapMessage.MessageType == WintapMessage.MessageTypeEnum.PROCESS && (wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Start || wintapMessage.ActivityType == WintapMessage.ActivityTypeEnum.Refresh))
                 {
                     handleStartEvent(wintapMessage);
                 }

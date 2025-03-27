@@ -39,7 +39,7 @@ namespace gov.llnl.wintap.core.collect
                     SysdigEvent sysDigEvent = JsonConvert.DeserializeObject<SysdigEvent>(jsonLine);
                     if(sysDigEvent.evt_num > currentEventNum)
                     {
-                        WintapMessage wintapMsg = new WintapMessage(gov.llnl.wintap.core.shared.Utilities.FromSysdigTime(sysDigEvent.evt_outputtime), sysDigEvent.thread_tid, WintapMessage.MessageTypeEnum.SysDig);
+                        WintapMessage wintapMsg = new WintapMessage(gov.llnl.wintap.core.shared.Utilities.FromSysdigTime(sysDigEvent.evt_outputtime), sysDigEvent.thread_tid, WintapMessage.MessageTypeEnum.SYSDIG);
                         wintapMsg.Sysdig = new WintapMessage.SysdigEventData();
                         wintapMsg.Sysdig.evt_info = sysDigEvent.evt_info;
                         wintapMsg.Sysdig.evt_outputtime = sysDigEvent.evt_outputtime;

@@ -39,9 +39,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Info);
             EPStatement etlToEsperPattern = EventChannel.compileDeploy(EventChannel.EsperRuntime,
                 $"SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name " +
-                $"FROM pattern[every PartA=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ProcessPartial.ToString()}' " +
+                $"FROM pattern[every PartA=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.PROCESS_PARTIAL.ToString()}' " +
                 $"AND  CAST(ActivityType, string)='{WintapMessage.ActivityTypeEnum.Rundown.ToString()}'" +
-                $") -> PartB=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ImageLoad}' " +
+                $") -> PartB=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.IMAGE_LOAD}' " +
                 "AND PID=PartA.PID) where timer:within(3 sec)]").Statements[0];
 
             WintapLogger.Log.Append("Building process tree.", LogLevel.Info);
@@ -74,7 +74,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 if (string.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Info); }
                 if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Info); }
 
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Start };
+                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.PROCESS) { ActivityType = WintapMessage.ActivityTypeEnum.Start };
                 msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments, UniqueProcessKey = obj.UniqueProcessKey.ToString() };
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
@@ -103,7 +103,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 string pname = partial.Get("PartB.Process.Name").ToString();
                 string ppath = partial.Get("PartB.Process.Path").ToString();
 
-                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(eventTime), pid, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Refresh };
+                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(eventTime), pid, WintapMessage.MessageTypeEnum.PROCESS) { ActivityType = WintapMessage.ActivityTypeEnum.Refresh };
                 msg.Process = new WintapMessage.ProcessObject() { Name = pname.ToLower(), Path = ppath.ToLower(), ParentPID = parentPid, CommandLine = ppath, User = "na", Arguments = "", UniqueProcessKey = "0" };
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
