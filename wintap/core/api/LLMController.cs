@@ -151,17 +151,19 @@ namespace gov.llnl.wintap.core.api
 
 
 
+            StringBuilder completeResponse = new StringBuilder();
+
             await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat, openAIPromptExecutionSettings))
             {
+                completeResponse.Append(message.Content);
                 Inference inf = new Inference() { Prompt = question, Response = message.Content, TokensUsed = 0 };
                 string jsonString = JsonConvert.SerializeObject(inf);
                 await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
             }
 
-            if (contextToRemove >= 0)
-            {
-                chat.RemoveAt(contextToRemove);
-            }
+            // Add the complete response as a single message after streaming
+            chat.AddAssistantMessage(completeResponse.ToString());
+
             builder.Clear();
             WintapLogger.Log.Append($"inference complete", LogLevel.Info);
         }
