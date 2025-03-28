@@ -15,6 +15,16 @@
             <img src="assets/wintap.svg" alt="Wintap Logo" class="empty-chat-logo">
             <h3>Welcome to Wintap Chat</h3>
             <p>Ask a question or upload a file to start chatting</p>
+
+            <!-- Example prompts section -->
+            <div class="example-prompts">
+                <h4>Examples</h4>
+                <div class="example-prompts-grid">
+                    <div class="example-prompt-card" *ngFor="let example of examplePrompts" (click)="useExamplePrompt(example)">
+                        {{ example }}
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div *ngFor="let message of messages" class="message-wrapper" [ngClass]="{'user-message-wrapper': message.isUser, 'assistant-message-wrapper': !message.isUser}">

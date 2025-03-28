@@ -87,8 +87,8 @@ $code-text-color: #abb2bf;
     padding: 20px;
 
     .empty-chat-logo {
-        width: 80px;
-        height: 80px;
+        width: 160px;
+        height: 160px;
         margin-bottom: 20px;
         opacity: 0.7;
     }
@@ -638,4 +638,55 @@ kbd {
     border-radius: 4px !important;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
     font-size: 0.9em !important;
+}
+
+/* Example Prompts Styles */
+.example-prompts {
+    margin-top: 2rem;
+    width: 100%;
+    max-width: 800px;
+
+    h4 {
+        font-size: 1rem;
+        font-weight: 500;
+        color: $text-light;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+}
+
+.example-prompts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    width: 100%;
+}
+
+.example-prompt-card {
+    background-color: $secondary-color;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all $transition-speed ease;
+    font-size: 0.95rem;
+    color: $text-color;
+    text-align: center;
+
+    &:hover {
+        border-color: $primary-color;
+        box-shadow: 0 2px 8px rgba($primary-color, 0.15);
+        transform: translateY(-2px);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+}
+
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+    .example-prompts-grid {
+        grid-template-columns: 1fr;
+    }
 }

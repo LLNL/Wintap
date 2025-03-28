@@ -177,6 +177,32 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
         }
     }
 
+    // Add this to your existing interface declarations
+    examplePrompts: string[] = [
+        "What Windows processes are consuming the most memory?",
+        "Show me how to monitor network connections in Wintap",
+        "Analyze file activity for suspicious patterns"
+    ];
+
+    // Add this method to handle example prompt clicks
+    useExamplePrompt(prompt: string): void {
+        this.userPrompt = prompt;
+
+        // Focus the input field
+        if (this.messageInput) {
+            this.messageInput.nativeElement.focus();
+        }
+
+        // Optional: Automatically adjust the textarea height
+        if (this.messageInput) {
+            this.adjustTextareaHeight({ target: this.messageInput.nativeElement });
+        }
+
+        // Optional: Auto-send the example prompt
+        // Uncomment this if you want prompts to be sent automatically when clicked
+        this.sendMessage();
+    }
+
     // Format message content with simple HTML formatting
     formatMessageContent(text: string): SafeHtml {
         if (!text) return this.sanitizer.bypassSecurityTrustHtml('');
