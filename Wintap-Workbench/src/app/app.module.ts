@@ -35,6 +35,7 @@ import { HubConnectionBuilder } from '@microsoft/signalr';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
+import { SliderModule } from 'primeng/slider'; // Add this for temperature slider
 
 @NgModule({
     declarations: [
@@ -71,7 +72,8 @@ import { MessageService } from 'primeng/api';
         InputSwitchModule,
         ScrollPanelModule,
         ProgressSpinnerModule,
-        ToastModule
+        ToastModule,
+        SliderModule
     ],
     providers: [
         DatePipe,

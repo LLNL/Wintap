@@ -119,13 +119,13 @@ namespace gov.llnl.wintap.core.api
 
             if (chat.Where(c => c.Role.Label == "assistant").Count() == 0)
             {
-                WintapLogger.Log.Append("Stuffing system prompt!!!!", LogLevel.Info);
-                string systemPrompt = "here is some additional information: ";
-                foreach (string ctxFilePath in Directory.GetFiles("C:\\data\\code\\test").ToList())
-                {
-                    systemPrompt += " \n\n" + System.IO.File.ReadAllText(ctxFilePath);
-                }
-                chat.AddUserMessage(systemPrompt);
+                //WintapLogger.Log.Append("Stuffing system prompt!!!!", LogLevel.Info);
+                //string systemPrompt = "here is some additional information: ";
+                //foreach (string ctxFilePath in Directory.GetFiles("C:\\data\\code\\test").ToList())
+                //{
+                //    systemPrompt += " \n\n" + System.IO.File.ReadAllText(ctxFilePath);
+                //}
+                //chat.AddUserMessage(systemPrompt);
                 //WintapLogger.Log.Append($"attempting to retrieve RAG inference from ollama endpoint", LogLevel.Info);
                 //try
                 //{

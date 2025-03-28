@@ -72,11 +72,14 @@
                       rows="1"></textarea>
 
             <div class="input-actions">
-                <button type="button" class="icon-button upload-button" title="Upload File" (click)="fileInput.click()" [disabled]="isResponding">
+                <button type="button" class="icon-button send-button" (click)="fileInput.click()" [disabled]="isResponding">
                     <i class="pi pi-upload"></i>
                 </button>
                 <button type="button" class="icon-button send-button" (click)="sendMessage()" [disabled]="!userPrompt.trim() || isResponding">
                     <i class="pi pi-send"></i>
+                </button>
+                <button type="button" class="icon-button send-button" (click)="clearChat()">
+                    <i class="pi pi-refresh"></i>
                 </button>
             </div>
 
