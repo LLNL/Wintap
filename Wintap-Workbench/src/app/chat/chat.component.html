@@ -1,40 +1,83 @@
-<!-- Header -->
-<header>
-</header>
-
-<!-- Chat Container -->
 <div class="chat-container">
-    <!-- Results Window -->
-    <div class="results-window">
-        <div class="message" *ngFor="let message of messages">
-            <div [ngClass]="{'user-message': message.isUser, 'ai-message': !message.isUser, 'markdown-message': !message.isUser}">
-                <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="AI Icon" class="ai-icon">
-                <div class="message-content code-highlighted" [innerHTML]="formatMessageText(message.text)"></div>
-                <span class="timestamp">{{ message.timestamp | date:'shortTime' }}</span>
+    <!-- Chat Header -->
+    <div class="chat-header">
+        <h2>Wintap Chat</h2>
+        <div class="header-actions">
+            <button type="button" class="icon-button" title="Clear Chat" (click)="clearChat()">
+                <i class="pi pi-trash"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div class="messages-area" #messagesContainer>
+        <div *ngIf="messages.length === 0" class="empty-chat">
+            <img src="assets/wintap.svg" alt="Wintap Logo" class="empty-chat-logo">
+            <h3>Welcome to Wintap Chat</h3>
+            <p>Ask a question or upload a file to start chatting</p>
+        </div>
+
+        <div *ngFor="let message of messages" class="message-wrapper" [ngClass]="{'user-message-wrapper': message.isUser, 'assistant-message-wrapper': !message.isUser}">
+            <div class="message" [ngClass]="{'user-message': message.isUser, 'assistant-message': !message.isUser}">
+                <div class="message-header">
+                    <div class="message-avatar">
+                        <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="Wintap" class="avatar-img">
+                        <i *ngIf="message.isUser" class="pi pi-user avatar-icon"></i>
+                    </div>
+                    <div class="message-source">{{ message.isUser ? 'You' : 'Wintap' }}</div>
+                    <div class="message-timestamp">{{ message.timestamp | date:'shortTime' }}</div>
+                </div>
+                <div class="message-content markdown-content" [innerHTML]="formatMessageContent(message.text)"></div>
             </div>
         </div>
-        <div class="progress-spinner" *ngIf="!isSpinnerHidden">
-            <div class="spinner"></div>
+
+        <!-- Typing Indicator -->
+        <div *ngIf="isResponding" class="typing-indicator-container">
+            <div class="message assistant-message typing-message">
+                <div class="message-header">
+                    <div class="message-avatar">
+                        <img src="assets/wintap.svg" alt="Wintap" class="avatar-img">
+                    </div>
+                    <div class="message-source">Wintap</div>
+                </div>
+                <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Prompt Window -->
-    <div class="prompt-window">
-        <textarea #prompt id="float-input" rows="1" pInputTextarea (keydown.enter)="sendPrompt(); $event.preventDefault()" [disabled]="isPromptDisabled" (input)="adjustTextareaHeight($event)" style="width: 100%;"></textarea>
-        <button type="button" class="send-button" (click)="sendPrompt()">
-            <i class="pi pi-send"></i>
-        </button>
-        <button type="button" class="refresh-button" (click)="performSetup()">
-            <i class="pi pi-refresh"></i>
-        </button>
-        <input type="file" (change)="onFileSelected($event)" style="display: none;" #fileInput>
-        <button type="button" class="upload-button" (click)="fileInput.click()">
-            <i class="pi pi-upload"></i>
-        </button>
+    <!-- Input Area -->
+    <div class="input-area">
+        <div class="input-container">
+            <textarea #messageInput
+                      class="message-input"
+                      placeholder="Type a message..."
+                      [(ngModel)]="userPrompt"
+                      (keydown.enter)="$event.preventDefault(); sendMessage()"
+                      (input)="adjustTextareaHeight($event)"
+                      [disabled]="isResponding"
+                      rows="1"></textarea>
+
+            <div class="input-actions">
+                <button type="button" class="icon-button upload-button" title="Upload File" (click)="fileInput.click()" [disabled]="isResponding">
+                    <i class="pi pi-upload"></i>
+                </button>
+                <button type="button" class="icon-button send-button" (click)="sendMessage()" [disabled]="!userPrompt.trim() || isResponding">
+                    <i class="pi pi-send"></i>
+                </button>
+            </div>
+
+            <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;">
+        </div>
+
+        <div class="input-footer">
+            <span class="input-tip">Press <kbd>Enter</kbd> to send</span>
+        </div>
     </div>
 </div>
 
-<!-- Error Message -->
-<div class="error-message" *ngIf="errorMessage !== ''">
-    {{ errorMessage }}
-</div>
+<!-- Error Notification -->
+<p-toast position="top-right"></p-toast>

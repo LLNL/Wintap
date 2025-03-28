@@ -33,12 +33,17 @@ import { EtwExplorerComponent } from './etw-explorer/etw-explorer.component';
 import { ChatComponent } from './chat/chat.component';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
-
-
+import { ToastModule } from 'primeng/toast';
+import { MessageService } from 'primeng/api';
 
 @NgModule({
     declarations: [
-        AppComponent, NotfoundComponent, QuerybuilderComponent, TreeviewComponent, EtwExplorerComponent, ChatComponent
+        AppComponent,
+        NotfoundComponent,
+        QuerybuilderComponent,
+        TreeviewComponent,
+        EtwExplorerComponent,
+        ChatComponent
     ],
     imports: [
         BrowserModule,
@@ -65,10 +70,12 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
         DropdownModule,
         InputSwitchModule,
         ScrollPanelModule,
-        ProgressSpinnerModule
+        ProgressSpinnerModule,
+        ToastModule
     ],
     providers: [
         DatePipe,
+        MessageService,
         HubConnectionBuilder,
         { provide: LocationStrategy, useClass: HashLocationStrategy },
     ],

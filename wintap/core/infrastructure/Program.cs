@@ -21,6 +21,8 @@ using gov.llnl.wintap.Properties;
 //using Microsoft.SemanticKernel.Connectors.Memory.Sqlite;
 using Microsoft.SemanticKernel.Embeddings;
 using Microsoft.SemanticKernel.Connectors.Sqlite;
+using System.IO;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -36,6 +38,7 @@ string DatabasePath =  @"c:\program files\wintap7\embeddings.db";
 string CollectionName = "Wintap";
 string OllamaEndpoint = "http://localhost:11434";
 string EmbeddingModel = "mxbai-embed-large";
+string llm = "gemma3:1b";
 
 #pragma warning disable SKEXP0070, SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020
 // Create a builder with both chat completion and embedding services
@@ -43,7 +46,7 @@ var aiBuilder = Kernel.CreateBuilder();
 
 // Add the Ollama chat completion service
 aiBuilder.AddOllamaChatCompletion(
-    modelId: "Wintap",
+    modelId: llm,
     endpoint: new Uri(OllamaEndpoint)
 );
 
@@ -80,12 +83,18 @@ builder.Services.AddSingleton<IChatCompletionService>(provider =>
     return chatService;
 });
 
+
+
 builder.Services.AddSingleton<ChatHistory>(provider =>
 {
     string systemPrompt = Settings.Default.SystemPrompt;
+   
     ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
+    WintapLogger.Log.Append(systemPrompt, LogLevel.Info);
     return chat;
 });
+
+
 
 // Configuration for Windows Service and Hosted Service
 builder.Services.AddWindowsService();

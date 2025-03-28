@@ -64,16 +64,9 @@ namespace EmbeddingGenerator
         private static async Task ProcessFilesAsync(IMemoryStore memoryStore, HttpClient client, string directory)
         {
             // Get all text files in the directory
-            var textFiles = Directory.GetFiles(directory, "*.txt", SearchOption.AllDirectories);
-            var codeFiles = Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories);
-            var mdFiles = Directory.GetFiles(directory, "*.md", SearchOption.AllDirectories);
+            List<string> allFiles = Directory.GetFiles(SourceDirectory).ToList();
 
-            var allFiles = new string[textFiles.Length + codeFiles.Length + mdFiles.Length];
-            textFiles.CopyTo(allFiles, 0);
-            codeFiles.CopyTo(allFiles, textFiles.Length);
-            mdFiles.CopyTo(allFiles, textFiles.Length + codeFiles.Length);
-
-            Console.WriteLine($"Found {allFiles.Length} files to process.");
+            Console.WriteLine($"Found {allFiles.Count} files to process.");
 
             int processedCount = 0;
             int errorCount = 0;

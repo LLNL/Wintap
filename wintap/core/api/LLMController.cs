@@ -91,7 +91,7 @@ namespace gov.llnl.wintap.core.api
 
 
             OpenAIPromptExecutionSettings openAIPromptExecutionSettings = new OpenAIPromptExecutionSettings();
-            openAIPromptExecutionSettings.Temperature = .2;
+            openAIPromptExecutionSettings.Temperature = .9;
             openAIPromptExecutionSettings.MaxTokens = 2000;
 
             try
@@ -115,37 +115,49 @@ namespace gov.llnl.wintap.core.api
                 WintapLogger.Log.Append($"Error checking collections: {ex.Message}", LogLevel.Error);
             }
 
-            WintapLogger.Log.Append($"attempting to retrieve RAG inference from ollama endpoint", LogLevel.Info);
-            try
+
+
+            if (chat.Where(c => c.Role.Label == "assistant").Count() == 0)
             {
-                WintapLogger.Log.Append($"collectionName: {collectionName}, question: {question}, minRel: {minRel}", LogLevel.Info);
-                int resultCount = 0;
-                await foreach (MemoryQueryResult result in memory.SearchAsync(collectionName, question, 3, minRel, withEmbeddings: true))
+                WintapLogger.Log.Append("Stuffing system prompt!!!!", LogLevel.Info);
+                string systemPrompt = "here is some additional information: ";
+                foreach (string ctxFilePath in Directory.GetFiles("C:\\data\\code\\test").ToList())
                 {
-                    resultCount++;
-                    WintapLogger.Log.Append($"Found match: Relevance={result.Relevance}", LogLevel.Info);
-                    builder.AppendLine(result.Metadata.Text);
+                    systemPrompt += " \n\n" + System.IO.File.ReadAllText(ctxFilePath);
                 }
-                WintapLogger.Log.Append($"Search complete. Found {resultCount} results", LogLevel.Info);
+                chat.AddUserMessage(systemPrompt);
+                //WintapLogger.Log.Append($"attempting to retrieve RAG inference from ollama endpoint", LogLevel.Info);
+                //try
+                //{
+                //    WintapLogger.Log.Append($"collectionName: {collectionName}, question: {question}, minRel: {minRel}", LogLevel.Info);
+                //    int resultCount = 0;
+                //    await foreach (MemoryQueryResult result in memory.SearchAsync(collectionName, question, 3, minRel, withEmbeddings: true))
+                //    {
+                //        resultCount++;
+                //        WintapLogger.Log.Append($"Found match: Relevance={result.Relevance}", LogLevel.Info);
+                //        builder.AppendLine(result.Metadata.Text);
+                //    }
+                //    WintapLogger.Log.Append($"Search complete. Found {resultCount} results", LogLevel.Info);
+                //}
+                //catch (Exception ex)
+                //{
+                //    WintapLogger.Log.Append($"ERROR in RAG inference request: {ex.Message}", LogLevel.Info);
+                //}
+
             }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"ERROR in RAG inference request: {ex.Message}", LogLevel.Info);
-            }
+
+
             int contextToRemove = -1;
-
-
-
             if (builder.Length != 0)
             {
                 string contextMessage = $" Here's some additional information that may help you answer this question: {builder.ToString()}";
                 WintapLogger.Log.Append($"Adding context to chat: {contextMessage}...", LogLevel.Info);
                 contextToRemove = chat.Count;
-                chat.AddUserMessage("USER QUERY: " + question + "\n\n" + " Retrieved data: " + contextMessage);
+                chat.AddUserMessage("USER: " + question + "\n\n" + " Retrieved data: " + contextMessage);
             }
             else
             {
-                chat.AddUserMessage("USER QUERY: " + question + "\n\n");
+                chat.AddUserMessage("USER: " + question + "\n\n");
             }
             //WintapLogger.Log.Append($"Additional info from RAG: {builder.ToString()}", LogLevel.Info);
 
