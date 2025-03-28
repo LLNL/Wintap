@@ -31,9 +31,8 @@
                             "src/assets"
                         ],
                         "styles": [
-                            "node_modules/prismjs/themes/prism-okaidia.css",
                             "src/styles.scss",
-                            "node_modules/prismjs/themes/prism.css",
+                            "node_modules/prismjs/themes/prism-okaidia.css",
                             "node_modules/codemirror/addon/hint/show-hint.css",
                             {
                                 "input": "node_modules/codemirror/lib/codemirror.css",
@@ -45,15 +44,14 @@
                             "node_modules/signalr/jquery.signalR.min.js",
                             "node_modules/codemirror/addon/hint/show-hint.js",
                             "node_modules/prismjs/prism.js",
-                            // Add these to the 'scripts' array in your angular.json file:
-                            "node_modules/prismjs/prism.js",
                             "node_modules/prismjs/components/prism-csharp.min.js",
                             "node_modules/prismjs/components/prism-javascript.min.js",
                             "node_modules/prismjs/components/prism-typescript.min.js",
                             "node_modules/prismjs/components/prism-powershell.min.js",
                             "node_modules/prismjs/components/prism-bash.min.js",
                             "node_modules/prismjs/components/prism-css.min.js",
-                            "node_modules/prismjs/components/prism-scss.min.js"
+                            "node_modules/prismjs/components/prism-scss.min.js",
+                            "node_modules/prismjs/components/prism-sql.js"
                         ]
                     },
                     "configurations": {

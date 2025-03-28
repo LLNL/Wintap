@@ -489,16 +489,20 @@ kbd {
 /* Code Highlighting */
 :host ::ng-deep {
     pre {
-        background-color: #282c34;
-        color: #abb2bf;
+        background-color: #1e1e1e;
+        color: #d4d4d4;
         border-radius: 6px;
-        padding: 1em;
+        padding: 1.2em;
+        margin: 1em 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
 
     code {
-        font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 0.9em;
+        line-height: 1.5;
     }
-
+    /* Better syntax highlighting */
     .token.comment {
         color: #6a9955;
     }
@@ -526,6 +530,32 @@ kbd {
     .token.variable {
         color: #9cdcfe;
     }
+
+    .token.punctuation {
+        color: #d4d4d4;
+    }
+
+    .token.property {
+        color: #9cdcfe;
+    }
+
+    .token.builtin {
+        color: #4ec9b0;
+    }
+
+    .token.parameter {
+        color: #9cdcfe;
+    }
+}
+
+/* Inline code styling */
+.markdown-content code:not(pre code) {
+    background-color: #f0f0f0;
+    color: #d32f2f;
+    border-radius: 3px;
+    padding: 2px 5px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85em;
 }
 
 /* Responsive adjustments */
@@ -543,4 +573,69 @@ kbd {
         padding: 12px;
         font-size: 0.9rem;
     }
+}
+
+/* PowerShell and code block styling */
+:host ::ng-deep {
+    pre {
+        background-color: #282c34 !important;
+        color: #abb2bf !important;
+        border-radius: 8px !important;
+        margin: 1em 0 !important;
+        padding: 16px !important;
+        overflow-x: auto !important;
+        border: 1px solid #3e4451 !important;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    pre code {
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #abb2bf !important;
+        background: transparent !important;
+        text-shadow: none !important;
+        padding: 0 !important;
+    }
+    /* PowerShell specific syntax highlighting */
+    .language-powershell .token.command,
+    .token.function {
+        color: #61afef !important;
+    }
+
+    .language-powershell .token.parameter,
+    .token.variable {
+        color: #e5c07b !important;
+    }
+
+    .language-powershell .token.string,
+    .token.string {
+        color: #98c379 !important;
+    }
+
+    .language-powershell .token.keyword,
+    .token.keyword {
+        color: #c678dd !important;
+    }
+
+    .language-powershell .token.comment,
+    .token.comment {
+        color: #7f848e !important;
+        font-style: italic !important;
+    }
+
+    .language-powershell .token.operator,
+    .token.operator {
+        color: #56b6c2 !important;
+    }
+}
+
+/* Ensure inline code looks good too */
+:host ::ng-deep code:not(pre code) {
+    background-color: rgba(40, 44, 52, 0.1) !important;
+    color: #e06c75 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+    font-size: 0.9em !important;
 }
