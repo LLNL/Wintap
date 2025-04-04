@@ -1,0 +1,745 @@
+# Advanced Guide to Esper Query Language in Wintap
+
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [Wintap Architecture Overview](#wintap-architecture-overview)
+3. [Understanding Esper Event Processing Language](#understanding-esper-event-processing-language)
+4. [The WintapMessage Data Model](#the-wintapmessage-data-model)
+5. [Basic Queries](#basic-queries)
+6. [Intermediate Queries](#intermediate-queries)
+7. [Advanced Query Techniques](#advanced-query-techniques)
+8. [Use Cases and Pattern Detection](#use-cases-and-pattern-detection)
+9. [Best Practices and Optimization](#best-practices-and-optimization)
+10. [Debugging and Troubleshooting](#debugging-and-troubleshooting)
+11. [Reference: Commonly Used Fields](#reference-commonly-used-fields)
+
+## Introduction
+
+Wintap is a sophisticated host-based telemetry collection system designed to capture, process, and analyze system events in real-time. At its core, Wintap leverages Esper, a powerful Complex Event Processing (CEP) engine, to filter, aggregate, and detect patterns in event streams.
+
+This guide provides an in-depth exploration of Esper Query Language (EPL) within the context of Wintap. It is designed for both beginners and advanced users who want to harness the full potential of Wintap's analysis capabilities.
+
+## Wintap Architecture Overview
+
+Before diving into queries, it's essential to understand how Wintap's event processing pipeline works:
+
+1. **Collectors**: Wintap uses various collectors (like ProcessCollector, TcpCollector, etc.) to gather events from the system. These collectors interface with Windows ETW (Event Tracing for Windows), system APIs, and other sources.
+
+2. **Event Channel**: All collected events flow through the EventChannel, which serves as the central hub for event processing.
+
+3. **Esper Engine**: The EventChannel routes events to the Esper engine, which processes them according to registered queries.
+
+4. **Sensors**: Specialized components that transform raw events into structured data models and apply Esper queries to detect specific patterns.
+
+5. **ETL Layer**: For persistence, events are processed through an Extract-Transform-Load layer and stored in Parquet format.
+
+## Understanding Esper Event Processing Language
+
+Esper EPL is a declarative language similar to SQL, but designed for processing event streams. Unlike traditional databases that store data before querying, Esper processes data on-the-fly as events occur.
+
+### Key Concepts in Esper EPL
+
+1. **Event Streams**: Continuously flowing sequences of events, represented in Wintap as the `WintapMessage` stream.
+
+2. **Windows**: Time or count-based snippets of events that Esper holds in memory for processing.
+
+3. **Patterns**: Sequences of events that must occur in a particular order, potentially with timing constraints.
+
+4. **Contexts**: Logical partitions that allow separate processing for different event categories.
+
+## The WintapMessage Data Model
+
+In Wintap, virtually all events are represented as `WintapMessage` objects. Understanding this data model is crucial for effective querying.
+
+### Core WintapMessage Properties
+
+```
+- MessageType: Enum indicating the event category (PROCESS, FILE, TCP_CONNECTION, etc.)
+- ActivityType: Specific action within the category (Start, Stop, Read, Write, etc.)
+- PID: Process ID associated with the event
+- PidHash: Unique identifier for the process instance
+- ProcessName: Name of the process
+- EventTime: When the event occurred (in Windows FileTime format)
+- ReceiveTime: When Wintap received the event
+```
+
+### Specialized Data Objects
+
+Depending on the `MessageType`, a WintapMessage contains specialized data in one of these fields:
+
+- Process: Details for process events
+- TcpConnection: Network connection data
+- UdpPacket: UDP traffic information
+- File: File operation details
+- Registry: Registry operation data
+- ImageLoad: DLL/module loading information
+- FocusChange: Application focus change data
+- WMI: Windows Management Instrumentation event data
+- MemoryMap: Memory allocation and usage information
+- KernelApiCall: Windows kernel API calls
+
+Understanding which fields are available for each message type is essential for writing effective queries.
+
+## Basic Queries
+
+### Simple Selection
+
+The most basic Esper query selects events from a stream:
+
+```sql
+SELECT * FROM WintapMessage
+```
+
+This will return all events passing through the system, which is typically overwhelming. Let's filter:
+
+```sql
+SELECT * FROM WintapMessage 
+WHERE MessageType = 'PROCESS'
+```
+
+Now we're only seeing process-related events. We can be even more specific:
+
+```sql
+SELECT 
+    ProcessName, 
+    PID, 
+    Process.Path, 
+    Process.CommandLine 
+FROM WintapMessage 
+WHERE MessageType = 'PROCESS' AND ActivityType = 'Start'
+```
+
+This query selects only process start events and returns specific fields.
+
+### Time Windows
+
+Time windows limit the scope of events to a specific duration:
+
+```sql
+SELECT 
+    ProcessName, 
+    COUNT(*) as FileOpCount 
+FROM WintapMessage.win:time(30 sec) 
+WHERE MessageType = 'FILE' 
+GROUP BY ProcessName
+```
+
+This query counts file operations by process over a 30-second sliding window.
+
+Window types include:
+- `win:time(x)`: Sliding time window
+- `win:length(x)`: Count-based window
+- `win:time_batch(x)`: Tumbling time window
+- `win:length_batch(x)`: Tumbling count window
+- `win:keepall()`: Keeps all events (use cautiously)
+
+### Filtering on Subfields
+
+For specialized event types, you often need to access subfields:
+
+```sql
+SELECT 
+    ProcessName, 
+    File.Path, 
+    File.BytesRequested
+FROM WintapMessage 
+WHERE 
+    MessageType = 'FILE' AND 
+    File.Path LIKE '%.exe' AND 
+    ActivityType = 'Write'
+```
+
+This query finds writes to executable files.
+
+## Intermediate Queries
+
+### Aggregation Functions
+
+Esper supports standard SQL aggregation functions:
+
+```sql
+SELECT 
+    DestinationAddress, 
+    DestinationPort, 
+    COUNT(*) as ConnectionCount, 
+    SUM(TcpConnection.PacketSize) as TotalBytes 
+FROM WintapMessage.win:time(5 min) 
+WHERE MessageType = 'TCP_CONNECTION' 
+GROUP BY DestinationAddress, DestinationPort 
+HAVING COUNT(*) > 10
+```
+
+This finds destination addresses receiving many connections.
+
+### Joins
+
+You can join multiple event streams:
+
+```sql
+SELECT 
+    proc.ProcessName, 
+    proc.Process.Path,
+    reg.Registry.Path,
+    reg.Registry.ValueName,
+    reg.Registry.Data
+FROM 
+    WintapMessage(MessageType='PROCESS').win:keepall() as proc
+JOIN 
+    WintapMessage(MessageType='REGISTRY') as reg
+ON 
+    proc.PID = reg.PID
+WHERE 
+    reg.ActivityType = 'Write' AND
+    reg.Registry.Path LIKE '%\\Run%'
+```
+
+This finds processes that write to Run registry keys.
+
+### Using Context
+
+Contexts partition your query processing:
+
+```sql
+CREATE CONTEXT PerProcessContext 
+PARTITION BY PID FROM WintapMessage;
+
+CONTEXT PerProcessContext 
+SELECT 
+    PID, 
+    ProcessName, 
+    COUNT(*) as TcpCount 
+FROM WintapMessage(MessageType='TCP_CONNECTION').win:time(1 min) 
+GROUP BY PID, ProcessName
+HAVING COUNT(*) > 100
+```
+
+This counts TCP connections per process independently.
+
+## Advanced Query Techniques
+
+### Pattern Recognition
+
+Pattern recognition is one of Esper's most powerful features:
+
+```sql
+SELECT 
+    proc.ProcessName, 
+    proc.Process.Path, 
+    file.File.Path
+FROM PATTERN [
+    every proc=WintapMessage(MessageType='PROCESS' AND ActivityType='Start') ->
+    file=WintapMessage(MessageType='FILE' AND ActivityType='Write' AND File.Path LIKE '%.dll' AND PID=proc.PID)
+    WHERE timer:within(5 seconds)
+]
+```
+
+This detects processes that write DLL files within 5 seconds of starting.
+
+### Complex Pattern with Multiple Events
+
+```sql
+SELECT 
+    a.ProcessName as ProcessName,
+    a.PID as PID,
+    b.Registry.Path as RegistryPath,
+    c.File.Path as FilePath
+FROM PATTERN [
+    every a=WintapMessage(MessageType='PROCESS' AND ActivityType='Start') ->
+    b=WintapMessage(MessageType='REGISTRY' AND ActivityType='Write' AND PID=a.PID) ->
+    c=WintapMessage(MessageType='FILE' AND ActivityType='Write' AND PID=a.PID)
+    WHERE timer:within(10 seconds)
+]
+```
+
+This detects processes that modify registry settings and then write to files.
+
+### Data Enrichment with External Sources
+
+Esper in Wintap can be extended to incorporate external information:
+
+```sql
+SELECT 
+    a.ProcessName, 
+    a.PID,
+    a.TcpConnection.DestinationAddress,
+    IoC.GetThreatLevel(a.TcpConnection.DestinationAddress) as ThreatLevel
+FROM 
+    WintapMessage a
+WHERE 
+    a.MessageType = 'TCP_CONNECTION' AND
+    IoC.GetThreatLevel(a.TcpConnection.DestinationAddress) > 0.7
+```
+
+This example assumes an `IoC` (Indicators of Compromise) module that can evaluate threat levels.
+
+### Named Windows for Complex Analysis
+
+Named windows allow you to maintain state across multiple queries:
+
+```sql
+CREATE WINDOW ProcessStartWindow.win:keepall() AS
+SELECT 
+    PID, 
+    ProcessName, 
+    Process.Path, 
+    Process.CommandLine, 
+    EventTime
+FROM 
+    WintapMessage
+WHERE 
+    MessageType = 'PROCESS' AND 
+    ActivityType = 'Start';
+
+INSERT INTO ProcessStartWindow
+SELECT 
+    PID, 
+    ProcessName, 
+    Process.Path, 
+    Process.CommandLine, 
+    EventTime
+FROM 
+    WintapMessage
+WHERE 
+    MessageType = 'PROCESS' AND 
+    ActivityType = 'Start';
+
+SELECT 
+    p.ProcessName, 
+    p.Process.Path,
+    f.File.Path
+FROM 
+    ProcessStartWindow p
+JOIN 
+    WintapMessage(MessageType='FILE' AND ActivityType='Write') f
+ON 
+    p.PID = f.PID
+WHERE 
+    f.File.Path LIKE '%.dll' AND
+    f.EventTime - p.EventTime < 5000000000 -- approximately 5 seconds in FileTime units
+```
+
+This achieves the same result as our pattern example but using named windows.
+
+## Use Cases and Pattern Detection
+
+Let's explore some real-world use cases for Esper queries in Wintap, including detailed queries for WMI, MemoryMap, and KernelApiCall events.
+
+### WMI Event Monitoring
+
+Windows Management Instrumentation (WMI) is often used by legitimate system management tools, but is also frequently abused by malware for persistence and information gathering.
+
+#### Basic WMI Event Query
+
+```sql
+SELECT 
+    ProcessName,
+    PID,
+    Wmi.Operation,
+    Wmi.User,
+    Wmi.ClientProcessId,
+    Wmi.IsLocal
+FROM 
+    WintapMessage
+WHERE 
+    MessageType = 'WMI'
+```
+
+#### Detecting WMI Process Creation
+
+```sql
+SELECT 
+    w.ProcessName,
+    w.PID,
+    w.Wmi.CommandLine,
+    w.Wmi.CreatedProcessId
+FROM 
+    WintapMessage w
+WHERE 
+    w.MessageType = 'WMI' AND 
+    w.Wmi.CommandLine IS NOT NULL AND
+    w.Wmi.CreatedProcessId > 0
+```
+
+#### Correlating WMI Events with Process Creation
+
+```sql
+SELECT 
+    wmi.ProcessName as WmiSource,
+    wmi.Wmi.CommandLine as CommandExecuted,
+    proc.ProcessName as CreatedProcess,
+    proc.Process.Path as CreatedProcessPath
+FROM 
+    WintapMessage(MessageType='WMI') as wmi
+JOIN 
+    WintapMessage(MessageType='PROCESS' AND ActivityType='Start').win:time(5 sec) as proc
+ON 
+    proc.PID = wmi.Wmi.CreatedProcessId
+WHERE 
+    wmi.Wmi.CreatedProcessId > 0
+```
+
+This detects processes created via WMI and correlates them with the WMI operation details.
+
+### Memory Map Analysis
+
+Memory mapping events provide insights into how processes allocate and use memory, which can reveal techniques like code injection, memory-resident malware, and other sophisticated attacks.
+
+#### Basic Memory Map Query
+
+```sql
+SELECT 
+    ProcessName, 
+    PID, 
+    MemoryMap.BaseAddress, 
+    MemoryMap.RegionSize,
+    MemoryMap.PageProtect,
+    MemoryMap.PageType
+FROM 
+    WintapMessage 
+WHERE 
+    MessageType = 'MEMORY_MAP'
+```
+
+#### Detecting Executable Memory Allocations
+
+```sql
+SELECT 
+    ProcessName, 
+    PID, 
+    MemoryMap.BaseAddress, 
+    MemoryMap.RegionSize,
+    MemoryMap.Description
+FROM 
+    WintapMessage 
+WHERE 
+    MessageType = 'MEMORY_MAP' AND
+    MemoryMap.PageProtect IN ('PAGE_EXECUTE', 'PAGE_EXECUTE_READ', 'PAGE_EXECUTE_READWRITE', 'PAGE_EXECUTE_WRITECOPY')
+```
+
+This identifies memory regions with execute permissions, which could be used for injected code.
+
+#### Detecting MZ Headers in Unexpected Memory Regions
+
+```sql
+SELECT 
+    ProcessName, 
+    PID, 
+    MemoryMap.BaseAddress, 
+    MemoryMap.RegionSize,
+    MemoryMap.PageProtect,
+    MemoryMap.Description
+FROM 
+    WintapMessage 
+WHERE 
+    MessageType = 'MEMORY_MAP' AND
+    MemoryMap.MZHeaderPresent = true AND
+    MemoryMap.PageType != 'MEM_IMAGE'
+```
+
+This query finds memory regions that contain executable code headers (MZ signature) but aren't properly loaded modules, which could indicate shellcode or injected executables.
+
+#### Correlating MemoryMap with Process and Memory Events
+
+```sql
+SELECT 
+    proc.ProcessName as TargetProcess,
+    proc.PID as TargetPID,
+    attacker.ProcessName as AttackerProcess,
+    mem.MemoryMap.BaseAddress,
+    mem.MemoryMap.RegionSize,
+    mem.MemoryMap.PageProtect
+FROM 
+    PATTERN [
+        every api=WintapMessage(
+            MessageType='KERNEL_API_CALL' AND 
+            ActivityType='OpenProcess' AND 
+            KernelApiCall.DesiredAccessString LIKE '%PROCESS_VM_WRITE%'
+        ) -> 
+        mem=WintapMessage(
+            MessageType='MEMORY_MAP' AND 
+            PID=api.KernelApiCall.TargetPid AND
+            MemoryMap.PageProtect IN ('PAGE_EXECUTE_READWRITE', 'PAGE_EXECUTE_WRITECOPY')
+        )
+        WHERE timer:within(3 seconds)
+    ]
+JOIN 
+    WintapMessage(MessageType='PROCESS').win:keepall() as proc
+ON 
+    proc.PID = api.KernelApiCall.TargetPid
+JOIN 
+    WintapMessage(MessageType='PROCESS').win:keepall() as attacker
+ON 
+    attacker.PID = api.PID
+```
+
+This complex query detects potential process injection by identifying processes that open other processes with memory write permissions followed by the appearance of executable memory regions.
+
+### Kernel API Call Analysis
+
+Kernel API calls provide insight into lower-level system operations that can reveal sophisticated attack techniques.
+
+#### Basic KernelApiCall Query
+
+```sql
+SELECT 
+    ProcessName,
+    PID,
+    KernelApiCall.TargetPid,
+    KernelApiCall.TargetProcessName,
+    ActivityType,
+    KernelApiCall.DesiredAccessString
+FROM 
+    WintapMessage 
+WHERE 
+    MessageType = 'KERNEL_API_CALL'
+```
+
+#### Detecting Process Tampering
+
+```sql
+SELECT 
+    src.ProcessName as SourceProcess,
+    target.ProcessName as TargetProcess,
+    k.ActivityType,
+    k.KernelApiCall.DesiredAccessString
+FROM 
+    WintapMessage(MessageType='KERNEL_API_CALL') as k
+JOIN 
+    WintapMessage(MessageType='PROCESS').win:keepall() as src
+ON 
+    src.PID = k.PID
+JOIN 
+    WintapMessage(MessageType='PROCESS').win:keepall() as target
+ON 
+    target.PID = k.KernelApiCall.TargetPid
+WHERE 
+    k.ActivityType = 'OpenProcess' AND
+    (
+        k.KernelApiCall.DesiredAccessString LIKE '%PROCESS_CREATE_THREAD%' OR
+        k.KernelApiCall.DesiredAccessString LIKE '%PROCESS_VM_OPERATION%' OR
+        k.KernelApiCall.DesiredAccessString LIKE '%PROCESS_VM_WRITE%'
+    ) AND
+    src.ProcessName != target.ProcessName AND
+    target.ProcessName NOT IN ('svchost.exe', 'csrss.exe')  -- Common system services
+```
+
+This detects when a process opens another process with potentially dangerous access rights.
+
+#### Analyzing Thread Creation Across Processes
+
+```sql
+SELECT 
+    src.ProcessName as Creator,
+    target.ProcessName as Target,
+    k.KernelApiCall.ThreadId
+FROM 
+    WintapMessage(MessageType='KERNEL_API_CALL' AND ActivityType='OpenThread') as k
+JOIN 
+    WintapMessage(MessageType='PROCESS').win:keepall() as src
+ON 
+    src.PID = k.PID
+JOIN 
+    WintapMessage(MessageType='PROCESS').win:keepall() as target
+ON 
+    target.PID = k.KernelApiCall.TargetPid
+WHERE 
+    src.ProcessName != target.ProcessName
+```
+
+This identifies cross-process thread operations, which can indicate thread injection techniques.
+
+#### Detecting Symbolic Link Manipulation
+
+```sql
+SELECT 
+    ProcessName,
+    PID,
+    KernelApiCall.LinkSourceName,
+    KernelApiCall.LinkTargetName
+FROM 
+    WintapMessage
+WHERE 
+    MessageType = 'KERNEL_API_CALL' AND
+    ActivityType = 'CreateSymbolicLink'
+```
+
+This monitors for symbolic link creation, which can be used to redirect file system access for privilege escalation.
+
+### Combined Analysis Across Multiple Event Types
+
+#### Process Behavior Profiling with Memory, API, and Network Activity
+
+```sql
+CREATE CONTEXT ProcessProfileContext PARTITION BY PID FROM WintapMessage;
+
+CONTEXT ProcessProfileContext
+SELECT 
+    ProcessName,
+    PID,
+    COUNT(CASE WHEN MessageType = 'MEMORY_MAP' AND 
+               MemoryMap.PageProtect IN ('PAGE_EXECUTE_READWRITE', 'PAGE_EXECUTE_WRITECOPY') 
+          THEN 1 ELSE NULL END) as ExecutableAllocCount,
+    COUNT(CASE WHEN MessageType = 'KERNEL_API_CALL' AND 
+               ActivityType = 'OpenProcess' 
+          THEN 1 ELSE NULL END) as ProcessOpenCount,
+    COUNT(CASE WHEN MessageType = 'TCP_CONNECTION' THEN 1 ELSE NULL END) as NetworkCount,
+    COUNT(CASE WHEN MessageType = 'WMI' THEN 1 ELSE NULL END) as WmiOperationCount
+FROM 
+    WintapMessage.win:time(5 min)
+WHERE 
+    MessageType IN ('MEMORY_MAP', 'KERNEL_API_CALL', 'TCP_CONNECTION', 'WMI')
+GROUP BY 
+    ProcessName, PID
+HAVING 
+    ExecutableAllocCount > 0 AND NetworkCount > 0
+```
+
+This creates a behavioral profile for each process, tracking suspicious memory allocations, process interactions, network connections, and WMI operations.
+
+#### Comprehensive Attack Chain Detection
+
+```sql
+SELECT 
+    proc.ProcessName,
+    proc.PID,
+    proc.Process.CommandLine,
+    mem.MemoryMap.BaseAddress as InjectionAddress,
+    net.TcpConnection.DestinationAddress as CallbackAddress,
+    net.TcpConnection.DestinationPort as CallbackPort
+FROM PATTERN [
+    every proc=WintapMessage(MessageType='PROCESS' AND ActivityType='Start') ->
+    (api=WintapMessage(MessageType='KERNEL_API_CALL' AND 
+                      (ActivityType='OpenProcess' OR ActivityType='CreateSymbolicLink') AND 
+                      PID=proc.PID)) ->
+    (mem=WintapMessage(MessageType='MEMORY_MAP' AND 
+                      MemoryMap.PageProtect IN ('PAGE_EXECUTE_READWRITE', 'PAGE_EXECUTE_WRITECOPY') AND 
+                      PID=proc.PID)) ->
+    (net=WintapMessage(MessageType='TCP_CONNECTION' AND PID=proc.PID))
+    WHERE timer:within(30 seconds)
+]
+```
+
+This complex pattern detects a potential attack sequence: process start, followed by suspicious API calls, executable memory allocation, and network communication.
+
+## Best Practices and Optimization
+
+### Memory Management
+
+Esper processes events in memory, so efficient memory usage is crucial:
+
+1. **Use appropriate windows**: Prefer `win:time(x)` over `win:keepall()` for high-volume events.
+2. **Filter early**: Apply filters as early as possible in your query.
+3. **Select only what you need**: Avoid `SELECT *` for large result sets.
+4. **Partition contexts**: Use contexts to partition data and reduce memory usage.
+
+### Query Performance
+
+1. **Index declarations**: For high-volume streams, declare indexes on frequently filtered fields.
+2. **Avoid complex joins**: Complex joins on large windows can be expensive.
+3. **Use subqueries judiciously**: Nested subqueries can significantly impact performance.
+4. **Consider batching**: For aggregations, `time_batch` windows can be more efficient than sliding windows.
+
+### Limitations to Consider
+
+1. **Event processing delay**: Wintap events have a small delay from system occurrence to Esper processing.
+2. **Dropped events**: Under high load, some events might be dropped to maintain system stability.
+3. **System impact**: Complex queries can impact system performance.
+
+## Debugging and Troubleshooting
+
+### Common Issues
+
+1. **No results**: Ensure your filter conditions aren't too restrictive.
+2. **Too many results**: Add more specific filters or aggregations.
+3. **Memory issues**: Review window sizes and consider context partitioning.
+4. **Syntax errors**: Check field names and event type references.
+
+### Debugging Techniques
+
+1. **Simplify**: Start with a simple query and add complexity incrementally.
+2. **Validate subqueries**: Test subqueries independently before combining.
+3. **Check field availability**: Ensure fields exist for the MessageType you're querying.
+4. **Monitor memory**: Watch for memory usage spikes during query execution.
+
+## Reference: Commonly Used Fields
+
+### Process Events
+```
+- Process.Name: Process executable name
+- Process.Path: Full path to the executable
+- Process.CommandLine: Full command line
+- Process.Arguments: Arguments passed to the process
+- Process.ParentPID: Parent process ID
+- Process.ParentPidHash: Unique ID of parent process
+- Process.User: User context of the process
+```
+
+### File Events
+```
+- File.Path: Path to the file
+- File.BytesRequested: Size of the operation
+```
+
+### Registry Events
+```
+- Registry.Path: Registry key path
+- Registry.ValueName: Name of the registry value
+- Registry.Data: Data written to the registry
+- Registry.DataType: Type of the registry data
+```
+
+### Network Events
+```
+- TcpConnection.SourceAddress: Source IP address
+- TcpConnection.SourcePort: Source port
+- TcpConnection.DestinationAddress: Destination IP address
+- TcpConnection.DestinationPort: Destination port
+- TcpConnection.PacketSize: Size of the packet
+- TcpConnection.State: Connection state
+```
+
+### Image Load Events
+```
+- ImageLoad.FileName: Name of the loaded DLL/module
+- ImageLoad.ImageBase: Base address where loaded
+- ImageLoad.ImageSize: Size of the loaded image
+- ImageLoad.MD5: MD5 hash of the file (if available)
+```
+
+### WMI Events
+```
+- Wmi.Operation: The type of WMI operation performed
+- Wmi.User: User context for the WMI operation
+- Wmi.ClientProcessId: Process ID that initiated the WMI request
+- Wmi.CreatedProcessId: Process ID created by the WMI operation (if applicable)
+- Wmi.CommandLine: Command line for processes created via WMI
+- Wmi.OperationId: Unique identifier for the WMI operation
+- Wmi.IsLocal: Whether the WMI operation was initiated locally
+- Wmi.ResultCode: Result/error code of the WMI operation
+```
+
+### Memory Map Events
+```
+- MemoryMap.BaseAddress: Starting address of the memory region
+- MemoryMap.RegionSize: Size of the memory region in bytes
+- MemoryMap.PageProtect: Memory protection attributes (e.g., PAGE_EXECUTE_READWRITE)
+- MemoryMap.PageType: Type of allocation (MEM_IMAGE, MEM_MAPPED, MEM_PRIVATE)
+- MemoryMap.MZHeaderPresent: Whether an executable header was detected
+- MemoryMap.Description: Additional information about the memory region
+- MemoryMap.AllocationBaseAddress: Base address of the allocation containing this region
+```
+
+### Kernel API Call Events
+```
+- KernelApiCall.ProviderName: Name of the ETW provider that captured the API call
+- KernelApiCall.TargetPid: PID of the target process (for cross-process operations)
+- KernelApiCall.TargetProcessName: Name of the target process
+- KernelApiCall.DesiredAccess: Numeric access rights requested
+- KernelApiCall.DesiredAccessString: Human-readable access rights (e.g., "PROCESS_VM_WRITE, PROCESS_VM_READ")
+- KernelApiCall.ReturnCode: Error or success code returned by the API
+- KernelApiCall.LinkSourceName: Source path for symbolic link operations
+- KernelApiCall.LinkTargetName: Target path for symbolic link operations
+- KernelApiCall.NotifyRoutineAddress: Address of notification callback (for notification routines)
+- KernelApiCall.TargetThreatId: Thread ID of target thread (for thread operations)
+```

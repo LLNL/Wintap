@@ -38,7 +38,7 @@ string DatabasePath =  @"c:\program files\wintap7\embeddings.db";
 string CollectionName = "Wintap";
 string OllamaEndpoint = "http://localhost:11434";
 string EmbeddingModel = "mxbai-embed-large";
-string llm = "Wintap";
+string llm = "Wintap-llama-3b";
 
 #pragma warning disable SKEXP0070, SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020
 // Create a builder with both chat completion and embedding services
