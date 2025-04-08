@@ -201,6 +201,7 @@
     <Compile Remove="core\shared\SingleLogit.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Remove="C:\Users\frye3\.nuget\packages\system.diagnostics.diagnosticsource\9.0.3\contentFiles\any\net8.0\ILLink\ILLink.Descriptors.LibraryBuild.xml" />
     <Content Remove="core\etl\ETLConfig.json" />
   </ItemGroup>
   <ItemGroup>

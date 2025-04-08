@@ -3,3 +3,29 @@
     padding: 6px 12px; /* Adjust the padding as needed */
     /* Add any other style properties as needed */
 }
+
+.result-data {
+    word-break: break-word;
+    white-space: normal;
+    overflow: visible;
+    max-height: none;
+  }
+
+  /* Make sure table rows and cells are always visible */
+.p-datatable .p-datatable-tbody > tr {
+    display: table-row !important;
+    visibility: visible !important;
+  }
+  
+  .p-datatable .p-datatable-tbody > tr > td {
+    display: table-cell !important;
+    visibility: visible !important;
+  }
+  
+  /* Ensure result content is visible */
+  .result-data {
+    word-break: break-word;
+    white-space: normal !important;
+    overflow: visible !important;
+    min-height: 1.5rem;
+  }

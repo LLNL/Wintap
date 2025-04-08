@@ -1,0 +1,194 @@
+// Variables
+$primary-color: var(--primary-color);
+$text-color: var(--text-color);
+$surface-border: var(--surface-border);
+$surface-hover: var(--surface-hover);
+$card-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+$border-radius: 6px;
+$transition-speed: 0.2s;
+
+// Global Component Styles
+:host ::ng-deep {
+  .card {
+    margin-bottom: 1.5rem;
+    border-radius: $border-radius;
+    box-shadow: $card-shadow;
+    overflow: hidden;
+    transition: box-shadow $transition-speed ease;
+    
+    &:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    }
+    
+    .card-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid $surface-border;
+      background-color: #f8f9fa;
+    }
+  }
+  
+  // Better Tables
+  .p-datatable {
+    .p-datatable-thead > tr > th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+    }
+    
+    .p-datatable-tbody > tr {
+      transition: background-color $transition-speed ease;
+      
+      &:hover {
+        background-color: rgba($primary-color, 0.04);
+      }
+      
+      &.p-highlight {
+        background-color: rgba($primary-color, 0.1);
+        
+        &:hover {
+          background-color: rgba($primary-color, 0.15);
+        }
+      }
+      
+      > td {
+        padding: 0.6rem 1rem;
+        vertical-align: middle;
+      }
+    }
+  }
+  
+  // Dialog Styling
+  .p-dialog {
+    .p-dialog-header {
+      padding: 1.25rem;
+      background-color: #f8f9fa;
+    }
+    
+    .p-dialog-content {
+      padding: 1.5rem;
+    }
+    
+    .p-dialog-footer {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid $surface-border;
+    }
+  }
+  
+  // Toast Notifications
+  .p-toast {
+    .p-toast-message {
+      border-radius: $border-radius;
+      box-shadow: $card-shadow;
+    }
+  }
+  
+  // Dropdown and Input Styling
+  .p-dropdown {
+    .p-dropdown-label {
+      padding: 0.5rem 0.75rem;
+    }
+  }
+  
+  .p-inputtext {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  // Accordion Styling
+  .query-tips-accordion {
+    .p-accordion-header-link {
+      padding: 0.75rem 1rem;
+      font-weight: 500;
+    }
+    
+    .p-accordion-content {
+      padding: 1rem;
+      background-color: #f8f9fa;
+    }
+  }
+  
+  // Tags and Chips Styling
+  .p-tag, .p-chip {
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+}
+
+// CodeMirror Editor Styling
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid $surface-border;
+  border-radius: $border-radius;
+  overflow: hidden;
+  margin: 1rem 0;
+  
+  .editor-toolbar {
+    border-bottom: 1px solid $surface-border;
+  }
+  
+  .CodeMirror {
+    height: 300px !important;
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+// Code Examples
+.code-example {
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.85rem;
+  border-left: 3px solid $primary-color;
+  overflow-x: auto;
+}
+
+// Result Data Styling
+.result-data {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  max-height: 60px;
+  overflow: hidden;
+  position: relative;
+  
+  &:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1));
+    pointer-events: none;
+  }
+  
+  &:hover {
+    max-height: none;
+    
+    &:after {
+      display: none;
+    }
+  }
+}
+
+// Responsive Adjustments
+@media (max-width: 768px) {
+  :host ::ng-deep {
+    .p-datatable {
+      .p-datatable-thead > tr > th,
+      .p-datatable-tbody > tr > td {
+        padding: 0.5rem 0.75rem;
+      }
+    }
+  }
+  
+  .editor-container {
+    .CodeMirror {
+      height: 200px !important;
+    }
+  }
+}

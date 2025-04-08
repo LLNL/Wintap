@@ -36,6 +36,11 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { SliderModule } from 'primeng/slider'; // Add this for temperature slider
+// Add these PrimeNG imports
+import { AccordionModule } from 'primeng/accordion';
+import { TooltipModule } from 'primeng/tooltip';
+import { CheckboxModule } from 'primeng/checkbox';
+
 
 @NgModule({
     declarations: [
@@ -73,7 +78,14 @@ import { SliderModule } from 'primeng/slider'; // Add this for temperature slide
         ScrollPanelModule,
         ProgressSpinnerModule,
         ToastModule,
-        SliderModule
+        SliderModule,
+        AccordionModule,
+        ToastModule,
+        ChipModule,
+        TagModule,
+        TooltipModule,
+        DropdownModule,
+        CheckboxModule
     ],
     providers: [
         DatePipe,

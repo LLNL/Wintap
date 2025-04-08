@@ -192,7 +192,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             WintapMessage wintapBuilder = new WintapMessage(etwObj.TimeStamp, etwObj.ProcessID, WintapMessage.MessageTypeEnum.TCP_CONNECTION);
             wintapBuilder.ActivityType = etwObj.EventName;
-            
             return wintapBuilder;
         }
 

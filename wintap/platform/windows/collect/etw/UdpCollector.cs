@@ -71,13 +71,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 // todo:
                 // base.UpdateStatistics(obj.Source.EventsLost);
                 WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UDP_PACKET);
-                if (Enum.TryParse(obj.EventName, true, out WintapMessage.ActivityTypeEnum parsedActivityType))
+                if (Enum.TryParse(obj.EventName.Replace("/",""), true, out WintapMessage.ActivityTypeEnum parsedActivityType))
                 {
                     wintapMsg.ActivityType = parsedActivityType;
                 }
                 else
                 {
-                    throw new ArgumentException($"Invalid registry activity type: {obj.EventName}");
+                    //  Invalid registry activity type: UdpIp/Recv   <-- stip the '/' and this may work!
+                    throw new ArgumentException($"Invalid UdpIp activity type: {obj.EventName}");
                 }
                 wintapMsg.UdpPacket = new WintapMessage.UdpPacketObject();
                 wintapMsg.UdpPacket.SourceAddress = obj.saddr.ToString();

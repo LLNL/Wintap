@@ -1,11 +1,14 @@
 ﻿using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using com.espertech.esper.common.client.configuration;
+using com.espertech.esper.common.client.metric;
 using com.espertech.esper.compat;
 using com.espertech.esper.compiler.client;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.api;
+using gov.llnl.wintap.core.api.helpers;
+using gov.llnl.wintap.core.infrastructure.helpers;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -28,6 +31,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private static long maxEventsPerSecond;
         private static DateTime maxEventTime;
         private static long totalEvents;
+        private static long lastTotalEvents;
         private static Stopwatch stopWatch;
         private static ConcurrentQueue<WintapMessage> eventBuffer;
         private static Stopwatch bufferProcessingInterval;
@@ -57,10 +61,24 @@ namespace gov.llnl.wintap.core.infrastructure
             resetWorkbench();
         }
 
+        // Add this method to your existing EventChannel class
+
         public static EPDeployment compileDeploy(EPRuntime runtime, String epl)
         {
-            // Obtain a copy of the engine configuration
+            // Force generation of the singleton
+            int i = EventChannel.Runtime.Length;
             Configuration configuration = EventChannel.EsperConfig;
+
+            // Always convert string-based queries to enum-based queries
+            // This ensures consistent behavior regardless of where the query comes from
+            string adaptedEpl = EnumFormatter.FormatQueryForCompile(epl);
+
+            // Log the original and adapted queries for debugging if needed
+            if (epl != adaptedEpl)
+            {
+                WintapLogger.Log.Append($"Original EPL: {epl}", LogLevel.Debug);
+                WintapLogger.Log.Append($"Adapted EPL: {adaptedEpl}", LogLevel.Debug);
+            }
 
             // Build compiler arguments
             CompilerArguments args = new CompilerArguments(configuration);
@@ -69,10 +87,64 @@ namespace gov.llnl.wintap.core.infrastructure
             args.GetPath().Add(runtime.RuntimePath);
 
             // Compile
-            EPCompiled compiled = EPCompilerProvider.GetCompiler().Compile(epl, args);
+            EPCompiled compiled = EPCompilerProvider.GetCompiler().Compile(adaptedEpl, args);
 
             // Return the deployment
             return runtime.DeploymentService.Deploy(compiled);
+        }
+
+        // Add this method to your existing EventChannel class
+        internal static EsperQuery ManageWorkbenchQuery(EsperQuery q)
+        {
+            List<EsperQuery> queries = getWorkbenchState();
+            EsperQuery targetQuery = getWorkbenchState().Where(existing => existing.Name.Equals(q.Name, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+
+            if (targetQuery != null)
+            {
+                targetQuery.State = (EsperQuery.EsperState)Enum.Parse(typeof(EsperQuery.EsperState), targetQuery.State.ToString());
+
+                // Manage the query based on its state
+                if (targetQuery.State == EsperQuery.EsperState.ACTIVE)
+                {
+                    queries.Remove(targetQuery);
+                    EsperQuery newTarget = createEsperQuery(q);
+                    queries.Add(newTarget);
+                }
+                else if (targetQuery.State == EsperQuery.EsperState.STOPPED)
+                {
+                    targetQuery = stopEsperQuery(targetQuery);
+                }
+                else if (targetQuery.State == EsperQuery.EsperState.DELETED)
+                {
+                    stopEsperQuery(targetQuery);
+                    queries.Remove(targetQuery);
+                }
+            }
+            else
+            {
+                // Create a new query
+                targetQuery = createEsperQuery(q);
+                queries.Add(targetQuery);
+            }
+
+            setWorkbenchState(queries);
+            return targetQuery;
+        }
+
+        private static EsperQuery createEsperQuery(EsperQuery q)
+        {
+            // Store the original query string for display purposes
+            string originalQuery = q.Query;
+
+            // Deploy with adapter-processed query
+            EPDeployment deployment = compileDeploy(EventChannel.EsperRuntime, q.Query);
+
+            q.Id = deployment.DeploymentId;
+
+            // Ensure we keep the original string-based query for display to users
+            q.Query = originalQuery;
+
+            return q;
         }
 
         private void StatsWorker_DoWork(object sender, DoWorkEventArgs e)
@@ -80,14 +152,20 @@ namespace gov.llnl.wintap.core.infrastructure
             while (true)
             {
                 System.Threading.Thread.Sleep(1000);
-                eventsPerSecond = EsperRuntime.MetricsService.GetRuntimeMetric().InputCountDelta;
+                //  totalEvents minus lastTotalEvents
+                eventsPerSecond = totalEvents - lastTotalEvents;
+                lastTotalEvents = totalEvents; ;
+
+                //  TODO: fix!  metrics can be enabled but InputCountDelta is always 0
+                //eventsPerSecond = EsperRuntime.MetricsService.GetRuntimeMetric().InputCountDelta;
+                //totalEvents = totalEvents + eventsPerSecond;
+
                 if (eventsPerSecond > maxEventsPerSecond)
                 {
                     maxEventsPerSecond = eventsPerSecond;
                     maxEventTime = DateTime.Now;
                 }
-                totalEvents = totalEvents + eventsPerSecond;
-                //EventChannel.Esper.EsperRuntime.ResetStats();
+
                 while (eventBuffer.Count > 0)
                 {
                     WintapMessage bufferedEvent;
@@ -118,6 +196,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         public static void Send(WintapMessage streamedEvent)
         {
+            totalEvents++;
             if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.PROCESS_PARTIAL)
             {
                 try
@@ -150,51 +229,11 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        internal static EsperQuery ManageWorkbenchQuery(EsperQuery q)
-        {
-            List<EsperQuery> queries = getWorkbenchState();
-            EsperQuery targetQuery = getWorkbenchState().Where(q => q.Name.Equals(q.Name, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-            if (targetQuery != null)
-            {
-                targetQuery.State = (EsperQuery.EsperState)Enum.Parse(typeof(EsperQuery.EsperState), targetQuery.State.ToString());
-                // do esper work here
-                if (targetQuery.State == EsperQuery.EsperState.ACTIVE)
-                {
-                    queries.Remove(targetQuery);
-                    EsperQuery newTarget = createEsperQuery(q);
-                    queries.Add(newTarget);
-                }
-                else if (targetQuery.State == EsperQuery.EsperState.STOPPED)
-                {
-                    targetQuery = stopEsperQuery(targetQuery);
-                }
-                else if(targetQuery.State == EsperQuery.EsperState.DELETED)
-                {
-                    stopEsperQuery(targetQuery);
-                    queries.Remove(targetQuery);
-                }
-            }
-            else
-            {
-                EsperQuery newTarget = createEsperQuery(q);
-                queries.Add(newTarget);
-            }
-            setWorkbenchState(queries);
-            return targetQuery;
-        }
-
         private static EsperQuery stopEsperQuery(EsperQuery targetQuery)
         {
             EsperRuntime.DeploymentService.Undeploy(targetQuery.Id);
             targetQuery.State = EsperQuery.EsperState.STOPPED;
             return targetQuery;
-        }
-
-        private static EsperQuery createEsperQuery(EsperQuery q)
-        {
-            EPDeployment deployment = compileDeploy(EventChannel.EsperRuntime, q.Query);
-            q.Id = deployment.DeploymentId;
-            return q;
         }
 
         private void resetWorkbench()
@@ -236,10 +275,15 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     var esperConfig = new Configuration();
                     esperConfig.Common.EventMeta.ClassPropertyResolutionStyle = PropertyResolutionStyle.CASE_INSENSITIVE;
-                    //esperRuntime.MetricsService.SetMetricsReportingEnabled();
-                    //esperRuntime.MetricsService.SetMetricsReportingInterval(null, 1000);
+                    
+                    // TODO: fix native metric reporting
+                    //esperConfig.Runtime.MetricsReporting.IsEnableMetricsReporting = true;
+                    //esperConfig.Runtime.MetricsReporting.IsRuntimeMetrics = true;
+                    //esperConfig.Runtime.MetricsReporting.RuntimeInterval = 1000;
+                    //esperConfig.Runtime.MetricsReporting.WithMetricsReporting(true);
+
                     esperConfig.Common.AddEventType(typeof(WintapMessage));
-                    //esperConfig.Common.AddEventType(typeof(ProcessTreeEvent));
+
                     // following three config settings from the Esper 8 upgrade guide: 
                     esperConfig.Compiler.ByteCode.IsAllowSubscriber = true;
                     esperConfig.Compiler.ByteCode.SetAccessModifiersPublic();

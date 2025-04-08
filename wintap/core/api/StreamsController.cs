@@ -19,6 +19,8 @@ using System.Web;
 using System.Threading.Tasks;
 using com.espertech.esper.runtime.client;
 using com.espertech.esper.common.client;
+using gov.llnl.wintap.core.api.helpers;
+using gov.llnl.wintap.core.infrastructure.helpers;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -62,25 +64,36 @@ namespace gov.llnl.wintap.core.api
 
 
 
-        /// <summary>
-        /// Activate, Stop or Delete handling
-        /// </summary>
-        /// <param name="q"></param>
-        /// <returns></returns>
         [HttpPost]
         [Route("api/streams")]
         public IActionResult Post([FromBody] EsperQuery q)
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
             string responseMsg = "OK";
-            bool error = false;     
+            bool error = false;
             try
             {
                 q = EventChannel.ManageWorkbenchQuery(q);
-                EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
-                esperDeployment.Statements[0].Events += ActiveQuery_Events;
+
+                // Get the deployment safely 
+                try
+                {
+                    EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
+                    esperDeployment.Statements[0].Events += ActiveQuery_Events;
+                }
+                catch (Exception deploymentEx)
+                {
+                    // Log the error but don't treat it as a fatal error
+                    WintapLogger.Log.Append($"Note: Could not attach to deployment: {deploymentEx.Message}", LogLevel.Debug);
+
+                    // Only throw if it's an actual critical error, not just a first-time deployment
+                    if (!deploymentEx.Message.Contains("No deployment found for deploymentId"))
+                    {
+                        throw;
+                    }
+                }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 responseMsg = ex.Message;
                 error = true;
@@ -185,19 +198,12 @@ namespace gov.llnl.wintap.core.api
             return result;
         }
 
-     
-
-        /// <summary>
-        /// web sockets method for broadcasting query results
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void ActiveQuery_Events(object sender, UpdateEventArgs e)
         {
-            foreach(var esperObject in e.NewEvents)
+            foreach (var esperObject in e.NewEvents)
             {
                 StringBuilder sb = new StringBuilder();
-                
+
                 foreach (string prop in esperObject.EventType.PropertyNames)
                 {
                     try
@@ -210,14 +216,28 @@ namespace gov.llnl.wintap.core.api
                         {
                             sb.Append(prop.ToString() + "=" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().ToLongTimeString() + " +" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().Millisecond + "ms, ");
                         }
+                        else if (prop.ToString().Equals("MessageType"))
+                        {
+                            string formattedValue = EnumFormatter.FormatEnumForDisplay("MessageType", esperObject[prop]);
+                            sb.Append(prop.ToString() + "=\"" + formattedValue + "\", ");
+                        }
+                        else if (prop.ToString().Equals("ActivityType"))
+                        {
+                            string formattedValue = EnumFormatter.FormatEnumForDisplay("ActivityType", esperObject[prop]);
+                            sb.Append(prop.ToString() + "=\"" + formattedValue + "\", ");
+                        }
                         else
                         {
                             sb.Append(prop.ToString() + "=" + esperObject[prop].ToString() + ", ");
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log the error but continue processing other properties
+                        WintapLogger.Log.Append($"Error formatting property {prop}: {ex.Message}", LogLevel.Debug);
+                    }
                 }
-                string resultRow = sb.ToString().TrimEnd(new char[] { ',' });
+                string resultRow = sb.ToString().TrimEnd( ',', ' ');
                 EsperResult esperResult = new EsperResult();
                 esperResult.Result = resultRow;
                 hubContext.Clients.All.SendAsync("ReceiveMessage", esperResult, "OK");
