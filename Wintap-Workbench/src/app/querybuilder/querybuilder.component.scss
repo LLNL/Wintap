@@ -1,194 +1,335 @@
-// Variables
-$primary-color: var(--primary-color);
-$text-color: var(--text-color);
-$surface-border: var(--surface-border);
-$surface-hover: var(--surface-hover);
-$card-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-$border-radius: 6px;
-$transition-speed: 0.2s;
-
-// Global Component Styles
-:host ::ng-deep {
-  .card {
-    margin-bottom: 1.5rem;
-    border-radius: $border-radius;
-    box-shadow: $card-shadow;
+/* Main container layout */
+.main-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
     overflow: hidden;
-    transition: box-shadow $transition-speed ease;
-    
-    &:hover {
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    }
-    
-    .card-header {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid $surface-border;
-      background-color: #f8f9fa;
-    }
-  }
-  
-  // Better Tables
-  .p-datatable {
-    .p-datatable-thead > tr > th {
-      background-color: #f8f9fa;
-      font-weight: 600;
-      padding: 0.75rem 1rem;
-    }
-    
-    .p-datatable-tbody > tr {
-      transition: background-color $transition-speed ease;
-      
-      &:hover {
-        background-color: rgba($primary-color, 0.04);
-      }
-      
-      &.p-highlight {
-        background-color: rgba($primary-color, 0.1);
-        
-        &:hover {
-          background-color: rgba($primary-color, 0.15);
-        }
-      }
-      
-      > td {
-        padding: 0.6rem 1rem;
-        vertical-align: middle;
-      }
-    }
-  }
-  
-  // Dialog Styling
-  .p-dialog {
-    .p-dialog-header {
-      padding: 1.25rem;
-      background-color: #f8f9fa;
-    }
-    
-    .p-dialog-content {
-      padding: 1.5rem;
-    }
-    
-    .p-dialog-footer {
-      padding: 1rem 1.25rem;
-      border-top: 1px solid $surface-border;
-    }
-  }
-  
-  // Toast Notifications
-  .p-toast {
-    .p-toast-message {
-      border-radius: $border-radius;
-      box-shadow: $card-shadow;
-    }
-  }
-  
-  // Dropdown and Input Styling
-  .p-dropdown {
-    .p-dropdown-label {
-      padding: 0.5rem 0.75rem;
-    }
-  }
-  
-  .p-inputtext {
-    padding: 0.5rem 0.75rem;
-  }
-  
-  // Accordion Styling
-  .query-tips-accordion {
-    .p-accordion-header-link {
-      padding: 0.75rem 1rem;
-      font-weight: 500;
-    }
-    
-    .p-accordion-content {
-      padding: 1rem;
-      background-color: #f8f9fa;
-    }
-  }
-  
-  // Tags and Chips Styling
-  .p-tag, .p-chip {
-    font-size: 0.8rem;
-    font-weight: 500;
-  }
+    background-color: #f8f9fa;
 }
 
-// CodeMirror Editor Styling
+/* Sidebar styling */
+.sidebar {
+    width: 260px;
+    height: 100%;
+    transition: width 0.3s ease;
+    padding: 0.5rem;
+    flex-shrink: 0;
+}
+
+.sidebar-collapsed {
+    width: 60px;
+    min-width: 60px;
+}
+
+.sidebar-content {
+    height: calc(100% - 50px);
+    overflow-y: auto;
+}
+
+.sidebar-collapsed-content {
+    height: calc(100% - 50px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 1rem;
+    gap: 1rem;
+}
+
+/* Content area styling */
+.content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 0.5rem;
+    overflow: hidden;
+}
+
+.editor-section {
+    height: 40%;
+    min-height: 200px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.results-section {
+    height: 60%;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* Explicitly target the results wrapper to ensure it doesn't overflow */
+.results-wrapper {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Editor styling */
 .editor-container {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid $surface-border;
-  border-radius: $border-radius;
-  overflow: hidden;
-  margin: 1rem 0;
-  
-  .editor-toolbar {
-    border-bottom: 1px solid $surface-border;
-  }
-  
-  .CodeMirror {
-    height: 300px !important;
-    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-    font-size: 14px;
-    line-height: 1.5;
-  }
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 56px);
+    overflow: hidden;
 }
 
-// Code Examples
-.code-example {
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  padding: 0.75rem;
-  margin: 0.5rem 0;
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-  font-size: 0.85rem;
-  border-left: 3px solid $primary-color;
-  overflow-x: auto;
+.query-editor {
+    flex: 1;
+    overflow: auto;
+    position: relative;
 }
 
-// Result Data Styling
+/* Card styling */
+.card {
+    border-radius: 4px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin: 0;
+}
+
+.card-header {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f0f0f0;
+    background-color: white;
+    flex-shrink: 0;
+}
+
+/* CRITICAL PAGINATION FIX: Force proper display for pagination */
+::ng-deep .p-datatable {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+}
+
+::ng-deep .p-datatable .p-datatable-wrapper {
+    flex: 1 1 auto !important;
+    overflow: auto !important;
+    max-height: unset !important; /* Override any max-height settings */
+}
+
+::ng-deep .p-datatable .p-paginator {
+    flex: 0 0 auto !important;
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 1 !important;
+    background-color: white !important;
+    border-top: 1px solid #e9ecef !important;
+}
+
+/* This prevents the paginator from being obscured */
+::ng-deep .p-datatable-scrollable .p-datatable-scrollable-body {
+    /* This prevents the table from growing too large and hiding paginator */
+    max-height: calc(100% - 67px) !important;
+}
+
+/* Force the paginator to show */
+::ng-deep .p-paginator.p-component {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Text styling */
+.text-overflow-ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
 .result-data {
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  max-height: 60px;
-  overflow: hidden;
-  position: relative;
-  
-  &:after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 20px;
-    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1));
-    pointer-events: none;
-  }
-  
-  &:hover {
-    max-height: none;
-    
-    &:after {
-      display: none;
-    }
-  }
+    white-space: normal;
+    word-break: break-word;
+    max-height: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-// Responsive Adjustments
-@media (max-width: 768px) {
-  :host ::ng-deep {
-    .p-datatable {
-      .p-datatable-thead > tr > th,
-      .p-datatable-tbody > tr > td {
-        padding: 0.5rem 0.75rem;
-      }
-    }
-  }
-  
-  .editor-container {
-    .CodeMirror {
-      height: 200px !important;
-    }
-  }
+/* Utility classes */
+.w-full {
+    width: 100%;
 }
+
+.h-full {
+    height: 100%;
+}
+
+/* Dropdown styling */
+::ng-deep .p-dropdown {
+    min-width: 12rem;
+}
+
+::ng-deep .p-dropdown-panel .p-dropdown-items {
+    padding: 0.5rem 0;
+}
+
+/* Button styling */
+::ng-deep .p-button.p-button-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+::ng-deep .p-button.p-button-rounded {
+    border-radius: 50%;
+    height: 2rem;
+    width: 2rem;
+}
+
+/* Status tag styling */
+::ng-deep .p-tag {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+::ng-deep .p-tag.p-tag-success {
+    background: #22c55e;
+    color: white;
+}
+
+::ng-deep .p-tag.p-tag-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+::ng-deep .p-tag.p-tag-danger {
+    background: #ef4444;
+    color: white;
+}
+
+/* Toolbar styling */
+::ng-deep .p-toolbar {
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+/* Input styling */
+::ng-deep .p-inputtext {
+    padding: 0.4rem 0.5rem;
+}
+
+/* Table row and cell styling */
+::ng-deep .p-datatable .p-datatable-thead > tr > th {
+    background-color: #f8f9fa;
+    color: #495057;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5rem;
+    border-width: 0 0 1px 0;
+}
+
+::ng-deep .p-datatable .p-datatable-tbody > tr > td {
+    padding: 0.5rem;
+    border-width: 0 0 1px 0;
+    vertical-align: middle;
+}
+
+::ng-deep .p-datatable .p-datatable-tbody > tr:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* CodeMirror customizations */
+::ng-deep .CodeMirror {
+    height: 100%;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+::ng-deep .CodeMirror-focused {
+    border-color: #2196F3;
+    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
+}
+
+/* Chip styling */
+::ng-deep .p-chip {
+    padding: 0 0.5rem;
+}
+
+::ng-deep .p-chip .p-chip-text {
+    font-size: 0.75rem;
+}
+
+/* Custom scrollbars for better UX */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background-color: #f5f5f5;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #aaa;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .main-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        min-height: 50px;
+        padding: 0.25rem;
+    }
+
+    .sidebar-collapsed {
+        height: 50px;
+        width: 100%;
+    }
+
+    .content {
+        height: calc(100vh - 50px);
+    }
+
+    .sidebar-collapsed-content {
+        flex-direction: row;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .editor-section, .results-section {
+        height: auto;
+        min-height: 300px;
+    }
+}
+
+@media (max-width: 576px) {
+    .card-header {
+        flex-wrap: wrap;
+    }
+
+    .card-header > div {
+        margin-bottom: 0.5rem;
+        width: 100%;
+    }
+
+    ::ng-deep .p-dropdown {
+        width: 100%;
+    }
+
+    .p-toolbar {
+        flex-wrap: wrap;
+    }
+}
+w

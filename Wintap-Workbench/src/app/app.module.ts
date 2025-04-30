@@ -40,6 +40,8 @@ import { SliderModule } from 'primeng/slider'; // Add this for temperature slide
 import { AccordionModule } from 'primeng/accordion';
 import { TooltipModule } from 'primeng/tooltip';
 import { CheckboxModule } from 'primeng/checkbox';
+import { MenuModule } from 'primeng/menu';
+import { SplitterModule } from 'primeng/splitter';
 
 
 @NgModule({
@@ -85,7 +87,9 @@ import { CheckboxModule } from 'primeng/checkbox';
         TagModule,
         TooltipModule,
         DropdownModule,
-        CheckboxModule
+        CheckboxModule,
+        MenuModule,
+        SplitterModule
     ],
     providers: [
         DatePipe,

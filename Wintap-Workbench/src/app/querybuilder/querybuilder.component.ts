@@ -562,7 +562,59 @@ WHERE MessageType = "Process"`);
       detail,
       life: 3000
     });
-  }
+    }
+
+    // Add these properties to your component class:
+    sidebarCollapsed = false;
+
+    toggleSidebar() {
+        this.sidebarCollapsed = !this.sidebarCollapsed;
+    }
+
+    createNewQuery() {
+        // Clear the editor and set focus
+        if (this.codeEditor && this.codeEditor.codeMirror) {
+            this.codeEditor.codeMirror.setValue('');
+            this.codeEditor.codeMirror.focus();
+        }
+
+        if (this.nameField) {
+            this.nameField.nativeElement.value = '';
+        }
+
+        // Expand sidebar if collapsed
+        if (this.sidebarCollapsed) {
+            this.sidebarCollapsed = false;
+        }
+    }
+
+    getQueryMenuItems(statement: Statement) {
+        return [
+            {
+                label: 'Start',
+                icon: 'pi pi-play',
+                command: () => this.startEpl(statement)
+            },
+            {
+                label: 'Stop',
+                icon: 'pi pi-stop',
+                command: () => this.stopEpl(statement)
+            },
+            {
+                label: 'Edit',
+                icon: 'pi pi-pencil',
+                command: () => this.editEpl(statement)
+            },
+            {
+                separator: true
+            },
+            {
+                label: 'Delete',
+                icon: 'pi pi-trash',
+                command: () => this.deleteOneEpl(statement)
+            }
+        ];
+    }
 
 // Add these helper methods to the QueryBuilder component
 // These help users craft queries using string literals
