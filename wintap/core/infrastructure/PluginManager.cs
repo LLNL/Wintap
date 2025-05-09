@@ -381,7 +381,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             try
             {
-                EPDeployment deployment = EventChannel.compileDeploy(EventChannel.EsperRuntime, query.Query);
+                EPDeployment deployment = EventChannel.CompileDeploy(query.Query, pluginName);
                 deployment.Statements[0].Events += (sender, e) =>
                 {
                     PluginExceptionHandler.Instance.WrapPluginMethod(() =>
@@ -403,9 +403,8 @@ namespace gov.llnl.wintap.core.infrastructure
                 try
                 {
                     WintapLogger.Log.Append("Creating Subscriber EPL", LogLevel.Info);
-                    EPStatement processEvents = EventChannel.compileDeploy(
-                        EventChannel.EsperRuntime,
-                        "SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'"
+                    EPStatement processEvents = EventChannel.CompileDeploy(
+                        "SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'", "ProcessPartial"
                     ).Statements[0];
                     processEvents.Events += All_Events;
                 }
@@ -419,10 +418,9 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 try
                 {
-                    EPStatement allWintapMsgs = EventChannel.compileDeploy(
-                        EventChannel.EsperRuntime,
+                    EPStatement allWintapMsgs = EventChannel.CompileDeploy(
                         "SELECT * FROM WintapMessage WHERE MessageType = 'GenericMessage' AND GenericMessage.Provider != 'Plugin'"
-                    ).Statements[0];
+                    , Guid.NewGuid().ToString()).Statements[0];
                     allWintapMsgs.Events += AllGeneric_Events;
                 }
                 catch (Exception ex)

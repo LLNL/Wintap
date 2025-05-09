@@ -1,87 +1,39 @@
-/* Main container layout */
+/* Main container layout - vertical stack */
 .main-container {
     display: flex;
+    flex-direction: column;
     height: 100vh;
     width: 100%;
     overflow: hidden;
     background-color: #f8f9fa;
-}
-
-/* Sidebar styling */
-.sidebar {
-    width: 260px;
-    height: 100%;
-    transition: width 0.3s ease;
     padding: 0.5rem;
-    flex-shrink: 0;
+    gap: 0.5rem;
 }
 
-.sidebar-collapsed {
-    width: 60px;
-    min-width: 60px;
+/* Saved queries panel - top */
+.saved-queries-panel {
+    height: auto;
+    min-height: 180px;
+    max-height: 200px;
 }
 
-.sidebar-content {
-    height: calc(100% - 50px);
-    overflow-y: auto;
+/* Editor panel - middle */
+.editor-panel {
+    flex: 2;
+    min-height: 250px;
 }
 
-.sidebar-collapsed-content {
-    height: calc(100% - 50px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-top: 1rem;
-    gap: 1rem;
+/* Results panel - bottom */
+.results-panel {
+    flex: 3;
+    min-height: 250px;
 }
 
-/* Content area styling */
-.content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    padding: 0.5rem;
-    overflow: hidden;
-}
-
-.editor-section {
-    height: 40%;
-    min-height: 200px;
-    margin-bottom: 0.5rem;
-    display: flex;
-    flex-direction: column;
-}
-
-.results-section {
-    height: 60%;
-    min-height: 200px;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-}
-
-/* Explicitly target the results wrapper to ensure it doesn't overflow */
+/* Wrapper for results table */
 .results-wrapper {
-    flex: 1;
-    overflow: hidden;
+    height: calc(100% - 56px); /* Subtract header height */
     position: relative;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Editor styling */
-.editor-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100% - 56px);
     overflow: hidden;
-}
-
-.query-editor {
-    flex: 1;
-    overflow: auto;
-    position: relative;
 }
 
 /* Card styling */
@@ -93,6 +45,7 @@
     flex-direction: column;
     height: 100%;
     margin: 0;
+    overflow: hidden;
 }
 
 .card-header {
@@ -102,39 +55,41 @@
     flex-shrink: 0;
 }
 
-/* CRITICAL PAGINATION FIX: Force proper display for pagination */
-::ng-deep .p-datatable {
-    display: flex !important;
-    flex-direction: column !important;
-    height: 100% !important;
+/* Editor container */
+.editor-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
 }
 
-::ng-deep .p-datatable .p-datatable-wrapper {
-    flex: 1 1 auto !important;
+.query-editor {
+    flex: 1;
+    min-height: 100px;
+}
+
+/* Table styling - important for pagination */
+:host ::ng-deep .p-datatable {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+:host ::ng-deep .p-datatable-wrapper {
+    flex: 1;
     overflow: auto !important;
-    max-height: unset !important; /* Override any max-height settings */
 }
 
-::ng-deep .p-datatable .p-paginator {
-    flex: 0 0 auto !important;
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 1 !important;
-    background-color: white !important;
-    border-top: 1px solid #e9ecef !important;
+:host ::ng-deep .p-paginator {
+    flex-shrink: 0;
+    border-top: 1px solid #e9ecef;
+    background-color: white;
+    padding: 0.5rem;
 }
 
-/* This prevents the paginator from being obscured */
-::ng-deep .p-datatable-scrollable .p-datatable-scrollable-body {
-    /* This prevents the table from growing too large and hiding paginator */
-    max-height: calc(100% - 67px) !important;
-}
-
-/* Force the paginator to show */
-::ng-deep .p-paginator.p-component {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+/* Fix scrolling for tables */
+:host ::ng-deep .p-datatable-scrollable .p-datatable-wrapper {
+    height: calc(100% - 65px) !important; /* Leave room for paginator */
 }
 
 /* Text styling */
@@ -153,92 +108,10 @@
     text-overflow: ellipsis;
 }
 
-/* Utility classes */
-.w-full {
-    width: 100%;
-}
-
-.h-full {
-    height: 100%;
-}
-
-/* Dropdown styling */
-::ng-deep .p-dropdown {
-    min-width: 12rem;
-}
-
-::ng-deep .p-dropdown-panel .p-dropdown-items {
-    padding: 0.5rem 0;
-}
-
-/* Button styling */
-::ng-deep .p-button.p-button-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-}
-
-::ng-deep .p-button.p-button-rounded {
-    border-radius: 50%;
-    height: 2rem;
-    width: 2rem;
-}
-
-/* Status tag styling */
-::ng-deep .p-tag {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-}
-
-::ng-deep .p-tag.p-tag-success {
-    background: #22c55e;
-    color: white;
-}
-
-::ng-deep .p-tag.p-tag-warning {
-    background: #f59e0b;
-    color: white;
-}
-
-::ng-deep .p-tag.p-tag-danger {
-    background: #ef4444;
-    color: white;
-}
-
-/* Toolbar styling */
-::ng-deep .p-toolbar {
-    padding: 0.5rem;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-}
-
-/* Input styling */
-::ng-deep .p-inputtext {
-    padding: 0.4rem 0.5rem;
-}
-
-/* Table row and cell styling */
-::ng-deep .p-datatable .p-datatable-thead > tr > th {
-    background-color: #f8f9fa;
-    color: #495057;
-    font-weight: 600;
-    text-align: left;
-    padding: 0.5rem;
-    border-width: 0 0 1px 0;
-}
-
-::ng-deep .p-datatable .p-datatable-tbody > tr > td {
-    padding: 0.5rem;
-    border-width: 0 0 1px 0;
-    vertical-align: middle;
-}
-
-::ng-deep .p-datatable .p-datatable-tbody > tr:hover {
-    background-color: rgba(0, 0, 0, 0.04);
-}
-
 /* CodeMirror customizations */
-::ng-deep .CodeMirror {
-    height: 100%;
+:host ::ng-deep .CodeMirror {
+    height: 100% !important;
+    min-height: 150px;
     font-family: monospace;
     font-size: 14px;
     line-height: 1.4;
@@ -246,21 +119,48 @@
     border-radius: 4px;
 }
 
-::ng-deep .CodeMirror-focused {
-    border-color: #2196F3;
-    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
-}
-
-/* Chip styling */
-::ng-deep .p-chip {
-    padding: 0 0.5rem;
-}
-
-::ng-deep .p-chip .p-chip-text {
+/* PrimeNG component styling */
+:host ::ng-deep .p-tag {
+    padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
 }
 
-/* Custom scrollbars for better UX */
+:host ::ng-deep .p-tag.p-tag-success {
+    background: #22c55e;
+    color: white;
+}
+
+:host ::ng-deep .p-tag.p-tag-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+:host ::ng-deep .p-tag.p-tag-danger {
+    background: #ef4444;
+    color: white;
+}
+
+:host ::ng-deep .p-chip {
+    padding: 0 0.5rem;
+}
+
+:host ::ng-deep .p-chip .p-chip-text {
+    font-size: 0.75rem;
+}
+
+:host ::ng-deep .p-button.p-button-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+:host ::ng-deep .p-button.p-button-rounded {
+    border-radius: 50%;
+    height: 2rem;
+    width: 2rem;
+    padding: 0;
+}
+
+/* Custom scrollbars */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -282,35 +182,18 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+    .saved-queries-panel {
+        max-height: none;
+    }
+
     .main-container {
-        flex-direction: column;
-    }
-
-    .sidebar {
-        width: 100%;
+        overflow-y: auto;
         height: auto;
-        min-height: 50px;
-        padding: 0.25rem;
+        min-height: 100vh;
     }
 
-    .sidebar-collapsed {
-        height: 50px;
-        width: 100%;
-    }
-
-    .content {
-        height: calc(100vh - 50px);
-    }
-
-    .sidebar-collapsed-content {
-        flex-direction: row;
-        justify-content: center;
-        gap: 1rem;
-    }
-
-    .editor-section, .results-section {
-        height: auto;
-        min-height: 300px;
+    .editor-panel, .results-panel {
+        min-height: 400px;
     }
 }
 
@@ -323,13 +206,4 @@
         margin-bottom: 0.5rem;
         width: 100%;
     }
-
-    ::ng-deep .p-dropdown {
-        width: 100%;
-    }
-
-    .p-toolbar {
-        flex-wrap: wrap;
-    }
 }
-w

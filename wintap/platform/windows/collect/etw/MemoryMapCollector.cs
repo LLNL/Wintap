@@ -107,7 +107,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             scanInProgress = false;
 
             string sql = "select * from WintapMessage where MessageType='Process' AND ActivityType='start'";
-            var epQuery = EventChannel.compileDeploy(EventChannel.EsperRuntime, sql).Statements[0];
+            var epQuery = EventChannel.CompileDeploy(sql, "MemoryMapCollector").Statements[0];
             epQuery.Events += EpQuery_Events;
 
             WintapLogger.Log.Append(CollectorName + " started", LogLevel.Info);

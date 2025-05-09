@@ -1,271 +1,263 @@
 <div class="main-container">
-    <!-- Left Panel: Improved collapsible sidebar -->
-    <div class="sidebar" [ngClass]="{'sidebar-collapsed': sidebarCollapsed}">
-        <div class="card h-full">
+    <!-- Top Panel: Saved Queries -->
+    <div class="saved-queries-panel">
+        <div class="card m-0">
             <div class="card-header">
                 <div class="flex justify-content-between align-items-center">
-                    <h5 class="m-0" *ngIf="!sidebarCollapsed">Saved Queries</h5>
-                    <button pButton pRipple type="button"
-                            [icon]="sidebarCollapsed ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"
-                            class="p-button-rounded p-button-text p-button-sm"
-                            (click)="toggleSidebar()"></button>
+                    <h5 class="m-0">Saved Queries</h5>
+                    <div class="flex align-items-center gap-2">
+                        <span class="p-input-icon-left">
+                            <i class="pi pi-search"></i>
+                            <input pInputText type="text" #filter (input)="onGlobalFilter(dt1, $event)" placeholder="Search" class="p-inputtext-sm" />
+                        </span>
+                        <button pButton pRipple type="button" icon="pi pi-plus"
+                                class="p-button-rounded p-button-sm p-button-text p-button-success"
+                                (click)="createNewQuery()" pTooltip="New Query"></button>
+                        <button pButton pRipple type="button" icon="pi pi-trash"
+                                class="p-button-rounded p-button-sm p-button-text p-button-danger"
+                                (click)="deleteEpl()" pTooltip="Delete All"></button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Expanded sidebar content -->
-            <div class="sidebar-content" *ngIf="!sidebarCollapsed">
-                <div class="p-2">
-                    <span class="p-input-icon-left w-full mb-2">
-                        <i class="pi pi-search"></i>
-                        <input pInputText type="text" #filter (input)="onGlobalFilter(dt1, $event)" placeholder="Search" class="w-full" />
-                    </span>
+            <!-- Table of saved queries -->
+            <p-table #dt1 [value]="eplListing" dataKey="name"
+                     styleClass="p-datatable-sm" [scrollable]="true" scrollHeight="150px"
+                     selectionMode="single" [(selection)]="selectedStatement" [rowHover]="true">
+
+                <ng-template pTemplate="header">
+                    <tr>
+                        <th>Name</th>
+                        <th style="width: 90px">Status</th>
+                        <th style="width: 130px">Actions</th>
+                    </tr>
+                </ng-template>
+
+                <ng-template pTemplate="body" let-statement>
+                    <tr [pSelectableRow]="statement">
+                        <td class="text-overflow-ellipsis">{{ statement.name }}</td>
+                        <td>
+                            <p-tag [value]="getEnumStringFromValue(statement.state)"
+                                   [severity]="getStatusSeverity(statement.state)"
+                                   styleClass="text-xs"></p-tag>
+                        </td>
+                        <td>
+                            <div class="flex gap-1 justify-content-center">
+                                <button pButton pRipple type="button" icon="pi pi-play"
+                                        class="p-button-rounded p-button-sm p-button-text p-button-success"
+                                        (click)="startEpl(statement)" pTooltip="Start"></button>
+                                <button pButton pRipple type="button" icon="pi pi-stop"
+                                        class="p-button-rounded p-button-sm p-button-text p-button-warning"
+                                        (click)="stopEpl(statement)" pTooltip="Stop"></button>
+                                <button pButton pRipple type="button" icon="pi pi-pencil"
+                                        class="p-button-rounded p-button-sm p-button-text p-button-info"
+                                        (click)="editEpl(statement)" pTooltip="Edit"></button>
+                                <button pButton pRipple type="button" icon="pi pi-trash"
+                                        class="p-button-rounded p-button-sm p-button-text p-button-danger"
+                                        (click)="deleteOneEpl(statement)" pTooltip="Delete"></button>
+                            </div>
+                        </td>
+                    </tr>
+                </ng-template>
+
+                <ng-template pTemplate="emptymessage">
+                    <tr>
+                        <td colspan="3" class="text-center p-3">
+                            <div class="flex flex-column align-items-center">
+                                <i class="pi pi-info-circle text-500 text-xl mb-2"></i>
+                                <span>No saved queries found</span>
+                            </div>
+                        </td>
+                    </tr>
+                </ng-template>
+            </p-table>
+        </div>
+    </div>
+
+    <!-- Middle Panel: Editor -->
+    <div class="editor-panel">
+        <div class="card m-0">
+            <div class="card-header">
+                <div class="flex justify-content-between align-items-center">
+                    <div class="flex align-items-center gap-2">
+                        <span class="p-input-icon-left">
+                            <i class="pi pi-tag"></i>
+                            <input pInputText id="queryName" #nameField type="text" placeholder="Query Name" class="p-inputtext-sm" />
+                        </span>
+                        <button pButton pRipple type="button" label="Execute" icon="pi pi-play"
+                                class="p-button-sm p-button-success" (click)="activateEpl(nameField.value)"></button>
+                    </div>
+                    <div class="flex align-items-center">
+                        <p-dropdown [options]="queryTemplates" optionLabel="name" placeholder="Insert Template"
+                                    [showClear]="true" (onChange)="insertTemplate($event.value)"
+                                    styleClass="p-inputtext-sm mr-2"></p-dropdown>
+                        <button pButton pRipple type="button" icon="pi pi-question-circle"
+                                class="p-button-text p-button-sm" (click)="showQueryHelp()"></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editor toolbar & CodeMirror - simplified -->
+            <div class="editor-container">
+                <div class="p-toolbar p-component p-1 flex flex-wrap gap-1 bg-gray-50">
+                    <button pButton pRipple type="button" icon="pi pi-file"
+                            class="p-button-text p-button-sm" pTooltip="New" tooltipPosition="bottom"
+                            (click)="createNewQuery()"></button>
+                    <button pButton pRipple type="button" icon="pi pi-save"
+                            class="p-button-text p-button-sm" pTooltip="Save" tooltipPosition="bottom"
+                            (click)="activateEpl(nameField.value)"></button>
+                    <button pButton pRipple type="button" icon="pi pi-question-circle"
+                            class="p-button-text p-button-sm" pTooltip="Query Help" tooltipPosition="bottom"
+                            (click)="showQueryHelp()"></button>
                 </div>
 
-                <p-table #dt1 [value]="eplListing" dataKey="name"
-                         styleClass="p-datatable-sm" [scrollable]="true" scrollHeight="calc(100vh - 170px)"
-                         selectionMode="single" [(selection)]="selectedStatement" [rowHover]="true">
+                <ngx-codemirror #editor
+                                [options]="{
+                  mode: 'wintapOverlay',
+                  lineNumbers: true,
+                  theme: 'material',
+                  autoCloseBrackets: true,
+                  matchBrackets: true,
+                  extraKeys: {'Ctrl-Space': 'autocomplete'}
+                }"
+                                class="query-editor"></ngx-codemirror>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Panel: Results -->
+    <div class="results-panel">
+        <div class="card m-0">
+            <div class="card-header">
+                <div class="flex justify-content-between align-items-center">
+                    <h5 class="m-0">
+                        Query Results
+                        <span class="text-sm text-500 ml-2">({{ esperResults.length }} events)</span>
+                    </h5>
+                    <div class="flex align-items-center gap-2">
+                        <span class="p-input-icon-left">
+                            <i class="pi pi-search"></i>
+                            <input pInputText type="text" #filter2 (input)="onGlobalFilter2(resultsTable, $event)"
+                                   placeholder="Filter results" class="p-inputtext-sm" />
+                        </span>
+                        <button pButton pRipple type="button" icon="pi pi-trash"
+                                class="p-button-text p-button-danger p-button-sm" (click)="clearResults(resultsTable)"
+                                pTooltip="Clear Results" tooltipPosition="bottom"></button>
+                        <button pButton pRipple type="button" icon="pi pi-download"
+                                class="p-button-text p-button-sm" pTooltip="Export" tooltipPosition="bottom"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-wrapper">
+                <p-table #resultsTable [value]="esperResults" dataKey="id" [rows]="10" [loading]="loading"
+                         styleClass="p-datatable-sm p-datatable-gridlines p-datatable-striped" [paginator]="true"
+                         [globalFilterFields]="['result']" [rowHover]="true"
+                         [scrollable]="true" scrollHeight="calc(100% - 65px)" [rowsPerPageOptions]="[10,25,50,100]"
+                         [sortField]="'timestamp'" [sortOrder]="-1">
 
                     <ng-template pTemplate="header">
                         <tr>
-                            <th>Name</th>
-                            <th style="width: 90px">Status</th>
-                            <th style="width: 80px">Actions</th>
+                            <th style="width: 10rem">Time</th>
+                            <th style="width: 8rem">Type</th>
+                            <th style="width: 5rem">PID</th>
+                            <th style="width: 10rem">Process</th>
+                            <th>Details</th>
                         </tr>
                     </ng-template>
 
-                    <ng-template pTemplate="body" let-statement>
-                        <tr [pSelectableRow]="statement">
-                            <td class="text-overflow-ellipsis">{{ statement.name }}</td>
+                    <ng-template pTemplate="body" let-result>
+                        <tr>
+                            <td>{{ result.timestamp | date:'HH:mm:ss.SSS' }}</td>
                             <td>
-                                <p-tag [value]="getEnumStringFromValue(statement.state)"
-                                       [severity]="getStatusSeverity(statement.state)"
-                                       styleClass="text-xs"></p-tag>
+                                <p-chip [label]="getEventType(result.result)"
+                                        [icon]="getEventTypeIcon(result.result)"
+                                        styleClass="text-xs"></p-chip>
+                            </td>
+                            <td>{{ extractPID(result.result) }}</td>
+                            <td class="text-overflow-ellipsis" style="max-width: 10rem">
+                                {{ extractProcessName(result.result) }}
                             </td>
                             <td>
-                                <div class="flex gap-1 justify-content-center">
-                                    <button pButton pRipple type="button" icon="pi pi-play"
-                                            class="p-button-rounded p-button-sm p-button-text p-button-success"
-                                            (click)="startEpl(statement)" pTooltip="Start"></button>
-                                    <button pButton pRipple type="button" icon="pi pi-pencil"
-                                            class="p-button-rounded p-button-sm p-button-text p-button-info"
-                                            (click)="editEpl(statement)" pTooltip="Edit"></button>
-                                </div>
+                                <div class="result-data">{{ result.result }}</div>
                             </td>
                         </tr>
                     </ng-template>
 
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="3" class="text-center p-3">
+                            <td colspan="5" class="text-center p-4">
                                 <div class="flex flex-column align-items-center">
-                                    <i class="pi pi-info-circle text-500 text-xl mb-2"></i>
-                                    <span>No saved queries found</span>
+                                    <i class="pi pi-inbox text-500 text-4xl mb-3"></i>
+                                    <span>No results yet</span>
+                                    <small class="text-500">Execute a query to see results here</small>
                                 </div>
                             </td>
                         </tr>
                     </ng-template>
-                </p-table>
-            </div>
 
-            <!-- Collapsed sidebar content (icons only) -->
-            <div class="sidebar-collapsed-content" *ngIf="sidebarCollapsed">
-                <div class="flex flex-column align-items-center py-3 gap-3">
-                    <button pButton pRipple icon="pi pi-plus" class="p-button-rounded"
-                            pTooltip="New Query" tooltipPosition="right" (click)="createNewQuery()"></button>
-                    <button pButton pRipple icon="pi pi-trash" class="p-button-rounded p-button-danger"
-                            pTooltip="Delete All" tooltipPosition="right" (click)="deleteEpl()"></button>
-                </div>
+                    <ng-template pTemplate="paginatorleft">
+                        <div class="p-d-flex p-ai-center">
+                            <span>Total: {{ esperResults.length }} events</span>
+                        </div>
+                    </ng-template>
+                </p-table>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Right Panel: Editor and Results -->
-    <div class="content">
-        <!-- Editor Section -->
-        <div class="editor-section">
-            <div class="card m-0">
-                <div class="card-header">
-                    <div class="flex justify-content-between align-items-center">
-                        <div class="flex align-items-center gap-2">
-                            <span class="p-input-icon-left">
-                                <i class="pi pi-tag"></i>
-                                <input pInputText id="queryName" #nameField type="text" placeholder="Query Name" class="p-inputtext-sm" />
-                            </span>
-                            <button pButton pRipple type="button" label="Execute" icon="pi pi-play"
-                                    class="p-button-sm p-button-success" (click)="activateEpl(nameField.value)"></button>
-                        </div>
-                        <div class="flex align-items-center">
-                            <p-dropdown [options]="queryTemplates" optionLabel="name" placeholder="Insert Template"
-                                        [showClear]="true" (onChange)="insertTemplate($event.value)"
-                                        styleClass="p-inputtext-sm mr-2"></p-dropdown>
-                            <button pButton pRipple type="button" icon="pi pi-question-circle"
-                                    class="p-button-text p-button-sm" (click)="showQueryHelp()"></button>
-                        </div>
-                    </div>
-                </div>
+<!-- Dialogs and toasts (unchanged) -->
+<p-dialog header="Confirm Delete" [(visible)]="showConfirmDialog" [modal]="true" [style]="{width: '450px'}"
+          [draggable]="false" [resizable]="false">
+    <div class="flex align-items-center">
+        <i class="pi pi-exclamation-triangle text-yellow-500 text-4xl mr-3"></i>
+        <span>This will delete ALL saved queries. Are you sure you want to continue?</span>
+    </div>
+    <ng-template pTemplate="footer">
+        <button pButton pRipple label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showConfirmDialog=false"></button>
+        <button pButton pRipple label="Delete All" icon="pi pi-trash" class="p-button-danger" (click)="deleteConfirmed()"></button>
+    </ng-template>
+</p-dialog>
 
-                <!-- Editor toolbar & CodeMirror - simplified without dropdown menus -->
-                <div class="editor-container">
-                    <div class="p-toolbar p-component p-1 flex flex-wrap gap-1 bg-gray-50">
-                        <button pButton pRipple type="button" icon="pi pi-file"
-                                class="p-button-text p-button-sm" pTooltip="New" tooltipPosition="bottom"
-                                (click)="createNewQuery()"></button>
-                        <button pButton pRipple type="button" icon="pi pi-save"
-                                class="p-button-text p-button-sm" pTooltip="Save" tooltipPosition="bottom"
-                                (click)="activateEpl(nameField.value)"></button>
-                        <button pButton pRipple type="button" icon="pi pi-question-circle"
-                                class="p-button-text p-button-sm" pTooltip="Query Help" tooltipPosition="bottom"
-                                (click)="showQueryHelp()"></button>
-                    </div>
-
-                    <ngx-codemirror #editor
-                                    [options]="{
-                      mode: 'wintapOverlay',
-                      lineNumbers: true,
-                      theme: 'material',
-                      autoCloseBrackets: true,
-                      matchBrackets: true,
-                      extraKeys: {'Ctrl-Space': 'autocomplete'}
-                    }"
-                                    class="query-editor"></ngx-codemirror>
-                </div>
-            </div>
+<p-dialog header="Invalid Query" [(visible)]="showInvalidQueryDialog" [modal]="true" [style]="{width: '500px'}"
+          [draggable]="false" [resizable]="false">
+    <div class="flex align-items-start">
+        <i class="pi pi-exclamation-circle text-red-500 text-4xl mr-3 mt-1"></i>
+        <div>
+            <h5 class="mt-0 mb-2">Query Execution Failed</h5>
+            <p class="text-600 m-0">{{queryError}}</p>
         </div>
+    </div>
+    <ng-template pTemplate="footer">
+        <button pButton pRipple label="OK" icon="pi pi-check" class="p-button-primary" (click)="showInvalidQueryDialog=false"></button>
+    </ng-template>
+</p-dialog>
 
-        <!-- Results Section with fixed pagination -->
-        <div class="results-section">
-            <div class="card m-0">
-                <div class="card-header">
-                    <div class="flex justify-content-between align-items-center">
-                        <h5 class="m-0">
-                            Query Results
-                            <span class="text-sm text-500 ml-2">({{ esperResults.length }} events)</span>
-                        </h5>
-                        <div class="flex align-items-center gap-2">
-                            <span class="p-input-icon-left">
-                                <i class="pi pi-search"></i>
-                                <input pInputText type="text" #filter2 (input)="onGlobalFilter2(resultsTable, $event)"
-                                       placeholder="Filter results" class="p-inputtext-sm" />
-                            </span>
-                            <button pButton pRipple type="button" icon="pi pi-trash"
-                                    class="p-button-text p-button-danger p-button-sm" (click)="clearResults(resultsTable)"
-                                    pTooltip="Clear Results" tooltipPosition="bottom"></button>
-                            <button pButton pRipple type="button" icon="pi pi-download"
-                                    class="p-button-text p-button-sm" pTooltip="Export" tooltipPosition="bottom"></button>
-                        </div>
-                    </div>
-                </div>
+<p-dialog header="Query Help" [(visible)]="helpDialogVisible" [modal]="true" [style]="{width: '700px'}"
+          [draggable]="true" [resizable]="false">
+    <div class="query-help-content">
+        <h4>Query Basics</h4>
+        <p>Wintap queries use Esper EPL (Event Processing Language) syntax to filter and analyze events.</p>
 
-                <!-- Results table with fixed layout -->
-                <div class="results-wrapper">
-                    <p-table #resultsTable [value]="esperResults" dataKey="id" [rows]="10" [loading]="loading"
-                             styleClass="p-datatable-sm p-datatable-gridlines p-datatable-striped" [paginator]="true"
-                             [globalFilterFields]="['result']" [rowHover]="true"
-                             [scrollable]="true" scrollHeight="calc(100% - 65px)" [rowsPerPageOptions]="[10,25,50,100]"
-                             [sortField]="'timestamp'" [sortOrder]="-1">
-
-                        <ng-template pTemplate="header">
-                            <tr>
-                                <th style="width: 10rem">Time</th>
-                                <th style="width: 8rem">Type</th>
-                                <th style="width: 5rem">PID</th>
-                                <th style="width: 10rem">Process</th>
-                                <th>Details</th>
-                            </tr>
-                        </ng-template>
-
-                        <ng-template pTemplate="body" let-result>
-                            <tr>
-                                <td>{{ result.timestamp | date:'HH:mm:ss.SSS' }}</td>
-                                <td>
-                                    <p-chip [label]="getEventType(result.result)"
-                                            [icon]="getEventTypeIcon(result.result)"
-                                            styleClass="text-xs"></p-chip>
-                                </td>
-                                <td>{{ extractPID(result.result) }}</td>
-                                <td class="text-overflow-ellipsis" style="max-width: 10rem">
-                                    {{ extractProcessName(result.result) }}
-                                </td>
-                                <td>
-                                    <div class="result-data">{{ result.result }}</div>
-                                </td>
-                            </tr>
-                        </ng-template>
-
-                        <ng-template pTemplate="emptymessage">
-                            <tr>
-                                <td colspan="5" class="text-center p-4">
-                                    <div class="flex flex-column align-items-center">
-                                        <i class="pi pi-inbox text-500 text-4xl mb-3"></i>
-                                        <span>No results yet</span>
-                                        <small class="text-500">Execute a query to see results here</small>
-                                    </div>
-                                </td>
-                            </tr>
-                        </ng-template>
-
-                        <!-- Ensure pagination template is included -->
-                        <ng-template pTemplate="paginatorleft">
-                            <div class="p-d-flex p-ai-center">
-                                <span>Total: {{ esperResults.length }} events</span>
-                            </div>
-                        </ng-template>
-                    </p-table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Dialogs and toasts (unchanged) -->
-        <p-dialog header="Confirm Delete" [(visible)]="showConfirmDialog" [modal]="true" [style]="{width: '450px'}"
-                  [draggable]="false" [resizable]="false">
-            <div class="flex align-items-center">
-                <i class="pi pi-exclamation-triangle text-yellow-500 text-4xl mr-3"></i>
-                <span>This will delete ALL saved queries. Are you sure you want to continue?</span>
-            </div>
-            <ng-template pTemplate="footer">
-                <button pButton pRipple label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showConfirmDialog=false"></button>
-                <button pButton pRipple label="Delete All" icon="pi pi-trash" class="p-button-danger" (click)="deleteConfirmed()"></button>
-            </ng-template>
-        </p-dialog>
-
-        <p-dialog header="Invalid Query" [(visible)]="showInvalidQueryDialog" [modal]="true" [style]="{width: '500px'}"
-                  [draggable]="false" [resizable]="false">
-            <div class="flex align-items-start">
-                <i class="pi pi-exclamation-circle text-red-500 text-4xl mr-3 mt-1"></i>
-                <div>
-                    <h5 class="mt-0 mb-2">Query Execution Failed</h5>
-                    <p class="text-600 m-0">{{queryError}}</p>
-                </div>
-            </div>
-            <ng-template pTemplate="footer">
-                <button pButton pRipple label="OK" icon="pi pi-check" class="p-button-primary" (click)="showInvalidQueryDialog=false"></button>
-            </ng-template>
-        </p-dialog>
-
-        <p-dialog header="Query Help" [(visible)]="helpDialogVisible" [modal]="true" [style]="{width: '700px'}"
-                  [draggable]="true" [resizable]="false">
-            <div class="query-help-content">
-                <h4>Query Basics</h4>
-                <p>Wintap queries use Esper EPL (Event Processing Language) syntax to filter and analyze events.</p>
-
-                <h4>Simple Query Pattern</h4>
-                <pre>
+        <h4>Simple Query Pattern</h4>
+        <pre>
 SELECT * FROM WintapMessage
 WHERE MessageType = "PROCESS"
 AND ActivityType = "Start"</pre>
 
-                <h4>Common Fields</h4>
-                <ul>
-                    <li><strong>MessageType</strong>: The type of event (PROCESS, FILE, etc.)</li>
-                    <li><strong>ActivityType</strong>: The action being performed (Start, Stop, Read, etc.)</li>
-                    <li><strong>PID</strong>: Process ID</li>
-                    <li><strong>ProcessName</strong>: Name of the process</li>
-                    <li><strong>EventTime</strong>: When the event occurred</li>
-                </ul>
-            </div>
-            <ng-template pTemplate="footer">
-                <button pButton pRipple label="Close" icon="pi pi-check" class="p-button-text" (click)="helpDialogVisible=false"></button>
-            </ng-template>
-        </p-dialog>
+        <h4>Common Fields</h4>
+        <ul>
+            <li><strong>MessageType</strong>: The type of event (PROCESS, FILE, etc.)</li>
+            <li><strong>ActivityType</strong>: The action being performed (Start, Stop, Read, etc.)</li>
+            <li><strong>PID</strong>: Process ID</li>
+            <li><strong>ProcessName</strong>: Name of the process</li>
+            <li><strong>EventTime</strong>: When the event occurred</li>
+        </ul>
+    </div>
+    <ng-template pTemplate="footer">
+        <button pButton pRipple label="Close" icon="pi pi-check" class="p-button-text" (click)="helpDialogVisible=false"></button>
+    </ng-template>
+</p-dialog>
 
-        <p-toast position="top-right"></p-toast>
+<p-toast position="top-right"></p-toast>

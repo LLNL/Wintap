@@ -75,21 +75,41 @@ namespace gov.llnl.wintap.core.api
             {
                 q = EventChannel.ManageWorkbenchQuery(q);
 
-                // Get the deployment safely 
-                try
+                // if query is ACTIVE, attach listeners
+                if(q.State == EsperQuery.EsperState.ACTIVE)
+                {
+                    try
+                    {
+                        EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
+                        if (esperDeployment != null)
+                        {
+                            esperDeployment.Statements[0].Events += ActiveQuery_Events;
+                        }
+                        else
+                        {
+                            // need to getAllDeployments and find the match by name, workaround here to just recreate it
+
+                        }
+                    }
+                    catch (Exception deploymentEx)
+                    {
+                        // Log the error but don't treat it as a fatal error
+                        WintapLogger.Log.Append($"Note: Could not attach to deployment: {deploymentEx.Message}", LogLevel.Debug);
+
+                        // Only throw if it's an actual critical error, not just a first-time deployment
+                        if (!deploymentEx.Message.Contains("No deployment found for deploymentId"))
+                        {
+                            throw;
+                        }
+                    }
+                }
+                else
                 {
                     EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
-                    esperDeployment.Statements[0].Events += ActiveQuery_Events;
-                }
-                catch (Exception deploymentEx)
-                {
-                    // Log the error but don't treat it as a fatal error
-                    WintapLogger.Log.Append($"Note: Could not attach to deployment: {deploymentEx.Message}", LogLevel.Debug);
-
-                    // Only throw if it's an actual critical error, not just a first-time deployment
-                    if (!deploymentEx.Message.Contains("No deployment found for deploymentId"))
+                    if (esperDeployment != null)
                     {
-                        throw;
+                        esperDeployment.Statements[0].Events -= ActiveQuery_Events;
+                        EventChannel.EsperRuntime.DeploymentService.Undeploy(esperDeployment.DeploymentId);
                     }
                 }
             }
@@ -101,7 +121,7 @@ namespace gov.llnl.wintap.core.api
 
             IActionResult result = Ok(new
             {
-                response = responseMsg
+                response = q
             });
             if (error)
             {
@@ -119,7 +139,7 @@ namespace gov.llnl.wintap.core.api
         public IActionResult GetAllStatements()
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
-            List<EsperQuery> allStatements = EventChannel.getWorkbenchState();
+            List<EsperQuery> allStatements = EventChannel.getWorkbenchState().Values.ToList();
             IActionResult result = Ok(new
             {
                 response = allStatements
@@ -141,8 +161,8 @@ namespace gov.llnl.wintap.core.api
             string responseMsg = "OK";
             try
             {
-                var statement = EventChannel.getWorkbenchState().Where(s => s.Name ==  name).FirstOrDefault();
-                responseMsg = statement.Query;
+                var statement = EventChannel.getWorkbenchState().Where(s => s.Key ==  name).FirstOrDefault();
+                responseMsg = statement.Value.Query;
             }
             catch (Exception ex)
             {
@@ -167,6 +187,7 @@ namespace gov.llnl.wintap.core.api
         /// </summary>
         /// <returns></returns>
         [HttpDelete]
+        [Route("api/Streams")]
         public IActionResult Delete()
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
@@ -174,12 +195,21 @@ namespace gov.llnl.wintap.core.api
             string responseMsg = "OK";
             try
             {
-                foreach (EsperQuery esperQuery in EventChannel.getWorkbenchState())
+                foreach (EsperQuery esperQuery in EventChannel.getWorkbenchState().Values)
                 {
-                    esperQuery.State = EsperQuery.EsperState.DELETED;
-                    EventChannel.ManageWorkbenchQuery(esperQuery);
+                    try
+                    {
+                        esperQuery.State = EsperQuery.EsperState.DELETED;
+                        EventChannel.ManageWorkbenchQuery(esperQuery);
+                    }
+                    catch(Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Could not delete workbench query {esperQuery.Id} message: {ex.Message}", LogLevel.Warn);
+                    }
+
                 }
 
+                EventChannel.setWorkbenchState(new Dictionary<string, EsperQuery>());
             }
             catch (Exception ex)
             {

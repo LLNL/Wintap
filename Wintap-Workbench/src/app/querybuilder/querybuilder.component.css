@@ -29,3 +29,37 @@
     overflow: visible !important;
     min-height: 1.5rem;
   }
+
+/* Saved queries panel - fixed height with proper scrolling */
+.saved-queries-panel {
+    flex: 0 0 auto;
+    height: 200px;
+    min-height: 200px;
+    max-height: 200px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Ensure the table wrapper takes the right height */
+.saved-queries-table {
+    height: calc(100% - 56px); /* Subtract header height */
+    overflow: hidden;
+    position: relative;
+}
+
+/* Make sure the table inside takes full height */
+:host ::ng-deep .saved-queries-panel .p-datatable {
+    height: 100% !important;
+}
+
+:host ::ng-deep .saved-queries-panel .p-datatable-wrapper {
+    max-height: 144px !important; /* Fixed height: 200px panel - 56px header */
+    overflow-y: auto !important;
+}
+
+/* Ensure scrolling works properly */
+:host ::ng-deep .saved-queries-panel .p-datatable-scrollable-body {
+    max-height: 144px !important;
+    overflow-y: scroll !important;
+}

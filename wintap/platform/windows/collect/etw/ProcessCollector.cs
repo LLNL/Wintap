@@ -37,12 +37,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
             WintapLogger.Log.Append("Assembling boot trace process events.", LogLevel.Info);
             WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Info);
-            EPStatement etlToEsperPattern = EventChannel.compileDeploy(EventChannel.EsperRuntime,
+            EPStatement etlToEsperPattern = EventChannel.CompileDeploy(
                 $"SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name " +
                 $"FROM pattern[every PartA=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.PROCESS_PARTIAL.ToString()}' " +
                 $"AND  CAST(ActivityType, string)='{WintapMessage.ActivityTypeEnum.Rundown.ToString()}'" +
                 $") -> PartB=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.IMAGE_LOAD}' " +
-                "AND PID=PartA.PID) where timer:within(3 sec)]").Statements[0];
+                "AND PID=PartA.PID) where timer:within(3 sec)]", "ETWBootTrace").Statements[0];
+            
 
             WintapLogger.Log.Append("Building process tree.", LogLevel.Info);
             processTree = new ProcessTree();

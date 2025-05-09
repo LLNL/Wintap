@@ -208,8 +208,10 @@ WHERE MessageType = "Process"`);
         finalize(() => this.loading = false)
       )
       .subscribe(
-        response => {
-          this.eplListing = response.response;
+          response => {
+              console.log(JSON.stringify(response.response));
+              this.eplListing = response.response;
+              console.log("eplListing: " + JSON.stringify(this.eplListing));
         },
         error => {
           console.error('Error fetching EPL statements:', error);
@@ -249,20 +251,20 @@ WHERE MessageType = "Process"`);
     console.log('Query content:', editorContent);
     
     // Do NOT encode the query content
-    this.addStream(eplName, editorContent, "ACTIVE")
+    this.addStream(eplName, eplName, editorContent, "ACTIVE")
       .pipe(
         finalize(() => this.loading = false)
       )
       .subscribe(
         response => {
-          this.showToast('success', 'Query Activated', `Query "${eplName}" has been successfully activated`);
+          this.showToast('success', 'Query Activated', `Query "${eplName}" has been successfully activated, RESPONSE: "${JSON.stringify(response)}" `);
           this.fetchEplListing();
         },
         error => {
           console.error('Error activating query:', error);
           
           // Show detailed error information
-          const errorMsg = error.error?.Message || error.message || error.error || 'Unknown error occurred';
+          const errorMsg = error.error || error.message ||  'Unknown error occurred';
           console.log('Detailed error information:', error);
           
           this.queryError = errorMsg;
@@ -279,9 +281,9 @@ WHERE MessageType = "Process"`);
     }
 
     this.loading = true;
-    const encodedContent = encodeURIComponent(statement.query);
+    //const encodedContent = encodeURIComponent(statement.query);
     
-    this.addStream(statement.name, encodedContent, "START")
+    this.addStream(statement.id, statement.name, statement.query, "ACTIVE")
       .pipe(
         finalize(() => this.loading = false)
       )
@@ -292,7 +294,7 @@ WHERE MessageType = "Process"`);
         },
         error => {
           console.error('Error starting query:', error);
-          this.queryError = error.error.Message || 'Unknown error occurred';
+          this.queryError = error.error || 'Unknown error occurred';
           this.showInvalidQueryDialog = true;
         }
       );
@@ -308,7 +310,7 @@ WHERE MessageType = "Process"`);
     this.loading = true;
     const encodedContent = encodeURIComponent(statement.query);
     
-    this.addStream(statement.name, encodedContent, "STOP")
+    this.addStream(statement.id, statement.name, statement.query, "STOPPED")
       .pipe(
         finalize(() => this.loading = false)
       )
@@ -319,7 +321,7 @@ WHERE MessageType = "Process"`);
         },
         error => {
           console.error('Error stopping query:', error);
-          this.queryError = error.error.Message || 'Unknown error occurred';
+          this.queryError = error.error || 'Unknown error occurred';
           this.showInvalidQueryDialog = true;
         }
       );
@@ -361,7 +363,8 @@ WHERE MessageType = "Process"`);
   }
 
   // Delete a single EPL statement
-  deleteOneEpl(statement = this.selectedStatement) {
+    deleteOneEpl(statement = this.selectedStatement) {
+        console.log('deleteOneEpl called');
     if (!statement) {
       this.showToast('warn', 'No Query Selected', 'Please select a query to delete');
       return;
@@ -370,7 +373,7 @@ WHERE MessageType = "Process"`);
     this.loading = true;
     const encodedContent = encodeURIComponent(statement.query);
     
-    this.addStream(statement.name, encodedContent, "DELETE")
+    this.addStream(statement.id, statement.name, statement.query, "DELETED")
       .pipe(
         finalize(() => this.loading = false)
       )
@@ -382,7 +385,7 @@ WHERE MessageType = "Process"`);
         },
         error => {
           console.error('Error deleting query:', error);
-          this.queryError = error.error.Message || 'Unknown error occurred';
+          this.queryError = error.error || 'Unknown error occurred';
           this.showInvalidQueryDialog = true;
         }
       );
@@ -427,7 +430,7 @@ WHERE MessageType = "Process"`);
   }
 
   // Helper method to add a stream - rewritten to match the EsperQuery class definition
-  addStream(shortName: string, queryString: string, stateString: string) {
+  addStream(id: string, shortName: string, queryString: string, stateString: string) {
     console.log(`Adding/updating stream: ${shortName}, state: ${stateString}`);
     
     // Create body to match the EsperQuery class definition
@@ -435,7 +438,7 @@ WHERE MessageType = "Process"`);
     // And we should NOT URL-encode the query string
     const body = {
       Name: shortName,
-      Id: shortName, // Using Name as Id since they appear to be the same
+      Id: id,
       Query: queryString, // No encoding here - send the raw query string
       State: this.getEnumValueFromString(stateString)
     };
@@ -459,7 +462,7 @@ WHERE MessageType = "Process"`);
       case 'DELETED':
         return 2; // EsperState.DELETED = 2
       default:
-        return 0; // Default to ACTIVE
+        return 1; // Default to STOPPED
     }
   }
 
@@ -744,7 +747,8 @@ export interface ApiResponse {
 }
 
 export interface Statement {
-  name: string;
+    name: string;
+    id: string;
   query: string;
   statementType: string | null;
   state: string | null;

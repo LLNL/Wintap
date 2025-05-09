@@ -44,7 +44,7 @@ namespace gov.llnl.wintap.core.etl.extract
             initSensor();
             foreach (string query in queries)
             {
-                registerQuery(query);
+                registerQuery(query, Guid.NewGuid().ToString());
                 esperQueries.Add(query);
             };
         }
@@ -52,7 +52,7 @@ namespace gov.llnl.wintap.core.etl.extract
         protected Sensor(string query)
         {
             initSensor();
-            registerQuery(query);
+            registerQuery(query, Guid.NewGuid().ToString());
             esperQueries.Add(query);
         }
 
@@ -171,7 +171,7 @@ namespace gov.llnl.wintap.core.etl.extract
             regContext();
             foreach (string query in esperQueries)
             {
-                registerQuery(query);
+                registerQuery(query, Guid.NewGuid().ToString());
             }
 
             IsEnabled = true;
@@ -311,7 +311,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 using (StreamReader reader = new StreamReader(stream))
                 {
                     string esperQuery = reader.ReadToEnd();
-                    gov.llnl.wintap.core.infrastructure.EventChannel.compileDeploy(gov.llnl.wintap.core.infrastructure.EventChannel.EsperRuntime, esperQuery);
+                    gov.llnl.wintap.core.infrastructure.EventChannel.CompileDeploy(esperQuery, "esper_context");
                 }
             }
             catch (Exception ex)
@@ -320,12 +320,12 @@ namespace gov.llnl.wintap.core.etl.extract
             }
         }
 
-        private void registerQuery(string queryPath)
+        private void registerQuery(string queryPath, string queryName)
         {
             try
             {
                 string esperQuery = readQueryFromFile(queryPath);
-                EPStatement newStatement = gov.llnl.wintap.core.infrastructure.EventChannel.compileDeploy(gov.llnl.wintap.core.infrastructure.EventChannel.EsperRuntime, esperQuery).Statements[0];
+                EPStatement newStatement = gov.llnl.wintap.core.infrastructure.EventChannel.CompileDeploy(esperQuery, queryName).Statements[0];
                 newStatement.Events += ProcStatement_Events;
                 WintapLogger.Log.Append("EPL created and event handlers attached on " + GetType().Name, LogLevel.Debug);
             }

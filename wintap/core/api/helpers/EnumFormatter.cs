@@ -62,12 +62,22 @@ namespace gov.llnl.wintap.core.infrastructure.helpers
                     foreach (Match match in matches)
                     {
                         var typeString = match.Groups[1].Value;
-                        if (Enum.TryParse<WintapMessage.MessageTypeEnum>(typeString, true, out var enumValue))
+
+                        bool msgTypeSupported = false;
+                        foreach(var enumVal in Enum.GetValues(typeof(WintapMessage.MessageTypeEnum)))
                         {
-                            // Replace with enum value or CAST function
-                            var replacement = $"CAST(MessageType, string) = '{typeString}'";
-                            query = query.Replace(match.Value, replacement);
+                            if(typeString.ToUpper() == enumVal.ToString().ToUpper())
+                            {
+                                var replacement = $"CAST(MessageType, string) = '{typeString}'";
+                                query = query.Replace(match.Value, replacement);
+                                msgTypeSupported = true;
+                            }
                         }
+                        if(!msgTypeSupported)
+                        {
+                            throw new Exception($"Unsupported MessageType: {typeString}");
+                        }
+                       
                     }
                 }
 
