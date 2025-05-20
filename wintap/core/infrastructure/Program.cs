@@ -23,6 +23,7 @@ using Microsoft.SemanticKernel.Embeddings;
 using Microsoft.SemanticKernel.Connectors.Sqlite;
 using System.IO;
 using System.Linq;
+using DuckDB.NET.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -126,4 +127,6 @@ app.UseEndpoints(endpoints =>
     endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });
 
-app.Run();
+
+
+    app.Run();

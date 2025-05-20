@@ -1,0 +1,77 @@
+<div class="duck-db-container">
+    <div class="card">
+        <div class="duck-db-status" [class.available]="isAvailable" [class.unavailable]="!isAvailable">
+            <div class="status-content">
+                <i class="pi" [class.pi-check-circle]="isAvailable" [class.pi-exclamation-triangle]="!isAvailable"></i>
+                <span>DuckDB UI is {{ isAvailable ? 'available' : 'not available' }}</span>
+            </div>
+
+            <!-- Enhanced prominent launch button -->
+            <button pButton
+                    type="button"
+                    [disabled]="!isAvailable"
+                    label="Launch DuckDB UI"
+                    class="p-button-raised p-button-primary p-button-large launch-button"
+                    (click)="openDuckDb()">
+                <i class="pi pi-external-link mr-2"></i>
+            </button>
+        </div>
+
+        <!-- Main content -->
+        <div class="p-4">
+            <h5>Getting Started with DuckDB</h5>
+
+            <div class="quick-instructions">
+                <h6>What is DuckDB?</h6>
+                <p>DuckDB is an in-process database management system that allows you to analyze and query stored Wintap data.</p>
+
+                <h6>Accessing Wintap Data</h6>
+                <p>Wintap stores collected data in Parquet files at <code>C:\ProgramData\Wintap\parquet</code>, organized by event type:</p>
+
+                <ul>
+                    <li><code>\process_sensor\</code> - Process creation events</li>
+                    <li><code>\tcpconnection_sensor\</code> - TCP network activity</li>
+                    <li><code>\udppacket_sensor\</code> - TCP network activity</li>
+                    <li><code>\file_sensor\</code> - File system operations</li>
+                    <li><code>\registry_sensor\</code> - Registry operations</li>
+                    <li><code>\imageload_sensor\</code> - Module/DLL load events</li>
+                </ul>
+
+                <h6>Example Query</h6>
+                <div class="example-query">
+                    <div class="code-header">
+                        <span>Process Events Query</span>
+                    </div>
+                    <pre><code>-- Load process events from parquet files
+CREATE OR REPLACE VIEW process_events AS
+  SELECT * FROM read_parquet('C:\\ProgramData\\Wintap\\parquet\\process_sensor\\*.parquet');
+  
+-- Query the view
+SELECT 
+  EventTime, 
+  ProcessName, 
+  PID, 
+  CommandLine
+FROM process_events
+ORDER BY EventTime DESC
+LIMIT 100;</code></pre>
+                </div>
+
+                <!-- Additional prominent launch button at the bottom -->
+                <div class="action-container mt-4">
+                    <button pButton
+                            type="button"
+                            [disabled]="!isAvailable"
+                            label="Launch DuckDB UI"
+                            class="p-button-raised p-button-primary launch-button-large"
+                            (click)="openDuckDb()">
+                        <i class="pi pi-external-link mr-2"></i>
+                    </button>
+                    <div class="button-hint" *ngIf="isAvailable">
+                        Click to open the DuckDB interface in a new window
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

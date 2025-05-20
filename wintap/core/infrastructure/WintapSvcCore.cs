@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Hosting;
+using DuckDB.NET.Data;
 
 namespace gov.llnl.wintap
 {
@@ -122,6 +123,23 @@ namespace gov.llnl.wintap
                     WintapLogger.Log.Append("Starting Workbench", core.infrastructure.LogLevel.Info);
                     startWorkbench(args);
                 }
+
+                WintapLogger.Log.Append("Starting DuckDB UI server", core.infrastructure.LogLevel.Info);
+                try
+                {
+                    var duckDBConnection = new DuckDBConnection("Data Source=:memory:");
+                    duckDBConnection.Open();
+                    var command = duckDBConnection.CreateCommand();
+                    command.CommandText = "CALL start_ui_server()";
+                    WintapLogger.Log.Append("Duck db command: " + command.CommandText, core.infrastructure.LogLevel.Info);
+                    var executeNonQuery = command.ExecuteNonQuery();
+                    WintapLogger.Log.Append("DuckDB UI server started", core.infrastructure.LogLevel.Info);
+                }
+                catch(Exception ex)
+                {
+                    WintapLogger.Log.Append($"Could not start DuckDB UI: {ex.Message}", core.infrastructure.LogLevel.Error);
+                }
+               
 
                 // Allow plugins to initialize
                 Thread.Sleep(5000);

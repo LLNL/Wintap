@@ -6,6 +6,7 @@ import { QuerybuilderComponent } from './querybuilder/querybuilder.component';
 import { TreeviewComponent } from './treeview/treeview.component';
 import { EtwExplorerComponent } from './etw-explorer/etw-explorer.component';
 import { ChatComponent } from './chat/chat.component';
+import { DuckDbComponent } from './duck-db/duck-db.component';
 
 @NgModule({
     imports: [
@@ -17,6 +18,7 @@ import { ChatComponent } from './chat/chat.component';
                     { path: 'querybuilder', component: QuerybuilderComponent },
                     { path: 'treeview', component: TreeviewComponent },
                     { path: 'etwexplorer', component: EtwExplorerComponent },
+                    { path: 'duckdb', component: DuckDbComponent },
                     { path: 'chat', component: ChatComponent },
                     { path: 'documentation', loadChildren: () => import('./documentation/documentation.module').then(m => m.DocumentationModule) },
                 ]
