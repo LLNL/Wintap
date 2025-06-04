@@ -92,9 +92,23 @@ namespace gov.llnl.wintap.core.etl.shared
 
         internal static ETLConfig GetETLConfig()
         {
-            string assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            string etlConfig = Path.Combine(assemblyDirectory, "ETLConfig.json");
-            return JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(etlConfig));
+            ETLConfig config = new ETLConfig();
+            config.LogLevel = "Normal";
+            config.SensorProfile = "Quality";
+            config.WriteToParquet = true;
+            config.SerializationIntervalSec = 60;
+            config.UploadIntervalSec = 300;
+            try
+            {
+                string assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                string etlConfig = Path.Combine(assemblyDirectory, "ETLConfig.json");
+                return JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(etlConfig));
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append("Could not read ETLConfig from disk, using default values", LogLevel.Warn);
+            }
+            return config;
         }
 
         internal static List<NIC> GetActiveNICs()

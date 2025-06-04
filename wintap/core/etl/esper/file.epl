@@ -11,6 +11,7 @@
   count(*) as eventCount,
   'File' as MessageType,
   AgentId
-from WintapMessage(messageType='File' AND (ActivityType='WRITE' OR ActivityType='READ')).win:time_batch(10 sec) as msg
+from WintapMessage(CAST(messageType, string) = 'FILE' AND 
+                   (CAST(ActivityType, string) = 'Write' OR CAST(ActivityType, string) = 'Read')).win:time_batch(10 sec) as msg
 group by fileActivity.path, PidHash, PID, activityType, ProcessName
 having count(*) > 0

@@ -92,27 +92,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         }
 
-        internal static bool CheckCacheForIP(string ip)
-        {
-            bool result = false;
-            try
-            {
-                //create a management scope object
-                ManagementScope scope = new ManagementScope("\\\\.\\ROOT\\StandardCimv2");
-                string strQuery = "SELECT Entry FROM MSFT_DNSClientCache where Type = 1 and Section = 1 and Data = '" + ip + "'";
-                //create object query
-                ObjectQuery query = new ObjectQuery(strQuery);
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                ManagementObjectCollection records = searcher.Get();
-                result = records.Count > 0;
-                searcher.Dispose();
-                records.Dispose();
-            }
-            catch (Exception ex) { }
-
-            return result;
-        }
-
         void Kernel_TcpIp_TypeGroup2_Handler(TcpIpConnectTraceData obj)
         {
             try
@@ -188,10 +167,39 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
 
+        internal static bool CheckCacheForIP(string ip)
+        {
+            bool result = false;
+            try
+            {
+                //create a management scope object
+                ManagementScope scope = new ManagementScope("\\\\.\\ROOT\\StandardCimv2");
+                string strQuery = "SELECT Entry FROM MSFT_DNSClientCache where Type = 1 and Section = 1 and Data = '" + ip + "'";
+                //create object query
+                ObjectQuery query = new ObjectQuery(strQuery);
+                ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+                ManagementObjectCollection records = searcher.Get();
+                result = records.Count > 0;
+                searcher.Dispose();
+                records.Dispose();
+            }
+            catch (Exception ex) { }
+
+            return result;
+        }
+
         private WintapMessage getWintapTCPBuilder(dynamic etwObj, string msgType)
         {
             WintapMessage wintapBuilder = new WintapMessage(etwObj.TimeStamp, etwObj.ProcessID, WintapMessage.MessageTypeEnum.TCP_CONNECTION);
-            wintapBuilder.ActivityType = etwObj.EventName;
+
+            // Remove the forward slash and convert to enum
+            string activityTypeString = etwObj.EventName.Replace("/", "");
+            wintapBuilder.ActivityType = (WintapMessage.ActivityTypeEnum)Enum.Parse(
+                typeof(WintapMessage.ActivityTypeEnum),
+                activityTypeString,
+                true  // Case-insensitive parsing
+            );
+
             return wintapBuilder;
         }
 
