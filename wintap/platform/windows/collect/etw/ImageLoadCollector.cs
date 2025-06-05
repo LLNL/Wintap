@@ -34,8 +34,35 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             base.Start();
             KernelParser.Instance.EtwParser.ImageLoad += Kernel_ImageLoad;
-            KernelParser.Instance.EtwParser.ImageUnload += Kernel_ImageLoad;
+            KernelParser.Instance.EtwParser.ImageUnload += Kernel_ImageUnload;
             return true;
+        }
+
+        private void Kernel_ImageUnload(ImageLoadTraceData obj)
+        {
+            try
+            {
+                base.Process_Event(obj);
+                WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.IMAGE_LOAD);
+                wintapBuilder.ImageLoad = new WintapMessage.ImageLoadObject();
+                wintapBuilder.ActivityType = WintapMessage.ActivityTypeEnum.Unload;
+                wintapBuilder.ImageLoad.BuildTime = obj.BuildTime.ToFileTimeUtc();
+                wintapBuilder.ImageLoad.FileName = obj.FileName.ToLower();
+                wintapBuilder.ImageLoad.ImageChecksum = obj.ImageChecksum;
+                wintapBuilder.ImageLoad.ImageSize = obj.ImageSize;
+                wintapBuilder.ImageLoad.DefaultBase = obj.DefaultBase.ToString();
+                wintapBuilder.ImageLoad.ImageBase = obj.ImageBase.ToString();
+                WintapMessage.ImageLoadObject cachedImageLoad = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault();
+                if (cachedImageLoad != null)
+                {
+                    wintapBuilder.ImageLoad.MD5 = cachedImageLoad.MD5;
+                }
+                EventChannel.Send(wintapBuilder);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error processing ImageLoad event from ETW: " + ex.Message, LogLevel.Debug);
+            }
         }
 
         public override void Process_Event(TraceEvent obj)

@@ -19,7 +19,7 @@ using static gov.llnl.wintap.collect.models.WintapMessage;
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
 
-    internal class MemoryMapCollector : EtwProviderCollector
+    internal class MEMORY_MAPCollector : EtwProviderCollector
     {
         Dictionary<string, CommitInfo> commitHistory;
         private Stopwatch refreshTimer;
@@ -89,7 +89,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         }
 
 
-        public MemoryMapCollector() : base()
+        public MEMORY_MAPCollector() : base()
         {
             CollectorName = "Microsoft-Windows-Kernel-Memory";
             EtwProviderId = "D1D93EF7-E1F2-4F45-9943-03D245FE6C00";
@@ -106,8 +106,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             bool status = true;
             scanInProgress = false;
 
-            string sql = "select * from WintapMessage where MessageType='Process' AND ActivityType='start'";
-            var epQuery = EventChannel.CompileDeploy(sql, "MemoryMapCollector").Statements[0];
+            string sql = "select * from WintapMessage where CAST(MessageType, string)='PROCESS' AND CAST(ActivityType, string)='Start'";
+            var epQuery = EventChannel.CompileDeploy(sql, "MEMORY_MAPCollector").Statements[0];
             epQuery.Events += EpQuery_Events;
 
             WintapLogger.Log.Append(CollectorName + " started", LogLevel.Info);
@@ -209,7 +209,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         // do we have an existing commit history for this process?
                         if (commitHistory.Count(ch => ch.Key == pidHash) > 0)
                         {
-                            // yes, so look for changes and trigger MemoryMap snapshot refresh
+                            // yes, so look for changes and trigger MEMORY_MAP snapshot refresh
                             ulong lastProcessPageCount = Convert.ToUInt64(commitHistory.Where(c => c.Key == pidHash).FirstOrDefault().Value.WorkingSetPageCount);
                             ulong currentProcessPageCount = Convert.ToUInt64(currentInfo.WorkingSetPageCount);
 
@@ -267,14 +267,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     wm.ProcessName = _owningProcess.ProcessName;
                     //wm.ActivityType = ((StateEnum)memInfo.State);
                     wm.ActivityType = ((ActivityTypeEnum)memInfo.State);
-                    wm.MemoryMap = new MemoryMapData();
-                    wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
-                    wm.MemoryMap.PageProtect = ((WintapMessage.PageProtectEnum)memInfo.AllocationProtect);
-                    wm.MemoryMap.PageType = ((WintapMessage.PageTypeEnum)memInfo.Type);
-                    wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
-                    wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
-                    wm.MemoryMap.PageProtect = ((PageProtectEnum)memInfo.Protect);
-                    wm.MemoryMap.MZHeaderPresent = false;
+                    wm.MEMORY_MAP = new MemoryMapData();
+                    wm.MEMORY_MAP.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
+                    wm.MEMORY_MAP.PageProtect = ((WintapMessage.PageProtectEnum)memInfo.AllocationProtect);
+                    wm.MEMORY_MAP.PageType = ((WintapMessage.PageTypeEnum)memInfo.Type);
+                    wm.MEMORY_MAP.BaseAddress = memInfo.BaseAddress.ToString("X");
+                    wm.MEMORY_MAP.RegionSize = memInfo.RegionSize.ToInt64();
+                    wm.MEMORY_MAP.PageProtect = ((PageProtectEnum)memInfo.Protect);
+                    wm.MEMORY_MAP.MZHeaderPresent = false;
 
                     if ((PageTypeEnum)memInfo.Type == PageTypeEnum.MEM_IMAGE)
                     {
@@ -282,7 +282,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         uint size = GetModuleFileNameEx(process.Handle, memInfo.BaseAddress, path, 1024);
                         if (size > 0)
                         {
-                            wm.MemoryMap.Description = path.ToString();
+                            wm.MEMORY_MAP.Description = path.ToString();
                         }
                     }
 
@@ -293,7 +293,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     {
                         if (buffer[0] == 'M' && buffer[1] == 'Z')
                         {
-                            wm.MemoryMap.MZHeaderPresent = true;
+                            wm.MEMORY_MAP.MZHeaderPresent = true;
                         }
                     }
 

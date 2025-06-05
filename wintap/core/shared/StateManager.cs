@@ -143,7 +143,7 @@ namespace gov.llnl.wintap.core.shared
                 settings["ImageLoad"] = Properties.Settings.Default.ImageLoadCollector;
                 settings["File"] = Properties.Settings.Default.FileCollector;
                 settings["Registry"] = Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector;
-                settings["MemoryMap"] = Properties.Settings.Default.MemoryMapCollector;
+                settings["MemoryMap"] = Properties.Settings.Default.MEMORY_MAPCollector;
                 settings["ApiCall"] = Properties.Settings.Default.KernelAPICallCollector;
                 settings["DeveloperMode"] = false;
                 if(Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
@@ -186,7 +186,7 @@ namespace gov.llnl.wintap.core.shared
                 }
                 if (kvp.Key == "MemoryMap")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.MemoryMapCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.MEMORY_MAPCollector), kvp.Value.ToString());
                 }
                 if (kvp.Key == "ApiCall")
                 {

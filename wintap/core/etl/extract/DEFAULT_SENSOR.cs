@@ -47,11 +47,11 @@ namespace gov.llnl.wintap.core.etl.extract
                     }
                 }
 
-                flatMsg.PidHash = wintapMessage.PidHash;
+                flatMsg.PidHash = sensorEvent["PidHash"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.PID = wintapMessage.PID;
-                flatMsg.MessageType = wintapMessage.MessageType;
-                flatMsg.ActivityType = wintapMessage.ActivityType;
+                flatMsg.MessageType = wintapMessage.MessageType.ToString();
+                flatMsg.ActivityType = wintapMessage.ActivityType.ToString();
                 flatMsg.EventTime = wintapMessage.EventTime;
                 flatMsg.ComputerName = Environment.MachineName;
                 flatMsg.AgentId = wintapMessage.AgentId;
@@ -67,7 +67,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("WARN creating default sensor data object for pid: " + sensorEvent["PID"] + " message type: " + sensorEvent["MessageType"] + ", exception: " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append("WARN creating default sensor data object for pid: " + sensorEvent["PID"] + " message type: " + sensorEvent["MessageType"] + ", exception: " + ex.Message, LogLevel.Debug);
             }
         }
     }

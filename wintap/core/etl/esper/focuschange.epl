@@ -1,1 +1,1 @@
-﻿SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = "FOCUS_CHANGE"
+﻿SELECT * FROM WintapMessage WHERE CAST(messageType, string) = "FOCUS_CHANGE"

@@ -1,17 +1,17 @@
 ﻿select istream
   "File" as protocol,
-  fileActivity.path as path,
-  sum(fileActivity.bytesRequested) as bytesRequested,
+  file.path as path,
+  sum(file.bytesRequested) as bytesRequested,
   PID,
   PidHash,
   ProcessName,
-  activityType,
-  min(receiveTime) as firstSeen,
-  max(receiveTime) as lastSeen,
+  CAST(activityType, string) as activityType,
+  min(eventTime) as firstSeen,
+  max(eventTime) as lastSeen,
   count(*) as eventCount,
   'File' as MessageType,
   AgentId
 from WintapMessage(CAST(messageType, string) = 'FILE' AND 
-                   (CAST(ActivityType, string) = 'Write' OR CAST(ActivityType, string) = 'Read')).win:time_batch(10 sec) as msg
-group by fileActivity.path, PidHash, PID, activityType, ProcessName
+                   (CAST(activityType, string) = 'Write' OR CAST(activityType, string) = 'Read')).win:time_batch(10 sec) as msg
+group by file.path, PidHash, PID, activityType, ProcessName
 having count(*) > 0
