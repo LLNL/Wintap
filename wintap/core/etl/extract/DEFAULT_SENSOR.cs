@@ -50,8 +50,12 @@ namespace gov.llnl.wintap.core.etl.extract
                 flatMsg.PidHash = sensorEvent["PidHash"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.PID = wintapMessage.PID;
+
+                // Parquet does not natively support .NET enum types
+                // converting enums to strings for Parquet compatibility
                 flatMsg.MessageType = wintapMessage.MessageType.ToString();
                 flatMsg.ActivityType = wintapMessage.ActivityType.ToString();
+
                 flatMsg.EventTime = wintapMessage.EventTime;
                 flatMsg.ComputerName = Environment.MachineName;
                 flatMsg.AgentId = wintapMessage.AgentId;

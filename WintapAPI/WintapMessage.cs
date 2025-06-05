@@ -469,6 +469,14 @@ namespace gov.llnl.wintap.collect.models
                 foreach (PropertyInfo propertyInfo in this.GetType().GetProperties())
                 {
                     var value = propertyInfo.GetValue(this, null);
+
+                    // Parquet does not natively support .NET enum types,
+                    // converting enums to strings for Parquet compatibility
+                    if (value != null && value.GetType().IsEnum)
+                    {
+                        value = value.ToString();
+                    }
+
                     expandoDic.Add(propertyInfo.Name, value);
                 }
                 return expando;
