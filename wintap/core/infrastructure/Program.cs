@@ -24,6 +24,7 @@ using Microsoft.SemanticKernel.Connectors.Sqlite;
 using System.IO;
 using System.Linq;
 using DuckDB.NET.Data;
+using System.ComponentModel;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -39,7 +40,7 @@ string DatabasePath = @"c:\program files\wintap7\embeddings.db";
 string CollectionName = "Wintap";
 string OllamaEndpoint = "http://localhost:11434";
 string EmbeddingModel = "mxbai-embed-large";
-string llm = "Wintap-llama-3b";
+string llm = "llama3.1:8b";
 
 #pragma warning disable SKEXP0070, SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020
 // Create a builder with both chat completion and embedding services
@@ -59,6 +60,19 @@ aiBuilder.AddOllamaTextEmbeddingGeneration(
 
 // Build the kernel with both services
 var kernel = aiBuilder.Build();
+
+try
+{
+    kernel.Plugins.AddFromType<TimePlugin>();
+}
+catch (Exception ex)
+{
+    int i = 0;
+}
+
+//kernel.ImportPluginFromFunctions("TimePlugin", new[] {
+//        kernel.CreateFunctionFromMethod(GetCurrentTime, "GetCurrentTime", "Retrieves the current time in UTC.")
+// });
 
 // Now you can get both services
 var chatService = kernel.GetRequiredService<IChatCompletionService>();
@@ -84,6 +98,10 @@ builder.Services.AddSingleton<IChatCompletionService>(provider =>
     return chatService;
 });
 
+builder.Services.AddSingleton<Kernel>(provider =>
+{
+    return kernel; 
+});
 
 
 builder.Services.AddSingleton<ChatHistory>(provider =>
@@ -130,3 +148,14 @@ app.UseEndpoints(endpoints =>
 
 
 app.Run();
+
+
+public class TimePlugin
+{
+    [KernelFunction]
+    [Description("Returns the current time")]
+    public string GetCurrentTime()
+    {
+        return DateTime.Now.ToShortTimeString();
+    }
+}

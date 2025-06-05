@@ -32,6 +32,9 @@ using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Http;
 using System.IO;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using System.Speech.Synthesis;
+using WinTAP.Properties;
+using System.ComponentModel;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -60,13 +63,15 @@ namespace gov.llnl.wintap.core.api
         private ISemanticTextMemory memory;
         private ChatHistory chat;
         private IChatCompletionService ai;
+        private Kernel kernel;
 
-        public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai)
+        public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai, Kernel _kernel)
         {
             this.hubContext = _hubContext;
             memory = _memory;
             chat = _chat;
             ai = _ai;
+            kernel = _kernel;
         }
 
         //[HttpGet]
@@ -86,13 +91,20 @@ namespace gov.llnl.wintap.core.api
             string collectionName = "Wintap";
             string question = promptModel.Prompt;
             StringBuilder builder = new StringBuilder();
-            double minRel = Settings.Default.MinRelevance;
-            minRel = 0.66;
+            //double minRel = Settings.Default.MinRelevance;
+            double minRel = 0.66;
 
 
             OpenAIPromptExecutionSettings openAIPromptExecutionSettings = new OpenAIPromptExecutionSettings();
-            openAIPromptExecutionSettings.Temperature = .9;
-            openAIPromptExecutionSettings.MaxTokens = 2000;
+            openAIPromptExecutionSettings.Temperature = .2;
+            openAIPromptExecutionSettings.MaxTokens = 20000;
+            openAIPromptExecutionSettings.ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions;
+            openAIPromptExecutionSettings.ToolCallBehavior = ToolCallBehavior.EnableKernelFunctions;
+            openAIPromptExecutionSettings.FunctionChoiceBehavior = FunctionChoiceBehavior.Auto();
+
+
+            var result = await kernel.InvokePromptAsync("what time is it?", new KernelArguments(openAIPromptExecutionSettings));
+            await this.hubContext.Clients.All.SendAsync("ReceiveMessage", result, "OK");
 
             try
             {
@@ -165,13 +177,21 @@ namespace gov.llnl.wintap.core.api
 
             StringBuilder completeResponse = new StringBuilder();
 
-            await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat, openAIPromptExecutionSettings))
-            {
-                completeResponse.Append(message.Content);
-                Inference inf = new Inference() { Prompt = question, Response = message.Content, TokensUsed = 0 };
-                string jsonString = JsonConvert.SerializeObject(inf);
-                await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
-            }
+            //await foreach (StreamingChatMessageContent message in ai.GetStreamingChatMessageContentsAsync(chat, openAIPromptExecutionSettings))
+            //{
+            //    try
+            //    {
+            //        completeResponse.Append(message.Content);
+            //        Inference inf = new Inference() { Prompt = question, Response = message.Content, TokensUsed = 0 };
+            //        string jsonString = JsonConvert.SerializeObject(inf);
+            //        await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
+            //    }
+            //    catch (Exception ex) 
+            //    {
+            //        int i = 0;
+            //    }
+                
+            //}
 
             // Add the complete response as a single message after streaming
             chat.AddAssistantMessage(completeResponse.ToString());
@@ -185,8 +205,8 @@ namespace gov.llnl.wintap.core.api
         {
             WintapLogger.Log.Append($"LLM Clear method called", LogLevel.Info);
             chat.RemoveRange(0, chat.Count);
-            string systemPrompt = Settings.Default.SystemPrompt;
-            chat = new ChatHistory(systemPrompt);
+            //string systemPrompt = Settings.Default.SystemPrompt;
+            //chat = new ChatHistory(systemPrompt);
         }
 
         [HttpPost("Upload")]
@@ -255,3 +275,5 @@ namespace gov.llnl.wintap.core.api
     }
 
 }
+
+
