@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -65,7 +65,7 @@ namespace gov.llnl.wintap.core.shared
         /// <summary>
         /// A list of physical disk drive number to logical drive letter mappings.  
         /// </summary>
-        public List<DiskVolume> DriveMap {get; set;}
+        public List<DiskVolume> DriveMap { get; set; }
 
         /// <summary>
         /// Last boot time as reported by WMI
@@ -116,7 +116,7 @@ namespace gov.llnl.wintap.core.shared
                     "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = 'SessionChange'", "StateManagerUserChangeNotify").Statements[0];
                 //TODO :  userChangeQuery.Events += UserChangeQuery_Events;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 WintapLogger.Log.Append($"StateManager encountered an error setting up user change notifications: {ex.Message}", LogLevel.Info);
             }
@@ -138,20 +138,20 @@ namespace gov.llnl.wintap.core.shared
             Dictionary<string, bool> settings = new Dictionary<string, bool>();
             try
             {
-                settings["Tcp"] = Properties.Settings.Default.TcpCollector;
-                settings["Udp"] = Properties.Settings.Default.UdpCollector;
-                settings["ImageLoad"] = Properties.Settings.Default.ImageLoadCollector;
-                settings["File"] = Properties.Settings.Default.FileCollector;
-                settings["Registry"] = Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector;
-                settings["MemoryMap"] = Properties.Settings.Default.MEMORY_MAPCollector;
-                settings["ApiCall"] = Properties.Settings.Default.KernelAPICallCollector;
+                settings["Tcp"] = Properties.Settings.Default.TcpSensor;
+                settings["Udp"] = Properties.Settings.Default.UdpSensor;
+                settings["ImageLoad"] = Properties.Settings.Default.ImageLoadSensor;
+                settings["File"] = Properties.Settings.Default.FileSensor;
+                settings["Registry"] = Properties.Settings.Default.RegistrySensor;
+                settings["MemoryMap"] = Properties.Settings.Default.MemoryMapSensor;
+                settings["ApiCall"] = Properties.Settings.Default.ApiCallSensor;
                 settings["DeveloperMode"] = false;
-                if(Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
+                if (Properties.Settings.Default.Profile.ToUpper() == "DEVELOPER")
                 {
                     settings["DeveloperMode"] = true;
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 WintapLogger.Log.Append($"StateManager: ERROR reading event provider enablement state, could not build collectorSettings object: {ex.Message}", LogLevel.Info);
             }
@@ -161,36 +161,36 @@ namespace gov.llnl.wintap.core.shared
         internal static void SetWintapSettings(Dictionary<string, bool> settings)
         {
             Dictionary<string, string> translatedSettings = new Dictionary<string, string>();
-            foreach(KeyValuePair<string, bool> kvp in settings)
+            foreach (KeyValuePair<string, bool> kvp in settings)
             {
 
                 if (kvp.Key == "Tcp")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.TcpCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.TcpSensor), kvp.Value.ToString());
                 }
                 if (kvp.Key == "Udp")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.UdpCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.UdpSensor), kvp.Value.ToString());
                 }
                 if (kvp.Key == "ImageLoad")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.ImageLoadCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.ImageLoadSensor), kvp.Value.ToString());
                 }
                 if (kvp.Key == "File")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.FileCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.FileSensor), kvp.Value.ToString());
                 }
                 if (kvp.Key == "Registry")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.RegistrySensor), kvp.Value.ToString());
                 }
                 if (kvp.Key == "MemoryMap")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.MEMORY_MAPCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.MemoryMapSensor), kvp.Value.ToString());
                 }
                 if (kvp.Key == "ApiCall")
                 {
-                    translatedSettings.Add(nameof(Properties.Settings.Default.KernelAPICallCollector), kvp.Value.ToString());
+                    translatedSettings.Add(nameof(Properties.Settings.Default.ApiCallSensor), kvp.Value.ToString());
                 }
                 if (kvp.Key == "EnableWorkbench")
                 {
@@ -200,7 +200,7 @@ namespace gov.llnl.wintap.core.shared
                 {
                     string settingName = "Profile";
                     string settingValue = "Production";
-                    if(kvp.Value == true)
+                    if (kvp.Value == true)
                     {
                         settingValue = "Developer";
                     }
@@ -258,7 +258,7 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex) { }
 
-            if(agentId == new Guid())
+            if (agentId == new Guid())
             {
                 WintapLogger.Log.Append("Generating new Agent Id for this sensor.", LogLevel.Info);
                 agentId = Guid.NewGuid();
@@ -349,7 +349,7 @@ namespace gov.llnl.wintap.core.shared
             {
                 WintapLogger.Log.Append("ERROR retrieving local IP address from .NET provider: " + ex.Message, LogLevel.Info);
             }
-            if(localIp == "NA")
+            if (localIp == "NA")
             {
                 localIp = getLocalIpAddressFromWMI();
             }

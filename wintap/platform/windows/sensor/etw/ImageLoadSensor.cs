@@ -1,0 +1,105 @@
+/*
+ * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+using Microsoft.Diagnostics.Tracing;
+using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+using System;
+using gov.llnl.wintap.collect.models;
+using gov.llnl.wintap.core.infrastructure;
+using System.Collections.Generic;
+using System.Linq;
+using gov.llnl.wintap.platform.windows.collect.shared;
+
+namespace gov.llnl.wintap.platform.windows.collect.etw
+{
+    /// <summary>
+    /// DLL loading events from the 'nt kernel logger'
+    /// </summary>
+    internal class ImageLoadSensor : EtwProviderCollector
+    {
+
+        private List<WintapMessage.ImageLoadObject> eventCache = new List<WintapMessage.ImageLoadObject>();
+
+        public ImageLoadSensor() : base()
+        {
+            SensorName = "ImageLoad";
+            EtwProviderId = "SystemTraceControlGuid";
+            KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.ImageLoad;
+        }
+
+        public override bool Start()
+        {
+            base.Start();
+            KernelParser.Instance.EtwParser.ImageLoad += Kernel_ImageLoad;
+            KernelParser.Instance.EtwParser.ImageUnload += Kernel_ImageUnload;
+            return true;
+        }
+
+        private void Kernel_ImageUnload(ImageLoadTraceData obj)
+        {
+            try
+            {
+                base.Process_Event(obj);
+                WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.ImageLoad);
+                wintapBuilder.ImageLoad = new WintapMessage.ImageLoadObject();
+                wintapBuilder.ActivityType = WintapMessage.ActivityTypeEnum.Unload;
+                wintapBuilder.ImageLoad.BuildTime = obj.BuildTime.ToFileTimeUtc();
+                wintapBuilder.ImageLoad.FileName = obj.FileName.ToLower();
+                wintapBuilder.ImageLoad.ImageChecksum = obj.ImageChecksum;
+                wintapBuilder.ImageLoad.ImageSize = obj.ImageSize;
+                wintapBuilder.ImageLoad.DefaultBase = obj.DefaultBase.ToString();
+                wintapBuilder.ImageLoad.ImageBase = obj.ImageBase.ToString();
+                WintapMessage.ImageLoadObject cachedImageLoad = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault();
+                if (cachedImageLoad != null)
+                {
+                    wintapBuilder.ImageLoad.MD5 = cachedImageLoad.MD5;
+                }
+                EventChannel.Send(wintapBuilder);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error processing ImageLoad event from ETW: " + ex.Message, LogLevel.Debug);
+            }
+        }
+
+        public override void Process_Event(TraceEvent obj)
+        {
+            // kernel event collectors have specialized event processing methods
+        }
+
+        public void Kernel_ImageLoad(ImageLoadTraceData obj)
+        {
+            try
+            {
+                base.Process_Event(obj);
+                WintapMessage wintapBuilder = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.ImageLoad);
+                wintapBuilder.ImageLoad = new WintapMessage.ImageLoadObject();
+                wintapBuilder.ActivityType = WintapMessage.ActivityTypeEnum.Load;
+                wintapBuilder.ImageLoad.BuildTime = obj.BuildTime.ToFileTimeUtc();
+                wintapBuilder.ImageLoad.FileName = obj.FileName.ToLower();
+                wintapBuilder.ImageLoad.ImageChecksum = obj.ImageChecksum;
+                wintapBuilder.ImageLoad.ImageSize = obj.ImageSize;
+                wintapBuilder.ImageLoad.DefaultBase = obj.DefaultBase.ToString();
+                wintapBuilder.ImageLoad.ImageBase = obj.ImageBase.ToString();
+                WintapMessage.ImageLoadObject cachedImageLoad = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault();
+                if (cachedImageLoad != null)
+                {
+                    wintapBuilder.ImageLoad.MD5 = cachedImageLoad.MD5;
+                }
+                else
+                {
+                    wintapBuilder.ImageLoad.MD5 = core.shared.Utilities.getMD5(obj.FileName);
+                    eventCache.Add(wintapBuilder.ImageLoad);
+                }
+                EventChannel.Send(wintapBuilder);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error processing ImageLoad event from ETW: " + ex.Message, LogLevel.Debug);
+            }
+        }
+    }
+}

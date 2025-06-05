@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -26,7 +26,7 @@ namespace gov.llnl.wintap.core.etl.load
         private BackgroundWorker uploaderThread;
         private bool svcRunning;
         private DirectoryInfo cacheDir;
-        private DirectoryInfo mergeDir;  
+        private DirectoryInfo mergeDir;
         private long bytesOnDisk;
         private int mergeHelperPid;
         private List<IUpload> uploaders;
@@ -49,7 +49,7 @@ namespace gov.llnl.wintap.core.etl.load
                 parquetDir.Create();
             }
             cacheDir = new DirectoryInfo(Strings.ParquetDataPath);
-            mergeDir = new DirectoryInfo(Path.Combine(cacheDir.FullName,"merged"));
+            mergeDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "merged"));
             bytesOnDisk = getCurrentCacheDirSize();
 
             WintapLogger.Log.Append("Loading data uploaders...", LogLevel.Info);
@@ -81,7 +81,7 @@ namespace gov.llnl.wintap.core.etl.load
 
         private void Uploader_UploadCompleted(object sender, string e)
         {
-            if(e.EndsWith("parquet"))
+            if (e.EndsWith("parquet"))
             {
                 try
                 {
@@ -89,7 +89,7 @@ namespace gov.llnl.wintap.core.etl.load
                     FileInfo fileInfo = new FileInfo(e);
                     fileInfo.Delete();
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
 
                 }
@@ -142,7 +142,7 @@ namespace gov.llnl.wintap.core.etl.load
                             {
                                 uploader.PreUpload(etlConfig.Adapters.Where(u => u.Name == uploader.Name).First().Properties);
                             }
-                            catch(Exception ex)
+                            catch (Exception ex)
                             {
                                 WintapLogger.Log.Append($"ERROR in preUpload for {uploader.Name}: {ex.Message}", LogLevel.Info);
                             }
@@ -166,7 +166,7 @@ namespace gov.llnl.wintap.core.etl.load
         private void upload()
         {
             WintapLogger.Log.Append("CacheManager upload method is starting. merge directory: " + mergeDir.FullName, LogLevel.Info);
-            
+
             foreach (FileInfo dataFile in mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories))
             {
                 if (dataFile.Length > 0)
@@ -244,8 +244,8 @@ namespace gov.llnl.wintap.core.etl.load
                 }
             }
 
-            if (genHost) { HOST_SENSOR.Instance.WriteHostRecord(); }
-            if (genMacIp) { HOST_SENSOR.Instance.WriteMacIPRecords(); }
+            if (genHost) { HostSerializer.Instance.WriteHostRecord(); }
+            if (genMacIp) { HostSerializer.Instance.WriteMacIPRecords(); }
         }
 
         /// Running external program to do the merging to avoid parquet schema stickiness  
@@ -287,18 +287,18 @@ namespace gov.llnl.wintap.core.etl.load
 
         private void cleanupUnmergedParquet(string path)
         {
-            if(path.EndsWith("merged")) { return; }
+            if (path.EndsWith("merged")) { return; }
             DirectoryInfo directoryInfo = new DirectoryInfo(path);
-            foreach(FileInfo file in directoryInfo.GetFiles())
+            foreach (FileInfo file in directoryInfo.GetFiles())
             {
                 try
                 {
-                    if(file.FullName.EndsWith("parquet"))
+                    if (file.FullName.EndsWith("parquet"))
                     {
                         file.Delete();
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     WintapLogger.Log.Append("ERROR deleting merged parquet: " + ex.Message, LogLevel.Debug);
                 }
@@ -349,7 +349,7 @@ namespace gov.llnl.wintap.core.etl.load
 
         private void clearCache()
         {
-            if(uploaders.Count > 0)
+            if (uploaders.Count > 0)
             {
                 foreach (FileInfo fi in cacheDir.GetFiles())
                 {

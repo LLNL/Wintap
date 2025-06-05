@@ -1,4 +1,4 @@
-﻿using SharpPcap;
+using SharpPcap;
 using SharpPcap.LibPcap;
 using PacketDotNet;
 using Antlr4.Runtime.Misc;
@@ -13,7 +13,7 @@ using gov.llnl.wintap.core.etl.shared;
 
 namespace gov.llnl.wintap.core.collect
 {
-    internal class SysdigCollector : BaseCollector
+    internal class SysdigCollector : BaseSensor
     {
         private FileInfo jsonInfo;
         private long currentEventNum;
@@ -37,9 +37,9 @@ namespace gov.llnl.wintap.core.collect
                 foreach (string jsonLine in jsonData)
                 {
                     SysdigEvent sysDigEvent = JsonConvert.DeserializeObject<SysdigEvent>(jsonLine);
-                    if(sysDigEvent.evt_num > currentEventNum)
+                    if (sysDigEvent.evt_num > currentEventNum)
                     {
-                        WintapMessage wintapMsg = new WintapMessage(gov.llnl.wintap.core.shared.Utilities.FromSysdigTime(sysDigEvent.evt_outputtime), sysDigEvent.thread_tid, WintapMessage.MessageTypeEnum.SYSDIG);
+                        WintapMessage wintapMsg = new WintapMessage(gov.llnl.wintap.core.shared.Utilities.FromSysdigTime(sysDigEvent.evt_outputtime), sysDigEvent.thread_tid, WintapMessage.MessageTypeEnum.Sysdig);
                         wintapMsg.Sysdig = new WintapMessage.SysdigEventData();
                         wintapMsg.Sysdig.evt_info = sysDigEvent.evt_info;
                         wintapMsg.Sysdig.evt_outputtime = sysDigEvent.evt_outputtime;

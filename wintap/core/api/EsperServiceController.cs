@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -19,7 +19,7 @@ namespace gov.llnl.wintap.core.api
     // meta data controller for the esper engine
     public class EsperServiceController : ControllerBase
     {
-        
+
         public EsperServiceController()
         {
 
@@ -44,11 +44,11 @@ namespace gov.llnl.wintap.core.api
                 runtime = EventChannel.Runtime,
                 wintapOK = parseWintapLog(),
                 collectorOK = parseCollectorLog()
-            }); 
+            });
             ;
         }
 
-        
+
         private bool parseWintapLog()
         {
             bool wintapLogOK = false;
@@ -56,7 +56,7 @@ namespace gov.llnl.wintap.core.api
             {
                 wintapLogOK = ReadTail(Path.Combine(Strings.FileDataRoot, "Logs", "Wintap.log"));
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
 
             }
@@ -64,8 +64,9 @@ namespace gov.llnl.wintap.core.api
             return wintapLogOK;
         }
 
-        private bool parseCollectorLog() { 
-        
+        private bool parseCollectorLog()
+        {
+
             bool collectorOK = false;
             try
             {
@@ -111,7 +112,7 @@ namespace gov.llnl.wintap.core.api
             string[] logLines = s.Split(new char[] { '\r' });
             foreach (string line in logLines)
             {
-                if(logName.ToUpper().Contains("WINTAPETL"))
+                if (logName.ToUpper().Contains("WINTAPETL"))
                 {
                     if (line.ToLower().Contains("error creating registry data object"))
                     {

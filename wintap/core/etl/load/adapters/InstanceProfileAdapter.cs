@@ -1,4 +1,4 @@
-﻿using Amazon.Runtime;
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using gov.llnl.wintap.core.etl.load.adapters.baseclass;
@@ -29,7 +29,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
         public bool PreUpload(Dictionary<string, string> parameters)
         {
             WintapLogger.Log.Append(" PreUpload method called", LogLevel.Info);
-            instanceProfileAWSCredentials = new InstanceProfileAWSCredentials();            
+            instanceProfileAWSCredentials = new InstanceProfileAWSCredentials();
             client = new AmazonS3Client(instanceProfileAWSCredentials, Amazon.RegionEndpoint.GetBySystemName(parameters["RegionEndpoint"]));
             this.startSessionStats();
             WintapLogger.Log.Append(" PreUpload method complete", LogLevel.Info);

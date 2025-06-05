@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System;
@@ -53,8 +53,8 @@ namespace gov.llnl.wintap.core.etl.load
                         var executeNonQuery = command.ExecuteNonQuery();
                         command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
                         executeNonQuery = command.ExecuteNonQuery();
-                        FileInfo tempFile = new FileInfo(Path.Combine(parquetDir,tempFileName + ".parquet"));
-                        FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir,mergeFileName + ".parquet"));
+                        FileInfo tempFile = new FileInfo(Path.Combine(parquetDir, tempFileName + ".parquet"));
+                        FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir, mergeFileName + ".parquet"));
                         tempFile.MoveTo(mergeFile.FullName);
                         // WintapRecorder support - todo:  not sure how I want to handle this just yet...
                         //if (RecordingSession.NowRecording(log))

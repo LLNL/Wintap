@@ -1,4 +1,4 @@
-﻿using com.espertech.esper.client;
+using com.espertech.esper.client;
 using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
@@ -482,7 +482,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             try
             {
-                var msg = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, WintapMessage.MessageTypeEnum.GENERIC_MESSAGE)
+                var msg = new WintapMessage(DateTime.UtcNow, e.GenericEvent.PID, WintapMessage.MessageTypeEnum.GenericMessage)
                 {
                     GenericMessage = e.GenericEvent,
                     ActivityType = WintapMessage.ActivityTypeEnum.Other
@@ -628,23 +628,23 @@ namespace gov.llnl.wintap.core.infrastructure
             var flagsStr = eventFlags.ToString();
 
             if (flagsStr.Contains("Process"))
-                Properties.Settings.Default.ProcessCollector = true;
+                Properties.Settings.Default.ProcessSensor = true;
             if (flagsStr.Contains("FileActivity"))
-                Properties.Settings.Default.FileCollector = true;
+                Properties.Settings.Default.FileSensor = true;
             if (flagsStr.Contains("RegistryActivity"))
-                Properties.Settings.Default.MicrosoftWindowsKernelRegistryCollector = true;
+                Properties.Settings.Default.RegistrySensor = true;
             if (flagsStr.Contains("UdpPacket"))
-                Properties.Settings.Default.UdpCollector = true;
+                Properties.Settings.Default.UdpSensor = true;
             if (flagsStr.Contains("TcpConnection"))
-                Properties.Settings.Default.TcpCollector = true;
+                Properties.Settings.Default.TcpSensor = true;
             if (flagsStr.Contains("SessionChange"))
-                Properties.Settings.Default.SensCollector = true;
+                Properties.Settings.Default.SensSensor = true;
             if (flagsStr.Contains("FocusChange"))
-                Properties.Settings.Default.MicrosoftWindowsWin32kCollector = true;
+                Properties.Settings.Default.UISensor = true;
             if (flagsStr.Contains("ImageLoad"))
-                Properties.Settings.Default.ImageLoadCollector = true;
+                Properties.Settings.Default.ImageLoadSensor = true;
             if (flagsStr.Contains("WaitCursor"))
-                Properties.Settings.Default.MicrosoftWindowsWin32kCollector = true;
+                Properties.Settings.Default.UISensor = true;
         }
 
         private void enableDynamicEtwProviders(List<string> etwProviders)

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2024, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -21,7 +21,7 @@ namespace gov.llnl.wintap.core.api
     {
         public async Task Send(string queryResult)
         {
-            StateManager.LastWorkbenchActivity = DateTime.Now;   
+            StateManager.LastWorkbenchActivity = DateTime.Now;
             await Clients.All.SendAsync("ReceiveMessage", queryResult);
         }
     }
@@ -50,7 +50,7 @@ namespace gov.llnl.wintap.core.api
                 {
                     Guid.Parse(p);  // skip all of the providers with no friendly names
                 }
-                catch(Exception ex) 
+                catch (Exception ex)
                 {
                     RegisteredProvider provider = new RegisteredProvider() { ProviderName = p };
                     providers.Add(provider);
@@ -77,7 +77,7 @@ namespace gov.llnl.wintap.core.api
             EtwUtility.ETW.EtwSampleEvent += EtwProvider_EtwSampleEvent;
             return Ok(new
             {
-                
+
             });
             ;
         }
@@ -105,7 +105,7 @@ namespace gov.llnl.wintap.core.api
             hubContext.Clients.All.SendAsync("ReceiveMessage", jsonString, "OK");
             StateManager.LastWorkbenchActivity = DateTime.Now;
         }
-       
+
     }
 
     public class RegisteredProvider

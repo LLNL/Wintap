@@ -1,4 +1,4 @@
-﻿using SharpPcap;
+using SharpPcap;
 using SharpPcap.LibPcap;
 using PacketDotNet;
 using Antlr4.Runtime.Misc;
@@ -15,7 +15,7 @@ namespace gov.llnl.wintap.core.collect
     {
         public int PacketIndex { get; }
         public string SourceHardwareAddress { get; }
-        public string DestinationHardwareAddress { get; } 
+        public string DestinationHardwareAddress { get; }
 
         public PcapEventArgs(int packetIndex)
         {
@@ -61,7 +61,7 @@ namespace gov.llnl.wintap.core.collect
             // Register our handler function to the 'packet arrival' event
             device.OnPacketArrival += new PacketArrivalEventHandler(device_OnPacketArrival);
 
-            WintapLogger.Log.Append("-- Capturing from '{0}', hit 'Ctrl-C' to exit...",LogLevel.Info);
+            WintapLogger.Log.Append("-- Capturing from '{0}', hit 'Ctrl-C' to exit...", LogLevel.Info);
 
             var startTime = DateTime.Now;
 
@@ -92,7 +92,7 @@ namespace gov.llnl.wintap.core.collect
             {
                 OnEmit(new PcapEventArgs(packetIndex));
             }
-            
+
         }
 
         protected virtual void OnEmit(PcapEventArgs e)

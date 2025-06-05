@@ -9,7 +9,51 @@ namespace gov.llnl.wintap.collect.models
     public class WintapMessage
     {
         public enum FailureCodeType { ERROR_INSUFFICIENT_RESOURCES, ERROR_TOO_MANY_ADDRESSES, ERROR_ADDRESS_EXISTS, ERROR_INVALID_ADDRESS, ERROR_OTHER, ERROR_TIMEWAIT_ADDRESS_EXIST };
-        public enum MessageTypeEnum { PROCESS, PROCESS_PARTIAL, TCP_CONNECTION, UDP_PACKET, FILE, REGISTRY, IMAGE_LOAD, FOCUS_CHANGE, SESSION_CHANGE, WAIT_CURSOR, WMI, THREAD, GENERIC_MESSAGE, MICROSOFT_WINDOWS_CPU_TRIGGER, MICROSOFT_WINDOWS_GROUP_POLICY, MEMORY_MAP, KERNEL_API_CALL, EVENT_LOG_EVENT, SYSDIG, WINTAP_ALERT };
+        public enum MessageTypeEnum
+        {
+            // Core system events
+            Process,
+            ProcessPartial,
+            Thread,
+
+            // Network events
+            TcpConnection,
+            UdpPacket,
+
+            // File system events
+            File,
+
+            // Registry events
+            Registry,
+
+            // Module events
+            ImageLoad,
+
+            // UI/Session events
+            UI,
+            SessionChange,
+
+            // API and system calls
+            ApiCall,
+            WMI,
+
+            // Monitoring and performance
+            CpuTrigger,      // Was MICROSOFT_WINDOWS_CPU_TRIGGER
+            MemoryMap,
+
+            // Configuration
+            GroupPolicy,     // Was MICROSOFT_WINDOWS_GROUP_POLICY
+
+            // Logging
+            EventLogEvent,
+            GenericMessage,
+
+            // Alerts and notifications
+            WintapAlert,
+
+            // Platform-specific (Linux)
+            Sysdig
+        }
         public enum ActivityTypeEnum { Start, Stop, Refresh, Rundown, Load, Unload, PsSetLoadImageNotifyRoutine, TerminateProcess, CreateSymbolicLink, SetThreadContext, OpenProcess, OpenThread, Read, Write, Open, Close, Delete, DeleteValue, CreateKey, DeleteKey, EventWritten, HighCpuUsage, TcpIpAccept, TcpIpRecv, TcpIpTCPCopy, TcpIpReconnect, TcpIpRetransmit, TcpIpDisconnect, TcpIpARPCopy, TcpIpDupACK, TcpIpFullACK, TcpIpPartACK, TcpIpConnect, TcpIpSend, TcpIpFail, UdpIpFail, UdpIpSend, UdpIpRecv, Other }; 
         public enum DirectionEnum { INBOUND, OUTBOUND };
         public enum StateEnum { ESTABLISHED, SYN_SENT, SYN_RECEIVED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSED, CLOSE_WAIT, LAST_ACK, LISTEN, CLOSING };
@@ -80,17 +124,16 @@ namespace gov.llnl.wintap.collect.models
         public ImageLoadObject ImageLoad { get; set; }
         public FileActivityObject File { get; set; }
         public RegActivityObject Registry { get; set; }
-        public FocusChangeObject FocusChange { get; set; }
         public SessionChangeObject SessionChange { get; set; }
-        public WaitCursorData WaitCursor { get; set; }
+        public UIData UI { get; set; }
         public GenericMessageObject GenericMessage { get; set; }
-        public WmiActivityObject Wmi { get; set; }
+        public WmiActivityObject WMI { get; set; }
         public ThreadStartObject Thread { get; set; }
         public EventlogEventObject EventLogEvent { get; set; }
-        public MicrosoftWindowsCpuTriggerData MicrosoftWindowsCpuTrigger { get; set; }
-        public MicrosoftWindowsGroupPolicyData MicrosoftWindowsGroupPolicy { get; set; }
-        public KernelApiCallData KernelApiCall { get; set; }
-        public MemoryMapData MEMORY_MAP { get; set; }
+        public MicrosoftWindowsCpuTriggerData CpuTrigger { get; set; }
+        public MicrosoftWindowsGroupPolicyData GroupPolicy { get; set; }
+        public ApiCallData ApiCall { get; set; }
+        public MemoryMapData MemoryMap { get; set; }
         public SysdigEventData Sysdig { get; set; }
         public WintapAlertData WintapAlert { get; set; }
 
@@ -185,8 +228,7 @@ namespace gov.llnl.wintap.collect.models
 
         public class FocusChangeObject : WintapBase
         {
-            public int OldProcessId { get; set; }
-            public int FocusChangeSessionId { get; set; }
+            
             public int PID { get; set; }
         }
 
@@ -197,11 +239,11 @@ namespace gov.llnl.wintap.collect.models
             public int PID { get; set; }
         }
 
-        public class WaitCursorData : WintapBase
+        public class UIData : WintapBase
         {
             public int SessionId { get; set; }
             public int DisplayTimeMS { get; set; }
-            public int PID { get; set; }
+            public int OldProcessId { get; set; }
         }
 
         public class GenericMessageObject : WintapBase
@@ -361,7 +403,7 @@ namespace gov.llnl.wintap.collect.models
             public string AlertDescription { get; set; }
         }
 
-        public class KernelApiCallData : WintapBase
+        public class ApiCallData : WintapBase
         {
             private string providerName;
             private int threadId;
@@ -373,7 +415,7 @@ namespace gov.llnl.wintap.collect.models
             private long? notifyRoutineAddress;
             private uint? targetThreatId;
 
-            public KernelApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId)
+            public ApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId)
             {
                 providerName = _providerName;
                 targetPid = _targetPid;
@@ -469,6 +511,14 @@ namespace gov.llnl.wintap.collect.models
                 foreach (PropertyInfo propertyInfo in this.GetType().GetProperties())
                 {
                     var value = propertyInfo.GetValue(this, null);
+
+                    // Parquet does not have native support for .NET enum types,
+                    // converting enums to strings when creating ExpandoObject for parquet compat
+                    if (value != null && value.GetType().IsEnum)
+                    {
+                        value = value.ToString();
+                    }
+
                     expandoDic.Add(propertyInfo.Name, value);
                 }
                 return expando;

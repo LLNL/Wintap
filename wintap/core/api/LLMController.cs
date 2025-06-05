@@ -1,4 +1,4 @@
-﻿
+
 #pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050;
 
 using System;

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -76,7 +76,7 @@ namespace gov.llnl.wintap.core.api
                 q = EventChannel.ManageWorkbenchQuery(q);
 
                 // if query is ACTIVE, attach listeners
-                if(q.State == EsperQuery.EsperState.ACTIVE)
+                if (q.State == EsperQuery.EsperState.ACTIVE)
                 {
                     try
                     {
@@ -161,7 +161,7 @@ namespace gov.llnl.wintap.core.api
             string responseMsg = "OK";
             try
             {
-                var statement = EventChannel.getWorkbenchState().Where(s => s.Key ==  name).FirstOrDefault();
+                var statement = EventChannel.getWorkbenchState().Where(s => s.Key == name).FirstOrDefault();
                 responseMsg = statement.Value.Query;
             }
             catch (Exception ex)
@@ -202,7 +202,7 @@ namespace gov.llnl.wintap.core.api
                         esperQuery.State = EsperQuery.EsperState.DELETED;
                         EventChannel.ManageWorkbenchQuery(esperQuery);
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         WintapLogger.Log.Append($"Could not delete workbench query {esperQuery.Id} message: {ex.Message}", LogLevel.Warn);
                     }
@@ -267,7 +267,7 @@ namespace gov.llnl.wintap.core.api
                         WintapLogger.Log.Append($"Error formatting property {prop}: {ex.Message}", LogLevel.Debug);
                     }
                 }
-                string resultRow = sb.ToString().TrimEnd( ',', ' ');
+                string resultRow = sb.ToString().TrimEnd(',', ' ');
                 EsperResult esperResult = new EsperResult();
                 esperResult.Result = resultRow;
                 hubContext.Clients.All.SendAsync("ReceiveMessage", esperResult, "OK");

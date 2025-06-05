@@ -1,4 +1,4 @@
-﻿using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition.Hosting;

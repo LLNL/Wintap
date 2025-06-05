@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -104,7 +104,7 @@ namespace gov.llnl.wintap.core.etl.shared
                 string etlConfig = Path.Combine(assemblyDirectory, "ETLConfig.json");
                 return JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(etlConfig));
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 WintapLogger.Log.Append("Could not read ETLConfig from disk, using default values", LogLevel.Warn);
             }

@@ -21,7 +21,7 @@ context Every10Seconds select istream
   count(*) as eventCount,
   'TcpConnection' as MessageType,
   AgentId
-from WintapMessage(CAST(messageType, string) = 'TCP_CONNECTION') as msg
+from WintapMessage(CAST(messageType, string) = 'TcpConnection') as msg
 group by tcpConnection.sourceAddress, tcpConnection.sourcePort, tcpConnection.destinationAddress, tcpConnection.destinationPort, PidHash, ProcessName, PID, CAST(activityType, string), AgentId
 having count(*) > 0
 output snapshot when terminated

@@ -1,4 +1,4 @@
-﻿//using gov.llnl.wintap.core.etl.load.adapters.baseclass;
+//using gov.llnl.wintap.core.etl.load.adapters.baseclass;
 //using gov.llnl.wintap.core.etl.load.interfaces;
 //using gov.llnl.wintap.core.infrastructure;
 //using System;
@@ -103,7 +103,7 @@
 
 //        private void UploadWaitWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
 //        {
-            
+
 //        }
 
 //        private void UploadWaitWorker_DoWork(object sender, DoWorkEventArgs e)

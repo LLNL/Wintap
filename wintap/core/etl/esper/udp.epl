@@ -17,7 +17,7 @@ context Every10Seconds select istream
   count(*) as eventCount,
   'UdpPacket' as MessageType,
   AgentId
-from WintapMessage(CAST(messageType, string) = 'UDP_PACKET') as msg
+from WintapMessage(CAST(messageType, string) = 'UdpPacket') as msg
 group by udpPacket.sourceAddress, udpPacket.sourcePort, udpPacket.destinationAddress, udpPacket.destinationPort, PidHash, PID, ProcessName, activityType, AgentId
 having count(*) > 0
 output snapshot when terminated

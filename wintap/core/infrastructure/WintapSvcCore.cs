@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.IO;
 using Microsoft.Win32;
@@ -135,11 +135,11 @@ namespace gov.llnl.wintap
                     var executeNonQuery = command.ExecuteNonQuery();
                     WintapLogger.Log.Append("DuckDB UI server started", core.infrastructure.LogLevel.Info);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     WintapLogger.Log.Append($"Could not start DuckDB UI: {ex.Message}", core.infrastructure.LogLevel.Error);
                 }
-               
+
 
                 // Allow plugins to initialize
                 Thread.Sleep(5000);

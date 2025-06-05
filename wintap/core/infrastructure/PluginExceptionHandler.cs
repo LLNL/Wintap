@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.collect.models;
@@ -111,7 +111,7 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 var pluginName = GetPluginNameFromStack(ex);
-                var msg = new WintapMessage(DateTime.UtcNow, Process.GetCurrentProcess().Id, WintapMessage.MessageTypeEnum.WINTAP_ALERT);
+                var msg = new WintapMessage(DateTime.UtcNow, Process.GetCurrentProcess().Id, WintapMessage.MessageTypeEnum.WintapAlert);
                 msg.WintapAlert = new WintapMessage.WintapAlertData
                 {
                     AlertName = WintapMessage.WintapAlertData.AlertNameEnum.OTHER,

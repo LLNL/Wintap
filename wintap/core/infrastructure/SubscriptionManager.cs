@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2016, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -17,19 +17,19 @@ namespace gov.llnl.wintap.core.infrastructure
     public class SubscriptionManager
     {
         private List<EtwProviderCollector> etwCollectors;
-        private List<BaseWinCollector> winCollectors;
+        private List<BaseWindowsSensor> winCollectors;
         private WindowsSubscriptionManager winSubMgr;
         private LinuxSubscriptionManager linuxSubMgr;
-        private List<BaseCollector> linuxCollectors;
+        private List<BaseSensor> linuxCollectors;
 
         internal SubscriptionManager()
         {
 
-            winCollectors = new List<BaseWinCollector>();
+            winCollectors = new List<BaseWindowsSensor>();
             etwCollectors = new List<EtwProviderCollector>();
             winSubMgr = new WindowsSubscriptionManager();
 
-            linuxCollectors = new List<BaseCollector>();
+            linuxCollectors = new List<BaseSensor>();
             linuxSubMgr = new LinuxSubscriptionManager();
         }
 
@@ -59,11 +59,11 @@ namespace gov.llnl.wintap.core.infrastructure
 
         internal void Stop()
         {
-            WintapLogger.Log.Append("Sensor shutting down. ", LogLevel.Info);
+            WintapLogger.Log.Append("Serializer shutting down. ", LogLevel.Info);
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                foreach (BaseWinCollector collector in winCollectors)
+                foreach (BaseWindowsSensor collector in winCollectors)
                 {
                     collector.Stop();
                 }
@@ -77,7 +77,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 // stop Mac collectors
             }
 
-            WintapLogger.Log.Append("Sensor shutdown", LogLevel.Info);
-        }     
+            WintapLogger.Log.Append("Serializer shutdown", LogLevel.Info);
+        }
     }
 }

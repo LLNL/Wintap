@@ -13,6 +13,6 @@
   count(*) as eventCount,
   'Registry' as MessageType,
   AgentId
-from WintapMessage(CAST(messageType, string) = 'REGISTRY').win:time_batch(10 sec) as msg
+from WintapMessage(CAST(messageType, string) = 'Registry').win:time_batch(10 sec) as msg
 group by registry.path, registry.dataType, registry.valueName, registry.data, PidHash, PID, activityType, ProcessName
 having count(*) > 0

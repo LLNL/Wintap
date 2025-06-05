@@ -1,2 +1,2 @@
 ﻿SELECT * FROM WintapMessage 
-WHERE CAST(messageType, string) NOT IN ('PROCESS','TCP_CONNECTION','UDP_PACKET','FILE','REGISTRY', 'FOCUS_CHANGE')
+WHERE CAST(messageType, string) NOT IN ('Process','TcpConnection','UdpPacket','File','Registry', 'UI')

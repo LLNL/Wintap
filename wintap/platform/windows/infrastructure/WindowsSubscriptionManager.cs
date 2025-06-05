@@ -1,4 +1,4 @@
-﻿using gov.llnl.wintap.core.collect;
+using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.platform.windows.collect.etw;
 using gov.llnl.wintap.platform.windows.collect.shared;
@@ -18,55 +18,55 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
         internal WindowsSubscriptionManager() { }
 
-        internal List<BaseWinCollector> Start()
+        internal List<BaseWindowsSensor> Start()
         {
 
-            List<BaseWinCollector> baseCollectors = new List<BaseWinCollector>();
+            List<BaseWindowsSensor> baseSensors = new List<BaseWindowsSensor>();
             // start process collector first for process attribution
-            WintapLogger.Log.Append("Starting Process collector", LogLevel.Info);
-            ProcessCollector pc = new ProcessCollector();
+            WintapLogger.Log.Append("Starting Process sensor", LogLevel.Info);
+            ProcessSensor pc = new ProcessSensor();
             pc.Start();
             kernelFlags = KernelTraceEventParser.Keywords.Process;
-            baseCollectors.Add(pc);
+            baseSensors.Add(pc);
 
             // start modelled collectors
             string nameSpace = "gov.llnl.wintap.platform.windows.collect.etw";
             foreach (SettingsProperty sp in Properties.Settings.Default.Properties)
             {
-                if (sp.Name.EndsWith("Collector") && Properties.Settings.Default[sp.Name].ToString() == "True")
+                if (sp.Name.EndsWith("Sensor") && Properties.Settings.Default[sp.Name].ToString() == "True")
                 {
                     System.Threading.Thread.Sleep(500);  // without this you will sometimes get an exception from TraceEventSession
-                    if (sp.Name == "ProcessCollector")
+                    if (sp.Name == "ProcessSensor")
                     {
                         continue;
                     }
-                    string collectorName = nameSpace + "." + sp.Name;
-                    WintapLogger.Log.Append("Attempting to load collector with name: " + collectorName, LogLevel.Info);
+                    string sensorName = nameSpace + "." + sp.Name;
+                    WintapLogger.Log.Append("Attempting to load collector with name: " + sensorName, LogLevel.Info);
                     try
                     {
-                        Type type = Type.GetType(collectorName);
+                        Type type = Type.GetType(sensorName);
                         object instance = Activator.CreateInstance(type, null);
                         MethodInfo method = type.GetMethod("Start");
                         if ((bool)method.Invoke(instance, null))
                         {
-                            baseCollectors.Add((BaseWinCollector)instance); // save the collectors so we can call thier Stop() methods on shutdown.
+                            baseSensors.Add((BaseWindowsSensor)instance); // save the collectors so we can call thier Stop() methods on shutdown.
                         }
                         try
                         {
                             // there can only be one kernel logger.  collectors that want to consume from NT Kernel Logger will declare this via kernel trace flags which we append to the global list.
-                            WintapLogger.Log.Append("Inspecting collector for Kernel trace flags: " + collectorName, LogLevel.Info);
+                            WintapLogger.Log.Append("Inspecting collector for Kernel trace flags: " + sensorName, LogLevel.Info);
                             PropertyInfo pi = type.GetProperty("KernelTraceEventFlags");
                             PropertyInfo pinfo = instance.GetType().GetProperty("KernelTraceEventFlags");
                             if (pinfo != null)  // only true for nt kernel logger collectors
                             {
                                 KernelTraceEventParser.Keywords newFlags = (KernelTraceEventParser.Keywords)pinfo.GetValue(instance, null);
                                 kernelFlags = kernelFlags | newFlags;
-                                WintapLogger.Log.Append("Found Kernel trace flags on " + collectorName + " flags: " + newFlags.ToString(), LogLevel.Info);
+                                WintapLogger.Log.Append("Found Kernel trace flags on " + sensorName + " flags: " + newFlags.ToString(), LogLevel.Info);
                             }
                         }
                         catch (Exception ex)
                         {
-                            WintapLogger.Log.Append("Error looking for Kernel trace flags on " + collectorName + ", error: " + ex.Message, LogLevel.Debug);
+                            WintapLogger.Log.Append("Error looking for Kernel trace flags on " + sensorName + ", error: " + ex.Message, LogLevel.Debug);
                         }
                     }
                     catch (Exception ex)
@@ -87,10 +87,10 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 string etwCollectorName = genericProvider;
                 WintapLogger.Log.Append("Found generic etw provider in config: " + etwCollectorName, LogLevel.Info);
                 System.Threading.Thread.Sleep(1000);
-                GenericCollector gc = new GenericCollector() { CollectorName = etwCollectorName, EtwProviderId = genericProvider };
+                GenericSensor gc = new GenericSensor() { SensorName = etwCollectorName, EtwProviderId = genericProvider };
                 if (gc.Start())
                 {
-                    baseCollectors.Add((BaseWinCollector)gc);
+                    baseSensors.Add((BaseWindowsSensor)gc);
                 }
             }
             WintapLogger.Log.Append("Done loading unmodelled collectors", LogLevel.Info);
@@ -102,7 +102,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             etwKernelModeListeningThread.DoWork += new DoWorkEventHandler(etwKernelModeListeningThread_DoWork);
             etwKernelModeListeningThread.RunWorkerAsync();
 
-            return baseCollectors;
+            return baseSensors;
         }
 
         internal void Stop()

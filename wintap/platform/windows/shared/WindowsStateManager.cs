@@ -1,4 +1,4 @@
-﻿using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using Microsoft.Win32;
 using System;

@@ -1,4 +1,4 @@
-﻿using gov.llnl.wintap.collect.models;
+using gov.llnl.wintap.collect.models;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 using System;
 using System.Text.RegularExpressions;
@@ -64,20 +64,20 @@ namespace gov.llnl.wintap.core.infrastructure.helpers
                         var typeString = match.Groups[1].Value;
 
                         bool msgTypeSupported = false;
-                        foreach(var enumVal in Enum.GetValues(typeof(WintapMessage.MessageTypeEnum)))
+                        foreach (var enumVal in Enum.GetValues(typeof(WintapMessage.MessageTypeEnum)))
                         {
-                            if(typeString.ToUpper() == enumVal.ToString().ToUpper())
+                            if (typeString.ToUpper() == enumVal.ToString().ToUpper())
                             {
                                 var replacement = $"CAST(MessageType, string) = '{typeString}'";
                                 query = query.Replace(match.Value, replacement);
                                 msgTypeSupported = true;
                             }
                         }
-                        if(!msgTypeSupported)
+                        if (!msgTypeSupported)
                         {
                             throw new Exception($"Unsupported MessageType: {typeString}");
                         }
-                       
+
                     }
                 }
 

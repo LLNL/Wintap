@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -35,7 +35,7 @@ builder.Services.AddControllers();
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
 // Match the configuration settings from the embedding generator app
-string DatabasePath =  @"c:\program files\wintap7\embeddings.db";
+string DatabasePath = @"c:\program files\wintap7\embeddings.db";
 string CollectionName = "Wintap";
 string OllamaEndpoint = "http://localhost:11434";
 string EmbeddingModel = "mxbai-embed-large";
@@ -89,7 +89,7 @@ builder.Services.AddSingleton<IChatCompletionService>(provider =>
 builder.Services.AddSingleton<ChatHistory>(provider =>
 {
     string systemPrompt = Settings.Default.SystemPrompt;
-   
+
     ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
     WintapLogger.Log.Append(systemPrompt, LogLevel.Info);
     return chat;
@@ -129,4 +129,4 @@ app.UseEndpoints(endpoints =>
 
 
 
-    app.Run();
+app.Run();

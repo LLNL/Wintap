@@ -45,7 +45,6 @@
   <ItemGroup>
     <Compile Remove="App_Start\**" />
     <Compile Remove="binary\**" />
-    <Compile Remove="platform\windows\collect\misc\**" />
     <Compile Remove="MergeHelper\**" />
     <Compile Remove="WintapAPI\**" />
     <Compile Remove="WintapETL\**" />
@@ -53,10 +52,8 @@
     <Compile Remove="WintapSvcMgr\**" />
     <Content Remove="App_Start\**" />
     <Content Remove="binary\**" />
-    <Content Remove="platform\windows\collect\misc\**" />
     <EmbeddedResource Remove="App_Start\**" />
     <EmbeddedResource Remove="binary\**" />
-    <EmbeddedResource Remove="platform\windows\collect\misc\**" />
     <EmbeddedResource Remove="MergeHelper\**" />
     <EmbeddedResource Remove="WintapAPI\**" />
     <EmbeddedResource Remove="WintapETL\**" />
@@ -64,7 +61,6 @@
     <EmbeddedResource Remove="WintapSvcMgr\**" />
     <None Remove="App_Start\**" />
     <None Remove="binary\**" />
-    <None Remove="platform\windows\collect\misc\**" />
     <None Remove="MergeHelper\**" />
     <None Remove="WintapAPI\**" />
     <None Remove="WintapETL\**" />
@@ -196,11 +192,10 @@
     <PackageReference Include="System.ServiceModel.Federation" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="platform\windows\collect\shared\BaseCollector - Copy.cs" />
-    <Compile Remove="platform\windows\collect\shared\EtwCollector - Copy.cs" />
     <Compile Remove="core\shared\SingleLogit.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Remove="C:\Users\frye3.THE-LAB\.nuget\packages\system.diagnostics.diagnosticsource\9.0.3\contentFiles\any\net8.0\ILLink\ILLink.Descriptors.LibraryBuild.xml" />
     <Content Remove="C:\Users\frye3\.nuget\packages\system.diagnostics.diagnosticsource\9.0.3\contentFiles\any\net8.0\ILLink\ILLink.Descriptors.LibraryBuild.xml" />
     <Content Remove="core\etl\ETLConfig.json" />
   </ItemGroup>

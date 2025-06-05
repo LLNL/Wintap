@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -77,7 +77,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private void setupSvcMgr()
         {
-            if(WintapProfile.Name == WintapProfile.ProfileEnum.Developer)
+            if (WintapProfile.Name == WintapProfile.ProfileEnum.Developer)
             {
                 ProcessStartInfo schTaskInfo = new ProcessStartInfo();
                 schTaskInfo.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\system32\\schtasks.exe";
@@ -161,7 +161,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private void sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum alertType, string description)
         {
             StateManager.DroppedEventsDetected = true;
-            WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, System.Diagnostics.Process.GetCurrentProcess().Id, WintapMessage.MessageTypeEnum.WINTAP_ALERT);
+            WintapMessage alertMsg = new WintapMessage(DateTime.UtcNow, System.Diagnostics.Process.GetCurrentProcess().Id, WintapMessage.MessageTypeEnum.WintapAlert);
             alertMsg.WintapAlert = new WintapMessage.WintapAlertData();
             alertMsg.WintapAlert.AlertName = alertType;
             alertMsg.WintapAlert.AlertDescription = description;
@@ -192,7 +192,7 @@ namespace gov.llnl.wintap.core.infrastructure
             WintapLogger.Log.Append(v, LogLevel.Info);
             EventLog appLog = new EventLog("Application", ".", "Wintap");
             appLog.WriteEntry(v, EventLogEntryType.Warning, eventID);
-           
+
         }
 
         //  monitor the runtime of a plugin's 'Run' method, restart Wintap if the plugin hangs
@@ -268,7 +268,7 @@ namespace gov.llnl.wintap.core.infrastructure
             MaxEventCount = 1000;
             SampleInterval = new TimeSpan(0, 0, 45);
             Name = ProfileEnum.Minimal;
-            if(Properties.Settings.Default.Profile.ToUpper() == "PRODUCTION")
+            if (Properties.Settings.Default.Profile.ToUpper() == "PRODUCTION")
             {
                 Name = ProfileEnum.Production;
                 MaxMem = 700000000;

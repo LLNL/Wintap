@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -48,7 +48,7 @@ namespace gov.llnl.wintap.core.etl.load
                 {
                     string fileName = "NA";
                     fileName = await Write(dataSet);
-                    if(fileName != "NA")
+                    if (fileName != "NA")
                     {
                         try
                         {
@@ -63,7 +63,7 @@ namespace gov.llnl.wintap.core.etl.load
                     }
                     else
                     {
-                        WintapLogger.Log.Append($"{dataSet.CollectorName}: Call to async WRITE returned no parquet data file.", LogLevel.Info );
+                        WintapLogger.Log.Append($"{dataSet.SensorName}: Call to async WRITE returned no parquet data file.", LogLevel.Info);
                     }
                 }
             }
@@ -103,7 +103,7 @@ namespace gov.llnl.wintap.core.etl.load
             }
             long timestamp = DateTime.UtcNow.ToFileTimeUtc() + Convert.ToInt32(applyOffset);
             string fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
-            WintapLogger.Log.Append($"{dataSet.CollectorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Info);
+            WintapLogger.Log.Append($"{dataSet.SensorName} is writing {dataSet.Data.Count} records to path: {fileName}", LogLevel.Info);
             try
             {
                 ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
@@ -117,12 +117,12 @@ namespace gov.llnl.wintap.core.etl.load
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error in ParquetWriter.Write: {ex.Message} ", LogLevel.Info);
-                if(ex.Message.Contains("used by another process"))
+                if (ex.Message.Contains("used by another process"))
                 {
                     WintapLogger.Log.Append($"Retrying write operation...", LogLevel.Info);
                     timestamp = DateTime.UtcNow.ToFileTimeUtc() + 1;
                     fileName = dataSet.ParquetPath + "-" + timestamp + ".parquet.active";  // name will be .active to avoid file contention with the uploader.
-                    WintapLogger.Log.Append($"{dataSet.CollectorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Info);
+                    WintapLogger.Log.Append($"{dataSet.SensorName} is retrying {dataSet.Data.Count} records to path: {fileName}", LogLevel.Info);
                     try
                     {
                         ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
@@ -133,7 +133,7 @@ namespace gov.llnl.wintap.core.etl.load
                             await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
                         }
                     }
-                    catch(Exception ex2)
+                    catch (Exception ex2)
                     {
                         WintapLogger.Log.Append($"{SensorName} error on retry of WRITE operation: {ex2.Message}", LogLevel.Info);
                     }
@@ -198,25 +198,24 @@ namespace gov.llnl.wintap.core.etl.load
             internal class SensorData
             {
                 private readonly string sensorName;
-                private readonly string collectorName;
                 private readonly ConcurrentQueue<ExpandoObject> sensorData;
                 private string parquetPath;
 
                 internal SensorData(string _sensorName, string _messageType, ConcurrentQueue<ExpandoObject> sensorData)
                 {
                     this.sensorName = _sensorName.ToLower();
-                    this.collectorName = _messageType.ToLower();
+                    this.sensorName = _messageType.ToLower();
                     this.sensorData = sensorData;
                     this.parquetPath = gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath(_sensorName);
                     DirectoryInfo sensorDataDir = new DirectoryInfo(this.parquetPath);
-                    if (this.sensorName.ToUpper() == "DEFAULT_SENSOR")
+                    if (this.sensorName.ToUpper() == "DefaultSerializer")
                     {
-                        sensorDataDir = new DirectoryInfo(Path.Combine(this.parquetPath, this.collectorName));
-                        this.parquetPath = Path.Combine(this.parquetPath, this.collectorName, this.collectorName);
+                        sensorDataDir = new DirectoryInfo(Path.Combine(this.parquetPath, this.sensorName));
+                        this.parquetPath = Path.Combine(this.parquetPath, this.sensorName, this.sensorName);
                     }
                     else
                     {
-                        this.parquetPath = Path.Combine(this.parquetPath, this.collectorName);
+                        this.parquetPath = Path.Combine(this.parquetPath, this.sensorName);
                     }
                     if (!sensorDataDir.Exists)
                     {
@@ -224,7 +223,7 @@ namespace gov.llnl.wintap.core.etl.load
                     }
                 }
 
-                internal string CollectorName { get { return collectorName; } }
+                internal string SensorName { get { return sensorName; } }
                 internal ConcurrentQueue<ExpandoObject> Data { get { return sensorData; } }
                 internal string ParquetPath { get { return parquetPath; } }
             }

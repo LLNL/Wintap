@@ -1,4 +1,4 @@
-﻿// Legacy-compatible logger delegating to ComponentLogger
+// Legacy-compatible logger delegating to ComponentLogger
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;

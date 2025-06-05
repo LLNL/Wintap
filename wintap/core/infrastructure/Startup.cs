@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -41,7 +41,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapHub<ExplorerHub>("/api/ExplorerHub");  
+                endpoints.MapHub<ExplorerHub>("/api/ExplorerHub");
                 endpoints.MapHub<WorkbenchHub>("/api/WorkbenchHub");
                 endpoints.MapHub<InferenceHub>("/api/InferenceHub");
                 endpoints.MapHub<MyHub>("/myhub");

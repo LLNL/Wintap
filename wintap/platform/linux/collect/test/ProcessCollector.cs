@@ -18,7 +18,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
     /// <summary>
     ///   THIS IS A DEMO -  it demonstrates the Wintap framework functionality on Linux.
     /// </summary>
-    public class ProcessCollector : BaseCollector
+    public class ProcessCollector : BaseSensor
     {
         private ConcurrentDictionary<string, WintapMessage> processDictionary;
         private ProcessHash idGen;
@@ -27,7 +27,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
 
         public ProcessCollector() : base()
         {
-            CollectorName = "Process";
+            SensorName = "Process";
             idGen = new ProcessHash();
             processDictionary = new ConcurrentDictionary<string, WintapMessage>();  // pidhash, wintapmessage of process
 
@@ -46,7 +46,7 @@ namespace gov.llnl.wintap.platform.linux.collect.test
             string processPath = currentProcess.MainModule.FileName;
             int processId = currentProcess.Id + 1; // defeat wintap self-event filtering
 
-            WintapMessage msg = new WintapMessage(DateTime.Now, processId, WintapMessage.MessageTypeEnum.PROCESS) { ActivityType =  WintapMessage.ActivityTypeEnum.Refresh };
+            WintapMessage msg = new WintapMessage(DateTime.Now, processId, WintapMessage.MessageTypeEnum.Process) { ActivityType =  WintapMessage.ActivityTypeEnum.Refresh };
             msg.Process = new WintapMessage.ProcessObject() { Name = processName, Path = processPath.ToLower() };
             msg.ProcessName = processName;
             msg.PidHash = idGen.GenPidHash(msg.PID, msg.EventTime);

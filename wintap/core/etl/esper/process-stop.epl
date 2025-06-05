@@ -1,1 +1,1 @@
-﻿SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = "PROCESS" AND ActivityType = "Stop"
+﻿SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = "Process" AND ActivityType = "Stop"

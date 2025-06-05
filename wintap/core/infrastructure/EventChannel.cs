@@ -1,4 +1,4 @@
-﻿using com.espertech.esper.client;
+using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using com.espertech.esper.common.client.configuration;
 using com.espertech.esper.common.client.metric;
@@ -45,7 +45,7 @@ namespace gov.llnl.wintap.core.infrastructure
         public static string Runtime { get { return stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss"); } }
         public static Configuration EsperConfig { get; set; }
         private static EPRuntime esperRuntime;
-        
+
 
         private EventChannel()
         {
@@ -65,7 +65,7 @@ namespace gov.llnl.wintap.core.infrastructure
         public static void Send(WintapMessage streamedEvent)
         {
             totalEvents++;
-            if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.PROCESS_PARTIAL)
+            if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.ProcessPartial)
             {
                 try
                 {
@@ -184,7 +184,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     {
                         EventChannel.EsperRuntime.DeploymentService.Undeploy(targetQuery.Id);
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         WintapLogger.Log.Append($"Workbench query {q.Name} not found in esper runtime", LogLevel.Warn);
                     }
@@ -206,7 +206,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             else
             {
-                if(q.State == EsperQuery.EsperState.ACTIVE)
+                if (q.State == EsperQuery.EsperState.ACTIVE)
                 {
                     // Create a new query
                     targetQuery = createWorkbenchQuery(q);
@@ -307,7 +307,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private void resetWorkbench()
         {
             Dictionary<string, EsperQuery> savedQueries = getWorkbenchState();
-            foreach(EsperQuery q in savedQueries.Values)
+            foreach (EsperQuery q in savedQueries.Values)
             {
                 q.State = EsperQuery.EsperState.STOPPED;
             }
@@ -322,7 +322,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 string readJsonString = File.ReadAllText(Path.Combine(Environment.CurrentDirectory, "workbenchstate.json"));
                 List<EsperQuery> esperQueries = JsonConvert.DeserializeObject<List<EsperQuery>>(readJsonString);
-                foreach(EsperQuery eq in esperQueries)
+                foreach (EsperQuery eq in esperQueries)
                 {
                     queries.Add(eq.Name, eq);
                 }

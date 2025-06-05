@@ -1,4 +1,4 @@
-﻿using gov.llnl.wintap.collect.models;
+using gov.llnl.wintap.collect.models;
 using com.espertech.esper.common.client;
 using System;
 using System.Text.RegularExpressions;

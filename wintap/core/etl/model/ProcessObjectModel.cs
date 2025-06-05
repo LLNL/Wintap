@@ -1,4 +1,4 @@
-﻿// * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
+// * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
 // * Produced at the Lawrence Livermore National Laboratory.
 // * All rights reserved.
 // */
@@ -121,7 +121,7 @@ internal class ProcessStartData : SensorData
         _processArgs = args;
         _eventTime = startTime;
         _uniqueProcessKey = uniqueProcessKey;
-        if(_uniqueProcessKey == null)
+        if (_uniqueProcessKey == null)
         {
             _uniqueProcessKey = "";
         }

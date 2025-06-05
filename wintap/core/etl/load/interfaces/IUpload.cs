@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,7 +18,7 @@ namespace gov.llnl.wintap.core.etl.load.interfaces
         /// Gets called once per upload cycle 
         /// </summary>
         /// <returns></returns>
-        bool PreUpload(Dictionary<string,string> parameters);
+        bool PreUpload(Dictionary<string, string> parameters);
         /// <summary>
         /// Method that uploads a single file to somewhere 
         /// </summary>
