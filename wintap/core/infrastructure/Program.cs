@@ -6,112 +6,150 @@
 
 #pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020, SKEXP0070;
 
+using DuckDB.NET.Data;
 using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel;
-using System;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.Properties;
-// Remove Chroma and add SQLite import
-//using Microsoft.SemanticKernel.Connectors.Memory.Sqlite;
-using Microsoft.SemanticKernel.Embeddings;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Sqlite;
+using Microsoft.SemanticKernel.Embeddings;
+using Microsoft.SemanticKernel.Memory;
+using ModelContextProtocol.Client;
+using OpenAI;
+using System;
+using System.ClientModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using DuckDB.NET.Data;
-using System.ComponentModel;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
-//builder.Services.AddSpaStaticFiles(configuration =>
-//{
-//    configuration.RootPath = @"C:\Program Files\Wintap\Workbench";
-//});
+
+//System.Diagnostics.Debugger.Launch();
 
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
+#region Local Ollama Implementation
+//       for SLMs 
 // Match the configuration settings from the embedding generator app
-string DatabasePath = @"c:\program files\wintap7\embeddings.db";
-string CollectionName = "Wintap";
-string OllamaEndpoint = "http://localhost:11434";
-string EmbeddingModel = "mxbai-embed-large";
-string llm = "llama3.1:8b";
+//string DatabasePath = @"c:\program files\wintap7\embeddings.db";
+//string CollectionName = "Wintap";
+//string OllamaEndpoint = "http://localhost:11434";
+//string EmbeddingModel = "mxbai-embed-large";
+//string llm = "llama3.1:8b";
 
-#pragma warning disable SKEXP0070, SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020
 // Create a builder with both chat completion and embedding services
-var aiBuilder = Kernel.CreateBuilder();
+//var aiBuilder = Kernel.CreateBuilder();
 
+//       for SLMs 
 // Add the Ollama chat completion service
-aiBuilder.AddOllamaChatCompletion(
-    modelId: llm,
-    endpoint: new Uri(OllamaEndpoint)
-);
+//aiBuilder.AddOllamaChatCompletion(
+//    modelId: llm,
+//    endpoint: new Uri(OllamaEndpoint)
+//);
 
+//       for SLMs 
 // Add the Ollama embedding service - using the same model as in the embedding generator
-aiBuilder.AddOllamaTextEmbeddingGeneration(
-    modelId: EmbeddingModel,
-    endpoint: new Uri(OllamaEndpoint)
-);
+//aiBuilder.AddOllamaTextEmbeddingGeneration(
+//    modelId: EmbeddingModel,
+//    endpoint: new Uri(OllamaEndpoint)
+//);
 
 // Build the kernel with both services
-var kernel = aiBuilder.Build();
+//var kernel = aiBuilder.Build();
 
-try
-{
-    kernel.Plugins.AddFromType<TimePlugin>();
-}
-catch (Exception ex)
-{
-    int i = 0;
-}
+//kernel.Plugins.AddFromType<TimePlugin>();
 
-//kernel.ImportPluginFromFunctions("TimePlugin", new[] {
-//        kernel.CreateFunctionFromMethod(GetCurrentTime, "GetCurrentTime", "Retrieves the current time in UTC.")
-// });
+//var chatService = kernel.GetRequiredService<IChatCompletionService>();
+//var embeddingService = kernel.GetRequiredService<ITextEmbeddingGenerationService>();
 
-// Now you can get both services
-var chatService = kernel.GetRequiredService<IChatCompletionService>();
-var embeddingService = kernel.GetRequiredService<ITextEmbeddingGenerationService>();
-
+//     For SLMs
 // Create memory using the embedding service and SQLite
 // Use the same database path as the embedding generator
-var sqliteMemoryStore = SqliteMemoryStore.ConnectAsync(DatabasePath).GetAwaiter().GetResult();
+//  var sqliteMemoryStore = SqliteMemoryStore.ConnectAsync(DatabasePath).GetAwaiter().GetResult();
 
-ISemanticTextMemory memory = new MemoryBuilder()
-    .WithLoggerFactory(kernel.LoggerFactory)
-    .WithMemoryStore(sqliteMemoryStore)
-    .WithTextEmbeddingGeneration(embeddingService)
-    .Build();
+//ISemanticTextMemory memory = new MemoryBuilder()
+//    .WithLoggerFactory(kernel.LoggerFactory)
+//    .WithMemoryStore(sqliteMemoryStore)
+//    .WithTextEmbeddingGeneration(embeddingService)
+//    .Build();
 
-builder.Services.AddSingleton<ISemanticTextMemory>(provider =>
+//builder.Services.AddSingleton<ISemanticTextMemory>(provider =>
+//{
+//    return memory;
+//});
+
+//builder.Services.AddSingleton<IChatCompletionService>(provider =>
+//{
+//    return chatService;
+//});
+
+//builder.Services.AddSingleton<Kernel>(provider =>
+//{
+//    return kernel; 
+//});
+
+
+//builder.Services.AddSingleton<ChatHistory>(provider =>
+//{
+//    string systemPrompt = Settings.Default.SystemPrompt;
+//    ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
+//    WintapLogger.Log.Append(systemPrompt, LogLevel.Info);
+//    return chat;
+//}); 
+#endregion
+
+IMcpClient mcpClient;
+try
 {
-    return memory;
-});
+    mcpClient = await McpClientFactory.CreateAsync(
+    new StdioClientTransport(new()
+    {
+        Command = "C:\\Repos\\BCB-AI\\ai_mcp_server\\bin\\debug\\net8.0\\ai_mcp_server.exe",
+        Arguments = [],
+        Name = "ai_mcp_server",
+    })
+);
+    // Connect to an MCP server
+    Console.WriteLine("Connecting client to MCP server");
 
-builder.Services.AddSingleton<IChatCompletionService>(provider =>
+    OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
+    openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api-dev.llnl.gov/v1") };
+
+    string? key = "sk-eU9jfjiaKRN3tpLPyx2Dmw";
+    //key = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+    ApiKeyCredential cred = new ApiKeyCredential(key!);
+    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4.1");
+
+    // Create a sampling client.
+    using IChatClient chatClient = openAIClient.AsIChatClient()
+        .AsBuilder()
+        .UseFunctionInvocation()
+        .Build();
+
+    builder.Services.AddSingleton<ChatHistory>(provider =>
+    {
+        string systemPrompt = "you are a helpful AI adept at tool calling";
+        ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
+        WintapLogger.Log.Append(systemPrompt, LogLevel.Info);
+        return chat;
+    });
+
+    builder.Services.AddSingleton<IMcpClient>(mcpClient);
+    builder.Services.AddSingleton(chatClient);
+}
+catch(Exception ex)
 {
-    return chatService;
-});
+    WintapLogger.Log.Append($"Error loading MCP Client: {ex.Message}", LogLevel.Error);
+}
 
-builder.Services.AddSingleton<Kernel>(provider =>
-{
-    return kernel; 
-});
-
-
-builder.Services.AddSingleton<ChatHistory>(provider =>
-{
-    string systemPrompt = Settings.Default.SystemPrompt;
-
-    ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
-    WintapLogger.Log.Append(systemPrompt, LogLevel.Info);
-    return chat;
-});
 
 
 
@@ -129,12 +167,13 @@ app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();  // This will map the routes to the API controllers
 
+//   Uncomment for deployment
 //app.UseSpa(spa =>
 //{
 //    spa.Options.SourcePath = "C:\\Program Files\\Wintap\\Workbench";
 //    if (app.Environment.IsDevelopment())
 //    {
-//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099"); // URL of the dev server
+//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099"); // URL of the prod server
 //    }
 //});
 
