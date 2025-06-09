@@ -34,18 +34,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public override bool Start()
         {
-            //System.Diagnostics.Debugger.Launch();
-            //  Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
-            //WintapLogger.Log.Append("Assembling boot trace process events.", LogLevel.Info);
-            //WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Info);
-            //EPStatement etlToEsperPattern = EventChannel.CompileDeploy(
-            //    $"SELECT PartA.PID, PartA.EventTime, PartA.Process.ParentPID, PartB.Process.Path, PartB.Process.Name " +
-            //    $"FROM pattern[every PartA=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ProcessPartial.ToString()}' " +
-            //    $"AND  CAST(ActivityType, string)='{WintapMessage.ActivityTypeEnum.Rundown.ToString()}'" +
-            //    $") -> PartB=WintapMessage(CAST(MessageType, string)='{WintapMessage.MessageTypeEnum.ImageLoad.ToString()}' " +
-            //    "AND PID=PartA.PID) where timer:within(3 sec)]", "ETWBootTrace").Statements[0];
-
-            //etlToEsperPattern.Events += etlToEsperPattern_Events;
+            //Boot trace process assembler.  Creates Process events from 'partial' boot trace Process events
+            WintapLogger.Log.Append("Assembling boot trace process events.", LogLevel.Info);
+            WintapLogger.Log.Append("Esper runtime? " + EventChannel.EsperRuntime.URI, LogLevel.Info);
+            EPStatement etlToEsperPattern = EventChannel.CompileDeploy("SELECT * FROM WintapMessage WHERE CAST(ActivityType, string) = 'Rundown'", "ProcessTraceRundown").Statements[0];
+            etlToEsperPattern.Events += etlToEsperPattern_Events;
 
 
 
@@ -94,27 +87,19 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         }
 
         /// <summary>
-        /// Esper listener that assembles the parts (ProcessPartial) of the ETL boot trace pattern query 
+        /// Esper listener that publishes process rundown events of the ETL boot trace pattern query 
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void etlToEsperPattern_Events(object sender, UpdateEventArgs e)
         {
             EventBean[] partials = e.NewEvents;
+
             foreach (EventBean partial in partials)
             {
-                int pid = Convert.ToInt32(partial.Get("PartA.PID").ToString());
-                long eventTime = Convert.ToInt64(partial.Get("PartA.EventTime").ToString());
-                int parentPid = Convert.ToInt32(partial.Get("PartA.Process.ParentPID").ToString());
-                string pname = partial.Get("PartB.Process.Name").ToString();
-                string ppath = partial.Get("PartB.Process.Path").ToString();
-
-                WintapMessage msg = new WintapMessage(DateTime.FromFileTimeUtc(eventTime), pid, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Refresh };
-                msg.Process = new WintapMessage.ProcessObject() { Name = pname.ToLower(), Path = ppath.ToLower(), ParentPID = parentPid, CommandLine = ppath, User = "na", Arguments = "", UniqueProcessKey = "0" };
-                msg.ReceiveTime = msg.EventTime;
-                msg.ProcessName = msg.Process.Name;
-                msg.Process.Arguments = "";
-                processTree.PublishProcess(msg);
+                WintapMessage rundownEvent = (WintapMessage)partial.Underlying;
+                rundownEvent.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
+                processTree.PublishProcess(rundownEvent);
             }
         }
     }

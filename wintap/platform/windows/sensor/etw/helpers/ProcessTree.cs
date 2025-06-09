@@ -48,32 +48,28 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             DateTime lastProcessEventTime = DateTime.Now;
             publishUntracedProcesses();
 
-            // get ground truth from boot trace
-            WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Info);
-            lastProcessEventTime = processTracer.LoadBootTrace();
+            try
+            {
+                if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
+                {
+                    // get ground truth from boot trace
+                    WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Info);
+                    lastProcessEventTime = processTracer.LoadBootTrace();
+                }
+                else
+                {
+                    // get cached copy from json
+                    WintapLogger.Log.Append("Building process tree from cache", LogLevel.Info);
+                    deserializeProcessTree();
+                    // cache holds the wintap process from the boot trace, we must refresh it.
+                    refreshWintapProcess();
+                }
 
-            //try
-            //{
-            //    if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
-            //    {
-            //        // get ground truth from boot trace
-            //        WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Info);
-            //        lastProcessEventTime = processTracer.LoadBootTrace();
-            //    }
-            //    else
-            //    {
-            //        // get cached copy from json
-            //        WintapLogger.Log.Append("Building process tree from cache", LogLevel.Info);
-            //        deserializeProcessTree();
-            //        // cache holds the wintap process from the boot trace, we must refresh it.
-            //        refreshWintapProcess();
-            //    }
-
-            //}
-            //catch (Exception ex)
-            //{
-            //    WintapLogger.Log.Append("ERROR building process tree: " + ex.Message, LogLevel.Info);
-            //}
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("ERROR building process tree: " + ex.Message, LogLevel.Info);
+            }
 
 
             Timer processExportTimer = new Timer();

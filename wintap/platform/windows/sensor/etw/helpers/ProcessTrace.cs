@@ -77,7 +77,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                                         WintapMessage fullProcessEvent = bootTraceProcessList.Where(p => p.PID == processId).FirstOrDefault();
                                         fullProcessEvent.EventTime = createTime.ToFileTimeUtc();
                                         fullProcessEvent.Process.ParentPID = parentProcessId;
-                                        EventChannel.Send(fullProcessEvent);
+
+                                        WintapLogger.Log.Append($"Sending Boot trace event from Process: {fullProcessEvent.ProcessName}", LogLevel.Info);
                                         bootTraceProcessList.RemoveAll(p => p.PID == processId);  // to support pid recycling
                                     }
                                     else
@@ -105,6 +106,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                                         fullProcessEvent.Process.Path = processInfo.FullName.ToLower();
                                         fullProcessEvent.Process.Name = processInfo.Name.ToLower();
                                         fullProcessEvent.ProcessName = processInfo.Name.ToLower();
+                                        WintapLogger.Log.Append($"Sending Boot trace event from IL: {fullProcessEvent.ProcessName}", LogLevel.Info);
                                         EventChannel.Send(fullProcessEvent);
                                         bootTraceProcessList.RemoveAll(p => p.PID == processId);  // to support pid recycling
                                     }
