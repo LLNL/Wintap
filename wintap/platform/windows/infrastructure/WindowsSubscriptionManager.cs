@@ -41,7 +41,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         continue;
                     }
                     string sensorName = nameSpace + "." + sp.Name;
-                    WintapLogger.Log.Append("Attempting to load collector with name: " + sensorName, LogLevel.Info);
+                    WintapLogger.Log.Append("Attempting to load sensor with name: " + sensorName, LogLevel.Info);
                     try
                     {
                         Type type = Type.GetType(sensorName);
@@ -71,15 +71,15 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append(sp.Name + " error loading collector: " + ex.Message, LogLevel.Info);
+                        WintapLogger.Log.Append(sp.Name + " error loading sensor: " + ex.Message, LogLevel.Info);
                     }
 
                 }
             }
-            WintapLogger.Log.Append("Done loading modelled collectors", LogLevel.Info);
+            WintapLogger.Log.Append("Done loading modelled sensors", LogLevel.Info);
 
             // Start unmodelled (aka generic) collectors
-            WintapLogger.Log.Append("loading unmodelled collectors", LogLevel.Info);
+            WintapLogger.Log.Append("loading unmodelled sensors", LogLevel.Info);
             int genericCounter = 0;
             foreach (string genericProvider in Properties.Settings.Default.GenericProviders)
             {
@@ -93,7 +93,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     baseSensors.Add((BaseWindowsSensor)gc);
                 }
             }
-            WintapLogger.Log.Append("Done loading unmodelled collectors", LogLevel.Info);
+            WintapLogger.Log.Append("Done loading unmodelled sensors", LogLevel.Info);
 
             // Create the shared Kernel logger session with the required event flags
             WintapLogger.Log.Append("Creating Kernel event listening thread (ETW)...", LogLevel.Info);

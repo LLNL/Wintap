@@ -7,9 +7,11 @@
 #pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020, SKEXP0070;
 
 using DuckDB.NET.Data;
+using DuckDB.NET.Data;
 using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
@@ -24,6 +26,7 @@ using ModelContextProtocol.Client;
 using OpenAI;
 using System;
 using System.ClientModel;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -121,6 +124,7 @@ try
 
     OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
     openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api-dev.llnl.gov/v1") };
+    
 
     string? key = "sk-eU9jfjiaKRN3tpLPyx2Dmw";
     //key = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
@@ -134,13 +138,10 @@ try
         .UseFunctionInvocation()
         .Build();
 
-    builder.Services.AddSingleton<ChatHistory>(provider =>
-    {
-        string systemPrompt = "you are a helpful AI adept at tool calling";
-        ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
-        WintapLogger.Log.Append(systemPrompt, LogLevel.Info);
-        return chat;
-    });
+    List<ChatMessage> chatHistory = [
+        new ChatMessage(ChatRole.System, System.IO.File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),
+    ];
+    builder.Services.AddSingleton(chatHistory);
 
     builder.Services.AddSingleton<IMcpClient>(mcpClient);
     builder.Services.AddSingleton(chatClient);
@@ -189,12 +190,12 @@ app.UseEndpoints(endpoints =>
 app.Run();
 
 
-public class TimePlugin
-{
-    [KernelFunction]
-    [Description("Returns the current time")]
-    public string GetCurrentTime()
-    {
-        return DateTime.Now.ToShortTimeString();
-    }
-}
+//public class TimePlugin
+//{
+//    [KernelFunction]
+//    [Description("Returns the current time")]
+//    public string GetCurrentTime()
+//    {
+//        return DateTime.Now.ToShortTimeString();
+//    }
+//}

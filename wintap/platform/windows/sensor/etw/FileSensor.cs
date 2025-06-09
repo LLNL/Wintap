@@ -13,6 +13,7 @@ using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.IO;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -35,22 +36,31 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             fileKeyToPath = new ConcurrentDictionary<ulong, string>();
 
             WintapLogger.Log.Append("Processing rundown trace", LogLevel.Info);
-            string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap\\etl\\kernelrundown.etl";
-            WintapLogger.Log.Append("processing rundown trace", LogLevel.Info);
-            int counter = 0;
-            using (var source = new ETWTraceEventSource(etlFilePath))
+            // TODO: make relative to assembly path
+            string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap7\\etl\\kernelrundown.etl";
+            FileInfo rundownInfo = new FileInfo(etlFilePath);
+            if(rundownInfo.Exists)
             {
-                // Set up callbacks
-                source.Kernel.FileIOFileRundown += delegate (FileIONameTraceData data)
+                WintapLogger.Log.Append("processing rundown trace", LogLevel.Info);
+                int counter = 0;
+                using (var source = new ETWTraceEventSource(etlFilePath))
                 {
-                    if (data.EventName.ToLower().Contains("rundown"))
+                    // Set up callbacks
+                    source.Kernel.FileIOFileRundown += delegate (FileIONameTraceData data)
                     {
-                        fileKeyToPath.TryAdd(data.FileKey, data.FileName);
-                        counter++;
-                    }
-                };
-                source.Process(); // Invoke callbacks, will break at eof
-                WintapLogger.Log.Append("Rundown file event trace complete. total rundowns processed: " + counter, LogLevel.Info);
+                        if (data.EventName.ToLower().Contains("rundown"))
+                        {
+                            fileKeyToPath.TryAdd(data.FileKey, data.FileName);
+                            counter++;
+                        }
+                    };
+                    source.Process(); // Invoke callbacks, will break at eof
+                    WintapLogger.Log.Append("Rundown file event trace complete. total rundowns processed: " + counter, LogLevel.Info);
+                }
+            }
+            else
+            {
+                WintapLogger.Log.Append("No file rundown ETL found.  File events may not always contaihn a path for this session.", LogLevel.Warn);
             }
 
         }

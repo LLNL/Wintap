@@ -13,6 +13,8 @@ namespace gov.llnl.wintap.core.api
     /// <summary>
     /// API for interfacing Esper with the Workbench
     /// </summary>
+    [ApiController]
+    [Route("api/[controller]")]
     public class TreeController : ControllerBase
     {
 

@@ -135,7 +135,15 @@ namespace gov.llnl.wintap.core.infrastructure
             // This ensures consistent behavior regardless of where the query comes from
             string adaptedEpl = EnumFormatter.FormatQueryForCompile(epl);
 
-            adaptedEpl = $"@name('WB-{name}') {adaptedEpl}";
+            if(name != "ETWBootTrace")
+            {
+                adaptedEpl = $"@name('WB-{name}') {adaptedEpl}";
+            }
+            else
+            {
+                int i = 0;
+            }
+
 
             // Log the original and adapted queries for debugging if needed
             if (epl != adaptedEpl)

@@ -37,7 +37,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Wintap-Workbench", "Wintap-Workbench", "{66763ED6-F638-4936-A82B-ADAB21030A27}"
 EndProject
-Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench(1)", "Wintap-Workbench\", "{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}"
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench", "Wintap-Workbench\", "{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}"
 	ProjectSection(WebsiteProperties) = preProject
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
 		Debug.AspNetCompiler.VirtualPath = "/localhost_55868"
@@ -63,6 +63,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleEventPlugin", "platform\samples\SimpleEventPlugin\SimpleEventPlugin.csproj", "{3CC4F4DA-5D11-450B-B592-1BC6CE49D094}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalRAG", "platform\windows\Utilities\LocalRAG\LocalRAG.csproj", "{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapCoreSvcMgr", "WintapCoreSvcMgr\WintapCoreSvcMgr.csproj", "{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -243,6 +245,22 @@ Global
 		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|x64.Build.0 = Release|Any CPU
 		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|x86.ActiveCfg = Release|Any CPU
 		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1}.Release|x86.Build.0 = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|x64.Build.0 = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Debug|x86.Build.0 = Debug|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|ARM64.Build.0 = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|x64.ActiveCfg = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|x64.Build.0 = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|x86.ActiveCfg = Release|Any CPU
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -260,6 +278,7 @@ Global
 		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
 		{3CC4F4DA-5D11-450B-B592-1BC6CE49D094} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1} = {D3644633-5670-4050-8E1D-465A966F45E1}
+		{9FBCD002-8AA4-4D37-B70F-91A01770DBAA} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B820FE25-5EEE-4E31-A6AE-C417551BE27C}

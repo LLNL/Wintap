@@ -46,7 +46,7 @@ namespace gov.llnl.wintap.core.etl.load
                         duckDBConnection.Open();
                         var command = duckDBConnection.CreateCommand();
                         string parquetDir = Path.Combine(Strings.ParquetDataPath, "merged");
-                        string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("_sensor", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
+                        string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
                         string tempFileName = sensorName;
                         command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";
                         WintapLogger.Log.Append("Duck db command: " + command.CommandText, LogLevel.Info);

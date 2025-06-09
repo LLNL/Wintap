@@ -41,7 +41,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 msg.ActivityId = obj.PayloadStringByName("ActivityId");
             }
-            msg.WMI = new WintapMessage.WmiActivityObject();
+            msg.WMI = new WintapMessage.WmiActivityObject() { ClientProcessId = -1, CommandLine = "", IsLocal = true, CreatedProcessId = -1, Operation = "", OperationId = -1, ProcessName = "", ResultCode = 0, User = "" };
             try
             {
                 if (obj.PayloadNames.Contains("Operation"))

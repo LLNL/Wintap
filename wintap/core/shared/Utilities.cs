@@ -69,7 +69,7 @@ namespace gov.llnl.wintap.core.shared
             {
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.UseShellExecute = false;
-                psi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
+                psi.FileName = Strings.FileRootPath + "\\WintapCoreSvcMgr.exe";
                 psi.Arguments = "RESTART";
                 psi.WindowStyle = ProcessWindowStyle.Hidden;
                 Process p = new Process();
@@ -79,7 +79,7 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error calling WintapSvcMgr for wintap restart: " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append("Error calling WintapCoreSvcMgr for wintap restart: " + ex.Message, LogLevel.Info);
             }
         }
 

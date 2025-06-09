@@ -47,28 +47,33 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             WintapLogger.Log.Append("Generating process tree.", LogLevel.Info);
             DateTime lastProcessEventTime = DateTime.Now;
             publishUntracedProcesses();
-            try
-            {
-                if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
-                {
-                    // get ground truth from boot trace
-                    WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Info);
-                    lastProcessEventTime = processTracer.LoadBootTrace();
-                }
-                else
-                {
-                    // get cached copy from json
-                    WintapLogger.Log.Append("Building process tree from cache", LogLevel.Info);
-                    deserializeProcessTree();
-                    // cache holds the wintap process from the boot trace, we must refresh it.
-                    refreshWintapProcess();
-                }
 
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR building process tree: " + ex.Message, LogLevel.Info);
-            }
+            // get ground truth from boot trace
+            WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Info);
+            lastProcessEventTime = processTracer.LoadBootTrace();
+
+            //try
+            //{
+            //    if (DateTime.Now.Subtract(StateManager.MachineBootTime) < new TimeSpan(0, 5, 0))
+            //    {
+            //        // get ground truth from boot trace
+            //        WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Info);
+            //        lastProcessEventTime = processTracer.LoadBootTrace();
+            //    }
+            //    else
+            //    {
+            //        // get cached copy from json
+            //        WintapLogger.Log.Append("Building process tree from cache", LogLevel.Info);
+            //        deserializeProcessTree();
+            //        // cache holds the wintap process from the boot trace, we must refresh it.
+            //        refreshWintapProcess();
+            //    }
+
+            //}
+            //catch (Exception ex)
+            //{
+            //    WintapLogger.Log.Append("ERROR building process tree: " + ex.Message, LogLevel.Info);
+            //}
 
 
             Timer processExportTimer = new Timer();
@@ -206,17 +211,25 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
         private void refreshWintapProcess()
         {
             WintapLogger.Log.Append("Refreshing Wintap process info", LogLevel.Info);
-            Process wintapProcess = Process.GetCurrentProcess();
-            // get the previous instance of wintap since it will have the same parent process info.
-            WintapMessage previousWintapProcess = processStack.Where(p => p.Value.ProcessName == "wintap.exe").OrderBy(p => p.Value.EventTime).LastOrDefault().Value;
-            WintapMessage newWintapProcess = new WintapMessage(StateManager.MachineBootTime, wintapProcess.Id, WintapMessage.MessageTypeEnum.Process);
-            newWintapProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
-            newWintapProcess.PidHash = idGen.GenPidHash(wintapProcess.Id, DateTime.Now.ToFileTimeUtc());
-            newWintapProcess.ProcessName = "wintap.exe";
-            newWintapProcess.Process = new WintapMessage.ProcessObject() { CommandLine = wintapProcess.MainModule.FileName, Name = newWintapProcess.ProcessName, ParentPID = previousWintapProcess.Process.ParentPID, ParentPidHash = previousWintapProcess.Process.ParentPidHash, Path = wintapProcess.MainModule.FileName, User = "system" };
-            newWintapProcess.Process.Arguments = "";
-            WintapLogger.Log.Append("New Wintap running under PID: " + newWintapProcess.PID, LogLevel.Info);
-            PublishProcess(newWintapProcess);
+            try
+            {
+                Process wintapProcess = Process.GetCurrentProcess();
+                // get the previous instance of wintap since it will have the same parent process info.
+                WintapMessage previousWintapProcess = processStack.Where(p => p.Value.ProcessName == "wintap.exe").OrderBy(p => p.Value.EventTime).LastOrDefault().Value;
+                WintapMessage newWintapProcess = new WintapMessage(StateManager.MachineBootTime, wintapProcess.Id, WintapMessage.MessageTypeEnum.Process);
+                newWintapProcess.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
+                newWintapProcess.PidHash = idGen.GenPidHash(wintapProcess.Id, DateTime.Now.ToFileTimeUtc());
+                newWintapProcess.ProcessName = "wintap.exe";
+                newWintapProcess.Process = new WintapMessage.ProcessObject() { CommandLine = wintapProcess.MainModule.FileName, Name = newWintapProcess.ProcessName, ParentPID = previousWintapProcess.Process.ParentPID, ParentPidHash = previousWintapProcess.Process.ParentPidHash, Path = wintapProcess.MainModule.FileName, User = "system" };
+                newWintapProcess.Process.Arguments = "";
+                WintapLogger.Log.Append("New Wintap running under PID: " + newWintapProcess.PID, LogLevel.Info);
+                PublishProcess(newWintapProcess);
+            }
+            catch(Exception ex)
+            {
+                WintapLogger.Log.Append($"Could not find wintap process, exception: {ex.Message}", LogLevel.Warn);
+            }
+
         }
 
         private void publishTree(TreeNode rootNode)

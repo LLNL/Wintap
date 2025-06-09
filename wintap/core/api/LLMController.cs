@@ -35,6 +35,7 @@ using WinTAP.Properties;
 using System.ComponentModel;
 using ModelContextProtocol.Client;
 using Microsoft.Extensions.AI;
+using System.ServiceModel.Channels;
 
 
 
@@ -69,6 +70,7 @@ namespace gov.llnl.wintap.core.api
 
         private IMcpClient mcpClient;
         private IChatClient chatClient;
+        private List<ChatMessage> chatHistory;
 
         //public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai, Kernel _kernel)
         //{
@@ -79,11 +81,12 @@ namespace gov.llnl.wintap.core.api
         //    kernel = _kernel;
         //}
 
-        public LLMController(IHubContext<InferenceHub> _hubContext, IMcpClient _mcpClient, IChatClient _chatClient)
+        public LLMController(IHubContext<InferenceHub> _hubContext, IMcpClient _mcpClient, IChatClient _chatClient, List<ChatMessage> _chatHistory)
         {
             this.hubContext = _hubContext;
             mcpClient = _mcpClient;
             chatClient = _chatClient;
+            chatHistory = _chatHistory;
         }
 
         [HttpPut("Inference")]
@@ -93,14 +96,13 @@ namespace gov.llnl.wintap.core.api
             WintapLogger.Log.Append($"Got inference request with question: {question}", LogLevel.Info);
             IList<McpClientTool> tools = await mcpClient.ListToolsAsync();
             // Create the message list with our time question
-            List<ChatMessage> messages = [
-                new ChatMessage(ChatRole.User, question)
-            ];
+            ChatMessage userQuestion = new ChatMessage(ChatRole.User, question);
+            chatHistory.Add(userQuestion);
 
             try
             {
                 var response = await chatClient.GetResponseAsync(
-                    messages,
+                    chatHistory,
                     new ChatOptions
                     {
                         Tools = [.. tools], // Make MCP tools available to the model
@@ -113,23 +115,12 @@ namespace gov.llnl.wintap.core.api
                 Inference inf = new Inference() { Prompt = question, Response = response.Text, TokensUsed = 0 };
                 string jsonString = JsonConvert.SerializeObject(inf);
                 await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
-                messages.Add(new ChatMessage(ChatRole.Assistant, response.Messages[0].Text));
+                chatHistory.Add(new ChatMessage(ChatRole.Assistant, response.Messages[0].Text));
             }
             catch (Exception ex)
             {
                 int i = 0;
             }
-           
-
-            // This part doesn't work either, but ignore for now...
-            //await foreach (ChatResponseUpdate message in chatClient.GetStreamingResponseAsync(messages))
-            //{
-            //    Inference inf = new Inference() { Prompt = question, Response = message.Contents.First().ToString(), TokensUsed = 0 };
-            //    string jsonString = JsonConvert.SerializeObject(inf);
-            //    await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
-            //}
-
-
 
             WintapLogger.Log.Append($"inference complete", LogLevel.Info);
         }

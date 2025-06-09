@@ -129,7 +129,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             RegistryKey wmiKey = Registry.LocalMachine.CreateSubKey("SYSTEM\\ControlSet001\\Control\\WMI\\Autologger\\" + etlBootTraceLogFile, true);
             wmiKey.SetValue("BufferSize", 8, RegistryValueKind.DWord);
             wmiKey.SetValue("ClockType", 1, RegistryValueKind.DWord);
-            wmiKey.SetValue("FileName", "C:\\Program Files\\Wintap\\etl\\" + etlBootTraceLogFile + ".etl", RegistryValueKind.String);
+            wmiKey.SetValue("FileName", "C:\\Program Files\\Wintap7\\etl\\" + etlBootTraceLogFile + ".etl", RegistryValueKind.String);
             wmiKey.SetValue("FlushTimer", 0, RegistryValueKind.DWord);
             wmiKey.SetValue("Guid", "{" + Guid.Empty + "}", RegistryValueKind.String);
             wmiKey.SetValue("LogFileMode", 4610, RegistryValueKind.DWord);

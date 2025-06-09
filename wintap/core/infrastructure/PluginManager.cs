@@ -404,7 +404,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     WintapLogger.Log.Append("Creating Subscriber EPL", LogLevel.Info);
                     EPStatement processEvents = EventChannel.CompileDeploy(
-                        "SELECT * FROM WintapMessage WHERE MessageType <> 'ProcessPartial'", "ProcessPartial"
+                        "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) <> 'ProcessPartial'", "ProcessPartial"
                     ).Statements[0];
                     processEvents.Events += All_Events;
                 }

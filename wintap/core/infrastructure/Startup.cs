@@ -14,6 +14,7 @@ namespace gov.llnl.wintap.core.infrastructure
     {
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddControllers();
             services.AddSignalR();  // Add SignalR services
                                     // Add other services like MVC, if neede
             services.AddCors(options =>
