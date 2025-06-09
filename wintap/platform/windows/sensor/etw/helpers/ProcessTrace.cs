@@ -11,8 +11,10 @@ using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
 {
@@ -22,6 +24,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
     internal class ProcessTrace : EtwProviderCollector
     {
         internal readonly string etlBootTraceLogFile = "Wintap.Collectors.Process.ETLFile.BootTrace";
+        internal List<WintapMessage> bootTraceProcessList = new List<WintapMessage>(); 
         internal ProcessTrace() { }
 
         internal DateTime LoadBootTrace()
@@ -63,21 +66,53 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                                     int processId = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
                                     DateTime createTime = DateTime.Parse(data.PayloadByName("CreateTime").ToString());
                                     int parentProcessId = Convert.ToInt32(data.PayloadByName("ParentProcessID").ToString());
-                                    WintapMessage processPartial = new WintapMessage(createTime.ToUniversalTime(), processId, WintapMessage.MessageTypeEnum.ProcessPartial) { ActivityType = WintapMessage.ActivityTypeEnum.Rundown };
+                                    WintapMessage processPartial = new WintapMessage(createTime.ToUniversalTime(), processId, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Rundown };
                                     processPartial.Process = new WintapMessage.ProcessObject() { ParentPID = parentProcessId };
-                                    EventChannel.Send(processPartial);
+                                    // debugging this esper based solution is too hard
+                                    //EventChannel.Send(processPartial);
+
+                                    if (bootTraceProcessList.Where(p => p.PID == processId).Any())
+                                    {
+                                        // process exists, so let's complete the event and send it
+                                        WintapMessage fullProcessEvent = bootTraceProcessList.Where(p => p.PID == processId).FirstOrDefault();
+                                        fullProcessEvent.EventTime = createTime.ToFileTimeUtc();
+                                        fullProcessEvent.Process.ParentPID = parentProcessId;
+                                        EventChannel.Send(fullProcessEvent);
+                                        bootTraceProcessList.RemoveAll(p => p.PID == processId);  // to support pid recycling
+                                    }
+                                    else
+                                    {
+                                        // doesn't exist, so let's add it to our interim collection
+                                        bootTraceProcessList.Add(processPartial);
+                                    }
+
                                 }
                                 if (data.EventName == "ImageLoad")
                                 {
                                     //int processId = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
                                     int processId = data.ProcessID;
                                     string processName = TranslateFilePath(data.PayloadByName("ImageName").ToString().ToLower()).ToLower();
-                                    WintapMessage processPartial = new WintapMessage(DateTime.UtcNow, processId, WintapMessage.MessageTypeEnum.ProcessPartial) { ActivityType = WintapMessage.ActivityTypeEnum.Rundown };
+                                    WintapMessage processPartial = new WintapMessage(DateTime.UtcNow, processId, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Rundown };
                                     processPartial.Process = new WintapMessage.ProcessObject() { Path = processName.ToLower() };
                                     FileInfo processInfo = new FileInfo(processName);
                                     processPartial.Process.Path = processInfo.FullName.ToLower();
                                     processPartial.Process.Name = processInfo.Name.ToLower();
-                                    EventChannel.Send(processPartial);
+                                    //EventChannel.Send(processPartial);
+                                    if (bootTraceProcessList.Where(p => p.PID == processId).Any())
+                                    {
+                                        // process exists, so let's complete the event and send it
+                                        WintapMessage fullProcessEvent = bootTraceProcessList.Where(p => p.PID == processId).FirstOrDefault();
+                                        fullProcessEvent.Process.Path = processInfo.FullName.ToLower();
+                                        fullProcessEvent.Process.Name = processInfo.Name.ToLower();
+                                        fullProcessEvent.ProcessName = processInfo.Name.ToLower();
+                                        EventChannel.Send(fullProcessEvent);
+                                        bootTraceProcessList.RemoveAll(p => p.PID == processId);  // to support pid recycling
+                                    }
+                                    else
+                                    {
+                                        // doesn't exist, so let's add it to our interim collection
+                                        bootTraceProcessList.Add(processPartial);
+                                    }
                                 }
                             }
                         }
