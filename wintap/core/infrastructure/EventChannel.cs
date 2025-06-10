@@ -37,6 +37,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private static ConcurrentQueue<WintapMessage> eventBuffer;
         private static Stopwatch bufferProcessingInterval;
         private static int droppedEventCount;
+        private static int MAX_BUFFER_SIZE = 5000;
 
         public static long EventsPerSecond { get { return eventsPerSecond; } }
         public static long MaxEventsPerSecond { get { return maxEventsPerSecond; } }
@@ -266,6 +267,12 @@ namespace gov.llnl.wintap.core.infrastructure
                     maxEventTime = DateTime.Now;
                 }
 
+                if (eventBuffer.Count >= MAX_BUFFER_SIZE)
+                {
+                    eventBuffer.TryDequeue(out _);  // Discard oldest event
+                    WintapLogger.Log.Append($"ERROR esper event Buffer full!  current size: {eventBuffer.Count} max size: {MAX_BUFFER_SIZE}, discarding oldest event", LogLevel.Always);
+                }
+
                 while (eventBuffer.Count > 0)
                 {
                     WintapMessage bufferedEvent;
@@ -286,8 +293,11 @@ namespace gov.llnl.wintap.core.infrastructure
                         }
                         catch (Exception ex)
                         {
-                            droppedEventCount++;
-                            WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message + ", total dropped event count: " + droppedEventCount, LogLevel.Info);
+                            if(bufferedEvent.PID != StateManager.WintapPID)
+                            {
+                                droppedEventCount++;
+                                WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message + ", total dropped event count: " + droppedEventCount, LogLevel.Info);
+                            }
                         }
                     }
                 }

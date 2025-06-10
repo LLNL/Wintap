@@ -378,7 +378,8 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
                     }
                     else
                     {
-                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}", LogLevel.Info);
+                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}, hardcoding drive assignment to C:", LogLevel.Always);
+                        newPath = originalPath.Replace(nativePrefix + volumeNumber, "c:");
                     }
                 }
                 else
@@ -396,11 +397,12 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
                 }
                 catch (Exception ex2)
                 {
-                    WintapLogger.Log.Append("Error translating, path: " + originalPath + "   error: " + ex2.Message, LogLevel.Info);
+                    WintapLogger.Log.Append("Error translating, path: " + originalPath + "   error: " + ex2.Message, LogLevel.Always);
                 }
             }
             return newPath;
         }
+
 
         private string fromUnix(string originalPath)
         {
