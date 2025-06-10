@@ -296,7 +296,7 @@ namespace gov.llnl.wintap.core.infrastructure
                             if(bufferedEvent.PID != StateManager.WintapPID)
                             {
                                 droppedEventCount++;
-                                WintapLogger.Log.Append("WARN: dropping event. No PidHash association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message + ", total dropped event count: " + droppedEventCount, LogLevel.Info);
+                                WintapLogger.Log.Append("WARN: dropping event. No PidHash  association for " + bufferedEvent.MessageType + " pid: " + bufferedEvent.PID + " exception:" + ex.Message + ", total dropped event count: " + droppedEventCount, LogLevel.Info);
                             }
                         }
                     }
