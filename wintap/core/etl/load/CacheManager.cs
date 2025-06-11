@@ -386,11 +386,11 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 WintapLogger.Log.Append("max cache size exceeded. pruning oldest files", LogLevel.Info);
                 long currentSizeBytes = 0;
-                IOrderedEnumerable<FileInfo> cacheFiles = cacheDir.GetFiles().OrderByDescending(f => f.CreationTime);  // oldest first
+                IOrderedEnumerable<FileInfo> cacheFiles = mergeDir.GetFiles().OrderByDescending(f => f.CreationTime);  // oldest first
                 foreach (FileInfo fi in cacheFiles)
                 {
                     currentSizeBytes += fi.Length;
-                    if (currentSizeBytes > (maxCacheSizeBytes))
+                    if (getCurrentCacheDirSize() > (maxCacheSizeBytes))
                     {
                         deleteFile(fi);
                     }

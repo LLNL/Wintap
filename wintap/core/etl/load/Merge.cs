@@ -77,7 +77,7 @@ namespace gov.llnl.wintap.core.etl.load
                             }
                             catch(Exception ex)
                             {
-                                WintapLogger.Log.Append($"Could not merge for default serializer type {defaultMergeType}", LogLevel.Error);
+                                WintapLogger.Log.Append($"Could not merge for default serializer type {defaultMergeType}: {ex.Message}", LogLevel.Error);
                             }
                             
                         }
@@ -116,7 +116,13 @@ namespace gov.llnl.wintap.core.etl.load
             }
 
 
-            WintapLogger.Log.Append("Merge complete!", LogLevel.Info);
+
+            foreach(FileInfo mergedParquet in new DirectoryInfo(parquetSearchRoot).GetFiles("*.parquet"))
+            {
+                mergedParquet.Delete();
+            }
+
+            WintapLogger.Log.Append("Merge and cleanup complete!", LogLevel.Info);
         }
 
         private static string renameSensor(string _sensorName)

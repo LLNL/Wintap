@@ -130,7 +130,7 @@ try
     //key = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 
     ApiKeyCredential cred = new ApiKeyCredential(key!);
-    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4.1");
+    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4o-commercial");
 
     // Create a sampling client.
     using IChatClient chatClient = openAIClient.AsIChatClient()

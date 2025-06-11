@@ -52,6 +52,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 wintapBuilder.ImageLoad.ImageSize = obj.ImageSize;
                 wintapBuilder.ImageLoad.DefaultBase = obj.DefaultBase.ToString();
                 wintapBuilder.ImageLoad.ImageBase = obj.ImageBase.ToString();
+                wintapBuilder.ImageLoad.MD5 = "";
                 WintapMessage.ImageLoadObject cachedImageLoad = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault();
                 if (cachedImageLoad != null)
                 {
@@ -84,6 +85,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 wintapBuilder.ImageLoad.ImageSize = obj.ImageSize;
                 wintapBuilder.ImageLoad.DefaultBase = obj.DefaultBase.ToString();
                 wintapBuilder.ImageLoad.ImageBase = obj.ImageBase.ToString();
+                wintapBuilder.ImageLoad.MD5 = "";
                 WintapMessage.ImageLoadObject cachedImageLoad = eventCache.Where(ec => ec.FileName == wintapBuilder.ImageLoad.FileName).FirstOrDefault();
                 if (cachedImageLoad != null)
                 {

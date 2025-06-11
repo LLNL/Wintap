@@ -50,7 +50,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 }
                 if (obj.PayloadNames.Contains("User"))
                 {
-                    msg.WMI.Operation = obj.PayloadByName("User").ToString();
+                    msg.WMI.User = obj.PayloadByName("User").ToString();
                 }
                 if (obj.PayloadNames.Contains("IsLocal"))
                 {
