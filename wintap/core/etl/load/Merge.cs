@@ -6,6 +6,7 @@ using Antlr4.Runtime.Misc;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.etl.shared;
 using DuckDB.NET.Data;
+using System.Collections.Generic;
 
 namespace gov.llnl.wintap.core.etl.load
 {
@@ -32,9 +33,56 @@ namespace gov.llnl.wintap.core.etl.load
             // MERGE PARQUET
             try
             {
-                if (parquetSearchRoot.EndsWith("default_sensor"))
+                if (parquetSearchRoot.EndsWith("defaultserializer"))
                 {
-                    callMergeOnDefaultTypes(parquetSearchRoot, mergeTime.ToFileTimeUtc());
+                    List<string> defaultTypes = new List<string>();
+                    // run merge on each contained type handled by default serializer
+                    DirectoryInfo defaultRoot = new DirectoryInfo(parquetSearchRoot);
+                    if (defaultRoot.Exists)
+                    {
+                        foreach(FileInfo file in defaultRoot.GetFiles())
+                        {
+                            string defaultType = file.Name.ToLower().Split('-')[0];
+                            if(!defaultTypes.Contains(defaultType))
+                            {
+                                defaultTypes.Add(defaultType);
+                            }
+                        }
+                        foreach (string defaultMergeType in defaultTypes)
+                        {
+                            WintapLogger.Log.Append($"Attempting parquet merge on default serializer type: {defaultMergeType}", LogLevel.Info);
+                            try
+                            {
+                                sensorName = defaultMergeType;
+                                using (var duckDBConnection = new DuckDBConnection("Data Source=:memory:"))
+                                {
+                                    // duckdb doesn't like the '+' character in table names, so name the table as  sensorName and then rename the file on disk to our expected format
+                                    duckDBConnection.Open();
+                                    var command = duckDBConnection.CreateCommand();
+                                    string parquetDir = Path.Combine(Strings.ParquetDataPath, "merged");
+                                    string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
+                                    string tempFileName = sensorName;
+                                    command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/" + defaultMergeType + "*.parquet';";
+                                    WintapLogger.Log.Append("Duck db command: " + command.CommandText, LogLevel.Info);
+                                    var executeNonQuery = command.ExecuteNonQuery();
+                                    command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
+                                    executeNonQuery = command.ExecuteNonQuery();
+                                    FileInfo tempFile = new FileInfo(Path.Combine(parquetDir, tempFileName + ".parquet"));
+                                    FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir, mergeFileName + ".parquet"));
+                                    tempFile.MoveTo(mergeFile.FullName);
+                                    command.CommandText = $"DROP TABLE IF EXISTS {tempFileName}";
+                                    command.ExecuteNonQuery();
+                                    WintapLogger.Log.Append("Table dropped: " + tempFileName, LogLevel.Info);
+                                }
+                            }
+                            catch(Exception ex)
+                            {
+                                WintapLogger.Log.Append($"Could not merge for default serializer type {defaultMergeType}", LogLevel.Error);
+                            }
+                            
+                        }
+                    }
+                    // split filenames by '-' to get distinct set of default types
                 }
                 else
                 {
@@ -56,12 +104,6 @@ namespace gov.llnl.wintap.core.etl.load
                         FileInfo tempFile = new FileInfo(Path.Combine(parquetDir, tempFileName + ".parquet"));
                         FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir, mergeFileName + ".parquet"));
                         tempFile.MoveTo(mergeFile.FullName);
-                        // WintapRecorder support - todo:  not sure how I want to handle this just yet...
-                        //if (RecordingSession.NowRecording(log))
-                        //{
-                        //    WintapLogger.Log.Append("Mirroring merged parquet to recording directory: " + mergeFile, LogLevel.Info);
-                        //    RecordingSession.Record(mergeFile.FullName, sensorName, log);
-                        //}
                         command.CommandText = $"DROP TABLE IF EXISTS {tempFileName}";
                         command.ExecuteNonQuery();
                         WintapLogger.Log.Append("Table dropped: " + tempFileName, LogLevel.Info);
@@ -79,40 +121,30 @@ namespace gov.llnl.wintap.core.etl.load
 
         private static string renameSensor(string _sensorName)
         {
-            if (_sensorName.ToLower() == "tcpconnection_sensor")
+            if (_sensorName.ToLower().StartsWith("tcpconnection"))
             {
                 _sensorName = "tcp_process_conn_incr";
             }
-            if (_sensorName.ToLower() == "udppacket_sensor")
+            if (_sensorName.ToLower().StartsWith("udppacket"))
             {
                 _sensorName = "udp_process_conn_incr";
             }
             return _sensorName;
         }
 
-        // call this program for all default_sensor subtypes
-        private static void callMergeOnDefaultTypes(string parquetSearchRoot, long eventTime)
-        {
-            DirectoryInfo directoryInfo = new DirectoryInfo(parquetSearchRoot);
-            foreach (DirectoryInfo defaultType in directoryInfo.GetDirectories())
-            {
-                runCmdLine(defaultType.FullName, eventTime);
-            }
-        }
-
-        private static void runCmdLine(string path, long eventTime)
-        {
-            WintapLogger.Log.Append("Shelling out for parquet merge for sensor: " + path, LogLevel.Info);
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
-            psi.Arguments = path + " " + eventTime;
-            Process helperExe = new Process();
-            helperExe.StartInfo = psi;
-            WintapLogger.Log.Append("Attempting to rerun parquet merger: " + psi.FileName + " " + psi.Arguments, LogLevel.Info);
-            helperExe.Start();
-            helperExe.WaitForExit();
-            WintapLogger.Log.Append("MergeHelper complete on : " + path, LogLevel.Info);
-        }
+        //private static void runCmdLine(string path, long eventTime)
+        //{
+        //    WintapLogger.Log.Append("Shelling out for parquet merge for sensor: " + path, LogLevel.Info);
+        //    ProcessStartInfo psi = new ProcessStartInfo();
+        //    psi.FileName = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
+        //    psi.Arguments = path + " " + eventTime;
+        //    Process helperExe = new Process();
+        //    helperExe.StartInfo = psi;
+        //    WintapLogger.Log.Append("Attempting to rerun parquet merger: " + psi.FileName + " " + psi.Arguments, LogLevel.Info);
+        //    helperExe.Start();
+        //    helperExe.WaitForExit();
+        //    WintapLogger.Log.Append("MergeHelper complete on : " + path, LogLevel.Info);
+        //}
 
         private static void processInputs(string[] args)
         {
