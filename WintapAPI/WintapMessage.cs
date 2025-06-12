@@ -415,7 +415,7 @@ namespace gov.llnl.wintap.collect.models
             private long? notifyRoutineAddress;
             private uint? targetThreatId;
 
-            public ApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId)
+            public ApiCallData(string _providerName, int _targetPid, uint? _desiredAccess, uint _returnCode, string _linkSourceName, string _linkTargetName, long? _notifyRoutineAddress, uint? _targetThreatId, int _threadId, string _targetProcessName, string _desiredAccessString)
             {
                 providerName = _providerName;
                 targetPid = _targetPid;
@@ -426,6 +426,8 @@ namespace gov.llnl.wintap.collect.models
                 notifyRoutineAddress = _notifyRoutineAddress;
                 targetThreatId = _targetThreatId;
                 threadId = _threadId;
+                TargetProcessName = _targetProcessName;
+                DesiredAccessString = _desiredAccessString;
             }
 
             public string ProviderName

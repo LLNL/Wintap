@@ -50,34 +50,34 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.PsSetLoadImageNotifyRoutine;
                     msg.ApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, 0, 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", Convert.ToInt64(obj.PayloadByName("NotifyRoutineAddress")), 0, obj.ThreadID);
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, 0, 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", Convert.ToInt64(obj.PayloadByName("NotifyRoutineAddress")), 0, obj.ThreadID, "", "");
                 }
                 else if (obj.EventName.Contains("EventID(2)"))
                 {
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.TerminateProcess;
                     msg.ApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID);
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID, obj.PayloadByName("TargetProcessName").ToString(), "");
                 }
                 else if (obj.EventName.Contains("EventID(3)"))
                 {
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.CreateSymbolicLink;
                     msg.ApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, 0, Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), obj.PayloadByName("LinkSourceName").ToString(), obj.PayloadByName("LinkTargetName").ToString(), 0, 0, obj.ThreadID);
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, 0, Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), obj.PayloadByName("LinkSourceName").ToString(), obj.PayloadByName("LinkTargetName").ToString(), 0, 0, obj.ThreadID, "", "");
                 }
                 else if (obj.EventName.Contains("EventID(4)"))
                 {
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.SetThreadContext;
                     msg.ApiCall.TargetProcessName = "";
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, 0, 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID);
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, 0, 0, Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID, "", "");
                 }
                 else if (obj.EventName.Contains("EventID(5)"))
                 {
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.OpenProcess;
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID);
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID, obj.PayloadByName("TargetProcessName").ToString(), obj.PayloadByName("DesiredAccessString").ToString());
                     msg.ApiCall.DesiredAccessString = translateDesiredAccessToEnum(msg.ApiCall.DesiredAccess);
                     try
                     {
@@ -92,7 +92,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 {
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.OpenThread;
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, Convert.ToUInt32(obj.PayloadByName("TargetThreatId")), obj.ThreadID);
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, Convert.ToUInt32(obj.PayloadByName("TargetThreatId")), obj.ThreadID, obj.PayloadByName("TargetProcessName").ToString(), obj.PayloadByName("DesiredAccessString").ToString());
                 }
                 EventChannel.Send(msg);
             }

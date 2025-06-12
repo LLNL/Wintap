@@ -378,25 +378,44 @@ namespace gov.llnl.wintap.core.etl.load
         /// </summary>
         private void pruneCache()
         {
+            // Determine free space and maximum cache size.
             long freeBytes = getFreeBytes(cacheDir.FullName.First() + ":\\");
             long maxCacheSizeBytes = 256000000;
+
+            // Get current cache size.
             bytesOnDisk = getCurrentCacheDirSize();
-            WintapLogger.Log.Append("cache prune finds current size of cache: " + bytesOnDisk + " bytes, max size: " + maxCacheSizeBytes + " bytes", LogLevel.Debug);
+            WintapLogger.Log.Append("cache prune finds current size of cache: " + bytesOnDisk + " bytes, max size: " + maxCacheSizeBytes + " bytes", LogLevel.Info);
+
+            // If the current cache size exceeds the maximum allowed.
             if (bytesOnDisk > maxCacheSizeBytes)
             {
-                WintapLogger.Log.Append("max cache size exceeded. pruning oldest files", LogLevel.Info);
-                long currentSizeBytes = 0;
-                IOrderedEnumerable<FileInfo> cacheFiles = mergeDir.GetFiles().OrderByDescending(f => f.CreationTime);  // oldest first
+                WintapLogger.Log.Append("max cache size exceeded. Pruning oldest files.", LogLevel.Info);
+
+                // Set a running total of current size.
+                long currentSizeBytes = bytesOnDisk;
+
+                // Get the list of files in cache, ordered by creation time ascending (oldest first).
+                IOrderedEnumerable<FileInfo> cacheFiles = mergeDir.GetFiles().OrderBy(f => f.CreationTime);
+
+                // Iterate files and delete them until the cache is below the maximum size.
                 foreach (FileInfo fi in cacheFiles)
                 {
-                    currentSizeBytes += fi.Length;
-                    if (getCurrentCacheDirSize() > (maxCacheSizeBytes))
+                    if (currentSizeBytes <= maxCacheSizeBytes)
                     {
-                        deleteFile(fi);
+                        // Stop once we’re within the size limit.
+                        break;
                     }
+
+                    fi.Delete();
+                    // If file deletion was successful, subtract its length from the current total.
+                    currentSizeBytes -= fi.Length;
+                    WintapLogger.Log.Append("Deleted file: " + fi.FullName + " (" + fi.Length + " bytes).", LogLevel.Debug);
                 }
-                WintapLogger.Log.Append("prune complete, new cache size: " + bytesOnDisk, LogLevel.Info);
+
+                WintapLogger.Log.Append("Prune complete, new cache size (estimated): " + currentSizeBytes, LogLevel.Info);
             }
+
+            // Recalculate the final cache size.
             bytesOnDisk = getCurrentCacheDirSize();
         }
 
