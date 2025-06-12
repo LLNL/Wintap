@@ -179,9 +179,9 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Add this to your existing interface declarations
     examplePrompts: string[] = [
-        "What Windows processes are consuming the most memory?",
-        "Show me how to monitor network connections in Wintap",
-        "Analyze file activity for suspicious patterns"
+        "An application recently stopped working, can you help me diagnose it?",
+        "Can you tell me if a specific application has connected to the internet?",
+        "Analyze the process tree for Explorer.exe, does it look complete and accurate?"
     ];
 
     // Add this method to handle example prompt clicks
