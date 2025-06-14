@@ -31,9 +31,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public override bool Start()
         {
-            enabled = true;  // disable throttling of TCP, too important.
+            enabled = true;  // disable throttling of TCP
+            
+            // IPv6 -- starting with just send/recv, will add the other handlers as we learn more about how want to model it
+            KernelParser.Instance.EtwParser.TcpIpSendIPV6 += EtwParser_TcpIpSendIPV6;
+            KernelParser.Instance.EtwParser.TcpIpRecvIPV6 += EtwParser_TcpIpRecvIPV6;
 
-            // typegroup 1 events
+            // typegroup 1 events            
             KernelParser.Instance.EtwParser.TcpIpReconnect += Kernel_TcpIp_TypeGroup1_Handler;
             KernelParser.Instance.EtwParser.TcpIpRecv += Kernel_TcpIp_TypeGroup1_Handler;
             KernelParser.Instance.EtwParser.TcpIpRetransmit += Kernel_TcpIp_TypeGroup1_Handler;
@@ -55,6 +59,52 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             CacheStatistics();
             enabled = true;
             return enabled;
+        }
+
+        private void EtwParser_TcpIpSendIPV6(TcpIpV6SendTraceData obj)
+        {
+            try
+            {
+                // todo:
+                // base.UpdateStatistics(obj.Source.EventsLost);
+                WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
+                msg.TcpConnection = new WintapMessage.TcpConnectionObject();
+                msg.TcpConnection.SourceAddress = obj.saddr.ToString();
+                msg.TcpConnection.SourcePort = obj.sport;
+                msg.TcpConnection.DestinationAddress = obj.daddr.ToString();
+                msg.TcpConnection.DestinationPort = obj.dport;
+                msg.TcpConnection.PacketSize = obj.size;
+                msg.TcpConnection.StartTime = obj.startime;
+                msg.TcpConnection.EndTime = obj.endtime;
+                msg.TcpConnection.SeqNo = obj.seqnum;
+                EventChannel.Send(msg);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error handling TcpIp event from ETW: " + ex.Message, LogLevel.Debug);
+            }
+        }
+
+        private void EtwParser_TcpIpRecvIPV6(TcpIpV6TraceData obj)
+        {
+            try
+            {
+                // todo:
+                // base.UpdateStatistics(obj.Source.EventsLost);
+                WintapMessage msg = getWintapTCPBuilder(obj, "TcpConnection");
+                msg.TcpConnection = new WintapMessage.TcpConnectionObject();
+                msg.TcpConnection.PacketSize = obj.size;
+                msg.TcpConnection.SeqNo = obj.seqnum;
+                msg.TcpConnection.SourceAddress = obj.saddr.ToString();
+                msg.TcpConnection.SourcePort = obj.sport;
+                msg.TcpConnection.DestinationAddress = obj.daddr.ToString();
+                msg.TcpConnection.DestinationPort = obj.dport;
+                EventChannel.Send(msg);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error handling TcpIp event from ETW: " + ex.Message, LogLevel.Debug);
+            }
         }
 
         void Kernel_TcpIp_TypeGroup1_Handler(TcpIpTraceData obj)

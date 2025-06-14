@@ -70,6 +70,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 // todo:
                 // base.UpdateStatistics(obj.Source.EventsLost);
+                if (obj.ProcessID == 13788)
+                {
+                    int i = 0;
+                }
                 WintapMessage wintapMsg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.UdpPacket);
                 if (Enum.TryParse(obj.EventName.Replace("/", ""), true, out WintapMessage.ActivityTypeEnum parsedActivityType))
                 {

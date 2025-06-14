@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.Win32;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -9,7 +10,8 @@ using System.Text;
 //  no try/catch so that any intentional breaking of this app will cause the app to fail
 
 
-Console.WriteLine("Signals is starting");
+Console.WriteLine("Signals is starting  awaiting pid harvest (press any key to continue)");
+Console.ReadLine();
 
 if(args.Contains("setup"))
 {
@@ -45,47 +47,56 @@ Console.WriteLine($"Loading dependency DLL from file system: {dependencyFile.Ful
 var assembly = System.Reflection.Assembly.LoadFrom(dependencyFile.FullName);
 
 
-// CONNECT to the internet
-using (HttpClient client = new HttpClient())
+// CONNECT to the internet using IPv4
+using (var handler = new SocketsHttpHandler())
 {
-    client.DefaultRequestVersion = new Version(1, 1);
-    client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact;
-
-    //  CONNECT to google
-    // URL to connect to (example: Google's homepage)
-    string url = "https://www.google.com";
-
-    // Send a GET request
-    HttpResponseMessage response = await client.GetAsync(url);
-
-    // Ensure the response is successful (status code 200-299)
-    response.EnsureSuccessStatusCode();
-
-    // Read the response content as a string
-    string responseBody = await response.Content.ReadAsStringAsync();
-
-    // Output the response
-    Console.WriteLine("Response received:");
-    Console.WriteLine(responseBody);
-}
-
-using (var client = new TcpClient("www.google.com", 80))
-using (var stream = client.GetStream())
-{
-    // Send a simple HTTP GET request
-    string request = "GET / HTTP/1.1\r\nHost: www.google.com\r\nConnection: close\r\n\r\n";
-    byte[] data = Encoding.ASCII.GetBytes(request);
-    stream.Write(data, 0, data.Length);
-
-    // Read the response
-    byte[] buffer = new byte[4096];
-    int bytesRead;
-    while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+    // Configure the handler to use IPv4 addresses
+    handler.ConnectCallback = async (context, cancellationToken) =>
     {
-        Console.Write(Encoding.ASCII.GetString(buffer, 0, bytesRead));
+        // Resolve host to IP addresses
+        var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host);
+
+        // Filter to only IPv4 addresses
+        var ipv4Addresses = entries.Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork).ToArray();
+
+        if (ipv4Addresses.Length == 0)
+        {
+            throw new Exception($"No IPv4 addresses found for {context.DnsEndPoint.Host}");
+        }
+
+        // Use the first IPv4 address
+        var ipv4Address = ipv4Addresses[0];
+
+        // Create a TCP client and connect using IPv4
+        var socket = new Socket(ipv4Address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+
+        await socket.ConnectAsync(ipv4Address, context.DnsEndPoint.Port, cancellationToken);
+
+        return new NetworkStream(socket, ownsSocket: true);
+    };
+
+    using (HttpClient client = new HttpClient(handler))
+    {
+        client.DefaultRequestVersion = new Version(1, 1);
+        client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact;
+
+        // URL to connect to (example: Google's homepage)
+        string url = "https://www.google.com";
+
+        // Send a GET request
+        HttpResponseMessage response = await client.GetAsync(url);
+
+        // Ensure the response is successful (status code 200-299)
+        response.EnsureSuccessStatusCode();
+
+        // Read the response content as a string
+        string responseBody = await response.Content.ReadAsStringAsync();
+
+        // Output the response
+        Console.WriteLine("Response received (via IPv4):");
+        Console.WriteLine(responseBody);
     }
 }
-
 
 
 
