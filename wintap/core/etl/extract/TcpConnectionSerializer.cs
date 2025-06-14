@@ -58,6 +58,11 @@ namespace gov.llnl.wintap.core.etl.extract
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.ActivityType = pci.IpEvent;
                 flatMsg.AgentId = sensorEvent["AgentId"].ToString();
+
+                // adding for convenience
+                flatMsg.SourceIpAddressString = sensorEvent["srcIp"].ToString();
+                flatMsg.DestinationIpAddressString = sensorEvent["destIp"].ToString();
+
                 this.Save(flatMsg);
                 sensorEvent = null;
                 flatMsg = null;
