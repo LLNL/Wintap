@@ -124,10 +124,9 @@ try
 
     OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
     openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api-dev.llnl.gov/v1") };
-    
 
-    string? key = "sk-eU9jfjiaKRN3tpLPyx2Dmw";
-    //key = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+    string? key = "";
+    key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
 
     ApiKeyCredential cred = new ApiKeyCredential(key!);
     var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4o-commercial");

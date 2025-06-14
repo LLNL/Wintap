@@ -47,55 +47,21 @@ Console.WriteLine($"Loading dependency DLL from file system: {dependencyFile.Ful
 var assembly = System.Reflection.Assembly.LoadFrom(dependencyFile.FullName);
 
 
-// CONNECT to the internet using IPv4
-using (var handler = new SocketsHttpHandler())
+// CONNECT to the internet
+using (HttpClient client = new HttpClient())
 {
-    // Configure the handler to use IPv4 addresses
-    handler.ConnectCallback = async (context, cancellationToken) =>
-    {
-        // Resolve host to IP addresses
-        var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host);
-
-        // Filter to only IPv4 addresses
-        var ipv4Addresses = entries.Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork).ToArray();
-
-        if (ipv4Addresses.Length == 0)
-        {
-            throw new Exception($"No IPv4 addresses found for {context.DnsEndPoint.Host}");
-        }
-
-        // Use the first IPv4 address
-        var ipv4Address = ipv4Addresses[0];
-
-        // Create a TCP client and connect using IPv4
-        var socket = new Socket(ipv4Address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-
-        await socket.ConnectAsync(ipv4Address, context.DnsEndPoint.Port, cancellationToken);
-
-        return new NetworkStream(socket, ownsSocket: true);
-    };
-
-    using (HttpClient client = new HttpClient(handler))
-    {
-        client.DefaultRequestVersion = new Version(1, 1);
-        client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact;
-
-        // URL to connect to (example: Google's homepage)
-        string url = "https://www.google.com";
-
-        // Send a GET request
-        HttpResponseMessage response = await client.GetAsync(url);
-
-        // Ensure the response is successful (status code 200-299)
-        response.EnsureSuccessStatusCode();
-
-        // Read the response content as a string
-        string responseBody = await response.Content.ReadAsStringAsync();
-
-        // Output the response
-        Console.WriteLine("Response received (via IPv4):");
-        Console.WriteLine(responseBody);
-    }
+    // CONNECT to google
+    // URL to connect to (example: Google's homepage)
+    string url = "https://www.google.com ";
+    // Send a GET request
+    HttpResponseMessage response = await client.GetAsync(url);
+    // Ensure the response is successful (status code 200-299)
+    response.EnsureSuccessStatusCode();
+    // Read the response content as a string
+    string responseBody = await response.Content.ReadAsStringAsync();
+    // Output the response
+    Console.WriteLine("Response received:");
+    Console.WriteLine(responseBody);
 }
 
 
