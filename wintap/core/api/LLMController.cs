@@ -17,6 +17,7 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 //using Microsoft.SemanticKernel.Text;
 using Microsoft.SemanticKernel.Embeddings;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 using Newtonsoft.Json;
 using OpenAI;
 using System;
@@ -65,23 +66,9 @@ namespace gov.llnl.wintap.core.api
     public class LLMController : ControllerBase
     {
         private readonly IHubContext<InferenceHub> hubContext;
-        //private ISemanticTextMemory memory;
-        //private ChatHistory chat;
-        //private IChatCompletionService ai;
-        //private Kernel kernel;
-
         private IMcpClient mcpClient;
         private IChatClient chatClient;
         private List<ChatMessage> chatHistory;
-
-        //public LLMController(IHubContext<InferenceHub> _hubContext, ISemanticTextMemory _memory, ChatHistory _chat, IChatCompletionService _ai, Kernel _kernel)
-        //{
-        //    this.hubContext = _hubContext;
-        //    memory = _memory;
-        //    chat = _chat;
-        //    ai = _ai;
-        //    kernel = _kernel;
-        //}
 
         public LLMController(IHubContext<InferenceHub> _hubContext, IMcpClient _mcpClient, IChatClient _chatClient, List<ChatMessage> _chatHistory)
         {
@@ -96,6 +83,20 @@ namespace gov.llnl.wintap.core.api
         {
             string question = promptModel.Prompt;
             WintapLogger.Log.Append($"Got inference request with question: {question}", LogLevel.Info);
+
+            // system prompt override
+            if(question == "An application recently stopped working, can you help me diagnose it?")
+            {
+                string existingPrompt = chatHistory.First().Text;
+                chatHistory.RemoveAt(0);
+                chatHistory.Add(new ChatMessage(ChatRole.System, existingPrompt + " " + @"To answer this particular question, you should prompt the user for the name of the process to analyse then, once you have it, follow these steps:
+
+Retrieve the process activity logs for both the failed run (most recent) and the most recent successful run of the identified process (you should assume the successful run is the run occuring just before the failed run containing the same command line parameters).
+Align the two sets of logs by event time to create a side-by-side timeline of events.
+Perform a temporal analysis to determine where the failed run deviated from—or stopped compared to—the successful run.
+Using the successful run’s sequence as a benchmark, infer which event should have occurred next in the failed run, and use this information to identify the potential root cause."));
+            }
+
             IList<McpClientTool> tools = await mcpClient.ListToolsAsync();
             // Create the message list with our time question
             ChatMessage userQuestion = new ChatMessage(ChatRole.User, question);
@@ -147,8 +148,7 @@ namespace gov.llnl.wintap.core.api
                 .UseFunctionInvocation()
                 .Build();
 
-            List<ChatMessage> chatHistory = [
-                new ChatMessage(ChatRole.System, System.IO.File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),];
+            List<ChatMessage> chatHistory = [new ChatMessage(ChatRole.System, System.IO.File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),];
         }
     }
 
