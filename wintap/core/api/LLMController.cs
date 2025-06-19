@@ -104,15 +104,26 @@ Using the successful run’s sequence as a benchmark, infer which event should hav
 
             try
             {
+                var chatOptions = new ChatOptions
+                {
+                    Tools = [.. tools], // Make MCP tools available to the model
+                    Temperature = 0.0f,
+                    // Remove AllowMultipleToolCalls entirely
+                    ToolMode = ChatToolMode.Auto
+                };
+
+                if (chatOptions.AdditionalProperties == null)
+                {
+                    chatOptions.AdditionalProperties = new AdditionalPropertiesDictionary();
+                }
+                chatOptions.AdditionalProperties["disabled_params"] = new Dictionary<string, object>
+                {
+                    ["parallel_tool_calls"] = null
+                };
+
                 var response = await chatClient.GetResponseAsync(
                     chatHistory,
-                    new ChatOptions
-                    {
-                        Tools = [.. tools], // Make MCP tools available to the model
-                        Temperature = 0.0f,
-                        AllowMultipleToolCalls = true,
-                        ToolMode = ChatToolMode.Auto
-                    }
+                    chatOptions
                 );
 
                 Inference inf = new Inference() { Prompt = question, Response = response.Text, TokensUsed = 0 };
