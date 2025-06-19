@@ -129,7 +129,7 @@ try
     key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
 
     ApiKeyCredential cred = new ApiKeyCredential(key!);
-    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4o-commercial");
+    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4.1");
 
     // Create a sampling client.
     using IChatClient chatClient = openAIClient.AsIChatClient()
