@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
@@ -23,6 +24,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
     /// </summary>
     internal class ProcessTrace : EtwProviderCollector
     {
+        const int EVENT_ENABLE_PROPERTY_SID = 0x00000001;
+        const int EVENT_ENABLE_PROPERTY_PROCESS_START_KEY = 0x00000080;
+
         internal readonly string etlBootTraceLogFile = "Wintap.Collectors.Process.ETLFile.BootTrace";
         internal List<WintapMessage> bootTraceProcessList = new List<WintapMessage>(); 
         internal ProcessTrace() { }
@@ -88,7 +92,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                                     }
 
                                 }
-                                if (data.EventName == "ImageLoad")
+                                else if (data.EventName == "ImageLoad")
                                 {
                                     //int processId = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
                                     int processId = data.ProcessID;
@@ -114,6 +118,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
                                     {
                                         // doesn't exist, so let's add it to our interim collection
                                         bootTraceProcessList.Add(processPartial);
+                                    }
+                                }
+                                else if (data.EventName == "ImageUnload")
+                                {
+                                    if (!bootTraceProcessList.Where(p => p.Process.ParentPID == p.PID).Any())
+                                    {
+                                        // no existing processes were spawned by the terminating process, we aren't tracking behavior of these during boot time
+                                        bootTraceProcessList.RemoveWhere(p => p.PID == data.ProcessID);
                                     }
                                 }
                             }
@@ -180,7 +192,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
             RegistryKey processSubKey = wmiKey.CreateSubKey("{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}");
             processSubKey.SetValue("Enabled", 1, RegistryValueKind.DWord);
             processSubKey.SetValue("EnableLevel", 0, RegistryValueKind.DWord);
-            processSubKey.SetValue("EnableProperty", 0, RegistryValueKind.DWord);
+            int enableProps = EVENT_ENABLE_PROPERTY_SID | EVENT_ENABLE_PROPERTY_PROCESS_START_KEY;
+            processSubKey.SetValue("EnableProperty", enableProps, RegistryValueKind.DWord);
             processSubKey.SetValue("MatchAnyKeyword", 80, RegistryValueKind.QWord);
             processSubKey.Flush();
             processSubKey.Close();

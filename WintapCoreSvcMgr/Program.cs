@@ -14,6 +14,7 @@ namespace gov.llnl.wintap
             //  HEALTHCHECK
             //  RESTART
             //  RUNDOWN
+            //  PRUNE    -- prunes out terminated processes from the process ETL log that have no ancestors 
             if (args.Length == 0)
             {
                 WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
@@ -63,6 +64,10 @@ namespace gov.llnl.wintap
             {
                 invokeEtwRundown();
             }
+            else if (args[0].ToUpper() == "PRUNE")
+            {
+                pruneProcessETL();
+            }
             else
             {
                 WintapLogger.Log.Append("Unknown parameter specified.", LogLevel.Info);
@@ -75,6 +80,11 @@ namespace gov.llnl.wintap
                 WintapLogger.Log.Close();
             }
             catch (Exception ex) { }
+        }
+
+        private static void pruneProcessETL()
+        {
+            
         }
 
         private static void invokeEtwRundown()
