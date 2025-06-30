@@ -123,7 +123,7 @@ try
     Console.WriteLine("Connecting client to MCP server");
 
     OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
-    openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api-dev.llnl.gov/v1")};
+    openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api.llnl.gov/v1")};
 
     string? key = "";
     key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
