@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Management;
 
-namespace gov.llnl.wintap.platform.windows.shared
+namespace gov.llnl.wintap.platform.windows.infrastructure
 {
     internal static class WindowsStateManager
     {
@@ -36,7 +36,7 @@ namespace gov.llnl.wintap.platform.windows.shared
             List<DiskVolume> driveMap = new List<DiskVolume>();
             string script = Environment.GetEnvironmentVariable("WINDIR") + @"\Temp\wintap_diskgather.txt";
             System.IO.File.WriteAllText(script, "list volume");
-            System.Diagnostics.Process diskPart = new Process();
+            Process diskPart = new Process();
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\System32\\diskpart.exe";
             psi.Arguments = "/S " + script;

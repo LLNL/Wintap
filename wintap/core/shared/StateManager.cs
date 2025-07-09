@@ -20,8 +20,8 @@ using System.IO;
 using Parquet.Schema;
 using Newtonsoft.Json;
 using System.Runtime.InteropServices;
-using gov.llnl.wintap.platform.windows.shared;
 using com.espertech.esper.runtime.client;
+using gov.llnl.wintap.platform.windows.infrastructure;
 
 namespace gov.llnl.wintap.core.shared
 {
