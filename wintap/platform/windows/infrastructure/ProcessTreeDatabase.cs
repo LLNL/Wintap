@@ -1,4 +1,5 @@
 ﻿using DuckDB.NET.Data;
+using gov.llnl.wintap.core.infrastructure;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -14,15 +15,14 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
     public class ProcessTreeDatabase : IDisposable
     {
         private readonly string _connectionString;
-        private readonly ILogger<ProcessTreeDatabase> _logger;
+        //private readonly ILogger<ProcessTreeDatabase> _logger;
         private DuckDBConnection _connection;
         private readonly object _lock = new object();
         private bool _disposed = false;
 
-        public ProcessTreeDatabase(string dbPath, ILogger<ProcessTreeDatabase> logger = null)
+        public ProcessTreeDatabase(string dbPath)
         {
             _connectionString = $"Data Source={dbPath}";
-            _logger = logger;
         }
 
         /// <summary>
@@ -35,7 +35,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 _connection = new DuckDBConnection(_connectionString);
                 await _connection.OpenAsync();
 
-                _logger?.LogInformation("Initializing ProcessTree database schema");
+                WintapLogger.Log.Append("Initializing ProcessTree database schema", core.infrastructure.LogLevel.Info);
 
                 // Create main process table
                 await CreateProcessTableAsync();
