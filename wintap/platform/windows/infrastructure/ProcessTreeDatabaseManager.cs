@@ -1,7 +1,8 @@
-﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+﻿using gov.llnl.wintap.core.infrastructure;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,24 +30,23 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
     public class ProcessTreeDatabaseManager : BackgroundService
     {
         private readonly ProcessTreeDatabaseConfig _config;
-        private readonly ILogger<ProcessTreeDatabaseManager> _logger;
         private ProcessTreeDatabase _database;
         private Timer _compactionTimer;
         private Timer _healthCheckTimer;
         private readonly SemaphoreSlim _operationSemaphore = new SemaphoreSlim(1, 1);
 
-        public ProcessTreeDatabaseManager(
-            IOptions<ProcessTreeDatabaseConfig> config,
-            ILogger<ProcessTreeDatabaseManager> logger)
+        public ProcessTreeDatabaseManager(IOptions<ProcessTreeDatabaseConfig> config)
         {
             _config = config.Value;
-            _logger = logger;
         }
 
         /// <summary>
         /// Get the active database instance
         /// </summary>
-        public ProcessTreeDatabase Database => _database;
+        public ProcessTreeDatabase Database
+        {
+            get { return _database; }
+        }
 
         /// <summary>
         /// Initialize the database manager
@@ -55,7 +55,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             try
             {
-                _logger.LogInformation("Starting ProcessTree Database Manager");
+                WintapLogger.Log.Append("Starting ProcessTree Database Manager", LogLevel.Info);
 
                 // Handle boot cleanup if configured
                 if (_config.DeleteDatabaseOnBoot)
@@ -72,13 +72,13 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 // Start maintenance timers
                 StartMaintenanceTimers();
 
-                _logger.LogInformation("ProcessTree Database Manager started successfully");
+                WintapLogger.Log.Append("ProcessTree Database Manager started successfully", LogLevel.Info);
 
                 await base.StartAsync(cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to start ProcessTree Database Manager");
+                WintapLogger.Log.Append($"Failed to start ProcessTree Database Manager: {ex.Message}", LogLevel.Error);
                 throw;
             }
         }
@@ -105,7 +105,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error in ProcessTree Database Manager background service");
+                    WintapLogger.Log.Append($"Error in ProcessTree Database Manager background service: {ex.Message}", LogLevel.Error);
                 }
             }
         }
@@ -119,7 +119,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             {
                 if (File.Exists(_config.DatabasePath))
                 {
-                    _logger.LogInformation("Deleting existing database for clean boot start");
+                    WintapLogger.Log.Append($"Deleting database file on boot: {_config.DatabasePath}", LogLevel.Info);
                     File.Delete(_config.DatabasePath);
 
                     // Also delete WAL file if it exists
@@ -132,7 +132,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to delete database on boot, continuing anyway");
+                WintapLogger.Log.Append($"Failed to delete database file on boot: {ex.Message}", LogLevel.Warn);
             }
         }
 
@@ -145,23 +145,33 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
-                _logger.LogInformation("Created database directory: {Directory}", directory);
+                WintapLogger.Log.Append($"Created database directory: {directory}", LogLevel.Info);
             }
         }
 
         /// <summary>
-        /// Initialize the database with schema
+        /// Initialize the database
         /// </summary>
         private async Task InitializeDatabaseAsync()
         {
-            // TODO: Fix logger type mismatch - for now use null
-            _database = new ProcessTreeDatabase(_config.DatabasePath, null);
-            await _database.InitializeAsync();
-            _logger.LogInformation("Database initialized at: {DatabasePath}", _config.DatabasePath);
+            await _operationSemaphore.WaitAsync();
+            try
+            {
+                WintapLogger.Log.Append($"Initializing ProcessTree database at: {_config.DatabasePath}", LogLevel.Info);
+
+                _database = new ProcessTreeDatabase(_config.DatabasePath);
+                _database.InitializeAsync(); // Backward compatibility
+
+                WintapLogger.Log.Append("ProcessTree database initialized successfully", LogLevel.Info);
+            }
+            finally
+            {
+                _operationSemaphore.Release();
+            }
         }
 
         /// <summary>
-        /// Start maintenance timers for compaction and health checks
+        /// Start maintenance timers
         /// </summary>
         private void StartMaintenanceTimers()
         {
@@ -173,7 +183,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     _config.CompactionInterval,
                     _config.CompactionInterval);
 
-                _logger.LogInformation("Started compaction timer with interval: {Interval}", _config.CompactionInterval);
+                WintapLogger.Log.Append($"Compaction timer started - interval: {_config.CompactionInterval}", LogLevel.Info);
             }
 
             _healthCheckTimer = new Timer(
@@ -182,30 +192,26 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 _config.HealthCheckInterval,
                 _config.HealthCheckInterval);
 
-            _logger.LogInformation("Started health check timer with interval: {Interval}", _config.HealthCheckInterval);
+            WintapLogger.Log.Append($"Health check timer started - interval: {_config.HealthCheckInterval}", LogLevel.Info);
         }
 
         /// <summary>
-        /// Perform smart compaction operation
+        /// Perform database compaction
         /// </summary>
-        public async Task<CompactionResult> PerformCompactionAsync()
+        private async Task PerformCompactionAsync()
         {
             await _operationSemaphore.WaitAsync();
             try
             {
-                _logger.LogInformation("Starting database compaction");
+                WintapLogger.Log.Append("Starting database compaction", LogLevel.Info);
 
-                var result = await Task.Run(() => _database.PerformSmartCompaction());
+                var processesRemoved = await Task.Run(() => _database.PerformSmartCompaction());
 
-                _logger.LogInformation("Compaction completed: {ProcessesDeleted} processes deleted, {ReductionPercent:F1}% reduction",
-                    result.ProcessesDeleted, result.CompactionRatio * 100);
-
-                return result;
+                WintapLogger.Log.Append($"Database compaction completed successfully. Processes removed: {processesRemoved}", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Database compaction failed");
-                throw;
+                WintapLogger.Log.Append($"Error during database compaction: {ex.Message}", LogLevel.Error);
             }
             finally
             {
@@ -214,144 +220,114 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         /// <summary>
-        /// Perform health check and log status
+        /// Perform health check
         /// </summary>
-        public async Task<DatabaseHealthStatus> PerformHealthCheckAsync()
+        private async Task PerformHealthCheckAsync()
         {
             try
             {
-                var health = new DatabaseHealthStatus();
-
-                // Check database connectivity
-                var stats = await Task.Run(() => _database.GetDatabaseStats());
-                health.DatabaseConnected = true;
-                health.TotalProcesses = stats.TotalProcesses;
-                health.ActiveProcesses = stats.ActiveProcesses;
-                health.DatabaseSize = stats.DatabaseSize;
-
-                // Check database size
-                var dbFileInfo = new FileInfo(_config.DatabasePath);
-                if (dbFileInfo.Exists)
-                {
-                    var sizeMB = dbFileInfo.Length / (1024 * 1024);
-                    health.DatabaseSizeMB = sizeMB;
-                    health.DatabaseSizeHealthy = sizeMB < _config.MaxDatabaseSizeMB;
-
-                    if (!health.DatabaseSizeHealthy)
-                    {
-                        _logger.LogWarning("Database size ({SizeMB}MB) exceeds maximum ({MaxSizeMB}MB)",
-                            sizeMB, _config.MaxDatabaseSizeMB);
-                    }
-                }
-
-                // Check for orphaned processes
-                health.OrphanedProcesses = stats.TotalProcesses - stats.ActiveProcesses - stats.ExitedProcesses;
-                health.HasOrphanedProcesses = health.OrphanedProcesses > 0;
-
-                // Overall health
-                health.IsHealthy = health.DatabaseConnected &&
-                                 health.DatabaseSizeHealthy &&
-                                 !health.HasOrphanedProcesses;
+                var health = await GetDatabaseHealthAsync();
 
                 if (!health.IsHealthy)
                 {
-                    _logger.LogWarning("Database health check failed: Connected={Connected}, SizeHealthy={SizeHealthy}, HasOrphans={HasOrphans}",
-                        health.DatabaseConnected, health.DatabaseSizeHealthy, health.HasOrphanedProcesses);
+                    WintapLogger.Log.Append($"Database health check failed: Connected={health.DatabaseConnected}, SizeHealthy={health.DatabaseSizeHealthy}, OrphanedProcesses={health.HasOrphanedProcesses}", LogLevel.Warn);
                 }
 
-                return health;
+                // Log periodic health stats
+                WintapLogger.Log.Append($"Database health: TotalProcesses={health.TotalProcesses}, ActiveProcesses={health.ActiveProcesses}, SizeMB={health.DatabaseSizeMB}", LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Health check failed");
-                return new DatabaseHealthStatus { DatabaseConnected = false, IsHealthy = false };
+                WintapLogger.Log.Append($"Error during health check: {ex.Message}", LogLevel.Error);
             }
         }
 
         /// <summary>
-        /// Force immediate compaction (used by scheduled tasks)
+        /// Get database health status
         /// </summary>
-        public async Task ForceCompactionAsync()
+        public async Task<DatabaseHealthStatus> GetDatabaseHealthAsync()
         {
-            _logger.LogInformation("Force compaction requested");
-            await PerformCompactionAsync();
-        }
-
-        /// <summary>
-        /// Get current database statistics
-        /// </summary>
-        public async Task<DatabaseStats> GetDatabaseStatsAsync()
-        {
-            return await Task.Run(() => _database.GetDatabaseStats());
-        }
-
-        /// <summary>
-        /// Add process from boot trace
-        /// </summary>
-        public async Task<bool> AddProcessFromBootTraceAsync(int processId, int? parentProcessId,
-            string processName, string imagePath, DateTime createTime, string commandLine = null)
-        {
-            var process = new ProcessRecord
+            try
             {
-                ProcessId = processId,
-                ParentProcessId = parentProcessId,
-                ProcessName = processName,
-                ImagePath = imagePath,
-                CommandLine = commandLine ?? string.Empty,
-                CreateTime = createTime,
-                IsActive = true,
-                Source = "boot_trace",
-                UniqueProcessKey = GenerateUniqueProcessKey(processId, createTime),
-                HasLiveDescendants = false // Will be updated during compaction
-            };
+                var stats = await Task.Run(() => _database.GetDatabaseStats());
+                var fileInfo = new FileInfo(_config.DatabasePath);
 
-            return await Task.Run(() => _database.UpsertProcess(process));
+                var exitedProcesses = stats.TotalProcesses - stats.ActiveProcesses;
+
+                return new DatabaseHealthStatus
+                {
+                    DatabaseConnected = _database != null,
+                    DatabaseSizeHealthy = fileInfo.Length / 1024 / 1024 < _config.MaxDatabaseSizeMB,
+                    HasOrphanedProcesses = exitedProcesses > stats.TotalProcesses * 0.5, // More than 50% exited
+                    IsHealthy = _database != null &&
+                               fileInfo.Length / 1024 / 1024 < _config.MaxDatabaseSizeMB &&
+                               exitedProcesses <= stats.TotalProcesses * 0.5,
+                    TotalProcesses = stats.TotalProcesses,
+                    ActiveProcesses = stats.ActiveProcesses,
+                    OrphanedProcesses = exitedProcesses,
+                    DatabaseSizeMB = fileInfo.Length / 1024 / 1024,
+                    DatabaseSize = $"{fileInfo.Length / 1024 / 1024:F1} MB"
+                };
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to get database health status: {ex.Message}", LogLevel.Error);
+                return new DatabaseHealthStatus
+                {
+                    IsHealthy = false,
+                    DatabaseConnected = false
+                };
+            }
         }
 
         /// <summary>
-        /// Add process from mini-trace
+        /// Add or update process in database
         /// </summary>
-        public async Task<bool> AddProcessFromMiniTraceAsync(int processId, int? parentProcessId,
-            string processName, string imagePath, DateTime createTime, string commandLine = null)
+        public async Task<bool> AddOrUpdateProcessAsync(
+            int processId,
+            int parentProcessId,
+            string processName,
+            string imagePath,
+            string commandLine,
+            DateTime createTime,
+            string userName = null)
         {
-            var process = new ProcessRecord
+            try
             {
-                ProcessId = processId,
-                ParentProcessId = parentProcessId,
-                ProcessName = processName,
-                ImagePath = imagePath,
-                CommandLine = commandLine ?? string.Empty,
-                CreateTime = createTime,
-                IsActive = true,
-                Source = "mini_trace",
-                UniqueProcessKey = GenerateUniqueProcessKey(processId, createTime),
-                HasLiveDescendants = false
-            };
+                // Generate PidHash for this process
+                var pidHash = GeneratePidHash(processId, createTime);
 
-            return await Task.Run(() => _database.UpsertProcess(process));
-        }
+                // Look up parent PidHash if parent exists
+                string parentPidHash = null;
+                if (parentProcessId > 0)
+                {
+                    var parentProcess = await Task.Run(() => _database.GetProcessById(parentProcessId));
+                    parentPidHash = parentProcess?.PidHash;
+                }
 
-        /// <summary>
-        /// Add process from real-time ETW
-        /// </summary>
-        public async Task<bool> AddProcessFromRealTimeAsync(int processId, int? parentProcessId,
-            string processName, string imagePath, DateTime createTime, string commandLine = null)
-        {
-            var process = new ProcessRecord
+                var process = new ProcessRecord
+                {
+                    PidHash = pidHash,
+                    ParentPidHash = parentPidHash,
+                    ProcessId = processId,
+                    ParentProcessId = parentProcessId,
+                    ProcessName = processName ?? string.Empty,
+                    ImagePath = imagePath ?? string.Empty,
+                    CommandLine = commandLine ?? string.Empty,
+                    CreateTime = createTime,
+                    IsActive = true,
+                    Source = "real_time",
+                    HasLiveDescendants = false,
+                    UserName = userName
+                };
+
+                return await Task.Run(() => _database.UpsertProcess(process));
+            }
+            catch (Exception ex)
             {
-                ProcessId = processId,
-                ParentProcessId = parentProcessId,
-                ProcessName = processName,
-                ImagePath = imagePath,
-                CommandLine = commandLine ?? string.Empty,
-                CreateTime = createTime,
-                IsActive = true,
-                Source = "real_time",
-                UniqueProcessKey = GenerateUniqueProcessKey(processId, createTime),
-                HasLiveDescendants = false
-            };
-
-            return await Task.Run(() => _database.UpsertProcess(process));
+                WintapLogger.Log.Append($"Failed to add/update process {processId}: {ex.Message}", LogLevel.Error);
+                return false;
+            }
         }
 
         /// <summary>
@@ -359,17 +335,26 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// </summary>
         public async Task<bool> MarkProcessExitedAsync(int processId, DateTime exitTime, int? exitCode = null)
         {
-            var process = await Task.Run(() => _database.GetProcessById(processId));
-            if (process != null)
+            try
             {
-                process.ExitTime = exitTime;
-                process.ExitCode = exitCode;
-                process.IsActive = false;
+                var process = await Task.Run(() => _database.GetProcessById(processId));
+                if (process != null)
+                {
+                    process.ExitTime = exitTime;
+                    process.ExitCode = exitCode;
+                    process.IsActive = false;
 
-                return await Task.Run(() => _database.UpsertProcess(process));
+                    return await Task.Run(() => _database.UpsertProcess(process));
+                }
+
+                WintapLogger.Log.Append($"Process {processId} not found when marking as exited", LogLevel.Warn);
+                return false;
             }
-
-            return false;
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to mark process {processId} as exited: {ex.Message}", LogLevel.Error);
+                return false;
+            }
         }
 
         /// <summary>
@@ -377,17 +362,93 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// </summary>
         public async Task<ProcessRecord> GetProcessForAttributionAsync(int processId)
         {
-            return await Task.Run(() => _database.GetProcessById(processId));
+            try
+            {
+                return await Task.Run(() => _database.GetProcessById(processId));
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to get process for attribution {processId}: {ex.Message}", LogLevel.Error);
+                return null;
+            }
         }
 
         /// <summary>
-        /// Generate unique process key (PidHash equivalent)
+        /// Get process by PidHash (primary key lookup)
         /// </summary>
-        private long GenerateUniqueProcessKey(int processId, DateTime createTime)
+        public async Task<ProcessRecord> GetProcessByPidHashAsync(string pidHash)
         {
-            // Simple hash combining PID and create time
+            try
+            {
+                return await Task.Run(() => _database.GetProcessByPidHash(pidHash));
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to get process by PidHash {pidHash}: {ex.Message}", LogLevel.Error);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Get all child processes of a given process
+        /// </summary>
+        public async Task<List<ProcessRecord>> GetChildProcessesAsync(string parentPidHash)
+        {
+            try
+            {
+                return await Task.Run(() => _database.GetChildProcesses(parentPidHash));
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to get child processes for {parentPidHash}: {ex.Message}", LogLevel.Error);
+                return new List<ProcessRecord>();
+            }
+        }
+
+        /// <summary>
+        /// Get the full process tree
+        /// </summary>
+        public async Task<List<ProcessRecord>> GetProcessTreeAsync(string rootPidHash = null)
+        {
+            try
+            {
+                return await Task.Run(() => _database.GetProcessTree(rootPidHash));
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to get process tree: {ex.Message}", LogLevel.Error);
+                return new List<ProcessRecord>();
+            }
+        }
+
+        /// <summary>
+        /// Generate PidHash for a process - this is the core identifier that eliminates PID recycling
+        /// </summary>
+        private string GeneratePidHash(int processId, DateTime createTime)
+        {
+            // Create a hash from PID + create time to ensure uniqueness
+            // This approach ensures that even if a PID is recycled, the hash will be different
             var timeHash = createTime.ToFileTimeUtc();
-            return ((long)processId << 32) | (timeHash & 0xFFFFFFFF);
+            var combinedHash = ((long)processId << 32) | (timeHash & 0xFFFFFFFF);
+
+            // Convert to hex string for database storage
+            return $"PID_{processId:X}_{timeHash:X16}";
+        }
+
+        /// <summary>
+        /// Get database statistics
+        /// </summary>
+        public async Task<DatabaseStats> GetDatabaseStatsAsync()
+        {
+            try
+            {
+                return await Task.Run(() => _database.GetDatabaseStats());
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to get database stats: {ex.Message}", LogLevel.Error);
+                return new DatabaseStats();
+            }
         }
 
         /// <summary>
@@ -395,7 +456,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// </summary>
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Stopping ProcessTree Database Manager");
+            WintapLogger.Log.Append("Stopping ProcessTree Database Manager", LogLevel.Info);
 
             _compactionTimer?.Dispose();
             _healthCheckTimer?.Dispose();
@@ -409,7 +470,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Final compaction failed during shutdown");
+                    WintapLogger.Log.Append($"Final compaction failed during shutdown: {ex.Message}", LogLevel.Warn);
                 }
             }
 
@@ -417,7 +478,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             _operationSemaphore?.Dispose();
 
             await base.StopAsync(cancellationToken);
-            _logger.LogInformation("ProcessTree Database Manager stopped");
+            WintapLogger.Log.Append("ProcessTree Database Manager stopped", LogLevel.Info);
         }
     }
 

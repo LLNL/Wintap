@@ -12,6 +12,7 @@ using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.platform.windows.infrastructure;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
@@ -33,6 +34,22 @@ using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
+
+builder.Services.Configure<ProcessTreeDatabaseConfig>(options =>
+{
+    options.DatabasePath = @"C:\ProgramData\Wintap\ProcessTree\live-processes.duckdb";
+    options.CompactionEnabled = true;
+    options.CompactionInterval = TimeSpan.FromHours(1);
+    options.DeleteDatabaseOnBoot = true;
+    options.EnableBootTraceProcessing = true;
+    options.MaxDatabaseSizeMB = 500;
+    options.HealthCheckInterval = TimeSpan.FromMinutes(5);
+});
+
+
+
+builder.Services.AddSingleton<ProcessTreeDatabaseManager>();
+builder.Services.AddHostedService<ProcessTreeDatabaseManager>(provider => provider.GetService<ProcessTreeDatabaseManager>());
 
 //System.Diagnostics.Debugger.Launch();
 
@@ -161,6 +178,8 @@ builder.Services.AddHostedService<WinTapSvc>();
 builder.Services.AddSignalR();
 
 var app = builder.Build();
+// make available as singleton 
+ServiceProviderAccessor.Services = app.Services;
 
 //app.UseStaticFiles();
 //app.UseSpaStaticFiles();

@@ -5,7 +5,9 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
+using gov.llnl.wintap.platform.windows.infrastructure;
 using Microsoft.Diagnostics.Tracing;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -168,7 +170,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             try
             {
                 WintapMessage newProcess = (WintapMessage)e.NewEvents[0].Underlying;
-                refreshSnapshot(newProcess);
+                ProcessRecord newPR = new ProcessRecord() { ProcessId = newProcess.PID, CommandLine = newProcess.Process.CommandLine, CreateTime = DateTime.FromFileTimeUtc(newProcess.EventTime), ImagePath = newProcess.Process.Path, ParentPidHash = newProcess.Process.ParentPidHash, PidHash = newProcess.PidHash, ParentProcessId = newProcess.Process.ParentPID, ProcessName = newProcess.ProcessName };
+                refreshSnapshot(newPR);
 
             }
             catch (Exception ex)
@@ -202,7 +205,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 try
                 {
-                    WintapMessage owningProcess = ProcessTree.GetByPid(currentInfo.ProcessId, eventTime.ToFileTimeUtc());
+                    ProcessRecord owningProcess = ServiceProviderAccessor.Services.GetRequiredService<ProcessTreeDatabaseManager>().Database.GetProcessById(currentInfo.ProcessId);
                     if (owningProcess.ProcessName != "unknown")
                     {
                         string pidHash = owningProcess.PidHash;
@@ -243,15 +246,15 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return scanCount;
         }
 
-        private void refreshSnapshot(WintapMessage _owningProcess)
+        private void refreshSnapshot(ProcessRecord _owningProcess)
         {
-            if (!processRunning(_owningProcess.PID)) { return; }
+            if (!processRunning(_owningProcess.ProcessId)) { return; }
             if (_owningProcess.ProcessName == "devenv.exe") { return; }
-            if (_owningProcess.PID < 200) { return; }  // skip protected processes
+            if (_owningProcess.ProcessId < 200) { return; }  // skip protected processes
             DateTime startScanTime = DateTime.Now;
-            Process process = Process.GetProcessById(_owningProcess.PID);
+            Process process = Process.GetProcessById(_owningProcess.ProcessId);
             nint baseAddress = new nint(0);
-            WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.PID, MessageTypeEnum.MemoryMap);
+            WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.ProcessId, MessageTypeEnum.MemoryMap);
             MEMORY_BASIC_INFORMATION memInfo = new MEMORY_BASIC_INFORMATION();
             while (true)
             {

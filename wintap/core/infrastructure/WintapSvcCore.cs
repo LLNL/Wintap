@@ -18,6 +18,13 @@ using DuckDB.NET.Data;
 
 namespace gov.llnl.wintap
 {
+
+    public static class ServiceProviderAccessor
+    {
+        public static IServiceProvider Services { get; set; }
+    }
+
+
     public partial class WinTapSvc : BackgroundService
     {
         private readonly ILogger<WinTapSvc> _logger;
@@ -86,10 +93,19 @@ namespace gov.llnl.wintap
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    WintapLogger.Log.Append("Setting up Windows permissions...", core.infrastructure.LogLevel.Info);
-                    Utilities.SetDirectoryPermissions(Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                        "Wintap"));
+                    bool isDebugBuild = false;
+#if DEBUG
+                        isDebugBuild = true;
+#endif
+                    if (isDebugBuild)
+                    {
+                        WintapLogger.Log.Append("DEBUG build detected, not setting NTFS permissions on wintap data", core.infrastructure.LogLevel.Warn);
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append("Setting NTFS permissions on Wintap data directory", core.infrastructure.LogLevel.Info);
+                        Utilities.SetDirectoryPermissions(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
+                    }
                 }
 
                 WintapLogger.Log.Append($"Wintap Agent ID: {StateManager.AgentId}", core.infrastructure.LogLevel.Info);
