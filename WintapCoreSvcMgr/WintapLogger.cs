@@ -33,6 +33,9 @@ namespace gov.llnl.wintap.core.infrastructure
             // First, log to the file as usual
             _defaultLogger.Append(entry, targetVerbosity, memberName, sourceFilePath);
 
+            // echo to the console for cmd programs
+            Console.WriteLine(entry);
+
             // If requested, also log to the Windows Event Log
             if (logToEventLog)
             {

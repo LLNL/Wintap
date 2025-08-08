@@ -9,8 +9,16 @@ using System.Threading.Tasks;
 namespace gov.llnl.wintap.platform.windows.infrastructure
 {
     /// <summary>
-    /// ProcessTreeDatabase - DuckDB-based process tree storage using PidHash as primary key
+    /// DuckDB-based process tree storage using PidHash as primary key
     /// This eliminates PID recycling issues by using unique PidHash identifiers
+    /// 
+    /// New approach:
+    ///     1. Refactor ProcessTreeDatabase This into shared DLL
+    ///     2. On start, Wintap calls WintapSvcMgr with RecoverProcessDB
+    ///     3. WintapCoreSvcMgr determines if this is a fresh boot
+    ///     4. Fresh boot, WintapCoreSvcMgr deletes existing DBs, process boot trace into .parallel.db, promotes (copies) .parallel.db to .main.db, Wintap hooks realtime ETW feed, WintapCoreSvcMgr sets up houly mini-trace processing
+    ///     5. On Wintap restart, WintapCoreSvcMgr deletes main.db, processes minitrace, promotes .parallel.db to .main.db, Wintap hooks realtime feed
+    /// 
     /// </summary>
     public class ProcessTreeDatabase : IDisposable
     {

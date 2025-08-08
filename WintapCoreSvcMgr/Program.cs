@@ -5,7 +5,9 @@ using Microsoft.Diagnostics.Tracing.Etlx;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
 using System.Diagnostics;
+using System.Management;
 using System.Xml;
+using WintapCoreSvcMgr.Database;
 
 namespace gov.llnl.wintap
 {
@@ -21,10 +23,12 @@ namespace gov.llnl.wintap
 
     internal class Program
     {
-        static void Main(string[] args)
+        private static BackupDatabaseManager backupDbManager;
+
+        public static async Task<int> Main(string[] args)
         {
-            args = new string[1];
-            args[0] = "PROCESS_TRACE";
+            backupDbManager = new BackupDatabaseManager();
+            
             //  MODES:
             //  UPDATE
             //  HEALTHCHECK
@@ -34,68 +38,81 @@ namespace gov.llnl.wintap
             if (args.Length == 0)
             {
                 WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
-                return;
+                return 1;
             }
 
-            WintapLogger.Log.Append("WintapSvcMgr was started with parameter: " + args[0], LogLevel.Info);
+            var command = args[0].ToUpperInvariant();
+            WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
+            var exitCode = await ProcessCommand(command);
 
-            if (args[0].ToUpper() == "HEALTHCHECK")
-            {
-                WintapLogger.Log.Append("Doing wintap health check.", LogLevel.Info);
+            WintapLogger.Log.Append($"WintapSvcMgr is complete.  result code: {exitCode}", LogLevel.Info);
+            WintapLogger.Log.Close();
+            return exitCode;
+        }
 
-                // 1.  Check that Wintap is setup to AUTO start
-                WintapLogger.Log.Append("     checking Wintap service start type", LogLevel.Info);
-                if (WintapController.GetSvcStartMode())
-                {
-                    WintapLogger.Log.Append("     Wintap service is to AUTO start", LogLevel.Info);
-                }
-                else
-                {
-                    WintapLogger.Log.Append("     Wintap service is NOT set to Auto.   Resetting...", LogLevel.Info);
-                    WintapController.SetSvcStartMode();
-                }
+        private static async Task<int> ProcessCommand(string command)
+        {
 
-                // 2.  Check that Wintap is running
-                WintapLogger.Log.Append("     checking Wintap service state", LogLevel.Info);
-                if (WintapController.GetWintapSvcState())
-                {
-                    WintapLogger.Log.Append("     Wintap service is RUNNING", LogLevel.Info);
-                }
-                else
-                {
-                    WintapLogger.Log.Append("     Wintap service is NOT in a RUNNING state.   Restarting...", LogLevel.Info);
-                    WintapController.StopWintap();
-                    WintapController.StartWintap();
-                }
-                WintapLogger.Log.Append("Wintap health check complete.", LogLevel.Info);
-            }
-            else if (args[0].ToUpper() == "RESTART")
+            return command switch
             {
-                WintapLogger.Log.Append("Restarting Wintap...", LogLevel.Info);
-                WintapController.StopWintap();
-                WintapController.StartWintap();
-                WintapLogger.Log.Append("Restart complete.", LogLevel.Info);
-            }
-            else if (args[0].ToUpper() == "RUNDOWN")
+                "PROCESS_MINI_TRACE" => await ProcessMiniTrace(),
+                "COMPACT_BACKUP_DB" => await CompactBackupDb(),
+                "RECOVER_DATABASE" => await RecoverDB(),
+                "HELP" or "/?" => ShowUsage(),
+                _ => ShowUsage()
+            };
+        }
+
+        private static int ShowUsage()
+        {
+            Console.WriteLine("Usage: RECOVER_DATABSE  -- provides a complete Main process tree database.");
+            return 0;
+        }
+
+        private static async Task<int> RecoverDB()
+        {
+            int returnCode = 0;
+            WintapLogger.Log.Append("starting database recovery", LogLevel.Info);
+            // delete main, if boot delete backup, if boot do boot trace else do mini trace, copy backup to main
+            WintapLogger.Log.Append("deleting main", LogLevel.Info);
+            backupDbManager.DeleteMainDb();
+            if(IsSystemBoot())
             {
-                invokeEtwRundown();
-            }
-            else if (args[0].ToUpper() == "PROCESS_TRACE")
-            {
-                processTrace();
+                WintapLogger.Log.Append("System boot detected, resetting recovery database", LogLevel.Info);
+                backupDbManager.DeleteRecoveryDb();
+                
             }
             else
             {
-                WintapLogger.Log.Append("Unknown parameter specified.", LogLevel.Info);
+                WintapLogger.Log.Append("System boot NOT detected", LogLevel.Info);
+                returnCode = ProcessMiniTrace().Result;
             }
+            WintapLogger.Log.Append($"Return code from RecoverDB: {returnCode}", LogLevel.Info);
+            return returnCode;
+        }
 
-
-            WintapLogger.Log.Append("WintapSvcMgr is complete.", LogLevel.Info);
+        private static async Task<int> CompactBackupDb()
+        {
+            int resultCode = 0;
             try
             {
-                WintapLogger.Log.Close();
+                backupDbManager.CompactBackupDatabase();
             }
-            catch (Exception ex) { }
+            catch (Exception ex)
+            {
+                resultCode = 1;
+            }
+            return resultCode;
+        }
+
+        private static async Task<int> ProcessMiniTrace()
+        {
+            var session = new MiniTraceETWSession();
+            session.StopMiniTraceSession(); 
+
+            // Then use existing logic
+            var result = await backupDbManager.ProcessMiniTraceETL();
+            return String.IsNullOrEmpty(result.ErrorMessage) ? 0 : 1;
         }
 
         /// <summary>
@@ -377,6 +394,32 @@ namespace gov.llnl.wintap
                 Thread.Sleep(TimeSpan.FromSeconds(1));
             }
             WintapLogger.Log.Append("Rundown complete.  ETL File Path: " + etlFilePath, LogLevel.Info);
+        }
+
+        internal static bool IsSystemBoot()
+        {
+            DateTime lastBoot = DateTime.MinValue;
+            try
+            {
+                SelectQuery query = new SelectQuery(@"SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
+                ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
+                foreach (ManagementObject mo in searcher.Get())
+                {
+                    lastBoot = ManagementDateTimeConverter.ToDateTime(mo.Properties["LastBootUpTime"].Value.ToString());
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("ERROR GETTING LAST BOOT TIME, using wintap start time as machine start time. " + ex.Message, LogLevel.Info);
+            }
+            bool boot = false;
+            if(DateTime.Now.Subtract(lastBoot) < TimeSpan.FromSeconds(120))
+            {
+                boot = true;
+            }
+            WintapLogger.Log.Append($"Last boot time: {lastBoot}", LogLevel.Info);
+            return boot;
         }
 
         private static bool isDeveloper()

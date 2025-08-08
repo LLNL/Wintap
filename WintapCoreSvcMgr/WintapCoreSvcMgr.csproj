@@ -8,10 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DuckDB.NET.Data.Full" Version="1.3.0" />
+    <PackageReference Include="DuckDB.NET.Data.Full" Version="1.3.2" />
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.22" />
     <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.5" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\platform\windows\Wintap.ProcessTree.Shared\Wintap.ProcessTree.Shared.csproj" />
   </ItemGroup>
 
 </Project>
