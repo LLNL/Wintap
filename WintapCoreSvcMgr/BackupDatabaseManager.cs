@@ -7,19 +7,10 @@
 using DuckDB.NET.Data;  // For direct database access
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;  // For StateManager
+using gov.llnl.wintap.platform.windows;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;  // For ProcessHash
 using gov.llnl.wintap.shared.models;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Data.Common;
-using System.IO;
-using System.Security.Cryptography;  // For fallback hash generation
-using System.Text.Json;  // For JSON parsing
-using System.Threading.Tasks;
 using Wintap.ProcessTree.Shared.Configuration;
-using Wintap.ProcessTree.Shared.Database;
-using Wintap.ProcessTree.Shared.Interfaces;
 
 namespace WintapCoreSvcMgr.Database
 {
@@ -83,6 +74,8 @@ namespace WintapCoreSvcMgr.Database
             FileInfo backupDbInfo = new FileInfo(RECOVERY_DB_PATH);
             if (backupDbInfo.Exists)
             {
+                _connection.Close();
+                _connection.Dispose();
                 backupDbInfo.Delete();
             }
         }
@@ -354,6 +347,72 @@ namespace WintapCoreSvcMgr.Database
             catch (Exception ex)
             {
                 LogError($"Failed to insert process start for {process.PidHash}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Insert boot trace ProcessRecord - INSERT ONLY, never update
+        /// Boot trace records are historical one-time events from system startup
+        /// </summary>
+        public bool InsertBootTraceRecord(gov.llnl.wintap.platform.windows.models.ProcessRecord process)
+        {
+            try
+            {
+                // Boot trace records always use UniqueProcessKey = 0 (they're historical, not real-time)
+                var uniqueKey = 0UL;
+
+                string EscapeString(string value)
+                {
+                    if (value == null) return "NULL";
+                    return "'" + value.Replace("'", "''") + "'";
+                }
+
+                string EscapeDateTime(DateTime dateTime)
+                {
+                    return "'" + dateTime.ToString("yyyy-MM-dd HH:mm:ss.fff") + "'";
+                }
+
+                // Use INSERT (not INSERT OR REPLACE) - boot trace records should never be duplicated
+                var sql = $@"
+        INSERT INTO live_processes (
+            pid_hash, parent_pid_hash, process_id, parent_process_id,
+            unique_process_key, process_name, image_path, command_line, 
+            create_time, is_active, source, depth, has_live_descendants,
+            user_name
+        ) VALUES (
+            {EscapeString(process.PidHash)},
+            {EscapeString(process.ParentPidHash)},
+            {process.ProcessId},
+            {process.ParentProcessId},
+            {uniqueKey},
+            {EscapeString(process.ProcessName)},
+            {EscapeString(process.ImagePath)},
+            {EscapeString(process.CommandLine)},
+            {EscapeDateTime(process.CreateTime)},
+            {(process.IsActive ? 1 : 0)},
+            {EscapeString(process.Source)},
+            {process.Depth},
+            {(process.HasLiveDescendants ? 1 : 0)},
+            {EscapeString(process.UserName)}
+        )";
+
+                using var cmd = new DuckDBCommand(sql, _connection);
+                cmd.ExecuteNonQuery();
+
+                LogInfo($"Inserted boot trace ProcessRecord: PID {process.ProcessId}, PidHash {process.PidHash}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to insert boot trace ProcessRecord {process.PidHash}: {ex.Message}");
+
+                // If this fails due to duplicate PidHash, that indicates a logic error in boot trace processing
+                if (ex.Message.Contains("UNIQUE constraint failed") || ex.Message.Contains("duplicate"))
+                {
+                    LogError($"DUPLICATE PidHash detected during boot trace insert: {process.PidHash} - this indicates a processing error");
+                }
+
                 return false;
             }
         }
@@ -989,6 +1048,24 @@ namespace WintapCoreSvcMgr.Database
                     ErrorMessage = ex.Message,
                     CheckedAt = DateTime.UtcNow
                 };
+            }
+        }
+
+        /// <summary>
+        /// Ensure boot trace AutoLogger is configured for fresh boot scenario
+        /// Called during RECOVER_DATABASE when IsSystemBoot() == true
+        /// </summary>
+        public void EnsureBootTraceConfigured()
+        {
+            try
+            {
+                LogInfo("Ensuring boot trace AutoLogger is configured for system boot");
+                ETWAutoLoggerSetup.ValidateAndRepairAutoLogger();
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to configure boot trace AutoLogger: {ex.Message}");
+                throw;
             }
         }
 

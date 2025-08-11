@@ -37,7 +37,7 @@ builder.Services.AddControllers();
 
 builder.Services.Configure<ProcessTreeDatabaseConfig>(options =>
 {
-    options.DatabasePath = @"C:\ProgramData\Wintap\ProcessTree\live-processes.duckdb";
+    options.DatabasePath = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb";
     options.CompactionEnabled = true;
     options.CompactionInterval = TimeSpan.FromHours(1);
     options.DeleteDatabaseOnBoot = true;

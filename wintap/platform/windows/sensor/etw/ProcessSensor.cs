@@ -45,7 +45,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.Process;
     
     // Open ready-made database (no creation/deletion logic)
-    database = new ProcessTreeDatabase(@"C:\ProgramData\Wintap\ProcessTree\main-trace.duckdb");
+    //database = new ProcessTreeDatabase(@"C:\ProgramData\Wintap\ProcessTree\main-trace.duckdb");
     processHash = new ProcessHash();
 }
 
@@ -74,7 +74,7 @@ private bool CallDatabaseRecovery()
         var processInfo = new ProcessStartInfo
         {
             FileName = "WintapCoreSvcMgr.exe",
-            Arguments = "RECOVER_PROCESS_DB",
+            Arguments = "RECOVER_DATABASE",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,

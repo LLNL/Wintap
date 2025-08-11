@@ -1,5 +1,6 @@
 ﻿using DuckDB.NET.Data;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.platform.windows.infrastructure;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Etlx;
 using Microsoft.Diagnostics.Tracing.Parsers;
@@ -57,9 +58,56 @@ namespace gov.llnl.wintap
                 "STOP_MINI_TRACE_SESSION" => StopMiniTraceSession(),
                 "MINI_TRACE_STATUS" => GetMiniTraceStatus(),
                 "BACKUP_DB_STATUS" => GetBackupDatabaseStatus(),
+                "MOCK_REBOOT" => await TestReboot(),
                 "HELP" or "/?" => ShowUsage(),
                 _ => ShowUsage()
             };
+        }
+
+        private static async Task<int> TestReboot()
+        {
+            try
+            {
+                WintapLogger.Log.Append("=== MOCKING FRESH BOOT SCENARIO ===", LogLevel.Info);
+
+                // Don't delete existing databases - just test the boot trace processing
+                var testManager = new BackupDatabaseManager();
+
+                // Test the fresh boot logic without destructive operations
+                WintapLogger.Log.Append("Testing boot trace processing (non-destructive)", LogLevel.Info);
+
+                var bootProcessor = new BootTraceProcessor(testManager);
+                var result = await bootProcessor.ProcessBootTraceAsync();
+
+                if (result.Success)
+                {
+                    WintapLogger.Log.Append($"Mock fresh boot SUCCESS: {result.ProcessesInserted} processes", LogLevel.Info);
+
+                    // Test database synchronization (without deleting main)
+                    var syncResult = testManager.SynchronizeDatabases();
+                    if (syncResult.Success)
+                    {
+                        WintapLogger.Log.Append("Database synchronization test SUCCESS", LogLevel.Info);
+                        return 0;
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append($"Database synchronization FAILED: {syncResult.ErrorMessage}", LogLevel.Error);
+                        return 1;
+                    }
+                }
+                else
+                {
+                    WintapLogger.Log.Append($"Mock fresh boot FAILED: {result.ErrorMessage}", LogLevel.Error);
+                    return 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Mock fresh boot EXCEPTION: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+                return 1;
+            }
         }
 
         private static int StartMiniTraceSession()
@@ -216,13 +264,24 @@ namespace gov.llnl.wintap
             {
                 WintapLogger.Log.Append("System boot detected, resetting recovery database", LogLevel.Info);
                 backupDbManager.DeleteRecoveryDb();
-                // process boot trace - this should recreate the recovery DB
+                backupDbManager = new BackupDatabaseManager();
+                // Process existing boot trace
+                BootTraceProcessor btp = new BootTraceProcessor(backupDbManager);
+                var bootTraceResult = await btp.ProcessBootTraceAsync();
+                if (!bootTraceResult.Success)
+                {
+                    WintapLogger.Log.Append($"Error process boot trace: {bootTraceResult.ErrorMessage}", LogLevel.Error);
+                    returnCode = 1;
+                }
             }
             else
             {
                 WintapLogger.Log.Append("System boot NOT detected", LogLevel.Info);
                 returnCode = ProcessMiniTrace().Result;
             }
+            // Ensure AutoLogger is configured for boot capture
+            WintapLogger.Log.Append($"Verifying boot trace", LogLevel.Info);
+            backupDbManager.EnsureBootTraceConfigured();
             backupDbManager.SynchronizeDatabases();
             WintapLogger.Log.Append($"Return code from RecoverDB: {returnCode}", LogLevel.Info);
             return returnCode;
