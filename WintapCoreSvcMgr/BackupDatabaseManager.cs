@@ -887,7 +887,8 @@ namespace WintapCoreSvcMgr.Database
                 }
 
                 // Close backup database connection temporarily for file copy
-                _backupDatabase.Dispose();
+                _connection.Close();
+                _connection.Dispose();
 
                 // Copy backup database to main database
                 File.Copy(RECOVERY_DB_PATH, MAIN_DB_PATH, overwrite: true);
@@ -900,8 +901,8 @@ namespace WintapCoreSvcMgr.Database
                     File.Copy(backupWalPath, mainWalPath, overwrite: true);
                 }
 
-                // Reinitialize backup database
-                var newBackupDb = new ProcessTreeDatabase(_config);
+                // reioe backup database
+                _connection.Open();
 
                 LogInfo("Database synchronization completed successfully");
 
@@ -963,11 +964,11 @@ namespace WintapCoreSvcMgr.Database
         {
             try
             {
-                var stats = _backupDatabase.GetDatabaseStats();
+                var stats = GetDatabaseStats();
 
                 return new BackupDatabaseStatus
                 {
-                    IsHealthy = _backupDatabase.IsHealthy(),
+                    IsHealthy = stats.IsHealthy,
                     DatabaseExists = File.Exists(RECOVERY_DB_PATH),
                     DatabasePath = RECOVERY_DB_PATH,
                     TotalProcesses = stats.TotalProcesses,
@@ -1043,8 +1044,7 @@ namespace WintapCoreSvcMgr.Database
         {
             if (!_disposed)
             {
-                _miniTraceSession?.Dispose();  // ← Add this line
-                _backupDatabase?.Dispose();
+                _miniTraceSession?.Dispose(); 
                 _disposed = true;
             }
         }

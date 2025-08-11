@@ -216,13 +216,14 @@ namespace gov.llnl.wintap
             {
                 WintapLogger.Log.Append("System boot detected, resetting recovery database", LogLevel.Info);
                 backupDbManager.DeleteRecoveryDb();
-                
+                // process boot trace - this should recreate the recovery DB
             }
             else
             {
                 WintapLogger.Log.Append("System boot NOT detected", LogLevel.Info);
                 returnCode = ProcessMiniTrace().Result;
             }
+            backupDbManager.SynchronizeDatabases();
             WintapLogger.Log.Append($"Return code from RecoverDB: {returnCode}", LogLevel.Info);
             return returnCode;
         }
