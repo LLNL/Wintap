@@ -27,7 +27,7 @@ namespace WintapCoreSvcMgr.Database
         private bool _disposed = false;
 
         // File paths
-        private const string BACKUP_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\backup-trace.duckdb";
+        private const string BACKUP_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb";
         private const string MAIN_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\main-trace.duckdb";
         private const string MINI_TRACE_ETL_PATH = @"C:\ProgramData\Wintap\ProcessTrace\mini-trace.etl";
         private const string BOOT_TRACE_ETL_PATH = @"C:\ProgramData\Wintap\BootTrace\boot-trace.etl";

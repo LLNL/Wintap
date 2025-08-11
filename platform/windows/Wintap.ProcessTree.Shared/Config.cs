@@ -152,7 +152,7 @@ namespace Wintap.ProcessTree.Shared.Configuration
         {
             return new ProcessTreeDatabaseConfig
             {
-                DatabasePath = @"C:\ProgramData\Wintap\ProcessTree\backup-trace.duckdb",
+                DatabasePath = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb",
                 TableName = "process_tree",
                 OwnerProcess = "WintapCoreSvcMgr.exe",
                 CompactionEnabled = true,   // Backup database handles maintenance

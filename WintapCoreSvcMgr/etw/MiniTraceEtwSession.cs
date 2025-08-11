@@ -1,12 +1,13 @@
-﻿using Microsoft.Diagnostics.Tracing.Session;
-using Microsoft.Diagnostics.Tracing.Parsers;
+﻿using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using Microsoft.Diagnostics.Tracing;
+using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+using Microsoft.Diagnostics.Tracing.Session;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Collections.Generic;
 
 /// <summary>
 /// Represents a process event captured from the mini-trace ETL
@@ -24,12 +25,22 @@ public class ProcessEvent
     public int? ExitCode { get; set; }
     public string PidHash { get; set; }
     public string ParentPidHash { get; set; }
+    public ulong UniqueProcessKey { get; set; }
 }
 
 public enum ProcessEventType
 {
     Start,
     Stop
+}
+
+/// <summary>
+/// Cache entry for process hash information
+/// </summary>
+internal class ProcessHashInfo
+{
+    public string PidHash { get; set; }
+    public DateTime CreateTime { get; set; }
 }
 
 /// <summary>
@@ -40,6 +51,10 @@ public class MiniTraceETWSession : IDisposable
 {
     private TraceEventSession _traceSession;
     private bool _disposed = false;
+
+    private readonly ProcessHash _processHash;
+    private readonly Dictionary<int, ProcessHashInfo> _processHashCache = new Dictionary<int, ProcessHashInfo>();
+
 
     // Configuration constants
     private const string SESSION_NAME = "WintapMiniTraceSession";
@@ -57,6 +72,9 @@ public class MiniTraceETWSession : IDisposable
     {
         _miniTraceFilePath = miniTraceFilePath ??
             @"C:\ProgramData\Wintap\ProcessTrace\mini-trace.etl";
+
+        // Initialize ProcessHash for consistent hash generation
+        _processHash = new ProcessHash();
     }
 
     /// <summary>
@@ -196,6 +214,7 @@ public class MiniTraceETWSession : IDisposable
                         ImagePath = data.ImageFileName,
                         CommandLine = data.CommandLine,
                         CreateTime = data.TimeStamp,
+                        UniqueProcessKey = data.UniqueProcessKey,
                         PidHash = GeneratePidHash(data.ProcessID, data.TimeStamp),
                         ParentPidHash = LookupParentPidHash(data.ParentID, data.TimeStamp)
                     };
@@ -214,6 +233,7 @@ public class MiniTraceETWSession : IDisposable
                         ImagePath = data.ImageFileName,
                         ExitTime = data.TimeStamp,
                         ExitCode = data.ExitStatus,
+                        UniqueProcessKey = data.UniqueProcessKey,
                         PidHash = LookupPidHashForStop(data.ProcessID, data.TimeStamp)
                     };
 
@@ -382,39 +402,50 @@ public class MiniTraceETWSession : IDisposable
     // Helper methods for PidHash generation and lookup
     private readonly Dictionary<int, string> _activePidHashes = new Dictionary<int, string>();
 
+
     private string GeneratePidHash(int pid, DateTime createTime)
     {
-        // Generate unique PidHash using PID + CreateTime
-        var input = $"{pid}_{createTime.Ticks}";
-        using (var sha256 = SHA256.Create())
-        {
-            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
-            var pidHash = Convert.ToBase64String(hash).Substring(0, 12);
+        // Use the official Wintap ProcessHash algorithm
+        long eventTimeFileTime = createTime.ToFileTimeUtc();
+        string pidHash = _processHash.GenPidHash(pid, eventTimeFileTime);
 
-            // Cache for parent lookups
-            _activePidHashes[pid] = pidHash;
-            return pidHash;
-        }
+        // Cache for parent lookups
+        _processHashCache[pid] = new ProcessHashInfo
+        {
+            PidHash = pidHash,
+            CreateTime = createTime
+        };
+
+        return pidHash;
     }
 
     private string LookupParentPidHash(int parentPid, DateTime eventTime)
     {
         // Try to find parent PidHash in our cache
-        return _activePidHashes.TryGetValue(parentPid, out string parentHash)
-            ? parentHash
-            : null;
+        if (_processHashCache.TryGetValue(parentPid, out ProcessHashInfo parentInfo))
+        {
+            return parentInfo.PidHash;
+        }
+
+        // If not in cache, we can't generate accurate parent PidHash without parent create time
+        // This is a limitation of ETW kernel events - we don't get parent create time
+        return null;
     }
 
     private string LookupPidHashForStop(int pid, DateTime eventTime)
     {
         // Look up the PidHash for process stop event
-        if (_activePidHashes.TryGetValue(pid, out string pidHash))
+        if (_processHashCache.TryGetValue(pid, out ProcessHashInfo processInfo))
         {
             // Remove from cache since process is stopping
-            _activePidHashes.Remove(pid);
-            return pidHash;
+            _processHashCache.Remove(pid);
+            return processInfo.PidHash;
         }
-        return null;
+
+        // If not in cache, generate based on current information
+        // Note: This might not be perfectly accurate if we missed the start event
+        long eventTimeFileTime = eventTime.ToFileTimeUtc();
+        return _processHash.GenPidHash(pid, eventTimeFileTime);
     }
 
     public void Dispose()

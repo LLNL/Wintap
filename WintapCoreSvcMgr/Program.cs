@@ -28,13 +28,7 @@ namespace gov.llnl.wintap
         public static async Task<int> Main(string[] args)
         {
             backupDbManager = new BackupDatabaseManager();
-            
-            //  MODES:
-            //  UPDATE
-            //  HEALTHCHECK
-            //  RESTART
-            //  RUNDOWN
-            //  PROCESS_TRACE   --  converts contents of file backed process trace to DuckDB, deletes existing on boot
+
             if (args.Length == 0)
             {
                 WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
@@ -43,6 +37,8 @@ namespace gov.llnl.wintap
 
             var command = args[0].ToUpperInvariant();
             WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
+
+            //string command = "PROCESS_MINI_TRACE";
             var exitCode = await ProcessCommand(command);
 
             WintapLogger.Log.Append($"WintapSvcMgr is complete.  result code: {exitCode}", LogLevel.Info);
@@ -52,20 +48,160 @@ namespace gov.llnl.wintap
 
         private static async Task<int> ProcessCommand(string command)
         {
-
             return command switch
             {
                 "PROCESS_MINI_TRACE" => await ProcessMiniTrace(),
                 "COMPACT_BACKUP_DB" => await CompactBackupDb(),
                 "RECOVER_DATABASE" => await RecoverDB(),
+                "START_MINI_TRACE_SESSION" => StartMiniTraceSession(),
+                "STOP_MINI_TRACE_SESSION" => StopMiniTraceSession(),
+                "MINI_TRACE_STATUS" => GetMiniTraceStatus(),
+                "BACKUP_DB_STATUS" => GetBackupDatabaseStatus(),
                 "HELP" or "/?" => ShowUsage(),
                 _ => ShowUsage()
             };
         }
 
+        private static int StartMiniTraceSession()
+        {
+            try
+            {
+                Console.WriteLine("Starting mini-trace ETW session");
+                bool success = backupDbManager.StartMiniTraceSession();
+
+                if (success)
+                {
+                    Console.WriteLine("Mini-trace ETW session started successfully");
+                    return 0;
+                }
+                else
+                {
+                    Console.WriteLine("Failed to start mini-trace ETW session");
+                    return 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error starting mini-trace ETW session: {ex.Message}");
+                WintapLogger.Log.Append($"Error starting mini-trace session: {ex.Message}", LogLevel.Error);
+                return 1;
+            }
+        }
+
+        private static int StopMiniTraceSession()
+        {
+            try
+            {
+                Console.WriteLine("Stopping mini-trace ETW session");
+                bool success = backupDbManager.StopMiniTraceSession();
+
+                if (success)
+                {
+                    Console.WriteLine("Mini-trace ETW session stopped successfully");
+                    return 0;
+                }
+                else
+                {
+                    Console.WriteLine("Failed to stop mini-trace ETW session");
+                    return 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error stopping mini-trace ETW session: {ex.Message}");
+                WintapLogger.Log.Append($"Error stopping mini-trace session: {ex.Message}", LogLevel.Error);
+                return 1;
+            }
+        }
+
+        private static int GetMiniTraceStatus()
+        {
+            try
+            {
+                Console.WriteLine("Checking mini-trace status");
+                var status = backupDbManager.GetMiniTraceStatus();
+
+                Console.WriteLine($"Mini-trace Status:");
+                Console.WriteLine($"  Running: {status.IsRunning}");
+                Console.WriteLine($"  ETL File Exists: {status.ETLFileExists}");
+                Console.WriteLine($"  ETL Size: {status.ETLFileSizeMB:F2} MB");
+                Console.WriteLine($"  Last Modified: {status.LastETLModified}");
+                Console.WriteLine($"  Checked At: {status.CheckedAt}");
+
+                if (!string.IsNullOrEmpty(status.ErrorMessage))
+                {
+                    Console.WriteLine($"  Error: {status.ErrorMessage}");
+                }
+
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting mini-trace status: {ex.Message}");
+                WintapLogger.Log.Append($"Error getting mini-trace status: {ex.Message}", LogLevel.Error);
+                return 1;
+            }
+        }
+
+        private static int GetBackupDatabaseStatus()
+        {
+            try
+            {
+                Console.WriteLine("Checking backup database status");
+                var status = backupDbManager.GetBackupDatabaseStatus();
+
+                Console.WriteLine($"Backup Database Status:");
+                Console.WriteLine($"  Healthy: {status.IsHealthy}");
+                Console.WriteLine($"  Database Exists: {status.DatabaseExists}");
+                Console.WriteLine($"  Database Path: {status.DatabasePath}");
+                Console.WriteLine($"  Total Processes: {status.TotalProcesses}");
+                Console.WriteLine($"  Active Processes: {status.ActiveProcesses}");
+                Console.WriteLine($"  Database Size: {status.DatabaseSizeMB:F2} MB");
+                Console.WriteLine($"  Last Modified: {status.LastModified}");
+                Console.WriteLine($"  Checked At: {status.CheckedAt}");
+
+                if (!string.IsNullOrEmpty(status.HealthDetails))
+                {
+                    Console.WriteLine($"  Health Details: {status.HealthDetails}");
+                }
+
+                if (!string.IsNullOrEmpty(status.ErrorMessage))
+                {
+                    Console.WriteLine($"  Error: {status.ErrorMessage}");
+                }
+
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting backup database status: {ex.Message}");
+                WintapLogger.Log.Append($"Error getting backup database status: {ex.Message}", LogLevel.Error);
+                return 1;
+            }
+        }
+
+        // Also update your ShowUsage method to include the new commands:
         private static int ShowUsage()
         {
-            Console.WriteLine("Usage: RECOVER_DATABSE  -- provides a complete Main process tree database.");
+            Console.WriteLine("WintapCoreSvcMgr - Database Recovery and ETW Session Management");
+            Console.WriteLine();
+            Console.WriteLine("Usage: WintapCoreSvcMgr.exe [COMMAND]");
+            Console.WriteLine();
+            Console.WriteLine("Commands:");
+            Console.WriteLine("  RECOVER_DATABASE           - Complete database recovery (main command)");
+            Console.WriteLine("  PROCESS_MINI_TRACE         - Process mini-trace.etl into backup database");
+            Console.WriteLine("  COMPACT_BACKUP_DB          - Compact backup database");
+            Console.WriteLine("  START_MINI_TRACE_SESSION   - Start mini-trace ETW session");
+            Console.WriteLine("  STOP_MINI_TRACE_SESSION    - Stop mini-trace ETW session");
+            Console.WriteLine("  MINI_TRACE_STATUS          - Check mini-trace session status");
+            Console.WriteLine("  BACKUP_DB_STATUS           - Check backup database status");
+            Console.WriteLine("  HELP, /?                   - Show this help");
+            Console.WriteLine();
+            Console.WriteLine("Examples:");
+            Console.WriteLine("  WintapCoreSvcMgr.exe RECOVER_DATABASE");
+            Console.WriteLine("  WintapCoreSvcMgr.exe MINI_TRACE_STATUS");
+            Console.WriteLine("  WintapCoreSvcMgr.exe PROCESS_MINI_TRACE");
+
             return 0;
         }
 
@@ -107,12 +243,17 @@ namespace gov.llnl.wintap
 
         private static async Task<int> ProcessMiniTrace()
         {
-            var session = new MiniTraceETWSession();
-            session.StopMiniTraceSession(); 
-
-            // Then use existing logic
-            var result = await backupDbManager.ProcessMiniTraceETL();
-            return String.IsNullOrEmpty(result.ErrorMessage) ? 0 : 1;
+            try
+            {
+                // No need to create a separate session - BackupDatabaseManager handles it
+                var result = await backupDbManager.ProcessMiniTraceETL();
+                return String.IsNullOrEmpty(result.ErrorMessage) ? 0 : 1;
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error in ProcessMiniTrace: {ex.Message}", LogLevel.Error);
+                return 1;
+            }
         }
 
         /// <summary>

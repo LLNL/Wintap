@@ -10,7 +10,7 @@ namespace gov.llnl.wintap.shared.models
 {
     /// <summary>
     /// Process record structure for database operations
-    /// Used by both main-trace.duckdb and backup-trace.duckdb
+    /// Used by both main-trace.duckdb and recovery.duckdb
     /// </summary>
     public class ProcessRecord
     {
@@ -104,6 +104,8 @@ namespace gov.llnl.wintap.shared.models
         /// </summary>
         public string SHA2Hash { get; set; }
 
+        public ulong UniqueProcessKey { get; set; }
+
         /// <summary>
         /// Create a copy of this ProcessRecord
         /// </summary>
@@ -128,7 +130,8 @@ namespace gov.llnl.wintap.shared.models
                 HasLiveDescendants = HasLiveDescendants,
                 UserName = UserName,
                 MD5Hash = MD5Hash,
-                SHA2Hash = SHA2Hash
+                SHA2Hash = SHA2Hash,
+                UniqueProcessKey = UniqueProcessKey
             };
         }
 
