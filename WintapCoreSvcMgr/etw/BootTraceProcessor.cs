@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -11,6 +11,7 @@ using gov.llnl.wintap.platform.windows.infrastructure;  // For ETWAutoLoggerSetu
 using gov.llnl.wintap.platform.windows.models;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Etlx;
+using Microsoft.Diagnostics.Tracing.Session;  // For ETWTraceEventSource
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -122,74 +123,89 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             var result = new BootTraceProcessingResult();
             var processRecords = new List<ProcessRecord>();
 
-            LogInfo("Starting boot trace ETL file processing using TraceLog.Processes");
+            LogInfo("Starting boot trace ETL file processing");
 
             using (var traceLog = Microsoft.Diagnostics.Tracing.Etlx.TraceLog.OpenOrConvert(etlFilePath))
             {
-                LogInfo($"ETL file opened successfully - Found {traceLog.Processes.Count} processes");
+                LogInfo($"ETL file opened successfully");
 
-                // Check timing span of the trace
+                // Check what we actually have in TraceLog.Processes
+                LogInfo($"TraceLog.Processes count: {traceLog.Processes.Count}");
+
                 if (traceLog.Processes.Count > 0)
                 {
-                    var processesWithValidTimes = traceLog.Processes.Where(p => p.StartTime != DateTime.MinValue).ToList();
-                    if (processesWithValidTimes.Any())
+                    // Sample the first few processes to see what data we have
+                    var sampleProcesses = traceLog.Processes.Take(3).ToList();
+                    foreach (var proc in sampleProcesses)
                     {
-                        var earliestProcess = processesWithValidTimes.OrderBy(p => p.StartTime).First();
-                        var latestProcess = processesWithValidTimes.OrderByDescending(p => p.StartTime).First();
-                        var timeSpan = latestProcess.StartTime - earliestProcess.StartTime;
-
-                        LogInfo($"Process time span: {earliestProcess.StartTime} to {latestProcess.StartTime} (duration: {timeSpan.TotalMinutes:F2} minutes)");
+                        LogInfo($"Sample TraceProcess: PID={proc.ProcessID}, Name='{proc.Name}', ImageFileName='{proc.ImageFileName}', CommandLine='{proc.CommandLine}', ParentID={proc.ParentID}");
                     }
                 }
 
-                // Add system processes first (PID 0, 4, etc.)
-                processRecords = AddSystemProcesses(processRecords);
+                // Count actual ProcessStart/ImageLoad events
+                var allEvents = traceLog.Events.ToList();
+                int actualProcessStartEvents = allEvents.Count(e => e.EventName.StartsWith("ProcessStart") || e.EventName.StartsWith("Process/Start"));
+                int actualImageLoadEvents = allEvents.Count(e => e.EventName.StartsWith("ImageLoad") || e.EventName.StartsWith("Image/Load"));
+                int kernelProcessEvents = allEvents.Count(e => e.EventName.Contains("Process"));
+                int totalEvents = allEvents.Count;
 
-                // Convert TraceProcess objects directly to ProcessRecord objects
-                int processedCount = 0;
-                int validProcesses = 0;
+                LogInfo($"ETL Analysis: {totalEvents} total events");
+                LogInfo($"ProcessStart events: {actualProcessStartEvents}");
+                LogInfo($"ImageLoad events: {actualImageLoadEvents}");
+                LogInfo($"Any Process-related events: {kernelProcessEvents}");
 
-                foreach (var traceProcess in traceLog.Processes)
+                if (actualProcessStartEvents == 0 && actualImageLoadEvents == 0)
                 {
-                    processedCount++;
+                    LogError("❌ ETL file contains NO ProcessStart or ImageLoad events!");
+                    LogError("❌ AutoLogger is misconfigured - not capturing process events we need");
 
-                    try
+                    // Log some sample event names to see what we do have
+                    var eventTypes = allEvents.Take(100).Select(e => e.EventName).Distinct().OrderBy(x => x).Take(20);
+                    LogInfo($"Sample event types in ETL: {string.Join(", ", eventTypes)}");
+
+                    // Since we have no process events, we can only provide system processes
+                    LogWarning("⚠️  Can only provide system processes - no boot trace process data available");
+                    processRecords = AddSystemProcesses(processRecords);
+                }
+                else
+                {
+                    LogInfo($"✅ Found {actualProcessStartEvents} ProcessStart and {actualImageLoadEvents} ImageLoad events");
+                    LogInfo("🔄 Processing events with original event-based approach...");
+
+                    // Add system processes first
+                    processRecords = AddSystemProcesses(processRecords);
+
+                    // Fall back to original event processing approach
+                    var partialProcesses = new Dictionary<int, Dictionary<string, object>>();
+
+                    foreach (TraceEvent data in traceLog.Events.OrderBy(e => e.TimeStamp))
                     {
-                        // Log progress every 50 processes
-                        if (processedCount % 50 == 0)
+                        try
                         {
-                            LogInfo($"Processed {processedCount} processes... ({validProcesses} valid)");
+                            if (data.EventName.StartsWith("ProcessStart") || data.EventName.StartsWith("Process/Start"))
+                            {
+                                ProcessSimpleProcessStartEvent(data, partialProcesses);
+                            }
+                            else if (data.EventName.StartsWith("ImageLoad") || data.EventName.StartsWith("Image/Load"))
+                            {
+                                ProcessSimpleImageLoadEvent(data, partialProcesses, processRecords);
+                            }
                         }
-
-                        var processRecord = ConvertTraceProcessToProcessRecord(traceProcess);
-
-                        if (processRecord != null)
+                        catch (Exception ex)
                         {
-                            processRecords.Add(processRecord);
-                            validProcesses++;
-
-                            LogInfo($"Added process: PID {processRecord.ProcessId}, Name '{processRecord.ProcessName}', Path '{processRecord.ImagePath}'");
+                            LogError($"Error processing event {data.EventName}: {ex.Message}");
+                            continue;
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Error processing TraceProcess PID {traceProcess.ProcessID}: {ex.Message}");
-                        continue;
                     }
                 }
 
-                LogInfo($"TraceProcess conversion complete: {processedCount} total, {validProcesses} valid processes converted");
-
-                // Now fix parent-child relationships using PidHash values
-                FixParentChildRelationships(processRecords, traceLog.Processes);
-
-                result.ProcessesFound = traceLog.Processes.Count;
-                result.ProcessesProcessed = validProcesses;
+                result.ProcessesFound = processRecords.Count;
+                result.ProcessesProcessed = processRecords.Count;
             }
 
             LogInfo("Boot trace processing complete, inserting into recovery database...");
 
-            // Insert all complete processes into recovery database
+            // Insert all processes into recovery database
             int recordsInserted = await BulkInsertProcessesAsync(processRecords);
 
             result.ProcessesInserted = recordsInserted;
@@ -200,110 +216,324 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         /// <summary>
-        /// Convert a TraceProcess directly to ProcessRecord - much simpler than event parsing!
+        /// Simple ProcessStart event processing with defensive payload access
         /// </summary>
-        private ProcessRecord ConvertTraceProcessToProcessRecord(Microsoft.Diagnostics.Tracing.Etlx.TraceProcess traceProcess)
+        private void ProcessSimpleProcessStartEvent(TraceEvent data, Dictionary<int, Dictionary<string, object>> partialProcesses)
         {
             try
             {
-                // Validate essential data
-                if (traceProcess.ProcessID <= 0)
+                // First, let's see what payload fields are actually available
+                LogInfo($"ProcessStart event analysis:");
+                LogInfo($"  EventName: {data.EventName}");
+                LogInfo($"  ProviderGuid: {data.ProviderGuid}");
+                LogInfo($"  ProviderName: {data.ProviderName}");
+                LogInfo($"  Available payload names: {string.Join(", ", data.PayloadNames)}");
+
+                // Try to safely extract ProcessID
+                int pid = 0;
+                if (data.PayloadNames.Contains("ProcessID"))
                 {
-                    LogWarning($"TraceProcess has invalid ProcessID: {traceProcess.ProcessID}");
-                    return null;
+                    try
+                    {
+                        pid = Convert.ToInt32(data.PayloadByName("ProcessID"));
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Failed to get ProcessID from payload: {ex.Message}");
+                        pid = data.ProcessID; // Use TraceEvent's ProcessID property instead
+                    }
+                }
+                else
+                {
+                    pid = data.ProcessID; // Use TraceEvent's ProcessID property
+                    LogWarning($"ProcessStart event has no ProcessID payload, using TraceEvent.ProcessID: {pid}");
                 }
 
-                // Get timing information
-                DateTime createTime = traceProcess.StartTime;
-                if (createTime == DateTime.MinValue || !IsValidFileTime(createTime))
+                // Try to safely extract ParentProcessID
+                int parentPid = 0;
+                if (data.PayloadNames.Contains("ParentProcessID"))
                 {
-                    LogWarning($"TraceProcess PID {traceProcess.ProcessID} has invalid StartTime: {createTime}, using boot time fallback");
-                    createTime = _bootTime;
+                    try
+                    {
+                        parentPid = Convert.ToInt32(data.PayloadByName("ParentProcessID"));
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Failed to get ParentProcessID from payload: {ex.Message}");
+                        parentPid = 0; // Unknown parent
+                    }
+                }
+                else
+                {
+                    LogWarning($"ProcessStart event has no ParentProcessID payload for PID {pid}");
+                    parentPid = 0; // Unknown parent
                 }
 
-                // Generate PidHash
-                var pidHash = _pidHashGenerator.GenPidHash(traceProcess.ProcessID, createTime.ToFileTimeUtc());
-                if (string.IsNullOrEmpty(pidHash))
+                if (pid > 0)
                 {
-                    LogError($"Failed to generate PidHash for TraceProcess PID {traceProcess.ProcessID}");
-                    return null;
+                    // Store basic process start info
+                    partialProcesses[pid] = new Dictionary<string, object>
+                    {
+                        ["ProcessId"] = pid,
+                        ["ParentProcessId"] = parentPid,
+                        ["CreateTime"] = data.TimeStamp,
+                        ["HasStart"] = true,
+                        ["ProviderName"] = data.ProviderName
+                    };
+
+                    LogInfo($"ProcessStart: PID {pid}, Parent {parentPid}, Time {data.TimeStamp}, Provider {data.ProviderName}");
                 }
-
-                // Extract process information
-                string processName = !string.IsNullOrEmpty(traceProcess.Name) ? traceProcess.Name.ToLower() : "unknown";
-                string imagePath = !string.IsNullOrEmpty(traceProcess.ImageFileName) ? traceProcess.ImageFileName.ToLower() : "unknown";
-                string commandLine = traceProcess.CommandLine ?? "";
-
-                // Normalize paths
-                if (imagePath != "unknown")
+                else
                 {
-                    imagePath = TranslateFilePath(imagePath);
+                    LogError($"ProcessStart event has invalid PID: {pid}");
                 }
-
-                // Determine if process is still active
-                bool isActive = traceProcess.EndTime == DateTime.MaxValue || traceProcess.ExitStatus == null;
-
-                var processRecord = new ProcessRecord
-                {
-                    PidHash = pidHash,
-                    ProcessId = traceProcess.ProcessID,
-                    ParentProcessId = traceProcess.ParentID,
-                    ProcessName = processName,
-                    ImagePath = imagePath,
-                    CommandLine = commandLine,
-                    CreateTime = createTime,
-                    ExitTime = traceProcess.EndTime == DateTime.MaxValue ? null : traceProcess.EndTime,
-                    ExitCode = traceProcess.ExitStatus,
-                    IsActive = isActive,
-                    Source = "boot_trace",
-                    UserName = "system", // TraceProcess doesn't provide user info
-                    UniqueProcessKey = 0 // Boot trace doesn't have UniqueProcessKey semantics
-                };
-
-                return processRecord;
             }
             catch (Exception ex)
             {
-                LogError($"Error converting TraceProcess PID {traceProcess.ProcessID}: {ex.Message}");
-                return null;
+                LogError($"Error processing ProcessStart event: {ex.Message}");
+                LogError($"Event details: {data.EventName}, Provider: {data.ProviderName}, PayloadNames: {string.Join(", ", data.PayloadNames)}");
             }
         }
 
         /// <summary>
-        /// Fix parent-child relationships by setting ParentPidHash values
+        /// Simple ImageLoad event processing with defensive payload access
         /// </summary>
-        private void FixParentChildRelationships(List<ProcessRecord> processRecords, IEnumerable<Microsoft.Diagnostics.Tracing.Etlx.TraceProcess> traceProcesses)
+        private void ProcessSimpleImageLoadEvent(TraceEvent data, Dictionary<int, Dictionary<string, object>> partialProcesses, List<ProcessRecord> processRecords)
         {
             try
             {
-                LogInfo("Fixing parent-child relationships...");
+                int pid = data.ProcessID;
 
-                // Create PID to PidHash lookup
-                var pidToPidHash = processRecords.ToDictionary(p => p.ProcessId, p => p.PidHash);
+                LogInfo($"ImageLoad event analysis for PID {pid}:");
+                LogInfo($"  Available payload names: {string.Join(", ", data.PayloadNames)}");
 
-                int relationshipsFixed = 0;
-
-                foreach (var processRecord in processRecords)
+                // Try to safely extract ImageName
+                string imageName = "";
+                if (data.PayloadNames.Contains("ImageName"))
                 {
-                    if (processRecord.ParentProcessId > 0 && string.IsNullOrEmpty(processRecord.ParentPidHash))
+                    try
                     {
-                        if (pidToPidHash.TryGetValue(processRecord.ParentProcessId, out string parentPidHash))
-                        {
-                            processRecord.ParentPidHash = parentPidHash;
-                            relationshipsFixed++;
-                        }
-                        else
-                        {
-                            LogWarning($"Parent PID {processRecord.ParentProcessId} not found for process {processRecord.ProcessId} ({processRecord.ProcessName})");
-                        }
+                        imageName = data.PayloadByName("ImageName").ToString();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Failed to get ImageName from payload: {ex.Message}");
+                        return;
                     }
                 }
+                else if (data.PayloadNames.Contains("FileName"))
+                {
+                    try
+                    {
+                        imageName = data.PayloadByName("FileName").ToString();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Failed to get FileName from payload: {ex.Message}");
+                        return;
+                    }
+                }
+                else
+                {
+                    LogWarning($"ImageLoad event has no ImageName or FileName payload for PID {pid}");
+                    return;
+                }
 
-                LogInfo($"Fixed {relationshipsFixed} parent-child relationships");
+                // Only process .exe files
+                if (!imageName.ToLower().EndsWith(".exe"))
+                {
+                    return;
+                }
+
+                LogInfo($"ImageLoad: PID {pid}, ImageName '{imageName}'");
+
+                // Complete the process record if we have a ProcessStart for this PID
+                if (partialProcesses.ContainsKey(pid))
+                {
+                    var partial = partialProcesses[pid];
+                    var createTime = (DateTime)partial["CreateTime"];
+
+                    if (!IsValidFileTime(createTime))
+                    {
+                        createTime = _bootTime;
+                        LogWarning($"Using boot time fallback for PID {pid}: {createTime}");
+                    }
+
+                    // Create complete process record
+                    var processRecord = new ProcessRecord
+                    {
+                        PidHash = _pidHashGenerator.GenPidHash(pid, createTime.ToFileTimeUtc()),
+                        ProcessId = pid,
+                        ParentProcessId = (int)partial["ParentProcessId"],
+                        ProcessName = Path.GetFileName(imageName).ToLower(),
+                        ImagePath = TranslateFilePath(imageName).ToLower(),
+                        CommandLine = "", // ImageLoad doesn't provide command line
+                        CreateTime = createTime,
+                        IsActive = true,
+                        Source = "boot_trace",
+                        UserName = "system",
+                        UniqueProcessKey = 0
+                    };
+
+                    if (!string.IsNullOrEmpty(processRecord.PidHash))
+                    {
+                        processRecords.Add(processRecord);
+                        LogInfo($"✅ Completed process: PID {pid}, Name '{processRecord.ProcessName}', Path '{processRecord.ImagePath}'");
+                    }
+
+                    partialProcesses.Remove(pid);
+                }
+                else
+                {
+                    LogWarning($"ImageLoad for PID {pid} but no corresponding ProcessStart event found");
+                }
             }
             catch (Exception ex)
             {
-                LogError($"Error fixing parent-child relationships: {ex.Message}");
+                LogError($"Error processing ImageLoad event: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Process a ProcessStart event from boot trace
+        /// </summary>
+        private void ProcessProcessStartEvent(TraceEvent data, Dictionary<int, PartialProcess> partialProcesses)
+        {
+            try
+            {
+                int pid = Convert.ToInt32(data.PayloadByName("ProcessID"));
+                int parentPid = Convert.ToInt32(data.PayloadByName("ParentProcessID"));
+
+                // Validate timestamp from ETW event
+                var eventTime = data.TimeStamp;
+                LogInfo($"ProcessStart event for PID {pid}: TimeStamp={eventTime} (Kind: {eventTime.Kind}, Ticks: {eventTime.Ticks})");
+
+                if (!IsValidFileTime(eventTime))
+                {
+                    LogError($"Invalid TimeStamp in ProcessStart event for PID {pid}: {eventTime}");
+                    eventTime = DateTime.UtcNow; // Fallback to current time
+                    LogWarning($"Using fallback timestamp for PID {pid}: {eventTime}");
+                }
+
+                // Extract sequence numbers if available
+                long procSeq = 0;
+                if (data.PayloadNames.Contains("ProcessSequenceNumber"))
+                    procSeq = Convert.ToInt64(data.PayloadByName("ProcessSequenceNumber"));
+
+                long parentProcSeq = 0;
+                if (data.PayloadNames.Contains("ParentProcessSequenceNumber"))
+                    parentProcSeq = Convert.ToInt64(data.PayloadByName("ParentProcessSequenceNumber"));
+
+                // Create or update partial process
+                if (!partialProcesses.ContainsKey(pid))
+                {
+                    partialProcesses[pid] = new PartialProcess
+                    {
+                        ProcessId = pid,
+                        ParentProcessId = parentPid,
+                        CreateTime = eventTime,
+                        ProcessSequenceNumber = procSeq,
+                        ParentProcessSequenceNumber = parentProcSeq
+                    };
+
+                    LogInfo($"Created PartialProcess for PID {pid} with CreateTime {eventTime}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error processing ProcessStart event: {ex.Message}");
+                LogError($"Event details: TimeStamp={data.TimeStamp}, EventName={data.EventName}");
+            }
+        }
+
+        /// <summary>
+        /// Process an ImageLoad event from boot trace
+        /// </summary>
+        private void ProcessImageLoadEvent(TraceEvent data, Dictionary<int, PartialProcess> partialProcesses, List<ProcessRecord> processRecords)
+        {
+            try
+            {
+                int pid = data.ProcessID;
+                string imageName = data.PayloadByName("ImageName").ToString();
+
+                // Only process .exe files
+                if (!imageName.ToLower().EndsWith(".exe"))
+                {
+                    return;
+                }
+
+                // Validate timestamp from ETW event
+                var eventTime = data.TimeStamp;
+                LogInfo($"ImageLoad event for PID {pid}: TimeStamp={eventTime} (Kind: {eventTime.Kind})");
+
+                if (!IsValidFileTime(eventTime))
+                {
+                    LogError($"Invalid TimeStamp in ImageLoad event for PID {pid}: {eventTime}");
+                    eventTime = DateTime.UtcNow; // Fallback to current time
+                    LogWarning($"Using fallback timestamp for ImageLoad PID {pid}: {eventTime}");
+                }
+
+                // Normalize the file path
+                string processName = TranslateFilePath(imageName);
+                FileInfo processInfo = new FileInfo(processName);
+
+                if (partialProcesses.ContainsKey(pid))
+                {
+                    // Complete the partial process and create ProcessRecord
+                    var partial = partialProcesses[pid];
+
+                    // Use the earlier timestamp (ProcessStart vs ImageLoad)
+                    var createTime = partial.CreateTime < eventTime ? partial.CreateTime : eventTime;
+
+                    LogInfo($"Completing process PID {pid}: using CreateTime {createTime} (ProcessStart: {partial.CreateTime}, ImageLoad: {eventTime})");
+
+                    var processRecord = CreateProcessRecord(
+                        partial.ProcessId,
+                        partial.ParentProcessId,
+                        createTime,
+                        processInfo.Name.ToLower(),
+                        processInfo.FullName.ToLower(),
+                        "" // No command line from ImageLoad
+                    );
+
+                    if (processRecord != null)
+                    {
+                        // Find and set parent PidHash
+                        var parentProcess = processRecords
+                            .Where(p => p.ProcessId == partial.ParentProcessId)
+                            .OrderByDescending(p => p.CreateTime)
+                            .FirstOrDefault();
+
+                        if (parentProcess != null)
+                        {
+                            processRecord.ParentPidHash = parentProcess.PidHash;
+                        }
+
+                        processRecords.Add(processRecord);
+                        LogInfo($"Completed boot trace process: {processRecord.ProcessName} (PID {processRecord.ProcessId})");
+                    }
+
+                    // Remove from partial list to avoid duplicates
+                    partialProcesses.Remove(pid);
+                }
+                else
+                {
+                    // Create new partial process from ImageLoad
+                    partialProcesses[pid] = new PartialProcess
+                    {
+                        ProcessId = pid,
+                        CreateTime = eventTime,
+                        ProcessName = processInfo.Name.ToLower(),
+                        ImagePath = processInfo.FullName.ToLower()
+                    };
+
+                    LogInfo($"Created PartialProcess from ImageLoad for PID {pid} with CreateTime {eventTime}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error processing ImageLoad event: {ex.Message}");
+                LogError($"Event details: TimeStamp={data.TimeStamp}, ProcessID={data.ProcessID}");
             }
         }
 
@@ -491,6 +721,58 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             }
         }
 
+        /// <summary>
+        /// Create a ProcessRecord from boot trace data
+        /// </summary>
+        private ProcessRecord CreateProcessRecord(int processId, int parentProcessId, DateTime createTime,
+            string processName, string imagePath, string commandLine)
+        {
+            try
+            {
+                // Validate timestamp before using it
+                if (!IsValidFileTime(createTime))
+                {
+                    LogError($"Invalid createTime for PID {processId}: {createTime} (Kind: {createTime.Kind})");
+
+                    // Use boot time as fallback
+                    createTime = _bootTime;
+                    LogWarning($"Using fallback createTime for PID {processId}: {createTime}");
+                }
+
+                // Generate PidHash using the create time
+                var pidHash = _pidHashGenerator.GenPidHash(processId, createTime.ToFileTimeUtc());
+
+                if (string.IsNullOrEmpty(pidHash))
+                {
+                    LogError($"Failed to generate PidHash for PID {processId}");
+                    return null;
+                }
+
+                var processRecord = new ProcessRecord
+                {
+                    PidHash = pidHash,
+                    ProcessId = processId,
+                    ParentProcessId = parentProcessId,
+                    ProcessName = processName ?? "unknown",
+                    ImagePath = imagePath ?? "unknown",
+                    CommandLine = commandLine ?? "",
+                    CreateTime = createTime,
+                    IsActive = true, // Boot trace processes are initially active
+                    Source = "boot_trace",
+                    UserName = "system", // Default for boot processes
+                    UniqueProcessKey = 0
+                };
+
+                LogInfo($"Created ProcessRecord: PID {processId}, PidHash {pidHash}, Name {processName}, CreateTime {createTime}");
+                return processRecord;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error creating ProcessRecord for PID {processId}: {ex.Message}");
+                LogError($"CreateTime details: {createTime} (Kind: {createTime.Kind}, Ticks: {createTime.Ticks})");
+                return null;
+            }
+        }
 
         #region Path Translation Methods (unchanged from original)
 
@@ -553,8 +835,9 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 else if (rawPath.ToLower().Contains(nativePrefix))
                 {
                     originalPathType = PathTypeEnum.Native;
+                    //windowsPath = fromNative(rawPath, StateManager.State.DriveMap).ToLower();
+                    LogWarning("Windows native paths not yet supported!");
                     windowsPath = rawPath;
-                    LogWarning("Windows Native file paths not yet supported!");
                 }
                 else if (rawPath.StartsWith(@"\??\"))
                 {
@@ -774,6 +1057,20 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Partial process information during boot trace processing
+    /// </summary>
+    internal class PartialProcess
+    {
+        public int ProcessId { get; set; }
+        public int ParentProcessId { get; set; }
+        public DateTime CreateTime { get; set; }
+        public string ProcessName { get; set; }
+        public string ImagePath { get; set; }
+        public long ProcessSequenceNumber { get; set; }
+        public long ParentProcessSequenceNumber { get; set; }
     }
 
     /// <summary>

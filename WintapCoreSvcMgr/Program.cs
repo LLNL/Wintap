@@ -30,16 +30,16 @@ namespace gov.llnl.wintap
         {
             backupDbManager = new BackupDatabaseManager();
 
-            if (args.Length == 0)
-            {
-                WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
-                return 1;
-            }
+            //if (args.Length == 0)
+            //{
+            //    WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
+            //    return 1;
+            //}
 
-            var command = args[0].ToUpperInvariant();
-            WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
+            //var command = args[0].ToUpperInvariant();
+            //WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
 
-            //string command = "PROCESS_MINI_TRACE";
+            string command = "MOCK_REBOOT";
             var exitCode = await ProcessCommand(command);
 
             WintapLogger.Log.Append($"WintapSvcMgr is complete.  result code: {exitCode}", LogLevel.Info);
