@@ -47,10 +47,40 @@ namespace gov.llnl.wintap.core.shared
         private StateManager()
         {
             WintapLogger.Log.Append($"StateManager is starting", LogLevel.Info);
+            MachineBootTime = getBootTime();
 
             WintapLogger.Log.Append($"StateManager is getting AgentId", LogLevel.Info);
             AgentId = getAgentId(readState());
             WintapLogger.Log.Append($"StateManager is initialized.", LogLevel.Info);
+        }
+
+        private DateTime getBootTime()
+        {
+            try
+            {
+                var uptimeMs = Environment.TickCount64;
+                var uptime = TimeSpan.FromMilliseconds(uptimeMs);
+                return DateTime.Now.Subtract(uptime);
+            }
+            catch (Exception ex)
+            {
+                // Fallback to WMI like in Program.cs
+                try
+                {
+                    SelectQuery query = new SelectQuery(@"SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
+                    ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
+                    foreach (ManagementObject mo in searcher.Get())
+                    {
+                        return ManagementDateTimeConverter.ToDateTime(mo.Properties["LastBootUpTime"].Value.ToString());
+                    }
+                }
+                catch
+                {
+                    // Last resort fallback
+                    return DateTime.Now.AddHours(-1);
+                }
+                return DateTime.Now.AddHours(-1);
+            }
         }
 
         private Guid getAgentId(WintapState state)

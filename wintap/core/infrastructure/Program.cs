@@ -35,19 +35,6 @@ using System.Linq;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
-builder.Services.Configure<ProcessTreeDatabaseConfig>(options =>
-{
-    options.DatabasePath = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb";
-    options.CompactionEnabled = true;
-    options.CompactionInterval = TimeSpan.FromHours(1);
-    options.DeleteDatabaseOnBoot = true;
-    options.EnableBootTraceProcessing = true;
-    options.MaxDatabaseSizeMB = 500;
-    options.HealthCheckInterval = TimeSpan.FromMinutes(5);
-});
-
-
-
 builder.Services.AddSingleton<ProcessTreeDatabaseManager>();
 builder.Services.AddHostedService<ProcessTreeDatabaseManager>(provider => provider.GetService<ProcessTreeDatabaseManager>());
 

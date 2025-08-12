@@ -83,7 +83,7 @@ private bool CallDatabaseRecovery()
 
         using (var process = Process.Start(processInfo))
         {
-            process.WaitForExit(60000); // 60 second timeout for recovery
+            process.WaitForExit(120000); // 2min timeout for recovery
             
             if (process.ExitCode == 0)
             {

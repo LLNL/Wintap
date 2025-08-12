@@ -600,27 +600,51 @@ namespace gov.llnl.wintap
         internal static bool IsSystemBoot()
         {
             DateTime lastBoot = DateTime.MinValue;
+            TimeSpan uptime = TimeSpan.Zero;
+
             try
             {
-                SelectQuery query = new SelectQuery(@"SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
-                foreach (ManagementObject mo in searcher.Get())
-                {
-                    lastBoot = ManagementDateTimeConverter.ToDateTime(mo.Properties["LastBootUpTime"].Value.ToString());
-                    break;
-                }
+                // Method 1: Use Environment.TickCount64 (most reliable)
+                var uptimeMs = Environment.TickCount64;
+                uptime = TimeSpan.FromMilliseconds(uptimeMs);
+                lastBoot = DateTime.Now.Subtract(uptime);
+
+                WintapLogger.Log.Append($"System uptime: {uptime.TotalMinutes:F2} minutes", LogLevel.Info);
+                WintapLogger.Log.Append($"Calculated boot time: {lastBoot}", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR GETTING LAST BOOT TIME, using wintap start time as machine start time. " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append($"Error calculating uptime with TickCount64, falling back to WMI: {ex.Message}", LogLevel.Warn);
+
+                // Fallback: Use WMI query
+                try
+                {
+                    SelectQuery query = new SelectQuery(@"SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
+                    ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
+                    foreach (ManagementObject mo in searcher.Get())
+                    {
+                        lastBoot = ManagementDateTimeConverter.ToDateTime(mo.Properties["LastBootUpTime"].Value.ToString());
+                        uptime = DateTime.Now.Subtract(lastBoot);
+                        break;
+                    }
+                    WintapLogger.Log.Append($"WMI boot time: {lastBoot}, uptime: {uptime.TotalMinutes:F2} minutes", LogLevel.Info);
+                }
+                catch (Exception wmiEx)
+                {
+                    WintapLogger.Log.Append($"ERROR GETTING LAST BOOT TIME: {wmiEx.Message}", LogLevel.Error);
+                    return false; // Can't determine boot time, assume not fresh boot
+                }
             }
-            bool boot = false;
-            if(DateTime.Now.Subtract(lastBoot) < TimeSpan.FromSeconds(120))
-            {
-                boot = true;
-            }
+
+            // Increase threshold to 10 minutes to account for slow boot processes
+            // Windows services can take several minutes to start, especially on slower systems
+            bool isRecentBoot = uptime.TotalMinutes < 10.0;
+
             WintapLogger.Log.Append($"Last boot time: {lastBoot}", LogLevel.Info);
-            return boot;
+            WintapLogger.Log.Append($"System uptime: {uptime.TotalMinutes:F2} minutes", LogLevel.Info);
+            WintapLogger.Log.Append($"Is fresh boot (< 10 min): {isRecentBoot}", LogLevel.Info);
+
+            return isRecentBoot;
         }
 
         private static bool isDeveloper()

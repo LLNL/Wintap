@@ -28,7 +28,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         private readonly string _etlBootTraceLogFile = "Wintap.Collectors.Process.ETLFile.BootTrace";
         private readonly string _bootTraceFilePath;
         private string nativePrefix = @"\device\harddiskvolume";
-        private string BootTracePath = @"C:\Program Files\Wintap\etl";
 
         public enum PathTypeEnum { Windows, WindowsShort, Relative, Unix, Win32File, Win32Device, Native, UNC, Unknown }
 
@@ -36,7 +35,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             _databaseManager = databaseManager ?? throw new ArgumentNullException(nameof(databaseManager));
             _pidHashGenerator = new ProcessHash();
-            _bootTraceFilePath = Path.Combine(BootTracePath, _etlBootTraceLogFile + ".etl");
+            _bootTraceFilePath = Path.Combine(@"C:\program files\wintap7\etl", _etlBootTraceLogFile + ".etl");
         }
 
         /// <summary>
@@ -101,21 +100,47 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             {
                 LogInfo($"TOTAL PROCESS EVENTS IN BOOT TRACE: {traceLog.Processes.Count}");
 
-                // Process events in chronological order
+                // Process events in chronological order with detailed logging
+                int eventCount = 0;
+                int processStartEvents = 0;
+                int imageLoadEvents = 0;
+
                 foreach (TraceEvent data in traceLog.Events.OrderBy(e => e.TimeStamp))
                 {
-                    if (data.EventName.StartsWith("ProcessStart"))
-                    {
-                        ProcessProcessStartEvent(data, partialProcesses);
-                    }
-                    else if (data.EventName.StartsWith("ImageLoad"))
-                    {
-                        ProcessImageLoadEvent(data, partialProcesses, processRecords);
-                    }
+                    eventCount++;
 
-                    lastEventTime = data.TimeStamp;
+                    try
+                    {
+                        // Log progress every 100 events
+                        if (eventCount % 100 == 0)
+                        {
+                            LogInfo($"Processed {eventCount} events... (ProcessStart: {processStartEvents}, ImageLoad: {imageLoadEvents})");
+                        }
+
+                        if (data.EventName.StartsWith("ProcessStart"))
+                        {
+                            processStartEvents++;
+                            ProcessProcessStartEvent(data, partialProcesses);
+                        }
+                        else if (data.EventName.StartsWith("ImageLoad"))
+                        {
+                            imageLoadEvents++;
+                            ProcessImageLoadEvent(data, partialProcesses, processRecords);
+                        }
+
+                        lastEventTime = data.TimeStamp;
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Error processing event #{eventCount}: {ex.Message}");
+                        LogError($"Event details: Name={data.EventName}, TimeStamp={data.TimeStamp}, ProcessID={data.ProcessID}");
+
+                        // Continue processing other events instead of failing completely
+                        continue;
+                    }
                 }
 
+                LogInfo($"Boot trace event processing complete: {eventCount} total events, {processStartEvents} ProcessStart, {imageLoadEvents} ImageLoad");
                 result.ProcessesFound = partialProcesses.Count + processRecords.Count;
                 result.LastEventTime = lastEventTime;
             }
@@ -143,6 +168,17 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 int pid = Convert.ToInt32(data.PayloadByName("ProcessID"));
                 int parentPid = Convert.ToInt32(data.PayloadByName("ParentProcessID"));
 
+                // Validate timestamp from ETW event
+                var eventTime = data.TimeStamp;
+                LogInfo($"ProcessStart event for PID {pid}: TimeStamp={eventTime} (Kind: {eventTime.Kind}, Ticks: {eventTime.Ticks})");
+
+                if (!IsValidFileTime(eventTime))
+                {
+                    LogError($"Invalid TimeStamp in ProcessStart event for PID {pid}: {eventTime}");
+                    eventTime = DateTime.UtcNow; // Fallback to current time
+                    LogWarning($"Using fallback timestamp for PID {pid}: {eventTime}");
+                }
+
                 // Extract sequence numbers if available
                 long procSeq = 0;
                 if (data.PayloadNames.Contains("ProcessSequenceNumber"))
@@ -159,15 +195,18 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     {
                         ProcessId = pid,
                         ParentProcessId = parentPid,
-                        CreateTime = data.TimeStamp,
+                        CreateTime = eventTime,
                         ProcessSequenceNumber = procSeq,
                         ParentProcessSequenceNumber = parentProcSeq
                     };
+
+                    LogInfo($"Created PartialProcess for PID {pid} with CreateTime {eventTime}");
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Error processing ProcessStart event: {ex.Message}");
+                LogError($"Event details: TimeStamp={data.TimeStamp}, EventName={data.EventName}");
             }
         }
 
@@ -187,6 +226,17 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     return;
                 }
 
+                // Validate timestamp from ETW event
+                var eventTime = data.TimeStamp;
+                LogInfo($"ImageLoad event for PID {pid}: TimeStamp={eventTime} (Kind: {eventTime.Kind})");
+
+                if (!IsValidFileTime(eventTime))
+                {
+                    LogError($"Invalid TimeStamp in ImageLoad event for PID {pid}: {eventTime}");
+                    eventTime = DateTime.UtcNow; // Fallback to current time
+                    LogWarning($"Using fallback timestamp for ImageLoad PID {pid}: {eventTime}");
+                }
+
                 // Normalize the file path
                 string processName = TranslateFilePath(imageName);
                 FileInfo processInfo = new FileInfo(processName);
@@ -196,10 +246,15 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     // Complete the partial process and create ProcessRecord
                     var partial = partialProcesses[pid];
 
+                    // Use the earlier timestamp (ProcessStart vs ImageLoad)
+                    var createTime = partial.CreateTime < eventTime ? partial.CreateTime : eventTime;
+
+                    LogInfo($"Completing process PID {pid}: using CreateTime {createTime} (ProcessStart: {partial.CreateTime}, ImageLoad: {eventTime})");
+
                     var processRecord = CreateProcessRecord(
                         partial.ProcessId,
                         partial.ParentProcessId,
-                        partial.CreateTime,
+                        createTime,
                         processInfo.Name.ToLower(),
                         processInfo.FullName.ToLower(),
                         "" // No command line from ImageLoad
@@ -231,15 +286,18 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     partialProcesses[pid] = new PartialProcess
                     {
                         ProcessId = pid,
-                        CreateTime = data.TimeStamp,
+                        CreateTime = eventTime,
                         ProcessName = processInfo.Name.ToLower(),
                         ImagePath = processInfo.FullName.ToLower()
                     };
+
+                    LogInfo($"Created PartialProcess from ImageLoad for PID {pid} with CreateTime {eventTime}");
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Error processing ImageLoad event: {ex.Message}");
+                LogError($"Event details: TimeStamp={data.TimeStamp}, ProcessID={data.ProcessID}");
             }
         }
 
@@ -251,6 +309,16 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             try
             {
+                // Validate timestamp before using it
+                if (!IsValidFileTime(createTime))
+                {
+                    LogError($"Invalid createTime for PID {processId}: {createTime} (Kind: {createTime.Kind})");
+
+                    // Use current time as fallback
+                    createTime = DateTime.UtcNow;
+                    LogWarning($"Using fallback createTime for PID {processId}: {createTime}");
+                }
+
                 // Generate PidHash using the create time
                 var pidHash = _pidHashGenerator.GenPidHash(processId, createTime.ToFileTimeUtc());
 
@@ -274,13 +342,45 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     UserName = "system" // Default for boot processes
                 };
 
-                LogInfo($"Created ProcessRecord: PID {processId}, PidHash {pidHash}, Name {processName}");
+                LogInfo($"Created ProcessRecord: PID {processId}, PidHash {pidHash}, Name {processName}, CreateTime {createTime}");
                 return processRecord;
             }
             catch (Exception ex)
             {
                 LogError($"Error creating ProcessRecord for PID {processId}: {ex.Message}");
+                LogError($"CreateTime details: {createTime} (Kind: {createTime.Kind}, Ticks: {createTime.Ticks})");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Validate if a DateTime can be converted to Windows FileTime
+        /// </summary>
+        private bool IsValidFileTime(DateTime dateTime)
+        {
+            try
+            {
+                // FileTime valid range: January 1, 1601 to ~30,000 AD
+                var minFileTime = new DateTime(1601, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var maxFileTime = new DateTime(3000, 1, 1, 0, 0, 0, DateTimeKind.Utc); // Reasonable upper bound
+
+                // Convert to UTC for comparison
+                var utcTime = dateTime.Kind == DateTimeKind.Utc ? dateTime : dateTime.ToUniversalTime();
+
+                if (utcTime < minFileTime || utcTime > maxFileTime)
+                {
+                    LogError($"DateTime out of FileTime range: {utcTime} (must be between {minFileTime} and {maxFileTime})");
+                    return false;
+                }
+
+                // Test the actual conversion
+                utcTime.ToFileTimeUtc();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogError($"FileTime validation failed for {dateTime}: {ex.Message}");
+                return false;
             }
         }
 
@@ -290,6 +390,16 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         private List<ProcessRecord> AddSystemProcesses(List<ProcessRecord> processRecords)
         {
             var bootTime = StateManager.MachineBootTime;
+
+            LogInfo($"Adding system processes with boot time: {bootTime} (Kind: {bootTime.Kind})");
+
+            // Validate boot time before using it
+            if (!IsValidFileTime(bootTime))
+            {
+                LogError($"Invalid MachineBootTime: {bootTime}");
+                bootTime = DateTime.UtcNow.AddMinutes(-5); // Fallback to 5 minutes ago
+                LogWarning($"Using fallback boot time: {bootTime}");
+            }
 
             // System Process (PID 4) - must be first for parent references
             var systemProcess = new ProcessRecord
@@ -308,6 +418,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             };
             systemProcess.ParentPidHash = systemProcess.PidHash; // Self-reference
             processRecords.Add(systemProcess);
+            LogInfo($"Added System process (PID 4): PidHash={systemProcess.PidHash}");
 
             // System Idle Process (PID 0)
             var idleProcess = new ProcessRecord
@@ -325,6 +436,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 UserName = "system"
             };
             processRecords.Add(idleProcess);
+            LogInfo($"Added Idle process (PID 0): PidHash={idleProcess.PidHash}");
 
             // Registry Process (if running)
             try
@@ -348,6 +460,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         UserName = "system"
                     };
                     processRecords.Add(registryRecord);
+                    LogInfo($"Added Registry process (PID {regProcess.Id}): PidHash={registryRecord.PidHash}");
                 }
             }
             catch (Exception ex)
@@ -486,7 +599,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 {
                     originalPathType = PathTypeEnum.Native;
                     //windowsPath = fromNative(rawPath, StateManager.State.DriveMap).ToLower();
-                    throw new Exception("Windows Native paths not yet supported");
+                    throw new Exception("Native paths not yet supported");
                 }
                 else if (rawPath.StartsWith(@"\??\"))
                 {
