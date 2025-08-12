@@ -11,8 +11,13 @@ using gov.llnl.wintap.platform.windows.infrastructure;  // For ETWAutoLoggerSetu
 using gov.llnl.wintap.platform.windows.models;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Etlx;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Management;
+using System.Threading.Tasks;
 using WintapCoreSvcMgr.Database;
 
 namespace gov.llnl.wintap.platform.windows.infrastructure
@@ -27,15 +32,43 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         private readonly ProcessHash _pidHashGenerator;
         private readonly string _etlBootTraceLogFile = "Wintap.Collectors.Process.ETLFile.BootTrace";
         private readonly string _bootTraceFilePath;
+        private readonly DateTime _bootTime; // Store the passed boot time
         private string nativePrefix = @"\device\harddiskvolume";
 
         public enum PathTypeEnum { Windows, WindowsShort, Relative, Unix, Win32File, Win32Device, Native, UNC, Unknown }
 
-        public BootTraceProcessor(BackupDatabaseManager databaseManager)
+        public BootTraceProcessor(BackupDatabaseManager databaseManager, DateTime? bootTime = null)
         {
             _databaseManager = databaseManager ?? throw new ArgumentNullException(nameof(databaseManager));
             _pidHashGenerator = new ProcessHash();
-            _bootTraceFilePath = Path.Combine(@"C:\program files\wintap7\etl", _etlBootTraceLogFile + ".etl");
+            _bootTraceFilePath = Path.Combine(@"c:\program files\wintap7\etl", _etlBootTraceLogFile + ".etl");
+
+            // Use passed boot time or calculate it
+            if (bootTime.HasValue && bootTime.Value > DateTime.MinValue)
+            {
+                _bootTime = bootTime.Value;
+                LogInfo($"Using provided boot time: {_bootTime}");
+            }
+            else
+            {
+                // Fallback to StateManager or calculation
+                _bootTime = StateManager.MachineBootTime;
+                if (_bootTime <= DateTime.MinValue)
+                {
+                    // Last resort - calculate it ourselves
+                    try
+                    {
+                        var uptimeMs = Environment.TickCount64;
+                        _bootTime = DateTime.Now.AddMilliseconds(-uptimeMs);
+                        LogInfo($"Calculated boot time as fallback: {_bootTime}");
+                    }
+                    catch
+                    {
+                        _bootTime = DateTime.Now.AddHours(-1);
+                        LogWarning($"Using fallback boot time: {_bootTime}");
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -88,70 +121,78 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             var result = new BootTraceProcessingResult();
             var processRecords = new List<ProcessRecord>();
-            var partialProcesses = new Dictionary<int, PartialProcess>();
 
-            // Add system processes first
-            processRecords = AddSystemProcesses(processRecords);
-
-            LogInfo("Starting boot trace ETL file processing");
-            DateTime lastEventTime = DateTime.MinValue;
+            LogInfo("Starting boot trace ETL file processing using TraceLog.Processes");
 
             using (var traceLog = Microsoft.Diagnostics.Tracing.Etlx.TraceLog.OpenOrConvert(etlFilePath))
             {
-                LogInfo($"TOTAL PROCESS EVENTS IN BOOT TRACE: {traceLog.Processes.Count}");
+                LogInfo($"ETL file opened successfully - Found {traceLog.Processes.Count} processes");
 
-                // Process events in chronological order with detailed logging
-                int eventCount = 0;
-                int processStartEvents = 0;
-                int imageLoadEvents = 0;
-
-                foreach (TraceEvent data in traceLog.Events.OrderBy(e => e.TimeStamp))
+                // Check timing span of the trace
+                if (traceLog.Processes.Count > 0)
                 {
-                    eventCount++;
+                    var processesWithValidTimes = traceLog.Processes.Where(p => p.StartTime != DateTime.MinValue).ToList();
+                    if (processesWithValidTimes.Any())
+                    {
+                        var earliestProcess = processesWithValidTimes.OrderBy(p => p.StartTime).First();
+                        var latestProcess = processesWithValidTimes.OrderByDescending(p => p.StartTime).First();
+                        var timeSpan = latestProcess.StartTime - earliestProcess.StartTime;
+
+                        LogInfo($"Process time span: {earliestProcess.StartTime} to {latestProcess.StartTime} (duration: {timeSpan.TotalMinutes:F2} minutes)");
+                    }
+                }
+
+                // Add system processes first (PID 0, 4, etc.)
+                processRecords = AddSystemProcesses(processRecords);
+
+                // Convert TraceProcess objects directly to ProcessRecord objects
+                int processedCount = 0;
+                int validProcesses = 0;
+
+                foreach (var traceProcess in traceLog.Processes)
+                {
+                    processedCount++;
 
                     try
                     {
-                        // Log progress every 100 events
-                        if (eventCount % 100 == 0)
+                        // Log progress every 50 processes
+                        if (processedCount % 50 == 0)
                         {
-                            LogInfo($"Processed {eventCount} events... (ProcessStart: {processStartEvents}, ImageLoad: {imageLoadEvents})");
+                            LogInfo($"Processed {processedCount} processes... ({validProcesses} valid)");
                         }
 
-                        if (data.EventName.StartsWith("ProcessStart"))
-                        {
-                            processStartEvents++;
-                            ProcessProcessStartEvent(data, partialProcesses);
-                        }
-                        else if (data.EventName.StartsWith("ImageLoad"))
-                        {
-                            imageLoadEvents++;
-                            ProcessImageLoadEvent(data, partialProcesses, processRecords);
-                        }
+                        var processRecord = ConvertTraceProcessToProcessRecord(traceProcess);
 
-                        lastEventTime = data.TimeStamp;
+                        if (processRecord != null)
+                        {
+                            processRecords.Add(processRecord);
+                            validProcesses++;
+
+                            LogInfo($"Added process: PID {processRecord.ProcessId}, Name '{processRecord.ProcessName}', Path '{processRecord.ImagePath}'");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Error processing event #{eventCount}: {ex.Message}");
-                        LogError($"Event details: Name={data.EventName}, TimeStamp={data.TimeStamp}, ProcessID={data.ProcessID}");
-
-                        // Continue processing other events instead of failing completely
+                        LogError($"Error processing TraceProcess PID {traceProcess.ProcessID}: {ex.Message}");
                         continue;
                     }
                 }
 
-                LogInfo($"Boot trace event processing complete: {eventCount} total events, {processStartEvents} ProcessStart, {imageLoadEvents} ImageLoad");
-                result.ProcessesFound = partialProcesses.Count + processRecords.Count;
-                result.LastEventTime = lastEventTime;
+                LogInfo($"TraceProcess conversion complete: {processedCount} total, {validProcesses} valid processes converted");
+
+                // Now fix parent-child relationships using PidHash values
+                FixParentChildRelationships(processRecords, traceLog.Processes);
+
+                result.ProcessesFound = traceLog.Processes.Count;
+                result.ProcessesProcessed = validProcesses;
             }
 
-            LogInfo("Boot trace replay complete, inserting into recovery database...");
+            LogInfo("Boot trace processing complete, inserting into recovery database...");
 
             // Insert all complete processes into recovery database
             int recordsInserted = await BulkInsertProcessesAsync(processRecords);
 
             result.ProcessesInserted = recordsInserted;
-            result.ProcessesProcessed = processRecords.Count;
 
             LogInfo($"Recovery database update complete, records created: {recordsInserted}");
 
@@ -159,197 +200,110 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         /// <summary>
-        /// Process a ProcessStart event from boot trace
+        /// Convert a TraceProcess directly to ProcessRecord - much simpler than event parsing!
         /// </summary>
-        private void ProcessProcessStartEvent(TraceEvent data, Dictionary<int, PartialProcess> partialProcesses)
+        private ProcessRecord ConvertTraceProcessToProcessRecord(Microsoft.Diagnostics.Tracing.Etlx.TraceProcess traceProcess)
         {
             try
             {
-                int pid = Convert.ToInt32(data.PayloadByName("ProcessID"));
-                int parentPid = Convert.ToInt32(data.PayloadByName("ParentProcessID"));
-
-                // Validate timestamp from ETW event
-                var eventTime = data.TimeStamp;
-                LogInfo($"ProcessStart event for PID {pid}: TimeStamp={eventTime} (Kind: {eventTime.Kind}, Ticks: {eventTime.Ticks})");
-
-                if (!IsValidFileTime(eventTime))
+                // Validate essential data
+                if (traceProcess.ProcessID <= 0)
                 {
-                    LogError($"Invalid TimeStamp in ProcessStart event for PID {pid}: {eventTime}");
-                    eventTime = DateTime.UtcNow; // Fallback to current time
-                    LogWarning($"Using fallback timestamp for PID {pid}: {eventTime}");
-                }
-
-                // Extract sequence numbers if available
-                long procSeq = 0;
-                if (data.PayloadNames.Contains("ProcessSequenceNumber"))
-                    procSeq = Convert.ToInt64(data.PayloadByName("ProcessSequenceNumber"));
-
-                long parentProcSeq = 0;
-                if (data.PayloadNames.Contains("ParentProcessSequenceNumber"))
-                    parentProcSeq = Convert.ToInt64(data.PayloadByName("ParentProcessSequenceNumber"));
-
-                // Create or update partial process
-                if (!partialProcesses.ContainsKey(pid))
-                {
-                    partialProcesses[pid] = new PartialProcess
-                    {
-                        ProcessId = pid,
-                        ParentProcessId = parentPid,
-                        CreateTime = eventTime,
-                        ProcessSequenceNumber = procSeq,
-                        ParentProcessSequenceNumber = parentProcSeq
-                    };
-
-                    LogInfo($"Created PartialProcess for PID {pid} with CreateTime {eventTime}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error processing ProcessStart event: {ex.Message}");
-                LogError($"Event details: TimeStamp={data.TimeStamp}, EventName={data.EventName}");
-            }
-        }
-
-        /// <summary>
-        /// Process an ImageLoad event from boot trace
-        /// </summary>
-        private void ProcessImageLoadEvent(TraceEvent data, Dictionary<int, PartialProcess> partialProcesses, List<ProcessRecord> processRecords)
-        {
-            try
-            {
-                int pid = data.ProcessID;
-                string imageName = data.PayloadByName("ImageName").ToString();
-
-                // Only process .exe files
-                if (!imageName.ToLower().EndsWith(".exe"))
-                {
-                    return;
-                }
-
-                // Validate timestamp from ETW event
-                var eventTime = data.TimeStamp;
-                LogInfo($"ImageLoad event for PID {pid}: TimeStamp={eventTime} (Kind: {eventTime.Kind})");
-
-                if (!IsValidFileTime(eventTime))
-                {
-                    LogError($"Invalid TimeStamp in ImageLoad event for PID {pid}: {eventTime}");
-                    eventTime = DateTime.UtcNow; // Fallback to current time
-                    LogWarning($"Using fallback timestamp for ImageLoad PID {pid}: {eventTime}");
-                }
-
-                // Normalize the file path
-                string processName = TranslateFilePath(imageName);
-                FileInfo processInfo = new FileInfo(processName);
-
-                if (partialProcesses.ContainsKey(pid))
-                {
-                    // Complete the partial process and create ProcessRecord
-                    var partial = partialProcesses[pid];
-
-                    // Use the earlier timestamp (ProcessStart vs ImageLoad)
-                    var createTime = partial.CreateTime < eventTime ? partial.CreateTime : eventTime;
-
-                    LogInfo($"Completing process PID {pid}: using CreateTime {createTime} (ProcessStart: {partial.CreateTime}, ImageLoad: {eventTime})");
-
-                    var processRecord = CreateProcessRecord(
-                        partial.ProcessId,
-                        partial.ParentProcessId,
-                        createTime,
-                        processInfo.Name.ToLower(),
-                        processInfo.FullName.ToLower(),
-                        "" // No command line from ImageLoad
-                    );
-
-                    if (processRecord != null)
-                    {
-                        // Find and set parent PidHash
-                        var parentProcess = processRecords
-                            .Where(p => p.ProcessId == partial.ParentProcessId)
-                            .OrderByDescending(p => p.CreateTime)
-                            .FirstOrDefault();
-
-                        if (parentProcess != null)
-                        {
-                            processRecord.ParentPidHash = parentProcess.PidHash;
-                        }
-
-                        processRecords.Add(processRecord);
-                        LogInfo($"Completed boot trace process: {processRecord.ProcessName} (PID {processRecord.ProcessId})");
-                    }
-
-                    // Remove from partial list to avoid duplicates
-                    partialProcesses.Remove(pid);
-                }
-                else
-                {
-                    // Create new partial process from ImageLoad
-                    partialProcesses[pid] = new PartialProcess
-                    {
-                        ProcessId = pid,
-                        CreateTime = eventTime,
-                        ProcessName = processInfo.Name.ToLower(),
-                        ImagePath = processInfo.FullName.ToLower()
-                    };
-
-                    LogInfo($"Created PartialProcess from ImageLoad for PID {pid} with CreateTime {eventTime}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error processing ImageLoad event: {ex.Message}");
-                LogError($"Event details: TimeStamp={data.TimeStamp}, ProcessID={data.ProcessID}");
-            }
-        }
-
-        /// <summary>
-        /// Create a ProcessRecord from boot trace data
-        /// </summary>
-        private ProcessRecord CreateProcessRecord(int processId, int parentProcessId, DateTime createTime,
-            string processName, string imagePath, string commandLine)
-        {
-            try
-            {
-                // Validate timestamp before using it
-                if (!IsValidFileTime(createTime))
-                {
-                    LogError($"Invalid createTime for PID {processId}: {createTime} (Kind: {createTime.Kind})");
-
-                    // Use current time as fallback
-                    createTime = DateTime.UtcNow;
-                    LogWarning($"Using fallback createTime for PID {processId}: {createTime}");
-                }
-
-                // Generate PidHash using the create time
-                var pidHash = _pidHashGenerator.GenPidHash(processId, createTime.ToFileTimeUtc());
-
-                if (string.IsNullOrEmpty(pidHash))
-                {
-                    LogError($"Failed to generate PidHash for PID {processId}");
+                    LogWarning($"TraceProcess has invalid ProcessID: {traceProcess.ProcessID}");
                     return null;
                 }
+
+                // Get timing information
+                DateTime createTime = traceProcess.StartTime;
+                if (createTime == DateTime.MinValue || !IsValidFileTime(createTime))
+                {
+                    LogWarning($"TraceProcess PID {traceProcess.ProcessID} has invalid StartTime: {createTime}, using boot time fallback");
+                    createTime = _bootTime;
+                }
+
+                // Generate PidHash
+                var pidHash = _pidHashGenerator.GenPidHash(traceProcess.ProcessID, createTime.ToFileTimeUtc());
+                if (string.IsNullOrEmpty(pidHash))
+                {
+                    LogError($"Failed to generate PidHash for TraceProcess PID {traceProcess.ProcessID}");
+                    return null;
+                }
+
+                // Extract process information
+                string processName = !string.IsNullOrEmpty(traceProcess.Name) ? traceProcess.Name.ToLower() : "unknown";
+                string imagePath = !string.IsNullOrEmpty(traceProcess.ImageFileName) ? traceProcess.ImageFileName.ToLower() : "unknown";
+                string commandLine = traceProcess.CommandLine ?? "";
+
+                // Normalize paths
+                if (imagePath != "unknown")
+                {
+                    imagePath = TranslateFilePath(imagePath);
+                }
+
+                // Determine if process is still active
+                bool isActive = traceProcess.EndTime == DateTime.MaxValue || traceProcess.ExitStatus == null;
 
                 var processRecord = new ProcessRecord
                 {
                     PidHash = pidHash,
-                    ProcessId = processId,
-                    ParentProcessId = parentProcessId,
-                    ProcessName = processName ?? "unknown",
-                    ImagePath = imagePath ?? "unknown",
-                    CommandLine = commandLine ?? "",
+                    ProcessId = traceProcess.ProcessID,
+                    ParentProcessId = traceProcess.ParentID,
+                    ProcessName = processName,
+                    ImagePath = imagePath,
+                    CommandLine = commandLine,
                     CreateTime = createTime,
-                    IsActive = true, // Boot trace processes are initially active
+                    ExitTime = traceProcess.EndTime == DateTime.MaxValue ? null : traceProcess.EndTime,
+                    ExitCode = traceProcess.ExitStatus,
+                    IsActive = isActive,
                     Source = "boot_trace",
-                    UserName = "system" // Default for boot processes
+                    UserName = "system", // TraceProcess doesn't provide user info
+                    UniqueProcessKey = 0 // Boot trace doesn't have UniqueProcessKey semantics
                 };
 
-                LogInfo($"Created ProcessRecord: PID {processId}, PidHash {pidHash}, Name {processName}, CreateTime {createTime}");
                 return processRecord;
             }
             catch (Exception ex)
             {
-                LogError($"Error creating ProcessRecord for PID {processId}: {ex.Message}");
-                LogError($"CreateTime details: {createTime} (Kind: {createTime.Kind}, Ticks: {createTime.Ticks})");
+                LogError($"Error converting TraceProcess PID {traceProcess.ProcessID}: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Fix parent-child relationships by setting ParentPidHash values
+        /// </summary>
+        private void FixParentChildRelationships(List<ProcessRecord> processRecords, IEnumerable<Microsoft.Diagnostics.Tracing.Etlx.TraceProcess> traceProcesses)
+        {
+            try
+            {
+                LogInfo("Fixing parent-child relationships...");
+
+                // Create PID to PidHash lookup
+                var pidToPidHash = processRecords.ToDictionary(p => p.ProcessId, p => p.PidHash);
+
+                int relationshipsFixed = 0;
+
+                foreach (var processRecord in processRecords)
+                {
+                    if (processRecord.ParentProcessId > 0 && string.IsNullOrEmpty(processRecord.ParentPidHash))
+                    {
+                        if (pidToPidHash.TryGetValue(processRecord.ParentProcessId, out string parentPidHash))
+                        {
+                            processRecord.ParentPidHash = parentPidHash;
+                            relationshipsFixed++;
+                        }
+                        else
+                        {
+                            LogWarning($"Parent PID {processRecord.ParentProcessId} not found for process {processRecord.ProcessId} ({processRecord.ProcessName})");
+                        }
+                    }
+                }
+
+                LogInfo($"Fixed {relationshipsFixed} parent-child relationships");
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error fixing parent-child relationships: {ex.Message}");
             }
         }
 
@@ -389,14 +343,14 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// </summary>
         private List<ProcessRecord> AddSystemProcesses(List<ProcessRecord> processRecords)
         {
-            var bootTime = StateManager.MachineBootTime;
+            var bootTime = _bootTime; // Use our calculated/passed boot time
 
             LogInfo($"Adding system processes with boot time: {bootTime} (Kind: {bootTime.Kind})");
 
             // Validate boot time before using it
             if (!IsValidFileTime(bootTime))
             {
-                LogError($"Invalid MachineBootTime: {bootTime}");
+                LogError($"Invalid boot time: {bootTime}");
                 bootTime = DateTime.UtcNow.AddMinutes(-5); // Fallback to 5 minutes ago
                 LogWarning($"Using fallback boot time: {bootTime}");
             }
@@ -537,6 +491,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             }
         }
 
+
         #region Path Translation Methods (unchanged from original)
 
         /// <summary>
@@ -598,8 +553,8 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 else if (rawPath.ToLower().Contains(nativePrefix))
                 {
                     originalPathType = PathTypeEnum.Native;
-                    //windowsPath = fromNative(rawPath, StateManager.State.DriveMap).ToLower();
-                    throw new Exception("Native paths not yet supported");
+                    windowsPath = rawPath;
+                    LogWarning("Windows Native file paths not yet supported!");
                 }
                 else if (rawPath.StartsWith(@"\??\"))
                 {
@@ -819,20 +774,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         #endregion
-    }
-
-    /// <summary>
-    /// Partial process information during boot trace processing
-    /// </summary>
-    internal class PartialProcess
-    {
-        public int ProcessId { get; set; }
-        public int ParentProcessId { get; set; }
-        public DateTime CreateTime { get; set; }
-        public string ProcessName { get; set; }
-        public string ImagePath { get; set; }
-        public long ProcessSequenceNumber { get; set; }
-        public long ParentProcessSequenceNumber { get; set; }
     }
 
     /// <summary>
