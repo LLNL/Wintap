@@ -1,4 +1,5 @@
 ﻿using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System;
@@ -14,7 +15,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
     /// </summary>
     public class ProcessTreeDatabaseConfig
     {
-        public string DatabasePath { get; set; } = @"C:\ProgramData\Wintap\ProcessTree\live-processes.duckdb";
+        public string DatabasePath { get; set; } = Path.Combine(Strings.FileDataRoot,"ProcessTree", "main.duckdb");
         public bool CompactionEnabled { get; set; } = true;
         public TimeSpan CompactionInterval { get; set; } = TimeSpan.FromHours(1);
         public bool DeleteDatabaseOnBoot { get; set; } = true;

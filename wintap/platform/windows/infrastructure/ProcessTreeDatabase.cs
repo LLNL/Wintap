@@ -35,6 +35,12 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             Initialize();
         }
 
+        public void Close()
+        {
+            _connection.Close();
+            _connection.Dispose();
+        }
+
         public void InitializeAsync()
         {
             // Already initialized in constructor, this is for backward compatibility

@@ -164,7 +164,7 @@ namespace WintapCoreSvcMgr.Database
         /// Process mini-trace.etl file into backup database
         /// Called by WintapCoreSvcMgr.exe PROCESS_MINI_TRACE command
         /// </summary>
-        public async Task<DatabaseOperationResult> ProcessMiniTraceETL()
+        public DatabaseOperationResult ProcessMiniTraceETL()
         {
             var startTime = DateTime.UtcNow;
 
@@ -405,7 +405,7 @@ namespace WintapCoreSvcMgr.Database
             }
             catch (Exception ex)
             {
-                LogError($"Failed to insert boot trace ProcessRecord {process.PidHash}: {ex.Message}");
+                LogError($"Failed to insert boot trace ProcessRecord {process.ImagePath} {process.PidHash}: {ex.Message}");
 
                 // If this fails due to duplicate PidHash, that indicates a logic error in boot trace processing
                 if (ex.Message.Contains("UNIQUE constraint failed") || ex.Message.Contains("duplicate"))

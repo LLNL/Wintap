@@ -26,7 +26,7 @@ namespace gov.llnl.wintap
     {
         private static BackupDatabaseManager backupDbManager;
 
-        public static async Task<int> Main(string[] args)
+        public static int Main(string[] args)
         {
             backupDbManager = new BackupDatabaseManager();
 
@@ -40,51 +40,54 @@ namespace gov.llnl.wintap
             //WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
 
             string command = "MOCK_REBOOT";
-            var exitCode = await ProcessCommand(command);
+            int exitCode = ProcessCommand(command);
 
             WintapLogger.Log.Append($"WintapSvcMgr is complete.  result code: {exitCode}", LogLevel.Info);
             WintapLogger.Log.Close();
             return exitCode;
         }
 
-        private static async Task<int> ProcessCommand(string command)
+        private static int ProcessCommand(string command)
         {
             return command switch
             {
-                "PROCESS_MINI_TRACE" => await ProcessMiniTrace(),
-                "COMPACT_BACKUP_DB" => await CompactBackupDb(),
-                "RECOVER_DATABASE" => await RecoverDB(),
+                "PROCESS_MINI_TRACE" => ProcessMiniTrace(),
+                "COMPACT_BACKUP_DB" => CompactBackupDb(),
+                "RECOVER_DATABASE" => RecoverDB(),
                 "START_MINI_TRACE_SESSION" => StartMiniTraceSession(),
                 "STOP_MINI_TRACE_SESSION" => StopMiniTraceSession(),
                 "MINI_TRACE_STATUS" => GetMiniTraceStatus(),
                 "BACKUP_DB_STATUS" => GetBackupDatabaseStatus(),
-                "MOCK_REBOOT" => await TestReboot(),
+                "MOCK_REBOOT" => TestReboot(),
                 "HELP" or "/?" => ShowUsage(),
                 _ => ShowUsage()
             };
         }
 
-        private static async Task<int> TestReboot()
+        private static int TestReboot()
         {
             try
             {
                 WintapLogger.Log.Append("=== MOCKING FRESH BOOT SCENARIO ===", LogLevel.Info);
 
+                System.Diagnostics.Debugger.Launch();
+
                 // Don't delete existing databases - just test the boot trace processing
-                var testManager = new BackupDatabaseManager();
+                //var testManager = new BackupDatabaseManager();
+                backupDbManager.DeleteMainDb();
 
                 // Test the fresh boot logic without destructive operations
                 WintapLogger.Log.Append("Testing boot trace processing (non-destructive)", LogLevel.Info);
 
-                var bootProcessor = new BootTraceProcessor(testManager);
-                var result = await bootProcessor.ProcessBootTraceAsync();
+                var bootProcessor = new BootTraceProcessor(backupDbManager);
+                var result = bootProcessor.ProcessBootTraceAsync();
 
                 if (result.Success)
                 {
                     WintapLogger.Log.Append($"Mock fresh boot SUCCESS: {result.ProcessesInserted} processes", LogLevel.Info);
 
                     // Test database synchronization (without deleting main)
-                    var syncResult = testManager.SynchronizeDatabases();
+                    var syncResult = backupDbManager.SynchronizeDatabases();
                     if (syncResult.Success)
                     {
                         WintapLogger.Log.Append("Database synchronization test SUCCESS", LogLevel.Info);
@@ -253,7 +256,7 @@ namespace gov.llnl.wintap
             return 0;
         }
 
-        private static async Task<int> RecoverDB()
+        private static int RecoverDB()
         {
             int returnCode = 0;
             WintapLogger.Log.Append("starting database recovery", LogLevel.Info);
@@ -267,7 +270,7 @@ namespace gov.llnl.wintap
                 backupDbManager = new BackupDatabaseManager();
                 // Process existing boot trace
                 BootTraceProcessor btp = new BootTraceProcessor(backupDbManager);
-                var bootTraceResult = await btp.ProcessBootTraceAsync();
+                var bootTraceResult = btp.ProcessBootTraceAsync();
                 if (!bootTraceResult.Success)
                 {
                     WintapLogger.Log.Append($"Error process boot trace: {bootTraceResult.ErrorMessage}", LogLevel.Error);
@@ -277,7 +280,7 @@ namespace gov.llnl.wintap
             else
             {
                 WintapLogger.Log.Append("System boot NOT detected", LogLevel.Info);
-                returnCode = ProcessMiniTrace().Result;
+                returnCode = ProcessMiniTrace();
             }
             // Ensure AutoLogger is configured for boot capture
             WintapLogger.Log.Append($"Verifying boot trace", LogLevel.Info);
@@ -287,7 +290,7 @@ namespace gov.llnl.wintap
             return returnCode;
         }
 
-        private static async Task<int> CompactBackupDb()
+        private static int CompactBackupDb()
         {
             int resultCode = 0;
             try
@@ -301,12 +304,12 @@ namespace gov.llnl.wintap
             return resultCode;
         }
 
-        private static async Task<int> ProcessMiniTrace()
+        private static int ProcessMiniTrace()
         {
             try
             {
                 // No need to create a separate session - BackupDatabaseManager handles it
-                var result = await backupDbManager.ProcessMiniTraceETL();
+                var result = backupDbManager.ProcessMiniTraceETL();
                 return String.IsNullOrEmpty(result.ErrorMessage) ? 0 : 1;
             }
             catch (Exception ex)

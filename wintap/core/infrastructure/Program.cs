@@ -29,14 +29,12 @@ using System;
 using System.ClientModel;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
-
-builder.Services.AddSingleton<ProcessTreeDatabaseManager>();
-builder.Services.AddHostedService<ProcessTreeDatabaseManager>(provider => provider.GetService<ProcessTreeDatabaseManager>());
 
 //System.Diagnostics.Debugger.Launch();
 
@@ -157,11 +155,20 @@ catch(Exception ex)
 }
 
 
+FileInfo mainDBInfo = new FileInfo(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb"));
+mainDBInfo.Delete();
+mainDBInfo = new FileInfo(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
+mainDBInfo.Delete();
 
+CallDatabaseRecovery();
 
 // Configuration for Windows Service and Hosted Service
 builder.Services.AddWindowsService();
 builder.Services.AddHostedService<WinTapSvc>();
+
+builder.Services.AddSingleton<ProcessTreeDatabaseManager>();
+builder.Services.AddHostedService<ProcessTreeDatabaseManager>(provider => provider.GetService<ProcessTreeDatabaseManager>());
+
 builder.Services.AddSignalR();
 
 var app = builder.Build();
@@ -206,3 +213,45 @@ app.Run();
 //        return DateTime.Now.ToShortTimeString();
 //    }
 //}
+
+bool CallDatabaseRecovery()
+{
+    try
+    {
+        //System.Diagnostics.Debugger.Launch();
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "WintapCoreSvcMgr.exe",
+            Arguments = "RECOVER_DATABASE",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = false,
+            RedirectStandardError = true
+        };
+
+        System.Diagnostics.Process wintapSvcMgr = new System.Diagnostics.Process();
+        wintapSvcMgr.StartInfo = processInfo;
+        wintapSvcMgr.Start();
+        wintapSvcMgr.WaitForExit();
+        while (System.Diagnostics.Process.GetProcessesByName("WintapCoreSvcMgr").Length > 0)
+        {
+            System.Threading.Thread.Sleep(100);
+        }
+        if (wintapSvcMgr.ExitCode == 0)
+        {
+            WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);
+            return true;
+        }
+        else
+        {
+            var error = wintapSvcMgr.StandardError.ReadToEnd();
+            WintapLogger.Log.Append($"Database recovery failed: {error}", LogLevel.Error);
+            return false;
+        }
+    }
+    catch (Exception ex)
+    {
+        WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
+        return false;
+    }
+}

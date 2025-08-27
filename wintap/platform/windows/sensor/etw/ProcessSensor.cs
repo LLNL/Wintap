@@ -14,6 +14,7 @@ using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using gov.llnl.wintap.platform.windows.infrastructure;
+using Microsoft.Diagnostics.Tracing.AutomatedAnalysis;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using Microsoft.Diagnostics.Tracing.StackSources;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
@@ -32,98 +34,82 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     /// </summary>
     internal class ProcessSensor : EtwProviderCollector
     {
-        private ProcessTreeDatabaseManager databaseManager;
         private ProcessTreeDatabase database;
         private ProcessHash processHash;
         public enum ProcessActivityEnum { start, stop, refresh };
 
-       public ProcessSensor() : base()
-{
-    // Simple constructor - database is already ready
-    SensorName = "Process";
-    EtwProviderId = "SystemTraceControlGuid";
-    KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.Process;
-    
-    // Open ready-made database (no creation/deletion logic)
-    //database = new ProcessTreeDatabase(@"C:\ProgramData\Wintap\ProcessTree\main-trace.duckdb");
-    processHash = new ProcessHash();
-}
-
-public override bool Start()
-{
-    // Call recovery first
-    if (!CallDatabaseRecovery())
-    {
-        WintapLogger.Log.Append("Database recovery failed", LogLevel.Error);
-        return false;
-    }
-    
-    // Database is now ready - just start real-time processing
-    WintapLogger.Log.Append("Enabling real-time ETW process handling", LogLevel.Info);
-    KernelParser.Instance.EtwParser.ProcessStart += Kernel_ProcessStart;
-    //KernelParser.Instance.EtwParser.ProcessStop += Kernel_ProcessStop;
-    
-    WintapLogger.Log.Append("Process collection startup complete", LogLevel.Info);
-    return true;
-}
-
-private bool CallDatabaseRecovery()
-{
-    try
-    {
-        var processInfo = new ProcessStartInfo
+        public ProcessSensor() : base()
         {
-            FileName = "WintapCoreSvcMgr.exe",
-            Arguments = "RECOVER_DATABASE",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
+            // Simple constructor - database is already ready
+            SensorName = "Process";
+            EtwProviderId = "SystemTraceControlGuid";
+            KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.Process;
 
-        using (var process = Process.Start(processInfo))
-        {
-            process.WaitForExit(120000); // 2min timeout for recovery
-            
-            if (process.ExitCode == 0)
-            {
-                WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);
-                return true;
-            }
-            else
-            {
-                var error = process.StandardError.ReadToEnd();
-                WintapLogger.Log.Append($"Database recovery failed: {error}", LogLevel.Error);
-                return false;
-            }
+            // Open ready-made database (no creation/deletion logic)
+            //database = new ProcessTreeDatabase(@"C:\ProgramData\Wintap\ProcessTree\main-trace.duckdb");
+            processHash = new ProcessHash();
+
         }
-    }
-    catch (Exception ex)
-    {
-        WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
-        return false;
-    }
-}
 
-        /// <summary>
-        /// Generate process tree - replaces ProcessTree.GenProcessTree() with database version
-        /// </summary>
-        internal async void GenProcessTree()
+        public override bool Start()
         {
-            WintapLogger.Log.Append("Generating process tree in database.", LogLevel.Info);
+            // Call recovery first
+            //if (!CallDatabaseRecovery())
+            //{
+            //    WintapLogger.Log.Append("Database recovery failed", LogLevel.Error);
+            //    return false;
+            //}
+
+            // Database is now ready - just start real-time processing
+            database = new ProcessTreeDatabase(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb"));
+            WintapLogger.Log.Append("Enabling real-time ETW process handling", LogLevel.Info);
+            KernelParser.Instance.EtwParser.ProcessStart += Kernel_ProcessStart;
+            //KernelParser.Instance.EtwParser.ProcessStop += Kernel_ProcessStop;
+
+            WintapLogger.Log.Append("Process collection startup complete", LogLevel.Info);
+            return true;
+        }
+
+        private bool CallDatabaseRecovery()
+        {
             try
             {
-                WintapLogger.Log.Append("Building process tree from boot trace", LogLevel.Info);
-                ETWAutoLoggerSetup.InitializeBootTraceAutoLogger();
-                BootTraceProcessor bootTracer = new BootTraceProcessor(database);
-                await bootTracer.ProcessBootTraceAsync();
+                //System.Diagnostics.Debugger.Launch();
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = "WintapCoreSvcMgr.exe",
+                    Arguments = "RECOVER_DATABASE",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = true
+                };
+
+                System.Diagnostics.Process wintapSvcMgr = new System.Diagnostics.Process();
+                wintapSvcMgr.StartInfo = processInfo;
+                wintapSvcMgr.Start();
+                wintapSvcMgr.WaitForExit();
+                while(System.Diagnostics.Process.GetProcessesByName("WintapCoreSvcMgr").Length > 0)
+                {
+                    System.Threading.Thread.Sleep(100);
+                }
+                if (wintapSvcMgr.ExitCode == 0)
+                {
+                    WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);
+                    return true;
+                }
+                else
+                {
+                    var error = wintapSvcMgr.StandardError.ReadToEnd();
+                    WintapLogger.Log.Append($"Database recovery failed: {error}", LogLevel.Error);
+                    return false;
+                }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading boot trace: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
+                return false;
             }
-
-            WintapLogger.Log.Append("Process tree generation complete.", LogLevel.Info);
         }
 
         /// <summary>

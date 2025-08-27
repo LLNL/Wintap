@@ -70,13 +70,14 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     }
                 }
             }
+            LogInfo("BootTrace Processor constructed");
         }
 
         /// <summary>
         /// Process boot trace and populate recovery database with historical processes
         /// </summary>
         /// <returns>Boot trace processing results</returns>
-        public async Task<BootTraceProcessingResult> ProcessBootTraceAsync()
+        public BootTraceProcessingResult ProcessBootTraceAsync()
         {
             var result = new BootTraceProcessingResult();
             var startTime = DateTime.Now;
@@ -85,18 +86,21 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             {
                 LogInfo("Starting boot trace processing for recovery database");
 
+
+                // infinite wait happening somewhere in this section!
+
                 // Ensure AutoLogger is properly configured before processing
                 EnsureBootTraceAutoLoggerConfigured();
 
                 // Stop current boot trace session and create working copy
-                await StopBootTraceAsync();
-                var workingFilePath = await CreateWorkingCopyAsync();
+                StopBootTraceAsync();
+                var workingFilePath = CreateWorkingCopyAsync();
 
                 // Restart boot trace session for future collection
-                await StartBootTraceAsync();
+                StartBootTraceAsync();
 
                 // Process the boot trace file directly into recovery database
-                result = await ProcessBootTraceFileAsync(workingFilePath);
+                result = ProcessBootTraceFileAsync(workingFilePath);
 
                 // Cleanup working copy
                 CleanupWorkingCopy(workingFilePath);
@@ -118,7 +122,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             return result;
         }
 
-        private async Task<BootTraceProcessingResult> ProcessBootTraceFileAsync(string etlFilePath)
+        private BootTraceProcessingResult ProcessBootTraceFileAsync(string etlFilePath)
         {
             var result = new BootTraceProcessingResult();
             var processRecords = new List<ProcessRecord>();
@@ -177,9 +181,13 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                     // Fall back to original event processing approach
                     var partialProcesses = new Dictionary<int, Dictionary<string, object>>();
-
+                    int eventsProcessed = 0;
+                    TraceEvent lastEvent;
                     foreach (TraceEvent data in traceLog.Events.OrderBy(e => e.TimeStamp))
                     {
+                        eventsProcessed++;
+                        lastEvent = data;
+                        LogInfo($"events processed: {eventsProcessed}");
                         try
                         {
                             if (data.EventName.StartsWith("ProcessStart") || data.EventName.StartsWith("Process/Start"))
@@ -193,10 +201,11 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         }
                         catch (Exception ex)
                         {
-                            LogError($"Error processing event {data.EventName}: {ex.Message}");
+                            LogError($"Error processing event: {ex.Message}");
                             continue;
                         }
                     }
+                    LogInfo("We never get here?");
                 }
 
                 result.ProcessesFound = processRecords.Count;
@@ -206,7 +215,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             LogInfo("Boot trace processing complete, inserting into recovery database...");
 
             // Insert all processes into recovery database
-            int recordsInserted = await BulkInsertProcessesAsync(processRecords);
+            int recordsInserted = BulkInsertProcessesAsync(processRecords);
 
             result.ProcessesInserted = recordsInserted;
 
@@ -223,49 +232,33 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             try
             {
                 // First, let's see what payload fields are actually available
-                LogInfo($"ProcessStart event analysis:");
-                LogInfo($"  EventName: {data.EventName}");
-                LogInfo($"  ProviderGuid: {data.ProviderGuid}");
-                LogInfo($"  ProviderName: {data.ProviderName}");
-                LogInfo($"  Available payload names: {string.Join(", ", data.PayloadNames)}");
+                //LogInfo($"ProcessStart event analysis:");
+                //LogInfo($"  EventName: {data.EventName}");
+                //LogInfo($"  ProviderGuid: {data.ProviderGuid}");
+                //LogInfo($"  ProviderName: {data.ProviderName}");
+                //LogInfo($"  Available payload names: {string.Join(", ", data.PayloadNames)}");
 
                 // Try to safely extract ProcessID
                 int pid = 0;
-                if (data.PayloadNames.Contains("ProcessID"))
+                try
                 {
-                    try
-                    {
-                        pid = Convert.ToInt32(data.PayloadByName("ProcessID"));
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to get ProcessID from payload: {ex.Message}");
-                        pid = data.ProcessID; // Use TraceEvent's ProcessID property instead
-                    }
+                    pid = Convert.ToInt32(data.PayloadByName("ProcessID"));
                 }
-                else
+                catch (Exception ex)
                 {
-                    pid = data.ProcessID; // Use TraceEvent's ProcessID property
-                    LogWarning($"ProcessStart event has no ProcessID payload, using TraceEvent.ProcessID: {pid}");
+                    LogError($"Failed to get ProcessID from payload: {ex.Message}");
                 }
+
 
                 // Try to safely extract ParentProcessID
                 int parentPid = 0;
-                if (data.PayloadNames.Contains("ParentProcessID"))
+                try
                 {
-                    try
-                    {
-                        parentPid = Convert.ToInt32(data.PayloadByName("ParentProcessID"));
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to get ParentProcessID from payload: {ex.Message}");
-                        parentPid = 0; // Unknown parent
-                    }
+                    parentPid = Convert.ToInt32(data.PayloadByName("ParentProcessID"));
                 }
-                else
+                catch (Exception ex)
                 {
-                    LogWarning($"ProcessStart event has no ParentProcessID payload for PID {pid}");
+                    LogError($"Failed to get ParentProcessID from payload: {ex.Message}");
                     parentPid = 0; // Unknown parent
                 }
 
@@ -302,10 +295,15 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             try
             {
-                int pid = data.ProcessID;
+                int pid = Convert.ToInt32(data.PayloadByName("ProcessID").ToString());
 
-                LogInfo($"ImageLoad event analysis for PID {pid}:");
-                LogInfo($"  Available payload names: {string.Join(", ", data.PayloadNames)}");
+                if(pid == 14500)
+                {
+                    return;
+                }
+
+                //LogInfo($"ImageLoad event analysis for PID {pid}:");
+                //LogInfo($"  Available payload names: {string.Join(", ", data.PayloadNames)}");
 
                 // Try to safely extract ImageName
                 string imageName = "";
@@ -345,7 +343,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     return;
                 }
 
-                LogInfo($"ImageLoad: PID {pid}, ImageName '{imageName}'");
+                LogInfo($"ImageLoad WITH EXE: PID {pid}, ImageName '{imageName}'");
 
                 // Complete the process record if we have a ProcessStart for this PID
                 if (partialProcesses.ContainsKey(pid))
@@ -355,8 +353,23 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                     if (!IsValidFileTime(createTime))
                     {
-                        createTime = _bootTime;
-                        LogWarning($"Using boot time fallback for PID {pid}: {createTime}");
+                        LogWarning($"Invalid boot time fallback for PID {pid}: {createTime}");
+                        return;
+                    }
+
+                    // attempt to get parentpid hash
+                    string partialProcessParentPidHash = "";
+
+                    try
+                    {
+                        int partialProcessParentPid = Convert.ToInt32(partialProcesses[pid]["ParentProcessIed"]);
+                        DateTime partialProcessParentCreate = (DateTime)partialProcesses[pid]["CreateTime"];
+                        partialProcessParentPidHash = _pidHashGenerator.GenPidHash(pid, partialProcessParentCreate.ToFileTimeUtc());
+                    }
+                    catch(Exception ex)
+                    {
+                        LogError($"Could not find parent process for pid: {pid}  msg: {ex.Message}");
+                        return;
                     }
 
                     // Create complete process record
@@ -365,6 +378,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         PidHash = _pidHashGenerator.GenPidHash(pid, createTime.ToFileTimeUtc()),
                         ProcessId = pid,
                         ParentProcessId = (int)partial["ParentProcessId"],
+                        ParentPidHash = partialProcessParentPidHash,
                         ProcessName = Path.GetFileName(imageName).ToLower(),
                         ImagePath = TranslateFilePath(imageName).ToLower(),
                         CommandLine = "", // ImageLoad doesn't provide command line
@@ -544,9 +558,9 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             try
             {
-                // FileTime valid range: January 1, 1601 to ~30,000 AD
-                var minFileTime = new DateTime(1601, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                var maxFileTime = new DateTime(3000, 1, 1, 0, 0, 0, DateTimeKind.Utc); // Reasonable upper bound
+                // FileTime valid range: January 1, 2025 to 2045
+                var minFileTime = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var maxFileTime = new DateTime(2045, 1, 1, 0, 0, 0, DateTimeKind.Utc); // Reasonable upper bound
 
                 // Convert to UTC for comparison
                 var utcTime = dateTime.Kind == DateTimeKind.Utc ? dateTime : dateTime.ToUniversalTime();
@@ -659,7 +673,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// <summary>
         /// Bulk insert processes into recovery database for better performance
         /// </summary>
-        private async Task<int> BulkInsertProcessesAsync(List<ProcessRecord> processRecords)
+        private int BulkInsertProcessesAsync(List<ProcessRecord> processRecords)
         {
             int insertedCount = 0;
 
@@ -674,7 +688,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     }
 
                     // Insert boot trace record (INSERT only, never update)
-                    bool success = await Task.Run(() => InsertBootTraceRecord(process));
+                    bool success =  InsertBootTraceRecord(process);
 
                     if (success)
                     {
@@ -716,7 +730,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             }
             catch (Exception ex)
             {
-                LogError($"Failed to insert boot trace ProcessRecord {process.PidHash}: {ex.Message}");
+                LogError($"Failed to insert boot trace ProcessRecord {process.ImagePath} {process.PidHash}: {ex.Message}");
                 return false;
             }
         }
@@ -916,104 +930,94 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// Stop boot trace ETW session (AutoLogger)
         /// This stops the currently running AutoLogger session to create a working copy
         /// </summary>
-        private async Task StopBootTraceAsync()
+        private void StopBootTraceAsync()
         {
-            await Task.Run(() =>
+            LogInfo("Stopping boot trace AutoLogger session");
+
+            var psi = new ProcessStartInfo
             {
-                LogInfo("Stopping boot trace AutoLogger session");
+                FileName = Path.Combine(Environment.GetEnvironmentVariable("WINDIR"), "System32", "logman.exe"),
+                Arguments = $"stop \"{_etlBootTraceLogFile}\" -ets",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
 
-                var psi = new ProcessStartInfo
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                if (process.ExitCode != 0)
                 {
-                    FileName = Path.Combine(Environment.GetEnvironmentVariable("WINDIR"), "System32", "logman.exe"),
-                    Arguments = $"stop \"{_etlBootTraceLogFile}\" -ets",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-
-                using var process = Process.Start(psi);
-                if (process != null)
-                {
-                    var output = process.StandardOutput.ReadToEnd();
-                    var error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                    {
-                        LogWarning($"logman stop returned exit code {process.ExitCode}. Output: {output}, Error: {error}");
-                    }
-                    else
-                    {
-                        LogInfo("Boot trace AutoLogger session stopped successfully");
-                    }
+                    LogWarning($"logman stop returned exit code {process.ExitCode}. Output: {output}, Error: {error}");
                 }
-            });
+                else
+                {
+                    LogInfo("Boot trace AutoLogger session stopped successfully");
+                }
+            }
         }
 
         /// <summary>
         /// Start boot trace ETW AutoLogger session
         /// This restarts the AutoLogger session after processing
         /// </summary>
-        private async Task StartBootTraceAsync()
+        private void StartBootTraceAsync()
         {
-            await Task.Run(() =>
+            LogInfo("Starting boot trace AutoLogger session");
+
+            // For AutoLogger sessions, we use the full session name
+            var psi = new ProcessStartInfo
             {
-                LogInfo("Starting boot trace AutoLogger session");
+                FileName = Path.Combine(Environment.GetEnvironmentVariable("WINDIR"), "System32", "logman.exe"),
+                Arguments = $"start \"{_etlBootTraceLogFile}\" -ets",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
 
-                // For AutoLogger sessions, we use the full session name
-                var psi = new ProcessStartInfo
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                if (process.ExitCode != 0)
                 {
-                    FileName = Path.Combine(Environment.GetEnvironmentVariable("WINDIR"), "System32", "logman.exe"),
-                    Arguments = $"start \"{_etlBootTraceLogFile}\" -ets",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
+                    LogWarning($"logman start returned exit code {process.ExitCode}. Output: {output}, Error: {error}");
 
-                using var process = Process.Start(psi);
-                if (process != null)
-                {
-                    var output = process.StandardOutput.ReadToEnd();
-                    var error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                    {
-                        LogWarning($"logman start returned exit code {process.ExitCode}. Output: {output}, Error: {error}");
-
-                        // If start failed, ensure AutoLogger is properly configured
-                        LogInfo("AutoLogger start failed, checking configuration...");
-                        EnsureBootTraceAutoLoggerConfigured();
-                    }
-                    else
-                    {
-                        LogInfo("Boot trace AutoLogger session started successfully");
-                    }
+                    // If start failed, ensure AutoLogger is properly configured
+                    LogInfo("AutoLogger start failed, checking configuration...");
+                    EnsureBootTraceAutoLoggerConfigured();
                 }
-            });
+                else
+                {
+                    LogInfo("Boot trace AutoLogger session started successfully");
+                }
+            }
         }
 
         /// <summary>
         /// Create a working copy of the boot trace file
         /// </summary>
-        private async Task<string> CreateWorkingCopyAsync()
+        private string CreateWorkingCopyAsync()
         {
             var workingFilePath = _bootTraceFilePath + ".working.etl";
-
-            await Task.Run(() =>
+            if (File.Exists(_bootTraceFilePath))
             {
-                if (File.Exists(_bootTraceFilePath))
-                {
-                    File.Copy(_bootTraceFilePath, workingFilePath, true);
-                    LogInfo($"Created working copy: {workingFilePath}");
-                }
-                else
-                {
-                    LogError($"Boot trace file not found: {_bootTraceFilePath}");
-                }
-            });
+                File.Copy(_bootTraceFilePath, workingFilePath, true);
+                LogInfo($"Created working copy: {workingFilePath}");
+            }
+            else
+            {
+                LogError($"Boot trace file not found: {_bootTraceFilePath}");
+            }
 
             return workingFilePath;
         }
