@@ -42,7 +42,7 @@ namespace gov.llnl.wintap.shared.models
         /// <summary>
         /// Full path to process executable
         /// </summary>
-        public string ImagePath { get; set; }
+        public string ProcessPath { get; set; }
 
         /// <summary>
         /// Process command line arguments
@@ -105,6 +105,7 @@ namespace gov.llnl.wintap.shared.models
         public string SHA2Hash { get; set; }
 
         public ulong UniqueProcessKey { get; set; }
+        public Guid AgentId { get; set; }
 
         /// <summary>
         /// Create a copy of this ProcessRecord
@@ -118,7 +119,7 @@ namespace gov.llnl.wintap.shared.models
                 ProcessId = ProcessId,
                 ParentProcessId = ParentProcessId,
                 ProcessName = ProcessName,
-                ImagePath = ImagePath,
+                ProcessPath = ProcessPath,
                 CommandLine = CommandLine,
                 CreateTime = CreateTime,
                 ExitTime = ExitTime,

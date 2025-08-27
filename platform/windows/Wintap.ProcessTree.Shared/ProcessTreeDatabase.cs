@@ -148,7 +148,7 @@ namespace Wintap.ProcessTree.Shared.Database
                 cmd.Parameters.Add(new DuckDBParameter("process_id", process.ProcessId));
                 cmd.Parameters.Add(new DuckDBParameter("parent_process_id", process.ParentProcessId));
                 cmd.Parameters.Add(new DuckDBParameter("process_name", process.ProcessName));
-                cmd.Parameters.Add(new DuckDBParameter("image_path", process.ImagePath));
+                cmd.Parameters.Add(new DuckDBParameter("process_path", process.ProcessPath));
                 cmd.Parameters.Add(new DuckDBParameter("command_line", process.CommandLine));
                 cmd.Parameters.Add(new DuckDBParameter("create_time", process.CreateTime));
                 cmd.Parameters.Add(new DuckDBParameter("exit_time", process.ExitTime));
@@ -522,7 +522,7 @@ namespace Wintap.ProcessTree.Shared.Database
                 ProcessId = reader.GetInt32(2),  // process_id
                 ParentProcessId = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),  // parent_process_id
                 ProcessName = reader.GetString(4),  // process_name
-                ImagePath = reader.IsDBNull(5) ? null : reader.GetString(5),  // image_path
+                ProcessPath = reader.IsDBNull(5) ? null : reader.GetString(5),  // image_path
                 CommandLine = reader.IsDBNull(6) ? null : reader.GetString(6),  // command_line
                 CreateTime = reader.GetDateTime(7),  // create_time
                 ExitTime = reader.IsDBNull(8) ? null : reader.GetDateTime(8),  // exit_time

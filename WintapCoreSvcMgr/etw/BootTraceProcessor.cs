@@ -380,7 +380,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         ParentProcessId = (int)partial["ParentProcessId"],
                         ParentPidHash = partialProcessParentPidHash,
                         ProcessName = Path.GetFileName(imageName).ToLower(),
-                        ImagePath = TranslateFilePath(imageName).ToLower(),
+                        ProcessPath = TranslateFilePath(imageName).ToLower(),
                         CommandLine = "", // ImageLoad doesn't provide command line
                         CreateTime = createTime,
                         IsActive = true,
@@ -392,7 +392,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     if (!string.IsNullOrEmpty(processRecord.PidHash))
                     {
                         processRecords.Add(processRecord);
-                        LogInfo($"✅ Completed process: PID {pid}, Name '{processRecord.ProcessName}', Path '{processRecord.ImagePath}'");
+                        LogInfo($"✅ Completed process: PID {pid}, Name '{processRecord.ProcessName}', Path '{processRecord.ProcessPath}'");
                     }
 
                     partialProcesses.Remove(pid);
@@ -607,7 +607,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 ParentProcessId = 4, // Self-parent
                 ParentPidHash = null, // Will be set after creation
                 ProcessName = "system",
-                ImagePath = "system",
+                ProcessPath = "system",
                 CommandLine = "system",
                 CreateTime = bootTime,
                 IsActive = true,
@@ -626,7 +626,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 ParentProcessId = 4,
                 ParentPidHash = systemProcess.PidHash,
                 ProcessName = "system idle process",
-                ImagePath = "idle",
+                ProcessPath = "idle",
                 CommandLine = "idle",
                 CreateTime = bootTime,
                 IsActive = true,
@@ -650,7 +650,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                         ParentProcessId = 4,
                         ParentPidHash = systemProcess.PidHash,
                         ProcessName = "registry",
-                        ImagePath = "registry",
+                        ProcessPath = "registry",
                         CommandLine = "registry",
                         CreateTime = bootTime,
                         IsActive = true,
@@ -730,7 +730,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             }
             catch (Exception ex)
             {
-                LogError($"Failed to insert boot trace ProcessRecord {process.ImagePath} {process.PidHash}: {ex.Message}");
+                LogError($"Failed to insert boot trace ProcessRecord {process.ProcessPath} {process.PidHash}: {ex.Message}");
                 return false;
             }
         }
@@ -768,7 +768,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     ProcessId = processId,
                     ParentProcessId = parentProcessId,
                     ProcessName = processName ?? "unknown",
-                    ImagePath = imagePath ?? "unknown",
+                    ProcessPath = imagePath ?? "unknown",
                     CommandLine = commandLine ?? "",
                     CreateTime = createTime,
                     IsActive = true, // Boot trace processes are initially active

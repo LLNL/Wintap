@@ -164,140 +164,140 @@ namespace WintapCoreSvcMgr.Database
         /// Process mini-trace.etl file into backup database
         /// Called by WintapCoreSvcMgr.exe PROCESS_MINI_TRACE command
         /// </summary>
-        public DatabaseOperationResult ProcessMiniTraceETL()
-        {
-            var startTime = DateTime.UtcNow;
+        //public DatabaseOperationResult ProcessMiniTraceETL()
+        //{
+        //    var startTime = DateTime.UtcNow;
 
-            try
-            {
-                LogInfo("Starting mini-trace ETL processing");
-                FileInfo miniTraceInfo = new FileInfo(MINI_TRACE_ETL_PATH);
-                MiniTraceSessionStatus miniTraceSessionStatus = new MiniTraceSessionStatus();
-                WintapLogger.Log.Append($"mini-trace session status: {miniTraceSessionStatus.IsRunning}, last written: {miniTraceSessionStatus.LastETLModified}", gov.llnl.wintap.core.infrastructure.LogLevel.Info);
+        //    try
+        //    {
+        //        LogInfo("Starting mini-trace ETL processing");
+        //        FileInfo miniTraceInfo = new FileInfo(MINI_TRACE_ETL_PATH);
+        //        MiniTraceSessionStatus miniTraceSessionStatus = new MiniTraceSessionStatus();
+        //        WintapLogger.Log.Append($"mini-trace session status: {miniTraceSessionStatus.IsRunning}, last written: {miniTraceSessionStatus.LastETLModified}", gov.llnl.wintap.core.infrastructure.LogLevel.Info);
 
-                if (GetMiniTraceStatus().IsRunning == false)
-                {
-                    LogError($"Mini-trace ETL session not running: {MINI_TRACE_ETL_PATH}");
-                    createMiniTrace();  // This now actually works!
-                    return DatabaseOperationResult.Failure("Mini-trace ETL file not found");
-                }
+        //        if (GetMiniTraceStatus().IsRunning == false)
+        //        {
+        //            LogError($"Mini-trace ETL session not running: {MINI_TRACE_ETL_PATH}");
+        //            createMiniTrace();  // This now actually works!
+        //            return DatabaseOperationResult.Failure("Mini-trace ETL file not found");
+        //        }
 
-                // Stop ETW session before processing (Option 2 approach)
-                LogInfo("Stopping ETW session for processing");
-                _miniTraceSession.StopMiniTraceSession();
+        //        // Stop ETW session before processing (Option 2 approach)
+        //        LogInfo("Stopping ETW session for processing");
+        //        _miniTraceSession.StopMiniTraceSession();
 
-                // Process captured events using the MiniTraceETWSession
-                int processedCount = 0;
-                int errorCount = 0;
-                bool success = _miniTraceSession.ProcessCapturedEvents(processEvent =>
-                {
-                    try
-                    {
-                        // Debug: Check if processEvent itself is null
-                        if (processEvent == null)
-                        {
-                            errorCount++;
-                            LogError("ProcessEvent is null");
-                            return;
-                        }
+        //        // Process captured events using the MiniTraceETWSession
+        //        int processedCount = 0;
+        //        int errorCount = 0;
+        //        bool success = _miniTraceSession.ProcessCapturedEvents(processEvent =>
+        //        {
+        //            try
+        //            {
+        //                // Debug: Check if processEvent itself is null
+        //                if (processEvent == null)
+        //                {
+        //                    errorCount++;
+        //                    LogError("ProcessEvent is null");
+        //                    return;
+        //                }
 
-                        // Debug: Log basic process event info to identify null reference source
-                        LogInfo($"Processing PID {processEvent.ProcessId}, Name: {processEvent.ProcessName ?? "NULL"}, Type: {processEvent.EventType}");
+        //                // Debug: Log basic process event info to identify null reference source
+        //                LogInfo($"Processing PID {processEvent.ProcessId}, Name: {processEvent.ProcessName ?? "NULL"}, Type: {processEvent.EventType}");
 
-                        // Convert ProcessEvent to ProcessRecord for database insertion
-                        var processRecord = ConvertToProcessRecord(processEvent);
-                        if (processRecord != null)
-                        {
-                            // Debug: Validate processRecord before database call
-                            if (string.IsNullOrEmpty(processRecord.PidHash))
-                            {
-                                LogError($"ProcessRecord has null/empty PidHash for PID {processEvent.ProcessId}");
-                                errorCount++;
-                                return;
-                            }
+        //                // Convert ProcessEvent to ProcessRecord for database insertion
+        //                var processRecord = ConvertToProcessRecord(processEvent);
+        //                if (processRecord != null)
+        //                {
+        //                    // Debug: Validate processRecord before database call
+        //                    if (string.IsNullOrEmpty(processRecord.PidHash))
+        //                    {
+        //                        LogError($"ProcessRecord has null/empty PidHash for PID {processEvent.ProcessId}");
+        //                        errorCount++;
+        //                        return;
+        //                    }
 
-                            try
-                            {
-                                LogInfo($"Attempting database insert for PID {processRecord.ProcessId} with PidHash {processRecord.PidHash}");
+        //                    try
+        //                    {
+        //                        LogInfo($"Attempting database insert for PID {processRecord.ProcessId} with PidHash {processRecord.PidHash}");
 
-                                // Try shared library first, with fallback to direct insert
-                                bool insertSuccess = false;
-                                if(processRecord.ExitTime.HasValue)
-                                {
-                                    insertSuccess = UpdateProcessStop(processRecord.UniqueProcessKey, (DateTime)processRecord.ExitTime, processRecord.ExitCode);
-                                }
-                                else
-                                {
-                                    insertSuccess = InsertProcessStart(processRecord);
-                                }
+        //                        // Try shared library first, with fallback to direct insert
+        //                        bool insertSuccess = false;
+        //                        if(processRecord.ExitTime.HasValue)
+        //                        {
+        //                            insertSuccess = UpdateProcessStop(processRecord.UniqueProcessKey, (DateTime)processRecord.ExitTime, processRecord.ExitCode);
+        //                        }
+        //                        else
+        //                        {
+        //                            insertSuccess = InsertProcessStart(processRecord);
+        //                        }
 
                                 
 
-                                if (insertSuccess)
-                                {
-                                    processedCount++;
-                                    LogInfo($"Successfully inserted/updated PID {processRecord.ProcessId} into database");
-                                }
-                                else
-                                {
-                                    LogError($"Both shared library and direct database insert failed for PID {processRecord.ProcessId}");
-                                    errorCount++;
-                                }
-                            }
-                            catch (Exception dbEx)
-                            {
-                                LogError($"Database insert failed for PID {processRecord.ProcessId}: {dbEx.Message}");
-                                LogError($"ProcessRecord details: PidHash={processRecord.PidHash}, ProcessName={processRecord.ProcessName}, " +
-                                         $"Source={processRecord.Source}, IsActive={processRecord.IsActive}, CreateTime={processRecord.CreateTime}");
-                                errorCount++;
-                            }
-                        }
-                        else
-                        {
-                            errorCount++;
-                            LogWarning($"Skipped invalid process event for PID {processEvent.ProcessId}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        errorCount++;
-                        LogError($"Error processing event for PID {processEvent?.ProcessId ?? -1}: {ex.Message}");
-                        LogError($"Exception details: {ex}"); // Full exception with stack trace
-                    }
-                });
+        //                        if (insertSuccess)
+        //                        {
+        //                            processedCount++;
+        //                            LogInfo($"Successfully inserted/updated PID {processRecord.ProcessId} into database");
+        //                        }
+        //                        else
+        //                        {
+        //                            LogError($"Both shared library and direct database insert failed for PID {processRecord.ProcessId}");
+        //                            errorCount++;
+        //                        }
+        //                    }
+        //                    catch (Exception dbEx)
+        //                    {
+        //                        LogError($"Database insert failed for PID {processRecord.ProcessId}: {dbEx.Message}");
+        //                        LogError($"ProcessRecord details: PidHash={processRecord.PidHash}, ProcessName={processRecord.ProcessName}, " +
+        //                                 $"Source={processRecord.Source}, IsActive={processRecord.IsActive}, CreateTime={processRecord.CreateTime}");
+        //                        errorCount++;
+        //                    }
+        //                }
+        //                else
+        //                {
+        //                    errorCount++;
+        //                    LogWarning($"Skipped invalid process event for PID {processEvent.ProcessId}");
+        //                }
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                errorCount++;
+        //                LogError($"Error processing event for PID {processEvent?.ProcessId ?? -1}: {ex.Message}");
+        //                LogError($"Exception details: {ex}"); // Full exception with stack trace
+        //            }
+        //        });
 
-                if (!success)
-                {
-                    LogError("Failed to process captured events");
-                    return DatabaseOperationResult.Failure("Failed to process ETL events");
-                }
+        //        if (!success)
+        //        {
+        //            LogError("Failed to process captured events");
+        //            return DatabaseOperationResult.Failure("Failed to process ETL events");
+        //        }
 
-                LogInfo($"ETL processing summary: {processedCount} successful, {errorCount} errors");
+        //        LogInfo($"ETL processing summary: {processedCount} successful, {errorCount} errors");
 
-                // Update live descendants status
-                UpdateLiveDescendantsStatus();
+        //        // Update live descendants status
+        //        UpdateLiveDescendantsStatus();
 
-                // Restart ETW session for continued monitoring
-                LogInfo("Restarting ETW session after processing");
-                _miniTraceSession.StartMiniTraceSession();
+        //        // Restart ETW session for continued monitoring
+        //        LogInfo("Restarting ETW session after processing");
+        //        _miniTraceSession.StartMiniTraceSession();
 
-                var executionTime = DateTime.UtcNow - startTime;
-                LogInfo($"Mini-trace ETL processing completed: {processedCount} records in {executionTime.TotalSeconds:F2}s");
+        //        var executionTime = DateTime.UtcNow - startTime;
+        //        LogInfo($"Mini-trace ETL processing completed: {processedCount} records in {executionTime.TotalSeconds:F2}s");
 
-                return DatabaseOperationResult.DBSuccess(processedCount, new
-                {
-                    ExecutionTime = executionTime,
-                    SourceFile = MINI_TRACE_ETL_PATH,
-                    ProcessedCount = processedCount,
-                    ErrorCount = errorCount
-                });
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to process mini-trace ETL: {ex.Message}");
-                return DatabaseOperationResult.Failure(ex.Message);
-            }
-        }
+        //        return DatabaseOperationResult.DBSuccess(processedCount, new
+        //        {
+        //            ExecutionTime = executionTime,
+        //            SourceFile = MINI_TRACE_ETL_PATH,
+        //            ProcessedCount = processedCount,
+        //            ErrorCount = errorCount
+        //        });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"Failed to process mini-trace ETL: {ex.Message}");
+        //        return DatabaseOperationResult.Failure(ex.Message);
+        //    }
+        //}
 
 
 
@@ -330,7 +330,7 @@ namespace WintapCoreSvcMgr.Database
                 {process.ParentProcessId},
                 {process.UniqueProcessKey},                    -- Added this!
                 {EscapeString(process.ProcessName)},
-                {EscapeString(process.ImagePath)},
+                {EscapeString(process.ProcessPath)},
                 {EscapeString(process.CommandLine)},
                 {EscapeDateTime(process.CreateTime)},
                 {process.IsActive.ToString().ToLower()},
@@ -387,7 +387,7 @@ namespace WintapCoreSvcMgr.Database
             {process.ParentProcessId},
             {uniqueKey},
             {EscapeString(process.ProcessName)},
-            {EscapeString(process.ImagePath)},
+            {EscapeString(process.ProcessPath)},
             {EscapeString(process.CommandLine)},
             {EscapeDateTime(process.CreateTime)},
             {(process.IsActive ? 1 : 0)},
@@ -405,7 +405,7 @@ namespace WintapCoreSvcMgr.Database
             }
             catch (Exception ex)
             {
-                LogError($"Failed to insert boot trace ProcessRecord {process.ImagePath} {process.PidHash}: {ex.Message}");
+                LogError($"Failed to insert boot trace ProcessRecord {process.ProcessPath} {process.PidHash}: {ex.Message}");
 
                 // If this fails due to duplicate PidHash, that indicates a logic error in boot trace processing
                 if (ex.Message.Contains("UNIQUE constraint failed") || ex.Message.Contains("duplicate"))
@@ -529,130 +529,130 @@ namespace WintapCoreSvcMgr.Database
         /// Convert ProcessEvent from ETW to ProcessRecord for database
         /// Handle ProcessStart vs ProcessStop events differently
         /// </summary>
-        private ProcessRecord ConvertToProcessRecord(ProcessEvent processEvent)
-        {
-            try
-            {
-                if (processEvent.EventType == ProcessEventType.Start)
-                {
-                    return HandleProcessStartEvent(processEvent);
-                }
-                else if (processEvent.EventType == ProcessEventType.Stop)
-                {
-                    return HandleProcessStopEvent(processEvent);
-                }
-                else
-                {
-                    LogError($"Unknown process event type: {processEvent.EventType}");
-                    return null;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Exception in ConvertToProcessRecord for PID {processEvent.ProcessId}: {ex.Message}");
-                return null;
-            }
-        }
+        //private ProcessRecord ConvertToProcessRecord(ProcessEvent processEvent)
+        //{
+        //    try
+        //    {
+        //        if (processEvent.EventType == ProcessEventType.Start)
+        //        {
+        //            return HandleProcessStartEvent(processEvent);
+        //        }
+        //        else if (processEvent.EventType == ProcessEventType.Stop)
+        //        {
+        //            return HandleProcessStopEvent(processEvent);
+        //        }
+        //        else
+        //        {
+        //            LogError($"Unknown process event type: {processEvent.EventType}");
+        //            return null;
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"Exception in ConvertToProcessRecord for PID {processEvent.ProcessId}: {ex.Message}");
+        //        return null;
+        //    }
+        //}
 
         /// <summary>
         /// Handle ProcessStart events - create new record
         /// </summary>
-        private ProcessRecord HandleProcessStartEvent(ProcessEvent processEvent)
-        {
-            // Validate DateTime first
-            if (processEvent.CreateTime == DateTime.MinValue ||
-                processEvent.CreateTime == DateTime.MaxValue ||
-                processEvent.CreateTime.Year < 1601) // FileTime epoch
-            {
-                LogError($"Invalid CreateTime for PID {processEvent.ProcessId}: {processEvent.CreateTime}");
-                return null;
-            }
+        //private ProcessRecord HandleProcessStartEvent(ProcessEvent processEvent)
+        //{
+        //    // Validate DateTime first
+        //    if (processEvent.CreateTime == DateTime.MinValue ||
+        //        processEvent.CreateTime == DateTime.MaxValue ||
+        //        processEvent.CreateTime.Year < 1601) // FileTime epoch
+        //    {
+        //        LogError($"Invalid CreateTime for PID {processEvent.ProcessId}: {processEvent.CreateTime}");
+        //        return null;
+        //    }
 
-            // Convert DateTime to FileTime for PidHash generation - with error handling
-            long eventTimeFileTime;
-            try
-            {
-                eventTimeFileTime = processEvent.CreateTime.ToFileTimeUtc();
-            }
-            catch (ArgumentOutOfRangeException ex)
-            {
-                LogError($"FileTime conversion failed for PID {processEvent.ProcessId}, CreateTime {processEvent.CreateTime}: {ex.Message}");
-                return null;
-            }
+        //    // Convert DateTime to FileTime for PidHash generation - with error handling
+        //    long eventTimeFileTime;
+        //    try
+        //    {
+        //        eventTimeFileTime = processEvent.CreateTime.ToFileTimeUtc();
+        //    }
+        //    catch (ArgumentOutOfRangeException ex)
+        //    {
+        //        LogError($"FileTime conversion failed for PID {processEvent.ProcessId}, CreateTime {processEvent.CreateTime}: {ex.Message}");
+        //        return null;
+        //    }
 
-            // Generate PidHash using the official Wintap ProcessHash class - with detailed debugging
-            string pidHash;
-            try
-            {
-                // Debug StateManager before calling ProcessHash
-                LogInfo($"StateManager.AgentId = {StateManager.AgentId}, Environment.MachineName = {Environment.MachineName}");
+        //    // Generate PidHash using the official Wintap ProcessHash class - with detailed debugging
+        //    string pidHash;
+        //    try
+        //    {
+        //        // Debug StateManager before calling ProcessHash
+        //        LogInfo($"StateManager.AgentId = {StateManager.AgentId}, Environment.MachineName = {Environment.MachineName}");
 
-                pidHash = _processHash.GenPidHash(processEvent.ProcessId, eventTimeFileTime);
+        //        pidHash = _processHash.GenPidHash(processEvent.ProcessId, eventTimeFileTime);
 
-                if (string.IsNullOrEmpty(pidHash))
-                {
-                    LogError($"ProcessHash.GenPidHash returned null/empty for PID {processEvent.ProcessId}");
-                    return null;
-                }
+        //        if (string.IsNullOrEmpty(pidHash))
+        //        {
+        //            LogError($"ProcessHash.GenPidHash returned null/empty for PID {processEvent.ProcessId}");
+        //            return null;
+        //        }
 
-                LogInfo($"Generated PidHash for PID {processEvent.ProcessId}: {pidHash}");
-            }
-            catch (Exception ex)
-            {
-                LogError($"ProcessHash.GenPidHash failed for PID {processEvent.ProcessId}: {ex.Message}");
-                LogError($"Exception stack trace: {ex.StackTrace}");
+        //        LogInfo($"Generated PidHash for PID {processEvent.ProcessId}: {pidHash}");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"ProcessHash.GenPidHash failed for PID {processEvent.ProcessId}: {ex.Message}");
+        //        LogError($"Exception stack trace: {ex.StackTrace}");
 
-                // TEMPORARY FALLBACK - use simple hash generation to keep things working
-                LogWarning($"Using fallback hash generation for PID {processEvent.ProcessId}");
-                pidHash = GenerateFallbackPidHash(processEvent.ProcessId, eventTimeFileTime);
+        //        // TEMPORARY FALLBACK - use simple hash generation to keep things working
+        //        LogWarning($"Using fallback hash generation for PID {processEvent.ProcessId}");
+        //        pidHash = GenerateFallbackPidHash(processEvent.ProcessId, eventTimeFileTime);
 
-                if (string.IsNullOrEmpty(pidHash))
-                {
-                    LogError($"Even fallback hash generation failed for PID {processEvent.ProcessId}");
-                    return null;
-                }
-            }
+        //        if (string.IsNullOrEmpty(pidHash))
+        //        {
+        //            LogError($"Even fallback hash generation failed for PID {processEvent.ProcessId}");
+        //            return null;
+        //        }
+        //    }
 
-            // Create new ProcessRecord for ProcessStart - ensure all fields are properly set
-            var processRecord = new ProcessRecord
-            {
-                // Primary keys - guaranteed non-null
-                PidHash = pidHash,
-                ParentPidHash = processEvent.ParentPidHash ?? string.Empty, // Use empty string instead of null
+        //    // Create new ProcessRecord for ProcessStart - ensure all fields are properly set
+        //    var processRecord = new ProcessRecord
+        //    {
+        //        // Primary keys - guaranteed non-null
+        //        PidHash = pidHash,
+        //        ParentPidHash = processEvent.ParentPidHash ?? string.Empty, // Use empty string instead of null
 
-                // Process identification - guaranteed non-null
-                ProcessId = processEvent.ProcessId,
-                ParentProcessId = processEvent.ParentProcessId,
-                ProcessName = processEvent.ProcessName ?? "Unknown",
-                ImagePath = processEvent.ImagePath ?? string.Empty,
-                CommandLine = processEvent.CommandLine ?? string.Empty,
+        //        // Process identification - guaranteed non-null
+        //        ProcessId = processEvent.ProcessId,
+        //        ParentProcessId = processEvent.ParentProcessId,
+        //        ProcessName = processEvent.ProcessName ?? "Unknown",
+        //        ProcessPath = processEvent.ImagePath ?? string.Empty,
+        //        CommandLine = processEvent.CommandLine ?? string.Empty,
 
-                // Timing and status
-                CreateTime = processEvent.CreateTime,
-                ExitTime = null, // Explicitly null for ProcessStart - DuckDB should handle this
-                ExitCode = null, // Explicitly null for ProcessStart - DuckDB should handle this
-                IsActive = true,
+        //        // Timing and status
+        //        CreateTime = processEvent.CreateTime,
+        //        ExitTime = null, // Explicitly null for ProcessStart - DuckDB should handle this
+        //        ExitCode = null, // Explicitly null for ProcessStart - DuckDB should handle this
+        //        IsActive = true,
 
-                // Metadata - ensure non-null values
-                Source = "mini_trace",
-                Depth = 0,
-                HasLiveDescendants = false,
+        //        // Metadata - ensure non-null values
+        //        Source = "mini_trace",
+        //        Depth = 0,
+        //        HasLiveDescendants = false,
 
-                // Optional fields - use empty strings instead of null to avoid DuckDB issues
-                UserName = string.Empty,    // Changed from null to empty string
-                MD5Hash = string.Empty,     // Changed from null to empty string  
-                SHA2Hash = string.Empty,    // Changed from null to empty string
+        //        // Optional fields - use empty strings instead of null to avoid DuckDB issues
+        //        UserName = string.Empty,    // Changed from null to empty string
+        //        MD5Hash = string.Empty,     // Changed from null to empty string  
+        //        SHA2Hash = string.Empty,    // Changed from null to empty string
 
-                UniqueProcessKey = processEvent.UniqueProcessKey
-            };
+        //        UniqueProcessKey = processEvent.UniqueProcessKey
+        //    };
 
-            // Debug: Log the ProcessRecord details to ensure everything is set
-            LogInfo($"Created ProcessRecord for PID {processRecord.ProcessId}: PidHash={processRecord.PidHash}, " +
-                   $"ParentPidHash={processRecord.ParentPidHash}, ProcessName={processRecord.ProcessName}, " +
-                   $"IsActive={processRecord.IsActive}, Source={processRecord.Source}");
+        //    // Debug: Log the ProcessRecord details to ensure everything is set
+        //    LogInfo($"Created ProcessRecord for PID {processRecord.ProcessId}: PidHash={processRecord.PidHash}, " +
+        //           $"ParentPidHash={processRecord.ParentPidHash}, ProcessName={processRecord.ProcessName}, " +
+        //           $"IsActive={processRecord.IsActive}, Source={processRecord.Source}");
 
-            return processRecord;
-        }
+        //    return processRecord;
+        //}
 
         /// <summary>
         /// Handle ProcessStop events - this needs special handling
@@ -664,35 +664,35 @@ namespace WintapCoreSvcMgr.Database
         /// ProcessStop events don't have CreateTime, but they do have UniqueProcessKey
         /// which provides a reliable way to match with the corresponding START event
         /// </summary>
-        private ProcessRecord HandleProcessStopEvent(ProcessEvent processEvent)
-        {
-            try
-            {
-                LogInfo($"Processing ProcessStop event for PID {processEvent.ProcessId}, UniqueProcessKey {processEvent.UniqueProcessKey}");
+        //private ProcessRecord HandleProcessStopEvent(ProcessEvent processEvent)
+        //{
+        //    try
+        //    {
+        //        LogInfo($"Processing ProcessStop event for PID {processEvent.ProcessId}, UniqueProcessKey {processEvent.UniqueProcessKey}");
 
-                // Extract exit information from the stop event
-                DateTime exitTime = processEvent.ExitTime ?? DateTime.Now;
-                int? exitCode = processEvent.ExitCode;
+        //        // Extract exit information from the stop event
+        //        DateTime exitTime = processEvent.ExitTime ?? DateTime.Now;
+        //        int? exitCode = processEvent.ExitCode;
 
-                // Update existing record using UniqueProcessKey - no PID recycling issues!
-                bool success = UpdateProcessStop(processEvent.UniqueProcessKey, exitTime, exitCode);
+        //        // Update existing record using UniqueProcessKey - no PID recycling issues!
+        //        bool success = UpdateProcessStop(processEvent.UniqueProcessKey, exitTime, exitCode);
 
-                if (success)
-                {
-                    LogInfo($"Successfully updated ProcessStop for UniqueProcessKey {processEvent.UniqueProcessKey}");
-                }
-                else
-                {
-                    LogWarning($"No active process found to stop for UniqueProcessKey {processEvent.UniqueProcessKey}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error handling ProcessStop event for UniqueProcessKey {processEvent.UniqueProcessKey}: {ex.Message}");
-            }
+        //        if (success)
+        //        {
+        //            LogInfo($"Successfully updated ProcessStop for UniqueProcessKey {processEvent.UniqueProcessKey}");
+        //        }
+        //        else
+        //        {
+        //            LogWarning($"No active process found to stop for UniqueProcessKey {processEvent.UniqueProcessKey}");
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"Error handling ProcessStop event for UniqueProcessKey {processEvent.UniqueProcessKey}: {ex.Message}");
+        //    }
 
-            return new ProcessRecord();
-        }
+        //    return new ProcessRecord();
+        //}
 
         /// <summary>
         /// Fallback PidHash generation when ProcessHash class fails
@@ -1072,27 +1072,27 @@ namespace WintapCoreSvcMgr.Database
         /// <summary>
         /// Extract process events from ETL file - now implemented using MiniTraceETWSession
         /// </summary>
-        private async Task<List<ProcessRecord>> ExtractProcessEventsFromETL(string etlFilePath)
-        {
-            LogInfo($"Extracting process events from ETL file: {etlFilePath}");
+        //private async Task<List<ProcessRecord>> ExtractProcessEventsFromETL(string etlFilePath)
+        //{
+        //    LogInfo($"Extracting process events from ETL file: {etlFilePath}");
 
-            var processRecords = new List<ProcessRecord>();
+        //    var processRecords = new List<ProcessRecord>();
 
-            // Use MiniTraceETWSession to process the ETL file
-            bool success = _miniTraceSession.ProcessCapturedEvents(processEvent =>
-            {
-                var processRecord = ConvertToProcessRecord(processEvent);
-                processRecords.Add(processRecord);
-            });
+        //    // Use MiniTraceETWSession to process the ETL file
+        //    bool success = _miniTraceSession.ProcessCapturedEvents(processEvent =>
+        //    {
+        //        var processRecord = ConvertToProcessRecord(processEvent);
+        //        processRecords.Add(processRecord);
+        //    });
 
-            if (!success)
-            {
-                LogError("Failed to extract process events from ETL file");
-            }
+        //    if (!success)
+        //    {
+        //        LogError("Failed to extract process events from ETL file");
+        //    }
 
-            LogInfo($"Extracted {processRecords.Count} process events from ETL file");
-            return processRecords;
-        }
+        //    LogInfo($"Extracted {processRecords.Count} process events from ETL file");
+        //    return processRecords;
+        //}
 
         /// <summary>
         /// Check if an ETW session is currently running - now uses MiniTraceETWSession
@@ -1124,6 +1124,23 @@ namespace WintapCoreSvcMgr.Database
                 _miniTraceSession?.Dispose(); 
                 _disposed = true;
             }
+        }
+
+        internal DateTime GetLatestRecord()
+        {
+            var countSql = "SELECT create_time FROM live_processes ORDER BY create_time DESC LIMIT 1";
+            using var countCmd = new DuckDBCommand(countSql, _connection);
+            DateTime mostRecentProcessTime = DateTime.Parse(countCmd.ExecuteScalar().ToString());
+            Console.WriteLine($"Most recent process create time: {mostRecentProcessTime}");
+            return mostRecentProcessTime;
+        }
+
+        internal string GetParentPidHash(int pid, string processName)
+        {
+            var countSql = $"SELECT pid_hash FROM live_processes WHERE pid = {pid} AND process_name = {processName} ORDER BY create_time DESC LIMIT 1";
+            using var countCmd = new DuckDBCommand(countSql, _connection);
+            string parentPidHash = countCmd.ExecuteScalar().ToString();
+            return parentPidHash;
         }
     }
 

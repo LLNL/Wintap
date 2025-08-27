@@ -20,7 +20,7 @@ namespace gov.llnl.wintap.platform.windows.models
         public int ProcessId { get; set; }
         public int ParentProcessId { get; set; }
         public string ProcessName { get; set; }
-        public string ImagePath { get; set; }
+        public string ProcessPath { get; set; }
         public string CommandLine { get; set; }
 
         // Timing information
@@ -48,7 +48,7 @@ namespace gov.llnl.wintap.platform.windows.models
             PidHash = string.Empty;
             ParentPidHash = string.Empty;
             ProcessName = string.Empty;
-            ImagePath = string.Empty;
+            ProcessPath = string.Empty;
             CommandLine = string.Empty;
             Source = string.Empty;
             UserName = string.Empty;

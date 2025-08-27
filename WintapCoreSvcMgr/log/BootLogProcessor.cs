@@ -8,9 +8,10 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.infrastructure;
-using gov.llnl.wintap.shared.models;
+using gov.llnl.wintap.platform.windows.models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
@@ -22,7 +23,8 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 {
     /// <summary>
     /// BootLogProcessor - Drop-in replacement for BootTraceProcessor using Windows Security Log
-    /// Processes Security Event Log entries from boot time to generate initial process tree
+    /// Processes Security Event Log entries from boot time until current time to generate complete process tree
+    /// Since this only runs at system boot, it processes ALL events to ensure no gaps before real-time monitoring begins
     /// Much simpler than ETL approach - no need to correlate ImageLoad/ProcessStart events
     /// </summary>
     public class BootLogProcessor : IDisposable
@@ -35,19 +37,29 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         private const int PROCESS_CREATION_EVENT_ID = 4688;
         private const int PROCESS_TERMINATION_EVENT_ID = 4689;
 
-        // Configuration
-        private readonly TimeSpan _bootProcessingWindow = TimeSpan.FromMinutes(10); // Process events from boot + 10 minutes
+        // Configuration - Default to processing all events since this only runs at system boot
+        private readonly TimeSpan _bootProcessingWindow;
+        private readonly bool _processAllEventsToNow;
 
-        public BootLogProcessor(BackupDatabaseManager database)
+        public BootLogProcessor(BackupDatabaseManager database, TimeSpan? bootProcessingWindow = null, bool processAllEventsToNow = true)
         {
             _database = database ?? throw new ArgumentNullException(nameof(database));
             _processHash = new ProcessHash();
 
-            LogInfo("BootLogProcessor initialized with Security Log backend");
+            // Configuration options - default to processing all events since this only runs at boot
+            _processAllEventsToNow = processAllEventsToNow;
+            _bootProcessingWindow = bootProcessingWindow ?? TimeSpan.FromMinutes(10);
+
+            var modeDescription = _processAllEventsToNow ?
+                "Process ALL events from boot to now (complete coverage)" :
+                $"Process boot events for {_bootProcessingWindow.TotalMinutes} minutes (legacy mode)";
+
+            LogInfo($"BootLogProcessor initialized - {modeDescription}");
         }
 
         /// <summary>
         /// Process boot events from Windows Security Log - drop-in replacement for ProcessBootTraceAsync
+        /// Processes ALL events from boot to now by default to ensure complete coverage before real-time monitoring begins
         /// </summary>
         public async Task<BootTraceProcessingResult> ProcessBootTraceAsync()
         {
@@ -71,19 +83,32 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     throw new InvalidOperationException("Cannot determine machine boot time");
                 }
 
-                var endTime = bootTime.Value.Add(_bootProcessingWindow);
+                var endTime = _processAllEventsToNow ?
+                    DateTime.UtcNow :
+                    bootTime.Value.Add(_bootProcessingWindow);
+
                 LogInfo($"Processing Security Log events from {bootTime.Value:yyyy-MM-dd HH:mm:ss} to {endTime:yyyy-MM-dd HH:mm:ss}");
 
-                // Query Security Log for process events during boot window
-                var processRecords = await ExtractProcessEventsFromSecurityLog(bootTime.Value, endTime);
+                if (_processAllEventsToNow)
+                {
+                    var timeSinceBoot = DateTime.UtcNow.Subtract(bootTime.Value);
+                    LogInfo($"Processing ALL events from boot to now ({timeSinceBoot.TotalMinutes:F1} minutes of history)");
+                    LogInfo("This ensures complete coverage with no gaps before real-time monitoring begins");
+                }
 
                 // Add system processes (same as existing implementation)
-                processRecords = AddSystemProcesses(processRecords);
+                List<ProcessRecord> processRecords = AddSystemProcesses();
+
+                // Query Security Log for process events during boot window
+                processRecords = await ExtractProcessEventsFromSecurityLog(bootTime.Value, endTime, processRecords);
 
                 LogInfo($"Extracted {processRecords.Count} process records from Security Log");
 
                 // Insert into database (same interface as existing)
-                await _database.BulkInsertProcessRecordsAsync(processRecords);
+                foreach (var processRecord in processRecords)
+                {
+                    _database.InsertBootTraceRecord(processRecord);
+                }
 
                 result.Success = true;
                 result.ProcessesInserted = processRecords.Count;
@@ -105,21 +130,27 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         /// <summary>
-        /// Extract process events from Windows Security Log during boot window
+        /// Extract process events from Windows Security Log from boot until now
         /// Much simpler than ETL - each event contains all needed information
+        /// Provides complete coverage with no gaps before real-time monitoring takes over
         /// </summary>
-        private async Task<List<ProcessRecord>> ExtractProcessEventsFromSecurityLog(DateTime startTime, DateTime endTime)
+        private async Task<List<ProcessRecord>> ExtractProcessEventsFromSecurityLog(DateTime startTime, DateTime endTime, List<ProcessRecord> processRecords)
         {
-            var processRecords = new List<ProcessRecord>();
             var activeProcesses = new Dictionary<string, ProcessRecord>(); // Key: ProcessId-CreateTime
 
             try
             {
-                // Create XPath query for Security Log process events in time range
+                // Check if Security Log is accessible before attempting to query
+                if (!CanAccessSecurityLog())
+                {
+                    throw new UnauthorizedAccessException("Cannot access Security Log. Ensure the application is running with appropriate privileges (Local System or Administrator with 'Generate security audits' privilege).");
+                }
+
+                // Create structured query for Security Log process events in time range
                 var startTimeXml = startTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                 var endTimeXml = endTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
 
-                var query = $@"
+                var queryXml = $@"
                     <QueryList>
                         <Query Id='0' Path='Security'>
                             <Select Path='Security'>
@@ -131,7 +162,8 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                 LogInfo($"Querying Security Log with time range filter");
 
-                using (var reader = new EventLogReader(query, PathType.FilePath))
+                var eventQuery = new EventLogQuery("Security", PathType.LogName, queryXml);
+                using (var reader = new EventLogReader(eventQuery))
                 {
                     EventRecord eventRecord;
                     int eventsProcessed = 0;
@@ -144,10 +176,10 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                             {
                                 if (eventRecord.Id == PROCESS_CREATION_EVENT_ID)
                                 {
-                                    var processRecord = ParseProcessCreationEvent(eventRecord);
+                                    var processRecord = ParseProcessCreationEvent(eventRecord, processRecords);
                                     if (processRecord != null)
                                     {
-                                        var key = $"{processRecord.ProcessId}-{processRecord.CreateTime.Ticks}";
+                                        var key = $"{processRecord.PidHash}";
                                         activeProcesses[key] = processRecord;
                                         processRecords.Add(processRecord);
                                     }
@@ -158,7 +190,10 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                                 }
 
                                 eventsProcessed++;
-                                if (eventsProcessed % 1000 == 0)
+
+                                // More frequent progress updates for "process all" mode
+                                var progressInterval = _processAllEventsToNow ? 500 : 1000;
+                                if (eventsProcessed % progressInterval == 0)
                                 {
                                     LogInfo($"Processed {eventsProcessed} security log events...");
                                 }
@@ -187,7 +222,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// Parse Windows Security Event 4688 (Process Creation)
         /// Much simpler than ETL - all info is in one event
         /// </summary>
-        private ProcessRecord ParseProcessCreationEvent(EventRecord eventRecord)
+        private ProcessRecord ParseProcessCreationEvent(EventRecord eventRecord, List<ProcessRecord> activeProcesses)
         {
             try
             {
@@ -196,7 +231,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                 // Extract process information from event data
                 if (!eventData.TryGetValue("NewProcessId", out string processIdHex) ||
-                    !eventData.TryGetValue("ProcessName", out string processName))
+                    !eventData.TryGetValue("NewProcessName", out string processName))
                 {
                     LogWarning($"Missing required fields in process creation event");
                     return null;
@@ -207,7 +242,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                 // Extract parent process ID if available
                 int parentProcessId = 0;
-                if (eventData.TryGetValue("ParentProcessId", out string parentPidHex))
+                if (eventData.TryGetValue("ProcessId", out string parentPidHex))
                 {
                     parentProcessId = Convert.ToInt32(parentPidHex, 16);
                 }
@@ -221,6 +256,17 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 // Extract command line if available
                 var commandLine = eventData.GetValueOrDefault("CommandLine", "");
 
+                ProcessRecord parentProcess = activeProcesses.Where(p => p.ProcessId == -1).First();
+                try
+                {
+                    parentProcess = activeProcesses.Where(p => p.ProcessName == Path.GetFileName(processName) && p.ProcessId == parentProcessId).OrderBy(o => o.CreateTime).Last();
+                }
+                catch(Exception ex)
+                {
+
+                }
+
+
                 // Create ProcessRecord (same structure as existing)
                 var processRecord = new ProcessRecord
                 {
@@ -231,13 +277,10 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     CommandLine = commandLine,
                     CreateTime = createTime,
                     PidHash = pidHash,
-                    ParentPidHash = null, // Will be resolved later
+                    ParentPidHash = parentProcess.PidHash,
                     UniqueProcessKey = 0, // Not available in Security Log
-                    ProcessorId = 0,
-                    SessionId = 0,
                     ExitTime = null,
                     ExitCode = null,
-                    AgentId = GetAgentId()
                 };
 
                 LogInfo($"Parsed process creation: PID={processId}, Name={processRecord.ProcessName}, Parent={parentProcessId}");
@@ -324,13 +367,18 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         /// <summary>
         /// Add system processes - same logic as existing BootTraceProcessor
         /// </summary>
-        private List<ProcessRecord> AddSystemProcesses(List<ProcessRecord> processRecords)
+        private List<ProcessRecord> AddSystemProcesses()
         {
-            // Add System Idle Process (PID 0)
-            processRecords.Add(CreateSystemProcess(0, "System Idle Process", "", DateTime.MinValue));
+            List<ProcessRecord> processRecords = new List<ProcessRecord>();
 
             // Add System Process (PID 4)  
-            processRecords.Add(CreateSystemProcess(4, "System", "", DateTime.MinValue));
+            processRecords.Add(CreateSystemProcess(4, "System", "", StateManager.MachineBootTime));
+
+            // Add System Idle Process (PID 0)
+            processRecords.Add(CreateSystemProcess(0, "System Idle Process", "", StateManager.MachineBootTime));
+
+            // Add System Process (PID 4)  
+            processRecords.Add(CreateSystemProcess(-1, "Unknown", "", StateManager.MachineBootTime));
 
             LogInfo("Added system processes (PID 0 and 4)");
             return processRecords;
@@ -338,23 +386,41 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
         private ProcessRecord CreateSystemProcess(int pid, string name, string path, DateTime createTime)
         {
-            return new ProcessRecord
+            ProcessRecord newSystemProc = new ProcessRecord
             {
                 ProcessId = pid,
-                ParentProcessId = 0,
+                ParentProcessId = 4,
                 ProcessName = name,
                 ProcessPath = path,
                 CommandLine = "",
                 CreateTime = createTime,
                 PidHash = _processHash.GenPidHash(pid, createTime.ToFileTimeUtc()),
-                ParentPidHash = null,
+                ParentPidHash = _processHash.GenPidHash(4, createTime.ToFileTimeUtc()),
                 UniqueProcessKey = 0,
-                ProcessorId = 0,
-                SessionId = 0,
                 ExitTime = null,
-                ExitCode = null,
-                AgentId = GetAgentId()
+                ExitCode = null
             };
+
+            return newSystemProc;
+        }
+
+        private bool CanAccessSecurityLog()
+        {
+            try
+            {
+                // Try to access the Security log to verify permissions
+                using (var eventLog = new EventLog("Security"))
+                {
+                    // Try to read log information - this will throw if access denied
+                    var logDisplayName = eventLog.LogDisplayName;
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Cannot access Security Log: {ex.Message}");
+                return false;
+            }
         }
 
         private DateTime? GetMachineBootTime()
@@ -377,11 +443,11 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             try
             {
                 // Use existing StateManager if available
-                return StateManager.AgentId ?? Guid.NewGuid();
+                return StateManager.AgentId;
             }
             catch
             {
-                return Guid.NewGuid();
+                throw new Exception("Agent ID not found");
             }
         }
 
