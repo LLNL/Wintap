@@ -54,11 +54,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public override bool Start()
         {
             // Call recovery first
-            //if (!CallDatabaseRecovery())
-            //{
-            //    WintapLogger.Log.Append("Database recovery failed", LogLevel.Error);
-            //    return false;
-            //}
+            if (!CallDatabaseRecovery())
+            {
+                WintapLogger.Log.Append("Database recovery failed", LogLevel.Error);
+                return false;
+            }
 
             // Database is now ready - just start real-time processing
             database = new ProcessTreeDatabase(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb"));

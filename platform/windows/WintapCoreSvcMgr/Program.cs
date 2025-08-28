@@ -53,7 +53,7 @@ namespace gov.llnl.wintap
         {
             return command switch
             {
-                "COMPACT_BACKUP_DB" => CompactBackupDb(),
+                //"COMPACT_BACKUP_DB" => CompactBackupDb(),
                 "RECOVER_DATABASE" => RecoverDB().Result,
                 "HELP" or "/?" => ShowUsage(),
                 _ => ShowUsage()
@@ -69,7 +69,7 @@ namespace gov.llnl.wintap
             Console.WriteLine();
             Console.WriteLine("Commands:");
             Console.WriteLine("  RECOVER_DATABASE           - Complete database recovery (main command)");
-            Console.WriteLine("  COMPACT_BACKUP_DB          - Compact backup database");
+            //Console.WriteLine("  COMPACT_BACKUP_DB          - Compact backup database");
             Console.WriteLine("  HELP, /?                   - Show this help");
             Console.WriteLine();
             Console.WriteLine("Examples:");
@@ -117,19 +117,19 @@ namespace gov.llnl.wintap
             return returnCode;
         }
 
-        private static int CompactBackupDb()
-        {
-            int resultCode = 0;
-            try
-            {
-                backupDbManager.CompactBackupDatabase();
-            }
-            catch (Exception ex)
-            {
-                resultCode = 1;
-            }
-            return resultCode;
-        }
+        //private static int CompactBackupDb()
+        //{
+        //    int resultCode = 0;
+        //    try
+        //    {
+        //        backupDbManager.CompactBackupDatabase();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        resultCode = 1;
+        //    }
+        //    return resultCode;
+        //}
 
         internal static bool IsSystemBoot()
         {

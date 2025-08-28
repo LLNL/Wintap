@@ -7,9 +7,10 @@
 using DuckDB.NET.Data;  // For direct database access
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;  // For StateManager
-using gov.llnl.wintap.platform.windows.collect.etw.helpers;  // For ProcessHash
-using gov.llnl.wintap.shared.models;
-using Wintap.ProcessTree.Shared.Configuration;
+using gov.llnl.wintap.platform.windows.collect.etw.helpers;
+using gov.llnl.wintap.platform.windows.models;  // For ProcessHash
+//using gov.llnl.wintap.shared.models;
+//using Wintap.ProcessTree.Shared.Configuration;
 
 namespace WintapCoreSvcMgr.Database
 {
@@ -20,7 +21,7 @@ namespace WintapCoreSvcMgr.Database
     /// </summary>
     public class BackupDatabaseManager : IDisposable
     {
-        private readonly ProcessTreeDatabaseConfig _config;
+        //private readonly ProcessTreeDatabaseConfig _config;
 
         // ProcessHash for consistent PidHash generation
         private readonly ProcessHash _processHash;
@@ -48,7 +49,7 @@ namespace WintapCoreSvcMgr.Database
             InitializeDatabase();
 
             // Create backup database configuration
-            _config = ProcessTreeDatabaseConfig.CreateBackupDatabaseConfig();
+            //_config = ProcessTreeDatabaseConfig.CreateBackupDatabaseConfig();
 
             LogInfo("BackupDatabaseManager initialized for WintapCoreSvcMgr.exe");
         }
@@ -302,33 +303,33 @@ namespace WintapCoreSvcMgr.Database
         /// Compact the backup database
         /// Called by WintapCoreSvcMgr.exe COMPACT_BACKUP_DB command
         /// </summary>
-        public DatabaseOperationResult CompactBackupDatabase()
-        {
-            try
-            {
-                LogInfo("Starting backup database compaction");
+        //public DatabaseOperationResult CompactBackupDatabase()
+        //{
+        //    try
+        //    {
+        //        LogInfo("Starting backup database compaction");
 
-                var statsBefore = GetDatabaseStats();
-                CompactDatabase();
-                var statsAfter = GetDatabaseStats();
+        //        var statsBefore = GetDatabaseStats();
+        //        CompactDatabase();
+        //        var statsAfter = GetDatabaseStats();
 
-                var spaceReclaimed = statsBefore.DatabaseSizeBytes - statsAfter.DatabaseSizeBytes;
+        //        var spaceReclaimed = statsBefore.DatabaseSizeBytes - statsAfter.DatabaseSizeBytes;
 
-                LogInfo($"Backup database compaction completed. Space reclaimed: {spaceReclaimed / (1024 * 1024)} MB");
+        //        LogInfo($"Backup database compaction completed. Space reclaimed: {spaceReclaimed / (1024 * 1024)} MB");
 
-                return DatabaseOperationResult.DBSuccess(0, new
-                {
-                    SpaceReclaimedBytes = spaceReclaimed,
-                    SizeBefore = statsBefore.DatabaseSizeBytes,
-                    SizeAfter = statsAfter.DatabaseSizeBytes
-                });
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to compact backup database: {ex.Message}");
-                return DatabaseOperationResult.Failure(ex.Message);
-            }
-        }
+        //        return DatabaseOperationResult.DBSuccess(0, new
+        //        {
+        //            SpaceReclaimedBytes = spaceReclaimed,
+        //            SizeBefore = statsBefore.DatabaseSizeBytes,
+        //            SizeAfter = statsAfter.DatabaseSizeBytes
+        //        });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"Failed to compact backup database: {ex.Message}");
+        //        return DatabaseOperationResult.Failure(ex.Message);
+        //    }
+        //}
 
 
 
@@ -401,26 +402,26 @@ namespace WintapCoreSvcMgr.Database
             }
         }
 
-        public void RemoveStaleProcesses(DateTime cutoffTime)
-        {
-            try
-            {
-                var sql = $@"
-                    DELETE FROM {_config.TableName} 
-                    WHERE is_active = false 
-                      AND exit_time < ? 
-                      AND has_live_descendants = false";
+        //public void RemoveStaleProcesses(DateTime cutoffTime)
+        //{
+        //    try
+        //    {
+        //        var sql = $@"
+        //            DELETE FROM {_config.TableName} 
+        //            WHERE is_active = false 
+        //              AND exit_time < ? 
+        //              AND has_live_descendants = false";
 
-                using var cmd = new DuckDBCommand(sql, _connection);
-                cmd.Parameters.Add(new DuckDBParameter("cutoff_time", cutoffTime));
-                cmd.ExecuteNonQuery();
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to remove stale processes: {ex.Message}");
-                throw;
-            }
-        }
+        //        using var cmd = new DuckDBCommand(sql, _connection);
+        //        cmd.Parameters.Add(new DuckDBParameter("cutoff_time", cutoffTime));
+        //        cmd.ExecuteNonQuery();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"Failed to remove stale processes: {ex.Message}");
+        //        throw;
+        //    }
+        //}
 
         public void CompactDatabase()
         {
@@ -436,41 +437,41 @@ namespace WintapCoreSvcMgr.Database
             }
         }
 
-        public DatabaseStats GetDatabaseStats()
-        {
-            try
-            {
-                var stats = new DatabaseStats
-                {
-                    CollectedAt = DateTime.UtcNow,
-                    IsHealthy = true
-                };
+        //public DatabaseStats GetDatabaseStats()
+        //{
+        //    try
+        //    {
+        //        var stats = new DatabaseStats
+        //        {
+        //            CollectedAt = DateTime.UtcNow,
+        //            IsHealthy = true
+        //        };
 
-                // Get process counts
-                stats.TotalProcesses = ExecuteScalar<int>($"SELECT COUNT(*) FROM {_config.TableName}");
-                stats.ActiveProcesses = ExecuteScalar<int>($"SELECT COUNT(*) FROM {_config.TableName} WHERE is_active = true");
-                stats.ExitedProcesses = stats.TotalProcesses - stats.ActiveProcesses;
+        //        // Get process counts
+        //        stats.TotalProcesses = ExecuteScalar<int>($"SELECT COUNT(*) FROM {_config.TableName}");
+        //        stats.ActiveProcesses = ExecuteScalar<int>($"SELECT COUNT(*) FROM {_config.TableName} WHERE is_active = true");
+        //        stats.ExitedProcesses = stats.TotalProcesses - stats.ActiveProcesses;
 
-                // Get database file size
-                if (File.Exists(_config.DatabasePath))
-                {
-                    stats.DatabaseSizeBytes = new FileInfo(_config.DatabasePath).Length;
-                }
+        //        // Get database file size
+        //        if (File.Exists(_config.DatabasePath))
+        //        {
+        //            stats.DatabaseSizeBytes = new FileInfo(_config.DatabasePath).Length;
+        //        }
 
-                stats.HealthDetails = $"Total: {stats.TotalProcesses}, Active: {stats.ActiveProcesses}, Size: {stats.DatabaseSizeBytes / (1024 * 1024)} MB";
-                return stats;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to get database stats: {ex.Message}");
-                return new DatabaseStats
-                {
-                    CollectedAt = DateTime.UtcNow,
-                    IsHealthy = false,
-                    HealthDetails = ex.Message
-                };
-            }
-        }
+        //        stats.HealthDetails = $"Total: {stats.TotalProcesses}, Active: {stats.ActiveProcesses}, Size: {stats.DatabaseSizeBytes / (1024 * 1024)} MB";
+        //        return stats;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"Failed to get database stats: {ex.Message}");
+        //        return new DatabaseStats
+        //        {
+        //            CollectedAt = DateTime.UtcNow,
+        //            IsHealthy = false,
+        //            HealthDetails = ex.Message
+        //        };
+        //    }
+        //}
 
         private T ExecuteScalar<T>(string sql)
         {
@@ -522,12 +523,7 @@ namespace WintapCoreSvcMgr.Database
 
                 LogInfo("Database synchronization completed successfully");
 
-                return DatabaseOperationResult.DBSuccess(1, new
-                {
-                    SourceDatabase = RECOVERY_DB_PATH,
-                    TargetDatabase = MAIN_DB_PATH,
-                    Timestamp = DateTime.UtcNow
-                });
+                return DatabaseOperationResult.SuccessResult();
             }
             catch (Exception ex)
             {
@@ -540,37 +536,37 @@ namespace WintapCoreSvcMgr.Database
         /// Get backup database status
         /// Called by WintapCoreSvcMgr.exe BACKUP_DB_STATUS command
         /// </summary>
-        public BackupDatabaseStatus GetBackupDatabaseStatus()
-        {
-            try
-            {
-                var stats = GetDatabaseStats();
+        //public BackupDatabaseStatus GetBackupDatabaseStatus()
+        //{
+        //    try
+        //    {
+        //        var stats = GetDatabaseStats();
 
-                return new BackupDatabaseStatus
-                {
-                    IsHealthy = stats.IsHealthy,
-                    DatabaseExists = File.Exists(RECOVERY_DB_PATH),
-                    DatabasePath = RECOVERY_DB_PATH,
-                    TotalProcesses = stats.TotalProcesses,
-                    ActiveProcesses = stats.ActiveProcesses,
-                    DatabaseSizeMB = stats.DatabaseSizeBytes / (1024.0 * 1024.0),
-                    LastModified = File.Exists(RECOVERY_DB_PATH) ? File.GetLastWriteTime(RECOVERY_DB_PATH) : null,
-                    CheckedAt = DateTime.UtcNow,
-                    HealthDetails = stats.HealthDetails
-                };
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to get backup database status: {ex.Message}");
-                return new BackupDatabaseStatus
-                {
-                    IsHealthy = false,
-                    DatabaseExists = File.Exists(RECOVERY_DB_PATH),
-                    ErrorMessage = ex.Message,
-                    CheckedAt = DateTime.UtcNow
-                };
-            }
-        }
+        //        return new BackupDatabaseStatus
+        //        {
+        //            IsHealthy = stats.IsHealthy,
+        //            DatabaseExists = File.Exists(RECOVERY_DB_PATH),
+        //            DatabasePath = RECOVERY_DB_PATH,
+        //            TotalProcesses = stats.TotalProcesses,
+        //            ActiveProcesses = stats.ActiveProcesses,
+        //            DatabaseSizeMB = stats.DatabaseSizeBytes / (1024.0 * 1024.0),
+        //            LastModified = File.Exists(RECOVERY_DB_PATH) ? File.GetLastWriteTime(RECOVERY_DB_PATH) : null,
+        //            CheckedAt = DateTime.UtcNow,
+        //            HealthDetails = stats.HealthDetails
+        //        };
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"Failed to get backup database status: {ex.Message}");
+        //        return new BackupDatabaseStatus
+        //        {
+        //            IsHealthy = false,
+        //            DatabaseExists = File.Exists(RECOVERY_DB_PATH),
+        //            ErrorMessage = ex.Message,
+        //            CheckedAt = DateTime.UtcNow
+        //        };
+        //    }
+        //}
 
        
 

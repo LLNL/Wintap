@@ -17,8 +17,4 @@
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.8" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\platform\windows\Wintap.ProcessTree.Shared\Wintap.ProcessTree.Shared.csproj" />
-  </ItemGroup>
-
 </Project>
