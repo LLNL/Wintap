@@ -256,10 +256,12 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 // Extract command line if available
                 var commandLine = eventData.GetValueOrDefault("CommandLine", "");
 
+                var ParentProcessName = eventData.GetValueOrDefault("ParentProcessName", "");
+
                 ProcessRecord parentProcess = activeProcesses.Where(p => p.ProcessId == -1).First();
                 try
                 {
-                    parentProcess = activeProcesses.Where(p => p.ProcessName == Path.GetFileName(processName) && p.ProcessId == parentProcessId).OrderBy(o => o.CreateTime).Last();
+                    parentProcess = activeProcesses.Where(p => p.ProcessId == parentProcessId).OrderBy(o => o.CreateTime).Last();
                 }
                 catch(Exception ex)
                 {

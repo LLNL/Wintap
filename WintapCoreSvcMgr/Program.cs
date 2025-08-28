@@ -262,12 +262,17 @@ namespace gov.llnl.wintap
         {
             int returnCode = 0;
             WintapLogger.Log.Append("starting database recovery", LogLevel.Info);
+
+            var uptimeMs = Environment.TickCount64;
+            var uptime = TimeSpan.FromMilliseconds(uptimeMs);
+            var lastBoot = DateTime.Now.Subtract(uptime);
+
             // delete main, if boot delete backup, if boot do boot trace else do mini trace, copy backup to main
             WintapLogger.Log.Append("deleting main", LogLevel.Info);
             backupDbManager.DeleteMainDb();
-            if(IsSystemBoot())
+            if(IsSystemBoot() || CheckSecurityLogCompleteness(lastBoot))
             {
-                WintapLogger.Log.Append("System boot detected, resetting recovery database", LogLevel.Info);
+                WintapLogger.Log.Append("Attempting complete process tree rebuild and reset of recovery database", LogLevel.Info);
                 backupDbManager.DeleteRecoveryDb();
                 backupDbManager = new BackupDatabaseManager();
                 // Process existing boot trace
@@ -281,7 +286,7 @@ namespace gov.llnl.wintap
             }
             else
             {
-                WintapLogger.Log.Append("System boot NOT detected", LogLevel.Info);
+                WintapLogger.Log.Append("System boot NOT detected, security log has wrapped, attempt a mini-log process", LogLevel.Info);
                 MiniLogProcessor miniLogProcessor = new MiniLogProcessor(backupDbManager);
                 await miniLogProcessor.ProcessEventsSinceLastCheckpoint();
             }
