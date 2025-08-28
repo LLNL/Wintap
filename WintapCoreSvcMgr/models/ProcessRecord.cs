@@ -135,4 +135,12 @@ namespace gov.llnl.wintap.platform.windows.models
             };
         }
     }
+
+    public class BootTraceProcessingResult
+    {
+        public bool Success { get; set; }
+        public int ProcessingTimeSeconds { get; set; }
+        public int ProcessesInserted { get; set; }
+        public string ErrorMessage { get; set; }
+    }
 }
