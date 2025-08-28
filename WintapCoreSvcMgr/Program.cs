@@ -6,6 +6,7 @@ using Microsoft.Diagnostics.Tracing.Etlx;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.Management;
 using System.Xml;
 using WintapCoreSvcMgr.Database;
@@ -30,16 +31,16 @@ namespace gov.llnl.wintap
         {
             backupDbManager = new BackupDatabaseManager();
 
-            if (args.Length == 0)
-            {
-                WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
-                return 1;
-            }
+            //if (args.Length == 0)
+            //{
+            //    WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
+            //    return 1;
+            //}
 
-            var command = args[0].ToUpperInvariant();
-            WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
+            //var command = args[0].ToUpperInvariant();
+            //WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
 
-            //string command = "MOCK_REBOOT";
+            string command = "RECOVER_DATABASE";
             
             int exitCode = ProcessCommand(command);
 
@@ -68,7 +69,7 @@ namespace gov.llnl.wintap
             {
                 WintapLogger.Log.Append("=== MOCKING FRESH BOOT SCENARIO ===", LogLevel.Info);
 
-                System.Diagnostics.Debugger.Launch();
+                //System.Diagnostics.Debugger.Launch();
 
                 // Don't delete existing databases - just test the boot trace processing
                 //var testManager = new BackupDatabaseManager();
@@ -604,52 +605,91 @@ namespace gov.llnl.wintap
 
         internal static bool IsSystemBoot()
         {
-            DateTime lastBoot = DateTime.MinValue;
-            TimeSpan uptime = TimeSpan.Zero;
+            // Calculate boot time using TickCount64 (extremely reliable on modern systems)
+            var uptimeMs = Environment.TickCount64;
+            var uptime = TimeSpan.FromMilliseconds(uptimeMs);
+            var lastBoot = DateTime.Now.Subtract(uptime);
 
+            WintapLogger.Log.Append($"System uptime: {uptime.TotalMinutes:F2} minutes", LogLevel.Info);
+            WintapLogger.Log.Append($"Calculated boot time: {lastBoot:yyyy-MM-dd HH:mm:ss}", LogLevel.Info);
+
+            // Check if this is a recent boot (< 10 minutes)
+            bool isRecentBoot = uptime.TotalMinutes < 10.0;
+
+            if (!isRecentBoot)
+            {
+                WintapLogger.Log.Append($"System uptime ({uptime.TotalMinutes:F2} minutes) exceeds threshold. Not a fresh boot.", LogLevel.Info);
+                return false;
+            }
+
+            // Check if Security log has complete data from boot time
+            bool hasCompleteLogData = CheckSecurityLogCompleteness(lastBoot);
+
+            WintapLogger.Log.Append($"Is fresh boot (< 10 min): {isRecentBoot}", LogLevel.Info);
+            WintapLogger.Log.Append($"Security log has complete data from boot: {hasCompleteLogData}", LogLevel.Info);
+
+            bool isFreshBootWithCompleteLogData = isRecentBoot && hasCompleteLogData;
+            WintapLogger.Log.Append($"Fresh boot with complete Security log data: {isFreshBootWithCompleteLogData}", LogLevel.Info);
+
+            return isFreshBootWithCompleteLogData;
+        }
+
+        /// <summary>
+        /// Check if Security log has complete data from boot time by examining the oldest event
+        /// If the oldest event is older than boot time, we have complete coverage
+        /// If the oldest event is newer than boot time, the log has wrapped and we're missing data
+        /// </summary>
+        private static bool CheckSecurityLogCompleteness(DateTime bootTime)
+        {
             try
             {
-                // Method 1: Use Environment.TickCount64 (most reliable)
-                var uptimeMs = Environment.TickCount64;
-                uptime = TimeSpan.FromMilliseconds(uptimeMs);
-                lastBoot = DateTime.Now.Subtract(uptime);
+                WintapLogger.Log.Append($"Checking if Security log contains complete data from boot time", LogLevel.Info);
 
-                WintapLogger.Log.Append($"System uptime: {uptime.TotalMinutes:F2} minutes", LogLevel.Info);
-                WintapLogger.Log.Append($"Calculated boot time: {lastBoot}", LogLevel.Info);
+                using (var eventLog = new EventLogReader("Security"))
+                {
+                    // Seek to the beginning to get the oldest event
+                    eventLog.Seek(SeekOrigin.Begin, 0);
+
+                    using (var oldestEvent = eventLog.ReadEvent())
+                    {
+                        if (oldestEvent == null)
+                        {
+                            WintapLogger.Log.Append("No events found in Security log", LogLevel.Warn);
+                            return false;
+                        }
+
+                        var oldestEventTime = oldestEvent.TimeCreated?.ToLocalTime() ?? DateTime.MaxValue;
+                        var timeDifference = (oldestEventTime - bootTime).TotalMinutes;
+
+                        WintapLogger.Log.Append($"Oldest Security log event: {oldestEventTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Info);
+                        WintapLogger.Log.Append($"Boot time: {bootTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Info);
+                        WintapLogger.Log.Append($"Time difference: {timeDifference:F2} minutes", LogLevel.Info);
+
+                        // If oldest event is before or close to boot time, we have complete coverage
+                        // Allow 2 minutes tolerance for timing differences and service startup delays
+                        if (timeDifference <= 2.0)
+                        {
+                            WintapLogger.Log.Append("✓ Security log contains complete data from boot - can build full process tree", LogLevel.Info);
+                            return true;
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"✗ Security log missing {timeDifference:F2} minutes of boot data - log has wrapped", LogLevel.Warn);
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                WintapLogger.Log.Append("Access denied reading Security log - check service permissions", LogLevel.Error);
+                return false;
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error calculating uptime with TickCount64, falling back to WMI: {ex.Message}", LogLevel.Warn);
-
-                // Fallback: Use WMI query
-                try
-                {
-                    SelectQuery query = new SelectQuery(@"SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
-                    ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
-                    foreach (ManagementObject mo in searcher.Get())
-                    {
-                        lastBoot = ManagementDateTimeConverter.ToDateTime(mo.Properties["LastBootUpTime"].Value.ToString());
-                        uptime = DateTime.Now.Subtract(lastBoot);
-                        break;
-                    }
-                    WintapLogger.Log.Append($"WMI boot time: {lastBoot}, uptime: {uptime.TotalMinutes:F2} minutes", LogLevel.Info);
-                }
-                catch (Exception wmiEx)
-                {
-                    WintapLogger.Log.Append($"ERROR GETTING LAST BOOT TIME: {wmiEx.Message}", LogLevel.Error);
-                    return false; // Can't determine boot time, assume not fresh boot
-                }
+                WintapLogger.Log.Append($"Error checking Security log completeness: {ex.Message}", LogLevel.Error);
+                return false;
             }
-
-            // Increase threshold to 10 minutes to account for slow boot processes
-            // Windows services can take several minutes to start, especially on slower systems
-            bool isRecentBoot = uptime.TotalMinutes < 10.0;
-
-            WintapLogger.Log.Append($"Last boot time: {lastBoot}", LogLevel.Info);
-            WintapLogger.Log.Append($"System uptime: {uptime.TotalMinutes:F2} minutes", LogLevel.Info);
-            WintapLogger.Log.Append($"Is fresh boot (< 10 min): {isRecentBoot}", LogLevel.Info);
-
-            return isRecentBoot;
         }
 
         private static bool isDeveloper()
