@@ -160,7 +160,20 @@ namespace gov.llnl.wintap.core.infrastructure
             // todo: make platform agnostic
             if(streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
             {
-                streamedEvent.PidHash = platform.windows.collect.etw.ProcessSensor.ResolvePidHash(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                streamedEvent.PidHash = ownerProcess.PidHash;
+                if (streamedEvent.ProcessName != null)
+                {
+                    if(streamedEvent.ProcessName.ToLower() != ownerProcess.ProcessName.ToLower())
+                    {
+                        WintapLogger.Log.Append($"Process owner mismatch, processname on event is {streamedEvent.ProcessName} but processname pulled from DB is {ownerProcess.ProcessName}, overriding native event value to match DB", LogLevel.Error);
+                        streamedEvent.ProcessName = ownerProcess.ProcessName;
+                    }
+                }
+                else
+                {
+                    streamedEvent.ProcessName = ownerProcess.ProcessName;
+                }
             }
             
             // Update events per second calculation

@@ -90,14 +90,15 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     // Find the process that was active at the given time
                     // This handles PID reuse by checking time ranges
                     var sql = $@"
-                SELECT TOP 1 pid_hash, parent_pid_hash, process_id, parent_process_id, 
+                SELECT pid_hash, parent_pid_hash, process_id, parent_process_id, 
                        process_name, image_path, command_line, create_time, 
                        exit_time, user_name, unique_process_key
                 FROM live_processes 
                 WHERE process_id = {pid}
                 AND create_time <= '{eventTime:yyyy-MM-dd HH:mm:ss.fff}'
                 AND (exit_time IS NULL OR exit_time > '{eventTime:yyyy-MM-dd HH:mm:ss.fff}')
-                ORDER BY create_time DESC";
+                ORDER BY create_time DESC
+                LIMIT 1";
 
                     using var cmd = new DuckDBCommand(sql, connection);
                     using var reader = cmd.ExecuteReader();
@@ -227,6 +228,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
             try
             {
+                int sendCount = 0;
                 using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
                 {
                     connection.Open();
@@ -236,7 +238,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                        process_name, image_path, command_line, create_time, 
                        user_name, unique_process_key
                 FROM live_processes 
-                WHERE is_active = true
                 ORDER BY create_time ASC";
 
                     using var cmd = new DuckDBCommand(sql, connection);
@@ -244,6 +245,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
                     while (reader.Read())
                     {
+                        sendCount++;
                         var process = new ProcessRecord
                         {
                             PidHash = reader["pid_hash"]?.ToString(),
@@ -262,6 +264,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         processes.Add(process);
                     }
                 }
+                WintapLogger.Log.Append($"Total process tree events sent: {sendCount}", LogLevel.Info);
             }
             catch (Exception ex)
             {
@@ -290,8 +293,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 Path = processRecord.ProcessPath,
                 ParentPID = processRecord.ParentProcessId,
                 CommandLine = processRecord.CommandLine,
-                User = processRecord.UserName,
-                UniqueProcessKey = processRecord.UniqueProcessKey.ToString(),
+                Arguments = processRecord.CommandLine,
                 ParentPidHash = processRecord.ParentPidHash
             };
 
@@ -343,10 +345,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
                 WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Start };
                 msg.PidHash = processHash.GenPidHash(msg.PID, msg.EventTime);
-                msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments, UniqueProcessKey = obj.UniqueProcessKey.ToString() };
+                msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments };
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
                 msg.ProcessPath = msg.Process.Path;
+                msg.Process.ParentPidHash = ResolveProcessAtTime(msg.PID, DateTime.FromFileTimeUtc(msg.EventTime)).ParentPidHash;
 
                 PublishProcess(msg);
             }
@@ -389,9 +392,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     ProcessPath = msg.Process?.Path,
                     CommandLine = msg.Process?.CommandLine,
                     CreateTime = DateTime.FromFileTimeUtc(msg.EventTime),
-                    IsActive = msg.ActivityType != WintapMessage.ActivityTypeEnum.Stop,
+                    //IsActive = msg.ActivityType != WintapMessage.ActivityTypeEnum.Stop,
                     Source = msg.ActivityType == WintapMessage.ActivityTypeEnum.Refresh ? "boot_trace" : "real_time",
-                    UserName = msg.Process?.User,
+                    //UserName = msg.Process?.User,
                     //UniqueProcessKey = msg.Process?.UniqueProcessKey
                 };
 

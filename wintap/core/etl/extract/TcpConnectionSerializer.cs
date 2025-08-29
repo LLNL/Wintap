@@ -54,10 +54,11 @@ namespace gov.llnl.wintap.core.etl.extract
                 pci.MaxPacketSize = maxPktSize;
                 pci.PacketSizeSquared = pktSizeSquared;
                 pci.EventTime = GetUnixNowTime();
+                pci.ActivityType = sensorEvent["activityType"].ToString();
                 dynamic flatMsg = (ExpandoObject)pci.ToDynamic();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.ActivityType = pci.IpEvent;
-                flatMsg.AgentId = sensorEvent["AgentId"].ToString();
+                //flatMsg.AgentId = sensorEvent["AgentId"].ToString();
 
                 // adding for convenience
                 flatMsg.SourceIpAddressString = sensorEvent["srcIp"].ToString();

@@ -11,6 +11,7 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.etl.transform;
 using System;
 using System.Dynamic;
+using gov.llnl.wintap.core.shared;
 
 namespace gov.llnl.wintap.core.etl.extract
 {
@@ -33,7 +34,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 IdGenerator idGen = new IdGenerator();
                 DateTime eventTime = DateTime.FromFileTimeUtc((long)sensorEvent["firstSeen"]);
                 dynamic flatMsg = new ExpandoObject();
-                flatMsg.AgentId = sensorEvent["AgentId"].ToString();
+                flatMsg.AgentId = StateManager.AgentId;
                 flatMsg.ActivityType = sensorEvent["activityType"].ToString();
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.Reg_Data = sensorEvent["data"].ToString();
@@ -47,7 +48,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 flatMsg.Reg_Value = sensorEvent["valueName"].ToString();
                 flatMsg.Reg_Id_Hash = idGen.GenKeyForRegistry_Entry(transform.Transformer.context, HostSerializer.Instance.HostId.Hostname, flatMsg.AgentId, flatMsg.Reg_Path, flatMsg.Reg_Value);
                 flatMsg.MessageType = "PROCESS_REGISTRY";
-                flatMsg.EventTime = GetUnixNowTime();
+                flatMsg.EventTime = eventTime;
                 this.Save(flatMsg);
                 sensorEvent = null;
                 flatMsg = null;
