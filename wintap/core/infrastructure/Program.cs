@@ -166,8 +166,8 @@ CallDatabaseRecovery();
 builder.Services.AddWindowsService();
 builder.Services.AddHostedService<WinTapSvc>();
 
-builder.Services.AddSingleton<ProcessTreeDatabaseManager>();
-builder.Services.AddHostedService<ProcessTreeDatabaseManager>(provider => provider.GetService<ProcessTreeDatabaseManager>());
+//builder.Services.AddSingleton<ProcessTreeDatabaseManager>();
+//builder.Services.AddHostedService<ProcessTreeDatabaseManager>(provider => provider.GetService<ProcessTreeDatabaseManager>());
 
 builder.Services.AddSignalR();
 

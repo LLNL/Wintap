@@ -568,7 +568,156 @@ namespace WintapCoreSvcMgr.Database
         //    }
         //}
 
-       
+        /// <summary>
+        /// this method determines whether or not the Recovery DB has a valid root of the process tree,
+        /// meaning that the existence of the essential boot process tree (ntoskrnl -> smss -> etc) is within a reasonable time after boot
+        /// </summary>
+        /// <returns>True if Recovery DB contains valid boot process tree, false otherwise</returns>
+        /// <remarks>
+        /// Required using statements:
+        /// using DuckDB.NET.Data;
+        /// using gov.llnl.wintap.core.infrastructure;
+        /// using gov.llnl.wintap.core.shared;
+        /// 
+        /// Required constant (add to class):
+        /// private const string RECOVERY_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb";
+        /// </remarks>
+        internal bool DuckHasValidRoot()
+        {
+            
+            try
+            {
+                var uptimeMs = Environment.TickCount64;
+                var uptime = TimeSpan.FromMilliseconds(uptimeMs);
+                var bootTime = DateTime.Now.Subtract(uptime);
+                bootTime = bootTime.AddSeconds(-2); // loosen up the precision - TickCount64 is actually a few ticks AFTER ntoskrnl start 
+
+                // Define reasonable timeframe for system boot
+                var bootProcessWindowEnd = bootTime.AddSeconds(60);
+
+                WintapLogger.Log.Append($"!! Looking for SYSTEM process between boot start: {bootTime} and boot windows end: {bootProcessWindowEnd}", LogLevel.Info);
+
+                using (var connection = new DuckDBConnection($"Data Source={RECOVERY_DB_PATH}"))
+                {
+                    connection.Open();
+
+                    // Essential Windows boot processes that should exist early in boot sequence
+                    var essentialProcesses = new[]
+                    {
+                "System",           // PID 4 - Windows System process
+                "smss.exe",         // Session Manager Subsystem
+                "csrss.exe",        // Client/Server Runtime Subsystem  
+                "wininit.exe",      // Windows Start-Up Application
+                "winlogon.exe",     // Windows Logon Application
+                "services.exe",     // Service Control Manager
+                "lsass.exe"         // Local Security Authority Subsystem Service
+            };
+
+                    // Check if we have essential boot processes within reasonable time after boot
+                    foreach (var processName in essentialProcesses)
+                    {
+                        var sql = $@"
+                    SELECT COUNT(*) 
+                    FROM live_processes 
+                    WHERE LOWER(process_name) = LOWER('{processName}')
+                    AND create_time >= '{bootTime:yyyy-MM-dd HH:mm:ss.fff}' 
+                    AND create_time <= '{bootProcessWindowEnd:yyyy-MM-dd HH:mm:ss.fff}'";
+
+                        using var cmd = new DuckDBCommand(sql, connection);
+
+                        WintapLogger.Log.Append($"verifying boot process with: {cmd.CommandText}", LogLevel.Info);
+
+                        var count = Convert.ToInt32(cmd.ExecuteScalar());
+
+                        if (count == 0)
+                        {
+                            WintapLogger.Log.Append($"Essential boot process '{processName}' not found in Recovery DB within boot window", LogLevel.Warn);
+                            return false;
+                        }
+                    }
+
+                    // Additional validation: Check that we have System process (PID 4) as root
+                    var systemProcessSql = $@"
+                SELECT COUNT(*) 
+                FROM live_processes 
+                WHERE process_id = 4 
+                AND LOWER(process_name) = 'system'
+                AND create_time >= '{bootTime:yyyy-MM-dd HH:mm:ss.fff}' 
+                AND create_time <= '{bootProcessWindowEnd:yyyy-MM-dd HH:mm:ss.fff}'";
+
+                    using var systemCmd = new DuckDBCommand(systemProcessSql, connection);
+
+                    var systemCount = Convert.ToInt32(systemCmd.ExecuteScalar());
+
+                    if (systemCount == 0)
+                    {
+                        WintapLogger.Log.Append("System process (PID 4) not found in Recovery DB - invalid root", LogLevel.Warn);
+                        return false;
+                    }
+
+                    // Validate process hierarchy: Check that key processes have expected parent relationships
+                    var hierarchyValidationSql = $@"
+                SELECT 
+                    p.process_name,
+                    p.process_id,
+                    p.parent_process_id,
+                    parent.process_name as parent_name
+                FROM live_processes p
+                LEFT JOIN live_processes parent ON p.parent_process_id = parent.process_id 
+                WHERE p.process_name IN ('smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe', 'lsass.exe')
+                AND p.create_time >= '{bootTime:yyyy-MM-dd HH:mm:ss.fff}' 
+                AND p.create_time <= '{bootProcessWindowEnd:yyyy-MM-dd HH:mm:ss.fff}'";
+
+                    using var hierarchyCmd = new DuckDBCommand(hierarchyValidationSql, connection);
+
+                    using var reader = hierarchyCmd.ExecuteReader();
+                    var processHierarchyFound = false;
+
+                    while (reader.Read())
+                    {
+                        processHierarchyFound = true;
+                        var processName = reader["process_name"]?.ToString();
+                        var parentName = reader["parent_name"]?.ToString();
+
+                        WintapLogger.Log.Append($"Found boot process: {processName} -> Parent: {parentName}", LogLevel.Debug);
+                    }
+
+                    if (!processHierarchyFound)
+                    {
+                        WintapLogger.Log.Append("No valid process hierarchy found in Recovery DB", LogLevel.Warn);
+                        return false;
+                    }
+
+                    // Final check: Ensure we have a reasonable number of total processes within boot window
+                    // A healthy Windows boot should have dozens of processes started
+                    var totalProcessesSql = $@"
+                SELECT COUNT(*) 
+                FROM live_processes 
+                WHERE create_time >= '{bootTime:yyyy-MM-dd HH:mm:ss.fff}' 
+                AND create_time <= '{bootProcessWindowEnd:yyyy-MM-dd HH:mm:ss.fff}'
+                AND source NOT IN ('boot_trace', 'mini_trace')";
+
+                    using var totalCmd = new DuckDBCommand(totalProcessesSql, connection);
+
+                    var totalProcesses = Convert.ToInt32(totalCmd.ExecuteScalar());
+
+                    // We should have at least 20 processes during a normal Windows boot sequence
+                    if (totalProcesses < 20)
+                    {
+                        WintapLogger.Log.Append($"Insufficient boot processes in Recovery DB ({totalProcesses} found, minimum 20 expected)", LogLevel.Warn);
+                        return false;
+                    }
+
+                    WintapLogger.Log.Append($"Recovery DB has valid root: {totalProcesses} boot processes found, all essential processes present", LogLevel.Info);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error validating Recovery DB root: {ex.Message}", LogLevel.Error);
+                return false;
+            }
+        }
 
         private void LogInfo(string message)
         {

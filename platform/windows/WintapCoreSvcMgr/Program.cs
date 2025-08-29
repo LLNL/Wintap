@@ -31,16 +31,16 @@ namespace gov.llnl.wintap
         {
             backupDbManager = new BackupDatabaseManager();
 
-            if (args.Length == 0)
-            {
-                WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
-                return 1;
-            }
+            //if (args.Length == 0)
+            //{
+            //    WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
+            //    return 1;
+            //}
 
-            var command = args[0].ToUpperInvariant();
-            WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
+            //var command = args[0].ToUpperInvariant();
+            //WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
 
-            //string command = "RECOVER_DATABASE";
+            string command = "RECOVER_DATABASE";
 
             int exitCode = ProcessCommand(command);
 
@@ -90,9 +90,15 @@ namespace gov.llnl.wintap
             // delete main, if boot delete backup, if boot do boot trace else do mini trace, copy backup to main
             WintapLogger.Log.Append("deleting main", LogLevel.Info);
             backupDbManager.DeleteMainDb();
-            if(IsSystemBoot() || CheckSecurityLogCompleteness(lastBoot))
+
+            // modes:
+            //  duckdDB has valid root (system process is after boot): process minilog
+            //  duckDB has no valid root (system process is before boot): attempt complete rebuild from log
+
+            //if(IsSystemBoot() || CheckSecurityLogCompleteness(lastBoot))
+            if(!backupDbManager.DuckHasValidRoot())
             {
-                WintapLogger.Log.Append("Attempting complete process tree rebuild and reset of recovery database", LogLevel.Info);
+                WintapLogger.Log.Append("Process tree root not found in DB.  Attempting complete process tree rebuild and reset of recovery database", LogLevel.Info);
                 backupDbManager.DeleteRecoveryDb();
                 backupDbManager = new BackupDatabaseManager();
                 // Process existing boot trace
@@ -106,11 +112,11 @@ namespace gov.llnl.wintap
             }
             else
             {
-                WintapLogger.Log.Append("System boot NOT detected, security log has wrapped, attempt a mini-log process", LogLevel.Info);
+                WintapLogger.Log.Append("Process tree root found in DB, attempt a mini-log process", LogLevel.Info);
                 MiniLogProcessor miniLogProcessor = new MiniLogProcessor(backupDbManager);
                 await miniLogProcessor.ProcessEventsSinceLastCheckpoint();
             }
-            // Ensure AutoLogger is configured for boot capture
+
             WintapLogger.Log.Append($"Verifying boot trace", LogLevel.Info);
             backupDbManager.SynchronizeDatabases();
             WintapLogger.Log.Append($"Return code from RecoverDB: {returnCode}", LogLevel.Info);
