@@ -9,6 +9,7 @@ using gov.llnl.wintap.core.api.helpers;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.infrastructure.helpers;
 using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.platform.linux.collect.test;
 using gov.llnl.wintap.platform.windows.infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -19,6 +20,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using gov.llnl.wintap.platform.windows.collect.etw;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -148,27 +150,6 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        /// <summary>
-        /// Get reference to ProcessTreeDatabaseManager from DI container
-        /// </summary>
-        private static ProcessTreeDatabaseManager GetProcessTreeManager()
-        {
-            try
-            {
-                if (ServiceProviderAccessor.Services == null)
-                {
-                    WintapLogger.Log.Append("ServiceProvider not available in EventChannel", LogLevel.Warn);
-                    return null;
-                }
-
-                return ServiceProviderAccessor.Services.GetRequiredService<ProcessTreeDatabaseManager>();
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error getting ProcessTreeDatabaseManager from DI: {ex.Message}", LogLevel.Error);
-                return null;
-            }
-        }
 
         /// <summary>
         /// Enhanced Send method using ProcessTreeDatabaseManager
@@ -176,7 +157,12 @@ namespace gov.llnl.wintap.core.infrastructure
         public static void Send(WintapMessage streamedEvent)
         {
             totalEvents++;
-
+            // todo: make platform agnostic
+            if(streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
+            {
+                streamedEvent.PidHash = platform.windows.collect.etw.ProcessSensor.ResolvePidHash(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+            }
+            
             // Update events per second calculation
             var now = DateTime.Now;
             if (now.Second != lastTotalEvents)
@@ -191,203 +177,10 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
 
-            if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.ProcessPartial)
-            {
-                try
-                {
-                    // Get process information from the new database
-                    var processInfo = GetProcessInfoFromDatabase(streamedEvent.PID, streamedEvent.EventTime);
-
-                    if (processInfo != null)
-                    {
-                        streamedEvent.ProcessName = processInfo.ProcessName;
-                        streamedEvent.ProcessPath = processInfo.ImagePath;
-                        streamedEvent.PidHash = processInfo.PidHash;
-                        streamedEvent.AgentId = StateManager.AgentId.ToString();
-
-                        // Filter out wintap.exe events
-                        if (processInfo.ProcessName != null && processInfo.ProcessName.ToLower() == "wintap.exe")
-                        {
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        // Process not found - add to buffer for later processing
-                        HandleBufferedEvent(streamedEvent);
-                        return;
-                    }
-                }
-                catch (InvalidOperationException)
-                {
-                    HandleBufferedEvent(streamedEvent);
-                    WintapLogger.Log.Append($"PidHash not found for PID: {streamedEvent.PID}. Event buffered for later processing.", LogLevel.Debug);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append($"ERROR sending event for MessageType: {streamedEvent.MessageType}, ActivityType: {streamedEvent.ActivityType}, pid: {streamedEvent.PID}: {ex.Message}", LogLevel.Info);
-                    return;
-                }
-
-                // Process buffered events periodically
-                if (bufferProcessingInterval.ElapsedMilliseconds > 1000)
-                {
-                    ProcessBufferedEvents();
-                    bufferProcessingInterval.Restart();
-                }
-            }
-
             // Send to Esper (filter out Wintap's own events)
             if (streamedEvent.PID != StateManager.WintapPID)
             {
                 EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
-            }
-        }
-
-        /// <summary>
-        /// Get process information from the database
-        /// </summary>
-        private static ProcessRecord GetProcessInfoFromDatabase(int pid, long eventTime)
-        {
-            try
-            {
-                var manager = GetProcessTreeManager();
-                if (manager?.Database == null)
-                {
-                    WintapLogger.Log.Append("ProcessTreeDatabaseManager not available", LogLevel.Warn);
-                    return null;
-                }
-
-                // First try to get by PID (fast path for active processes)
-                var processRecord = manager.Database.GetProcessById(pid);
-
-                if (processRecord != null)
-                {
-                    // Check if this process was running at the time of the event
-                    var eventDateTime = DateTime.FromFileTimeUtc(eventTime);
-
-                    // Process should be active at event time
-                    if (processRecord.CreateTime <= eventDateTime &&
-                        (processRecord.ExitTime == null || processRecord.ExitTime >= eventDateTime))
-                    {
-                        return processRecord;
-                    }
-                }
-
-                // If no active process found, try to find historical process
-                return GetHistoricalProcessByPid(pid, eventTime);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error getting process info for PID {pid}: {ex.Message}", LogLevel.Error);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Get historical process by PID and event time (handles PID recycling)
-        /// </summary>
-        private static ProcessRecord GetHistoricalProcessByPid(int pid, long eventTime)
-        {
-            try
-            {
-                var manager = GetProcessTreeManager();
-                if (manager?.Database == null)
-                {
-                    return null;
-                }
-
-                var eventDateTime = DateTime.FromFileTimeUtc(eventTime);
-                return manager.Database.GetProcessByPidAtTime(pid, eventDateTime);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error getting historical process info for PID {pid}: {ex.Message}", LogLevel.Error);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Handle events that couldn't be immediately processed
-        /// </summary>
-        private static void HandleBufferedEvent(WintapMessage streamedEvent)
-        {
-            if (eventBuffer.Count >= MAX_BUFFER_SIZE)
-            {
-                // Buffer is full, drop oldest event
-                if (eventBuffer.TryDequeue(out var droppedEvent))
-                {
-                    droppedEventCount++;
-                    WintapLogger.Log.Append($"Event buffer full (PID: {streamedEvent.PID}), " +
-                        $"current size: {eventBuffer.Count} max size: {MAX_BUFFER_SIZE}, discarding oldest event",
-                        LogLevel.Always);
-                }
-            }
-
-            eventBuffer.Enqueue(streamedEvent);
-        }
-
-        /// <summary>
-        /// Process buffered events
-        /// </summary>
-        private static void ProcessBufferedEvents()
-        {
-            var processingScope = DateTime.Now.AddSeconds(-3);
-            var processedCount = 0;
-            var maxProcessed = 100; // Limit processing to avoid blocking
-
-            while (eventBuffer.Count > 0 && processedCount < maxProcessed)
-            {
-                if (eventBuffer.TryDequeue(out var bufferedEvent))
-                {
-                    // Skip events that are too old
-                    if (bufferedEvent.EventTime < processingScope.ToFileTimeUtc())
-                    {
-                        processedCount++;
-                        continue;
-                    }
-
-                    try
-                    {
-                        var processInfo = GetProcessInfoFromDatabase(bufferedEvent.PID, bufferedEvent.EventTime);
-
-                        if (processInfo != null)
-                        {
-                            bufferedEvent.ProcessName = processInfo.ProcessName;
-                            bufferedEvent.ProcessPath = processInfo.ImagePath;
-                            bufferedEvent.PidHash = processInfo.PidHash;
-                            bufferedEvent.AgentId = StateManager.AgentId.ToString();
-
-                            // Filter out wintap.exe events
-                            if (processInfo.ProcessName != null && processInfo.ProcessName.ToLower() != "wintap.exe")
-                            {
-                                EsperRuntime.EventService.SendEventBean(bufferedEvent, "WintapMessage");
-                            }
-                        }
-                        else
-                        {
-                            // Still can't find process info, check if event is from Wintap itself
-                            if (bufferedEvent.PID != StateManager.WintapPID)
-                            {
-                                droppedEventCount++;
-                                WintapLogger.Log.Append($"WARN: dropping event. PID: {bufferedEvent.PID}, " +
-                                    $"Type: {bufferedEvent.MessageType}, dropped count: {droppedEventCount}",
-                                    LogLevel.Info);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        if (bufferedEvent.PID != StateManager.WintapPID)
-                        {
-                            droppedEventCount++;
-                            WintapLogger.Log.Append($"WARN: dropping event due to exception. PID: {bufferedEvent.PID}, " +
-                                $"Error: {ex.Message}, dropped count: {droppedEventCount}", LogLevel.Info);
-                        }
-                    }
-                }
-                processedCount++;
             }
         }
 

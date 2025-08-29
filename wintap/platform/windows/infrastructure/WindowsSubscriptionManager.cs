@@ -26,6 +26,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             WintapLogger.Log.Append("Starting Process sensor", LogLevel.Info);
             ProcessSensor pc = new ProcessSensor();
             pc.Start();
+            WintapLogger.Log.Append("Process sensor started", LogLevel.Info);
             kernelFlags = KernelTraceEventParser.Keywords.Process;
             baseSensors.Add(pc);
 

@@ -141,7 +141,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 cmd.Parameters.Add(new DuckDBParameter(process.ProcessId));
                 cmd.Parameters.Add(new DuckDBParameter(process.ParentProcessId));
                 cmd.Parameters.Add(new DuckDBParameter(process.ProcessName ?? (object)DBNull.Value));
-                cmd.Parameters.Add(new DuckDBParameter(process.ImagePath ?? (object)DBNull.Value));
+                cmd.Parameters.Add(new DuckDBParameter(process.ProcessPath ?? (object)DBNull.Value));
                 cmd.Parameters.Add(new DuckDBParameter(process.CommandLine ?? (object)DBNull.Value));
                 cmd.Parameters.Add(new DuckDBParameter(process.CreateTime));
                 cmd.Parameters.Add(new DuckDBParameter(process.ExitTime ?? (object)DBNull.Value));
@@ -499,7 +499,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 ProcessId = reader.GetInt32("process_id"),
                 ParentProcessId = reader.IsDBNull("parent_process_id") ? 0 : reader.GetInt32("parent_process_id"),
                 ProcessName = reader.GetString("process_name"),
-                ImagePath = reader.IsDBNull("image_path") ? null : reader.GetString("image_path"),
+                ProcessPath = reader.IsDBNull("image_path") ? null : reader.GetString("image_path"),
                 CommandLine = reader.IsDBNull("command_line") ? null : reader.GetString("command_line"),
                 CreateTime = reader.GetDateTime("create_time"),
                 ExitTime = reader.IsDBNull("exit_time") ? null : reader.GetDateTime("exit_time"),
@@ -551,7 +551,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         public int ProcessId { get; set; }
         public int ParentProcessId { get; set; }
         public string ProcessName { get; set; }
-        public string ImagePath { get; set; }
+        public string ProcessPath { get; set; }
         public string CommandLine { get; set; }
         public DateTime CreateTime { get; set; }
         public DateTime? ExitTime { get; set; }

@@ -170,7 +170,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             try
             {
                 WintapMessage newProcess = (WintapMessage)e.NewEvents[0].Underlying;
-                ProcessRecord newPR = new ProcessRecord() { ProcessId = newProcess.PID, CommandLine = newProcess.Process.CommandLine, CreateTime = DateTime.FromFileTimeUtc(newProcess.EventTime), ImagePath = newProcess.Process.Path, ParentPidHash = newProcess.Process.ParentPidHash, PidHash = newProcess.PidHash, ParentProcessId = newProcess.Process.ParentPID, ProcessName = newProcess.ProcessName };
+                ProcessRecord newPR = new ProcessRecord() { ProcessId = newProcess.PID, CommandLine = newProcess.Process.CommandLine, CreateTime = DateTime.FromFileTimeUtc(newProcess.EventTime), ProcessPath = newProcess.Process.Path, ParentPidHash = newProcess.Process.ParentPidHash, PidHash = newProcess.PidHash, ParentProcessId = newProcess.Process.ParentPID, ProcessName = newProcess.ProcessName };
                 refreshSnapshot(newPR);
 
             }

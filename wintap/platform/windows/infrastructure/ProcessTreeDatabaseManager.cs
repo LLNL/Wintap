@@ -313,7 +313,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     ProcessId = processId,
                     ParentProcessId = parentProcessId,
                     ProcessName = processName ?? string.Empty,
-                    ImagePath = imagePath ?? string.Empty,
+                    ProcessPath = imagePath ?? string.Empty,
                     CommandLine = commandLine ?? string.Empty,
                     CreateTime = createTime,
                     IsActive = true,
