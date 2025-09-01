@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using WintapCoreSvcMgr.Database;
 
@@ -69,20 +70,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// <returns>ProcessRecord if found, null otherwise</returns>
         internal static ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime)
         {
+            eventTime = eventTime.ToUniversalTime();
             try
             {
-                // Lazy initialization of static database manager
-                if (_staticDbManager == null)
-                {
-                    lock (_lockObject)
-                    {
-                        if (_staticDbManager == null)
-                        {
-                            _staticDbManager = new BackupDatabaseManager();
-                        }
-                    }
-                }
-
                 using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
                 {
                     connection.Open();
@@ -349,13 +339,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
                 msg.ProcessPath = msg.Process.Path;
-                msg.Process.ParentPidHash = ResolveProcessAtTime(msg.PID, DateTime.FromFileTimeUtc(msg.EventTime)).ParentPidHash;
+                msg.Process.ParentPidHash = ResolveProcessAtTime(msg.Process.ParentPID, DateTime.FromFileTimeUtc(msg.EventTime)).PidHash;
 
                 PublishProcess(msg);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error handling process event from ETW: " + ex.Message, LogLevel.Debug);
+                WintapLogger.Log.Append("Error handling process event from ETW: " + ex.Message, LogLevel.Error);
             }
         }
 
@@ -394,12 +384,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     CreateTime = DateTime.FromFileTimeUtc(msg.EventTime),
                     //IsActive = msg.ActivityType != WintapMessage.ActivityTypeEnum.Stop,
                     Source = msg.ActivityType == WintapMessage.ActivityTypeEnum.Refresh ? "boot_trace" : "real_time",
-                    //UserName = msg.Process?.User,
+                    UserName = "Unknown",
                     //UniqueProcessKey = msg.Process?.UniqueProcessKey
                 };
 
                 // Store in database
-                //database.UpsertProcess(processRecord);
+                InsertProcessStart(processRecord);
 
                 // Publish to event stream for compatibility with existing pipeline
                 EventChannel.Send(msg);
@@ -407,6 +397,55 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error publishing process event: {ex.Message}", LogLevel.Error);
+            }
+        }
+
+        internal static bool InsertProcessStart(ProcessRecord process)
+        {
+            try
+            {
+                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
+                {
+                    connection.Open();
+                    // Helper methods (same as before)
+                    string EscapeString(string value)
+                    {
+                        if (value == null) return "NULL";
+                        return "'" + value.Replace("'", "''") + "'";
+                    }
+
+                    string EscapeDateTime(DateTime dateTime)
+                    {
+                        return "'" + dateTime.ToString("yyyy-MM-dd HH:mm:ss.fff") + "'";
+                    }
+
+                    var sql = $@"
+            INSERT OR REPLACE INTO live_processes (
+                pid_hash, parent_pid_hash, process_id, parent_process_id,
+                process_name, image_path, command_line, 
+                create_time, source, user_name
+            ) VALUES (
+                {EscapeString(process.PidHash)},
+                {EscapeString(process.ParentPidHash)},
+                {process.ProcessId},
+                {process.ParentProcessId},
+                {EscapeString(process.ProcessName)},
+                {EscapeString(process.ProcessPath)},
+                {EscapeString(process.CommandLine)},
+                {EscapeDateTime(process.CreateTime)},
+                {EscapeString(process.Source)},
+                {EscapeString(process.UserName)}
+            )";
+
+                    using var cmd = new DuckDBCommand(sql, connection);
+                    cmd.ExecuteNonQuery();
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to insert process start for {process.PidHash}: {ex.Message}", LogLevel.Error);
+                return false;
             }
         }
 
@@ -493,6 +532,40 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 WintapLogger.Log.Append($"Error retrieving database statistics: {ex.Message}", LogLevel.Error);
                 return new DatabaseStats();
+            }
+        }
+
+        internal static bool ProcessExistsForPid(int pid, long eventTime)
+        {
+            try
+            {
+                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
+                {
+                    connection.Open();
+
+                    // Convert FileTime to DateTime BEFORE formatting
+                    var eventDateTime = DateTime.FromFileTimeUtc(eventTime);
+
+                    // Add 2-second tolerance window for out-of-order ETW delivery
+                    var createTimeWindow = eventDateTime.AddSeconds(2);
+
+                    var sql = $@"
+            SELECT 1 FROM live_processes 
+            WHERE process_id = {pid} 
+            AND create_time <= '{createTimeWindow:yyyy-MM-dd HH:mm:ss}' 
+            AND (exit_time IS NULL OR exit_time > '{eventDateTime:yyyy-MM-dd HH:mm:ss}')
+            LIMIT 1";
+
+                    using var cmd = new DuckDBCommand(sql, connection);
+                    var result = cmd.ExecuteScalar();
+                    return result != null;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Database error checking process existence for PID {pid}: {ex.Message}", LogLevel.Error);
+                return false;
             }
         }
     }

@@ -157,14 +157,14 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 cmd.ExecuteNonQuery();
 
                 // Update the in-memory cache
-                if (process.IsActive)
-                {
-                    _activePidToPidHash[process.ProcessId] = process.PidHash;
-                }
-                else
-                {
-                    _activePidToPidHash.Remove(process.ProcessId);
-                }
+                //if (process.IsActive)
+                //{
+                //    _activePidToPidHash[process.ProcessId] = process.PidHash;
+                //}
+                //else
+                //{
+                //    _activePidToPidHash.Remove(process.ProcessId);
+                //}
 
                 return true;
             }

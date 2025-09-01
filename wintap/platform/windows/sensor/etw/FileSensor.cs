@@ -178,6 +178,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     correlationId = obj.PayloadStringByName("CorrelationId");
                 }
                 catch (Exception ex) { }
+                if (!String.IsNullOrEmpty(filePath))
+                {
+                    int i = 0;
+                }
                 sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Write, obj.IoSize, activityId, correlationId);
             }
             catch (Exception ex)

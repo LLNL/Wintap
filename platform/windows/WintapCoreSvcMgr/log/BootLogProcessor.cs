@@ -248,7 +248,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 }
 
                 // Create time from event timestamp
-                var createTime = eventRecord.TimeCreated ?? DateTime.UtcNow;
+                var createTime = eventRecord.TimeCreated.Value.ToUniversalTime();
 
                 // Generate PidHash (same algorithm as existing)
                 var pidHash = _processHash.GenPidHash(processId, createTime.ToFileTimeUtc());
@@ -374,13 +374,13 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             List<ProcessRecord> processRecords = new List<ProcessRecord>();
 
             // Add System Process (PID 4)  
-            processRecords.Add(CreateSystemProcess(4, "System", "", StateManager.MachineBootTime));
+            processRecords.Add(CreateSystemProcess(4, "System", Path.Combine(Environment.SystemDirectory, "ntoskrnl.exe"), StateManager.MachineBootTime.ToUniversalTime()));
 
             // Add System Idle Process (PID 0)
-            processRecords.Add(CreateSystemProcess(0, "System Idle Process", "", StateManager.MachineBootTime));
+            processRecords.Add(CreateSystemProcess(0, "System Idle Process", "idle", StateManager.MachineBootTime.ToUniversalTime()));
 
             // Add System Process (PID 4)  
-            processRecords.Add(CreateSystemProcess(-1, "Unknown", "", StateManager.MachineBootTime));
+            processRecords.Add(CreateSystemProcess(-1, "Unknown", "unknown", StateManager.MachineBootTime.ToUniversalTime()));
 
             LogInfo("Added system processes (PID 0 and 4)");
             return processRecords;
