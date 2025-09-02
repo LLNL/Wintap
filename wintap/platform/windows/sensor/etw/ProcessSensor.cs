@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
@@ -309,9 +310,192 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelParser.Instance.EtwParser.ProcessStart += Kernel_ProcessStart;
             //KernelParser.Instance.EtwParser.ProcessStop += Kernel_ProcessStop;
 
+            startSecurityLogMonitoring();
+
             WintapLogger.Log.Append("Process collection startup complete", LogLevel.Info);
             return true;
         }
+
+
+        /// <summary>
+        /// Start real-time Security log monitoring for Event ID 4688 (Process Creation)
+        /// </summary>
+        private void startSecurityLogMonitoring()
+        {
+            try
+            {
+                // Create query for Event ID 4688 (Process Creation) starting from now
+                string query = "*[System[EventID=4688 and TimeCreated[timediff(@SystemTime) <= 86400000]]]"; // Only events from last 24 hours to start
+
+                EventLogQuery eventQuery = new EventLogQuery("Security", PathType.LogName, query);
+                EventLogWatcher securityLogWatcher = new EventLogWatcher(eventQuery);
+
+                // Set up event handler
+                securityLogWatcher.EventRecordWritten += SecurityLogWatcher_EventRecordWritten;
+
+                // Enable real-time monitoring
+                securityLogWatcher.Enabled = true;
+
+                WintapLogger.Log.Append("Real-time Security log monitoring started successfully", LogLevel.Info);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                WintapLogger.Log.Append($"Access denied to Security log - Security log monitoring disabled: {ex.Message}", LogLevel.Warn);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to start Security log monitoring: {ex.Message}", LogLevel.Error);
+            }
+        }
+
+        /// Handle real-time Security log events (Event ID 4688 - Process Creation)
+        /// </summary>
+        private void SecurityLogWatcher_EventRecordWritten(object sender, EventRecordWrittenEventArgs e)
+        {
+            try
+            {
+                if (e.EventRecord?.Id == 4688) // Process Creation
+                {
+                    // Process the security log event
+                    ProcessSecurityLogEvent(e.EventRecord);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error processing real-time Security log event: {ex.Message}", LogLevel.Debug);
+            }
+        }
+
+        /// <summary>
+        /// Process a Security log Event ID 4688 and convert to WintapMessage
+        /// </summary>
+        private void ProcessSecurityLogEvent(EventRecord eventRecord)
+        {
+            try
+            {
+                // Extract process information from Security log event
+                var processInfo = ExtractProcessInfoFromSecurityEvent(eventRecord);
+                if (processInfo == null)
+                {
+                    WintapLogger.Log.Append("Failed to extract process info from Security log event", LogLevel.Debug);
+                    return;
+                }
+
+                // Create WintapMessage
+                var wintapMessage = new WintapMessage(processInfo.CreateTime.ToUniversalTime(), processInfo.ProcessId, WintapMessage.MessageTypeEnum.Process)
+                {
+                    EventTime = eventRecord.TimeCreated?.ToFileTimeUtc() ?? DateTime.UtcNow.ToFileTimeUtc(),
+                    MessageType = WintapMessage.MessageTypeEnum.Process,
+                    ActivityType = WintapMessage.ActivityTypeEnum.Start,
+                    PID = processInfo.ProcessId,
+                    PidHash = processHash.GenPidHash(processInfo.ProcessId, processInfo.CreateTime.ToFileTimeUtc()),
+                    ProcessName = processInfo.ProcessName,
+                    ProcessPath = processInfo.ImagePath,
+                    Process = new gov.llnl.wintap.collect.models.WintapMessage.ProcessObject
+                    {
+                        PID = processInfo.ProcessId,
+                        ParentPID = processInfo.ParentProcessId,
+                        Name = processInfo.ProcessName,
+                        Path = processInfo.ImagePath,
+                        CommandLine = processInfo.CommandLine,
+                        //User = processInfo.UserName,
+                    }
+                };
+                WintapLogger.Log.Append($"Sourcing Process record from security log subscription on pid: ${wintapMessage.PID}  name: ${wintapMessage.ProcessName}", LogLevel.Info);
+                PublishProcess(wintapMessage);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error processing Security log process event: {ex.Message}", LogLevel.Warn);
+            }
+        }
+
+        /// Extract process information from Security log Event ID 4688
+        /// </summary>
+        private ProcessInfo ExtractProcessInfoFromSecurityEvent(EventRecord eventRecord)
+        {
+            try
+            {
+                var processInfo = new ProcessInfo();
+
+                // Parse XML data from the event record
+                if (eventRecord.ToXml() != null)
+                {
+                    var xmlDoc = new System.Xml.XmlDocument();
+                    xmlDoc.LoadXml(eventRecord.ToXml());
+                    var nsmgr = new System.Xml.XmlNamespaceManager(xmlDoc.NameTable);
+                    nsmgr.AddNamespace("ns", "http://schemas.microsoft.com/win/2004/08/events/event");
+
+                    // Extract key fields from Event Data
+                    var dataNodes = xmlDoc.SelectNodes("//ns:Data", nsmgr);
+                    foreach (System.Xml.XmlNode node in dataNodes)
+                    {
+                        var name = node.Attributes?["Name"]?.Value;
+                        var value = node.InnerText;
+
+                        switch (name)
+                        {
+                            case "NewProcessId":
+                                if (value.StartsWith("0x"))
+                                    processInfo.ProcessId = Convert.ToInt32(value, 16);
+                                else
+                                    processInfo.ProcessId = Convert.ToInt32(value);
+                                break;
+                            case "ProcessId":
+                                if (value.StartsWith("0x"))
+                                    processInfo.ParentProcessId = Convert.ToInt32(value, 16);
+                                else
+                                    processInfo.ParentProcessId = Convert.ToInt32(value);
+                                break;
+                            case "NewProcessName":
+                                processInfo.ImagePath = value;
+                                processInfo.ProcessName = System.IO.Path.GetFileName(value);
+                                break;
+                            case "CommandLine":
+                                processInfo.CommandLine = value;
+                                break;
+                            case "SubjectUserName":
+                                processInfo.UserName = value;
+                                break;
+                            case "SubjectDomainName":
+                                if (!string.IsNullOrEmpty(value) && value != "-")
+                                    processInfo.UserName = $"{value}\\{processInfo.UserName}";
+                                break;
+                        }
+                    }
+
+                    // Use event creation time as process creation time
+                    processInfo.CreateTime = eventRecord.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow;
+                }
+
+                // Validate we have minimum required info
+                if (processInfo.ProcessId > 0 && !string.IsNullOrEmpty(processInfo.ProcessName))
+                {
+                    return processInfo;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error extracting process info from Security event: {ex.Message}", LogLevel.Debug);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Helper class for process information extraction
+        /// </summary>
+        private class ProcessInfo
+        {
+            public int ProcessId { get; set; }
+            public int ParentProcessId { get; set; }
+            public string ProcessName { get; set; }
+            public string ImagePath { get; set; }
+            public string CommandLine { get; set; }
+            public string UserName { get; set; }
+            public DateTime CreateTime { get; set; }
+        }
+
 
         private void ProcessTreeWorker_DoWork(object sender, DoWorkEventArgs e)
         {
@@ -342,7 +526,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 ProcessRecord parentProcess = ResolveProcessAtTime(msg.Process.ParentPID, DateTime.FromFileTimeUtc(msg.EventTime));
                 msg.Process.ParentPidHash = parentProcess.PidHash;
                 msg.Process.ParentProcessName = parentProcess.ProcessName;
-              PublishProcess(msg);
+                PublishProcess(msg);
             }
             catch (Exception ex)
             {
