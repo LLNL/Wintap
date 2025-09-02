@@ -339,9 +339,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 msg.ReceiveTime = msg.EventTime;
                 msg.ProcessName = msg.Process.Name;
                 msg.ProcessPath = msg.Process.Path;
-                msg.Process.ParentPidHash = ResolveProcessAtTime(msg.Process.ParentPID, DateTime.FromFileTimeUtc(msg.EventTime)).PidHash;
-
-                PublishProcess(msg);
+                ProcessRecord parentProcess = ResolveProcessAtTime(msg.Process.ParentPID, DateTime.FromFileTimeUtc(msg.EventTime));
+                msg.Process.ParentPidHash = parentProcess.PidHash;
+                msg.Process.ParentProcessName = parentProcess.ProcessName;
+              PublishProcess(msg);
             }
             catch (Exception ex)
             {
@@ -558,6 +559,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
                     using var cmd = new DuckDBCommand(sql, connection);
                     var result = cmd.ExecuteScalar();
+                    if(result == null)
+                    {
+                        int i = 0;
+                    }
                     return result != null;
                 }
 

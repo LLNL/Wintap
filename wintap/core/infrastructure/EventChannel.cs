@@ -194,20 +194,32 @@ namespace gov.llnl.wintap.core.infrastructure
                     return;
                 }
                 streamedEvent.AgentId = StateManager.AgentId.ToString();
-                ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
-                streamedEvent.PidHash = ownerProcess.PidHash;
-                if (streamedEvent.ProcessName != null)
+                if(streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
                 {
-                    if (streamedEvent.ProcessName.ToLower() != ownerProcess.ProcessName.ToLower())
+                    ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                    streamedEvent.PidHash = ownerProcess.PidHash;
+                    if (streamedEvent.ProcessName != null)
                     {
-                        WintapLogger.Log.Append($"Process owner mismatch, processname on event is {streamedEvent.ProcessName} but processname pulled from DB is {ownerProcess.ProcessName}, overriding native event value to match DB", LogLevel.Error);
+                        if (streamedEvent.ProcessName.ToLower() != ownerProcess.ProcessName.ToLower())
+                        {
+                            WintapLogger.Log.Append($"Process owner mismatch, processname on event is {streamedEvent.ProcessName} but processname pulled from DB is {ownerProcess.ProcessName}, overriding native event value to match DB", LogLevel.Error);
+                            streamedEvent.ProcessName = ownerProcess.ProcessName;
+                        }
+                    }
+                    else
+                    {
                         streamedEvent.ProcessName = ownerProcess.ProcessName;
                     }
                 }
                 else
                 {
-                    streamedEvent.ProcessName = ownerProcess.ProcessName;
+                    ProcessRecord parentProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.Process.ParentPID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                    streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
+                    streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
                 }
+                    
+
+                
                 EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
             }
             catch (Exception ex)

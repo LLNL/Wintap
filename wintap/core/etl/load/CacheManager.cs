@@ -397,19 +397,26 @@ namespace gov.llnl.wintap.core.etl.load
                 // Get the list of files in cache, ordered by creation time ascending (oldest first).
                 IOrderedEnumerable<FileInfo> cacheFiles = mergeDir.GetFiles().OrderBy(f => f.CreationTime);
 
-                // Iterate files and delete them until the cache is below the maximum size.
-                foreach (FileInfo fi in cacheFiles)
+                // Iterate parquet files and delete them until the cache is below the maximum size.
+                foreach (FileInfo fi in cacheFiles.Where(f => f.Extension.ToLower().Contains("parquet")))
                 {
-                    if (currentSizeBytes <= maxCacheSizeBytes)
+                    try
                     {
-                        // Stop once we’re within the size limit.
-                        break;
-                    }
+                        // be optimistic and update the size ahead of the delete
+                        currentSizeBytes -= fi.Length;
+                        if (currentSizeBytes <= maxCacheSizeBytes)
+                        {
+                            // Stop once we’re within the size limit.
+                            break;
+                        }
 
-                    fi.Delete();
-                    // If file deletion was successful, subtract its length from the current total.
-                    currentSizeBytes -= fi.Length;
-                    WintapLogger.Log.Append("Deleted file: " + fi.FullName + " (" + fi.Length + " bytes).", LogLevel.Debug);
+                        fi.Delete();
+                        WintapLogger.Log.Append($"Deleted file: " + fi.FullName + " (" + fi.Length + $" bytes).  new size of merged: {currentSizeBytes}", LogLevel.Info);
+                    }
+                    catch(Exception ex)
+                    {
+                        WintapLogger.Log.Append($"could not delete file {fi.Name}  reason: {ex.Message} ", LogLevel.Warn);
+                    }
                 }
 
                 WintapLogger.Log.Append("Prune complete, new cache size (estimated): " + currentSizeBytes, LogLevel.Info);
