@@ -5,11 +5,13 @@ using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Etlx;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Management;
 using System.Xml;
 using WintapCoreSvcMgr.Database;
+using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
 
 namespace gov.llnl.wintap
 {
@@ -31,16 +33,16 @@ namespace gov.llnl.wintap
         {
             backupDbManager = new BackupDatabaseManager();
 
-            //if (args.Length == 0)
-            //{
-            //    WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
-            //    return 1;
-            //}
+            if (args.Length == 0)
+            {
+                WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
+                return 1;
+            }
 
-            //var command = args[0].ToUpperInvariant();
-            //WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
+            var command = args[0].ToUpperInvariant();
+            WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
 
-            string command = "RECOVER_DATABASE";
+            //string command = "RECOVER_DATABASE";
 
             int exitCode = ProcessCommand(command);
 
@@ -55,6 +57,7 @@ namespace gov.llnl.wintap
             {
                 //"COMPACT_BACKUP_DB" => CompactBackupDb(),
                 "RECOVER_DATABASE" => RecoverDB().Result,
+                "RUNDOWN" => DoETWRundown().Result,
                 "HELP" or "/?" => ShowUsage(),
                 _ => ShowUsage()
             };
@@ -76,6 +79,26 @@ namespace gov.llnl.wintap
             Console.WriteLine("  WintapCoreSvcMgr.exe RECOVER_DATABASE");
 
             return 0;
+        }
+
+        private async static Task<int> DoETWRundown()
+        {
+            int returnCode = 0;
+            WintapLogger.Log.Append("Starting ETW file event rundown", core.infrastructure.LogLevel.Info);
+            string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap7\\etl\\kernelrundown.etl";
+            using (var session = new TraceEventSession("NT Kernel Logger", etlFilePath))
+            {
+                session.EnableKernelProvider(KernelTraceEventParser.Keywords.DiskIO |
+                                             KernelTraceEventParser.Keywords.DiskFileIO |
+                                             KernelTraceEventParser.Keywords.DiskIOInit |
+                                             KernelTraceEventParser.Keywords.FileIO |
+                                             KernelTraceEventParser.Keywords.FileIOInit);
+
+                // ETW emits rundown events at session stop, so we only need a brief duration
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+            }
+            WintapLogger.Log.Append("Rundown complete.  ETL File Path: " + etlFilePath, core.infrastructure.LogLevel.Info);
+            return returnCode;
         }
 
         private async static Task<int> RecoverDB()

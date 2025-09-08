@@ -13,6 +13,7 @@ using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
@@ -35,11 +36,27 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIOInit;
             fileKeyToPath = new ConcurrentDictionary<ulong, string>();
 
+        }
+
+        public bool Start()
+        {
+            base.Start();
+
+            KernelParser.Instance.EtwParser.FileIOWrite += Kernel_FileIoWrite;
+            KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
+            KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
+            KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
+            KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
+            if (Properties.Settings.Default.CollectFileRead)
+            {
+                KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
+            }
+
             WintapLogger.Log.Append("Processing rundown trace", LogLevel.Info);
             // TODO: make relative to assembly path
             string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap7\\etl\\kernelrundown.etl";
             FileInfo rundownInfo = new FileInfo(etlFilePath);
-            if(rundownInfo.Exists)
+            if (rundownInfo.Exists)
             {
                 WintapLogger.Log.Append("processing rundown trace", LogLevel.Info);
                 int counter = 0;
@@ -63,20 +80,16 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 WintapLogger.Log.Append("No file rundown ETL found.  File events may not always contaihn a path for this session.", LogLevel.Warn);
             }
 
-        }
+            WintapLogger.Log.Append("Doing ETW event rundown", LogLevel.Always);
+            ProcessStartInfo rundownPsi = new ProcessStartInfo();
+            rundownPsi.FileName = Strings.FileRootPath + "\\WintapCoreSvcMgr.exe";
+            rundownPsi.Arguments = "RUNDOWN";
+            System.Diagnostics.Process rundown = new Process();
+            rundown.StartInfo = rundownPsi;
+            rundown.Start();
+            rundown.WaitForExit();
+            WintapLogger.Log.Append("ETW Rundown complete", LogLevel.Always);
 
-        public bool Start()
-        {
-            base.Start();
-            KernelParser.Instance.EtwParser.FileIOWrite += Kernel_FileIoWrite;
-            KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
-            KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
-            KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
-            KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
-            if (Properties.Settings.Default.CollectFileRead)
-            {
-                KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
-            }
             return true;
         }
 

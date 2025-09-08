@@ -107,7 +107,7 @@ Using the successful run’s sequence as a benchmark, infer which event should hav
                 var chatOptions = new ChatOptions
                 {
                     Tools = [.. tools], // Make MCP tools available to the model
-                    Temperature = 0.0f,
+                    Temperature = 1.0f,
                     // Remove AllowMultipleToolCalls entirely
                     ToolMode = ChatToolMode.Auto
                 };
@@ -118,7 +118,8 @@ Using the successful run’s sequence as a benchmark, infer which event should hav
                 }
                 chatOptions.AdditionalProperties["disabled_params"] = new Dictionary<string, object>
                 {
-                    ["parallel_tool_calls"] = null
+                    ["parallel_tool_calls"] = null,
+                    ["reasnong_effort"] = "low"
                 };
 
                 var response = await chatClient.GetResponseAsync(

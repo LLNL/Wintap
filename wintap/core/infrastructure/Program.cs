@@ -132,7 +132,7 @@ try
 
     ApiKeyCredential cred = new ApiKeyCredential(key!);
     //var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("o3-mini");
-    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4.1");
+    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-5");
 
 
     // Create a sampling client.
