@@ -526,6 +526,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 ProcessRecord parentProcess = ResolveProcessAtTime(msg.Process.ParentPID, DateTime.FromFileTimeUtc(msg.EventTime));
                 msg.Process.ParentPidHash = parentProcess.PidHash;
                 msg.Process.ParentProcessName = parentProcess.ProcessName;
+                WintapLogger.Log.Append($"Sourcing Process record from ETW on pid: ${msg.PID}  name: ${msg.ProcessName}", LogLevel.Info);
                 PublishProcess(msg);
             }
             catch (Exception ex)

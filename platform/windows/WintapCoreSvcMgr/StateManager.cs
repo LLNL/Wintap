@@ -5,17 +5,8 @@
  */
 
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Management;
-using Microsoft.Win32;
-using System.Diagnostics;
-using System.Collections.Concurrent;
 using gov.llnl.wintap.core.infrastructure;
-using System.Net.NetworkInformation;
-using System.IO;
-using System.Runtime.InteropServices;
 using Newtonsoft.Json;
 
 namespace gov.llnl.wintap.core.shared

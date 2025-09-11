@@ -34,14 +34,22 @@ namespace WintapCoreSvcMgr.Database
         private const string MAIN_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\main.duckdb";
         private const string MINI_TRACE_ETL_PATH = @"C:\ProgramData\Wintap\ProcessTrace\mini-trace.etl";
         private const string BOOT_TRACE_ETL_PATH = @"C:\ProgramData\Wintap\BootTrace\boot-trace.etl";
+        private string DB_PATH;
         private DuckDBConnection _connection;
 
         // In-memory cache for fast PID-to-PidHash resolution
         private readonly Dictionary<int, string> _activePidToPidHash = new();
         private readonly object _cacheLock = new object();
 
-        public BackupDatabaseManager()
+        public enum DatabaseTargetEnum { MAIN, RECOVERY }
+
+        public BackupDatabaseManager(DatabaseTargetEnum target)
         {
+            DB_PATH = MAIN_DB_PATH;
+            if (target == DatabaseTargetEnum.RECOVERY)
+            {
+                DB_PATH = RECOVERY_DB_PATH;
+            }
             _ = StateManager.AgentId; // This triggers StateManager initialization
 
             _processHash = new ProcessHash();
@@ -235,7 +243,7 @@ namespace WintapCoreSvcMgr.Database
         {
             try
             {
-                _connection = new DuckDBConnection($"Data Source={RECOVERY_DB_PATH}");
+                _connection = new DuckDBConnection($"Data Source={DB_PATH}");
                 _connection.Open();
 
                 var createProcessTable = @"
@@ -273,7 +281,7 @@ namespace WintapCoreSvcMgr.Database
 
                 ExecuteNonQuery(createProcessTable);
                 ExecuteNonQuery(createIndexes);
-                LogInfo("Backup database initialized successfully");
+                LogInfo($"Backup database initialized successfully for: {DB_PATH}");
             }
             catch (Exception ex)
             {

@@ -116,7 +116,7 @@ Using the successful run’s sequence as a benchmark, infer which event should hav
                 {
                     chatOptions.AdditionalProperties = new AdditionalPropertiesDictionary()
                     {
-                        ["reasoning_effort"] = "low"  // Set to desired level: minimal, low, medium, or high
+                        ["reasoning_effort"] = "minimal"  // Set to desired level: minimal, low, medium, or high
                     };
                 }
                 chatOptions.AdditionalProperties["disabled_params"] = new Dictionary<string, object>

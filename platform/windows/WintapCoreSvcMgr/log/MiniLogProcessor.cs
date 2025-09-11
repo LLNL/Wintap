@@ -58,7 +58,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
             _lastProcessedEventTime = _database.GetLatestRecord();
 
-            LogInfo("MiniLogProcessor initialized with Security Log backend");
+            LogInfo($"MiniLogProcessor initialized with Security Log backend, most recent process in DB: {_lastProcessedEventTime}");
         }
 
         #region Real-time Monitoring Interface (replaces MiniTraceETWSession)

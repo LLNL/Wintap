@@ -1,15 +1,8 @@
-﻿using DuckDB.NET.Data;
-using gov.llnl.wintap.core.infrastructure;
+﻿using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.platform.windows.infrastructure;
-using Microsoft.Diagnostics.Tracing;
-using Microsoft.Diagnostics.Tracing.Etlx;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
-using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
-using System.Management;
-using System.Xml;
 using WintapCoreSvcMgr.Database;
 using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
 
@@ -31,7 +24,6 @@ namespace gov.llnl.wintap
 
         public static int Main(string[] args)
         {
-            backupDbManager = new BackupDatabaseManager();
 
             if (args.Length == 0)
             {
@@ -43,6 +35,13 @@ namespace gov.llnl.wintap
             WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
 
             //string command = "RECOVER_DATABASE";
+
+            BackupDatabaseManager.DatabaseTargetEnum target = BackupDatabaseManager.DatabaseTargetEnum.RECOVERY;
+            if(command.ToLower().Contains("process_minitrace"))
+            {
+                target = BackupDatabaseManager.DatabaseTargetEnum.RECOVERY;
+            }
+            backupDbManager = new BackupDatabaseManager(target);
 
             int exitCode = ProcessCommand(command);
 
@@ -56,11 +55,19 @@ namespace gov.llnl.wintap
             return command switch
             {
                 //"COMPACT_BACKUP_DB" => CompactBackupDb(),
-                "RECOVER_DATABASE" => RecoverDB().Result,
+                "RECOVER_DATABASE" => RecoverDB().Result,  // only called by Wintap on startup
+                "PROCESS_MINITRACE" => ProcessMiniTrace().Result, // only called by scheduled task to update recovery
                 "RUNDOWN" => DoETWRundown().Result,
                 "HELP" or "/?" => ShowUsage(),
                 _ => ShowUsage()
             };
+        }
+
+        private async static Task<int> ProcessMiniTrace()
+        {
+            MiniLogProcessor miniLogProcessor = new MiniLogProcessor(backupDbManager);
+            await miniLogProcessor.ProcessEventsSinceLastCheckpoint();
+            return 0;
         }
 
         // Also update your ShowUsage method to include the new commands:
@@ -123,7 +130,7 @@ namespace gov.llnl.wintap
             {
                 WintapLogger.Log.Append("Process tree root not found in DB.  Attempting complete process tree rebuild and reset of recovery database", LogLevel.Info);
                 backupDbManager.DeleteRecoveryDb();
-                backupDbManager = new BackupDatabaseManager();
+                backupDbManager = new BackupDatabaseManager(BackupDatabaseManager.DatabaseTargetEnum.MAIN);
                 // Process existing boot trace
                 BootLogProcessor btp = new BootLogProcessor(backupDbManager);
                 var bootTraceResult = btp.ProcessBootTraceAsync().Result;
