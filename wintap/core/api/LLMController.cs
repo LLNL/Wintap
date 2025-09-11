@@ -114,13 +114,16 @@ Using the successful run’s sequence as a benchmark, infer which event should hav
 
                 if (chatOptions.AdditionalProperties == null)
                 {
-                    chatOptions.AdditionalProperties = new AdditionalPropertiesDictionary();
+                    chatOptions.AdditionalProperties = new AdditionalPropertiesDictionary()
+                    {
+                        ["reasoning_effort"] = "low"  // Set to desired level: minimal, low, medium, or high
+                    };
                 }
                 chatOptions.AdditionalProperties["disabled_params"] = new Dictionary<string, object>
                 {
-                    ["parallel_tool_calls"] = null,
-                    ["reasnong_effort"] = "low"
+                    ["parallel_tool_calls"] = null
                 };
+
 
                 var response = await chatClient.GetResponseAsync(
                     chatHistory,
