@@ -16,7 +16,7 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
             List<BaseSensor> baseSensors = new List<BaseSensor>();
             ProcessSensor pc = new ProcessSensor();
             pc.Start();
-            SysdigCollector sysdig = new SysdigCollector(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "Sysdig", "ygm-class-long-99.json"));
+            SysdigSensor sysdig = new SysdigSensor(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "Sysdig", "ygm-class-long-99.json"));
             sysdig.Start();
             baseSensors.Add(pc);
             baseSensors.Add(sysdig);

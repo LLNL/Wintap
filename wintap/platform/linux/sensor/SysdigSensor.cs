@@ -13,7 +13,7 @@ using gov.llnl.wintap.core.etl.shared;
 
 namespace gov.llnl.wintap.core.collect
 {
-    internal class SysdigCollector : BaseSensor
+    internal class SysdigSensor : BaseSensor
     {
         private FileInfo jsonInfo;
         private long currentEventNum;
@@ -22,7 +22,7 @@ namespace gov.llnl.wintap.core.collect
         /// Path to the local json file containing the sysdig data
         /// </summary>
         /// <param name="jsonFile"></param>
-        internal SysdigCollector(string jsonFile)
+        internal SysdigSensor(string jsonFile)
         {
             jsonInfo = new FileInfo(jsonFile);
             currentEventNum = 0;
