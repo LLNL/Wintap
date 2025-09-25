@@ -12,7 +12,7 @@ namespace gov.llnl.wintap.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.13.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.14.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -326,38 +326,25 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0.7")]
-        public float MinRelevance {
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string AiApiUrl {
             get {
-                return ((float)(this["MinRelevance"]));
+                return ((string)(this["AiApiUrl"]));
             }
             set {
-                this["MinRelevance"] = value;
+                this["AiApiUrl"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("You are an AI assistant that analyzes and interprets host-based Windows telemetry" +
-            " and offers guidance to improve performance and security of the system.")]
-        public string SystemPrompt {
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string AiApiKey {
             get {
-                return ((string)(this["SystemPrompt"]));
+                return ((string)(this["AiApiKey"]));
             }
             set {
-                this["SystemPrompt"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("phi3")]
-        public string ModelId {
-            get {
-                return ((string)(this["ModelId"]));
-            }
-            set {
-                this["ModelId"] = value;
+                this["AiApiKey"] = value;
             }
         }
     }

@@ -33,8 +33,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Wintap.png = Wintap.png
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Wintap-Workbench", "Wintap-Workbench", "{66763ED6-F638-4936-A82B-ADAB21030A27}"
-EndProject
 Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench", "Wintap-Workbench\", "{18ED5F1A-4D5F-482F-AAFF-05D52C35C84A}"
 	ProjectSection(WebsiteProperties) = preProject
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
@@ -65,6 +63,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Signals", "Signals\Signals.csproj", "{5CA163CC-5F85-4652-9CAB-FE17EB478F3F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapCoreSvcMgr", "platform\windows\WintapCoreSvcMgr\WintapCoreSvcMgr.csproj", "{81FBD822-2DC1-2331-8CA9-BC480052207F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "mcp", "mcp", "{08E106AB-B8F1-4929-A42E-9DD182949CA2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wintap_mcp_server", "mcp\wintap_mcp_server\wintap_mcp_server.csproj", "{3AF04818-F981-487B-803E-EBB3ADDAD774}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -261,6 +263,22 @@ Global
 		{81FBD822-2DC1-2331-8CA9-BC480052207F}.Release|x64.Build.0 = Release|Any CPU
 		{81FBD822-2DC1-2331-8CA9-BC480052207F}.Release|x86.ActiveCfg = Release|Any CPU
 		{81FBD822-2DC1-2331-8CA9-BC480052207F}.Release|x86.Build.0 = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|x64.Build.0 = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Debug|x86.Build.0 = Debug|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|ARM64.Build.0 = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|x64.ActiveCfg = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|x64.Build.0 = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|x86.ActiveCfg = Release|Any CPU
+		{3AF04818-F981-487B-803E-EBB3ADDAD774}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -278,6 +296,7 @@ Global
 		{8FC32DE9-BC64-4655-ABBA-ECF721390BC1} = {D3644633-5670-4050-8E1D-465A966F45E1}
 		{5CA163CC-5F85-4652-9CAB-FE17EB478F3F} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{81FBD822-2DC1-2331-8CA9-BC480052207F} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
+		{3AF04818-F981-487B-803E-EBB3ADDAD774} = {08E106AB-B8F1-4929-A42E-9DD182949CA2}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B820FE25-5EEE-4E31-A6AE-C417551BE27C}

@@ -32,6 +32,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -113,34 +114,58 @@ WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 IMcpClient mcpClient;
 try
 {
-    mcpClient = await McpClientFactory.CreateAsync(
-    new StdioClientTransport(new()
-    {
-        Command = "C:\\Repos\\BCB-AI\\ai_mcp_server\\bin\\debug\\net8.0\\ai_mcp_server.exe",
-        Arguments = [],
-        Name = "ai_mcp_server",
-    })
-);
-    // Connect to an MCP server
-    Console.WriteLine("Connecting client to MCP server");
+    string fileRootPath = Strings.FileRootPath;
+    string exeName;
 
+    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+    {
+        exeName = "wintap_mcp_server.exe";
+    }
+    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
+             RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+    {
+        exeName = "wintap_mcp_server"; // No .exe extension
+    }
+    else
+    {
+        throw new PlatformNotSupportedException("Unsupported OS");
+    }
+
+    string commandPath = Path.Combine(fileRootPath, "mcp", exeName);
+
+    mcpClient = await McpClientFactory.CreateAsync(
+        new StdioClientTransport(new()
+        {
+            Command = commandPath,
+            Arguments = [],
+            Name = "ai_mcp_server",
+        })
+    );
+
+    // Connect to an MCP server
+    WintapLogger.Log.Append("Connecting client to MCP Server", LogLevel.Info);
+
+    string ai_url = Settings.Default.AiApiUrl;
+    WintapLogger.Log.Append($"URL to MCP Server: {ai_url}", LogLevel.Info);
     OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
     openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api.llnl.gov/v1")};
+    //openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri(ai_url) };
 
     string? key = "";
-    key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
+    // key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
+    key = Settings.Default.AiApiKey;
 
     ApiKeyCredential cred = new ApiKeyCredential(key!);
-    //var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("o3-mini");
     var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-5-mini");
 
-
+    WintapLogger.Log.Append("Creating chat client", LogLevel.Info);
     // Create a sampling client.
     using IChatClient chatClient = openAIClient.AsIChatClient()
         .AsBuilder()
         .UseFunctionInvocation()
         .Build();
 
+    WintapLogger.Log.Append("Reading system prompt", LogLevel.Info);
     List<ChatMessage> chatHistory = [
         new ChatMessage(ChatRole.System, System.IO.File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),
     ];
@@ -148,6 +173,7 @@ try
 
     builder.Services.AddSingleton<IMcpClient>(mcpClient);
     builder.Services.AddSingleton(chatClient);
+    WintapLogger.Log.Append("Done with MCP setup", LogLevel.Info);
 }
 catch(Exception ex)
 {

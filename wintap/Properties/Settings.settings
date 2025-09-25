@@ -78,14 +78,11 @@
     <Setting Name="MemoryMapSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MinRelevance" Type="System.Single" Scope="User">
-      <Value Profile="(Default)">0.7</Value>
+    <Setting Name="AiApiUrl" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
     </Setting>
-    <Setting Name="SystemPrompt" Type="System.String" Scope="User">
-      <Value Profile="(Default)">You are an AI assistant that analyzes and interprets host-based Windows telemetry and offers guidance to improve performance and security of the system.</Value>
-    </Setting>
-    <Setting Name="ModelId" Type="System.String" Scope="User">
-      <Value Profile="(Default)">phi3</Value>
+    <Setting Name="AiApiKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
     </Setting>
   </Settings>
 </SettingsFile>
