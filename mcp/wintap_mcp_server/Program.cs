@@ -19,9 +19,6 @@ builder.Logging.AddConsole(consoleLogOptions =>
     consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
 });
 
-HashSet<string> subscriptions = [];
-var _minimumLoggingLevel = LoggingLevel.Debug;
-
 DuckDBManager.Initialize();
 
 Logit.Instance.Append("MCP Server is creating services", LogVerboseLevel.Normal);
@@ -29,44 +26,7 @@ Logit.Instance.Append("MCP Server is creating services", LogVerboseLevel.Normal)
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
-    .WithTools<mcp_tools>()
-    .WithSubscribeToResourcesHandler(async (ctx, ct) =>
-    {
-        var uri = ctx.Params?.Uri;
-
-        if (uri is not null)
-        {
-            subscriptions.Add(uri);
-
-            await ctx.Server.SampleAsync([
-                new ChatMessage(ChatRole.System, "You are a helpful test server"),
-                new ChatMessage(ChatRole.User, $"Resource {uri}, context: A new subscription was started"),
-            ],
-            options: new ChatOptions
-            {
-                MaxOutputTokens = 100,
-                Temperature = 0.7f,
-            },
-            cancellationToken: ct);
-        }
-
-        return new EmptyResult();
-    })
-    .WithUnsubscribeFromResourcesHandler(async (ctx, ct) =>
-    {
-        var uri = ctx.Params?.Uri;
-        if (uri is not null)
-        {
-            subscriptions.Remove(uri);
-        }
-        return new EmptyResult();
-    });
-
-builder.Services.AddSingleton(subscriptions);
-builder.Services.AddHostedService<SubscriptionMessageSender>();
-builder.Services.AddHostedService<LoggingUpdateMessageSender>();
-
-builder.Services.AddSingleton<Func<LoggingLevel>>(_ => () => _minimumLoggingLevel);
+    .WithTools<mcp_tools>();
 
 Logit.Instance.Append("MCP Server is started", LogVerboseLevel.Normal);
 

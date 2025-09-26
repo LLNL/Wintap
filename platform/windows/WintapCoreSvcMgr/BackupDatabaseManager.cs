@@ -598,10 +598,10 @@ namespace WintapCoreSvcMgr.Database
                 var uptimeMs = Environment.TickCount64;
                 var uptime = TimeSpan.FromMilliseconds(uptimeMs);
                 var bootTime = DateTime.Now.Subtract(uptime);
-                bootTime = bootTime.AddSeconds(-2); // loosen up the precision - TickCount64 is actually a few ticks AFTER ntoskrnl start 
+                bootTime = bootTime.AddSeconds(-2).ToUniversalTime(); // loosen up the precision - TickCount64 is actually a few ticks AFTER ntoskrnl start 
 
                 // Define reasonable timeframe for system boot
-                var bootProcessWindowEnd = bootTime.AddSeconds(60);
+                var bootProcessWindowEnd = bootTime.AddSeconds(60).ToUniversalTime();
 
                 WintapLogger.Log.Append($"!! Looking for SYSTEM process between boot start: {bootTime} and boot windows end: {bootProcessWindowEnd}", LogLevel.Info);
 
@@ -755,8 +755,8 @@ namespace WintapCoreSvcMgr.Database
             var countSql = "SELECT create_time FROM live_processes ORDER BY create_time DESC LIMIT 1";
             using var countCmd = new DuckDBCommand(countSql, _connection);
             DateTime mostRecentProcessTime = DateTime.Parse(countCmd.ExecuteScalar().ToString());
-            Console.WriteLine($"Most recent process create time: {mostRecentProcessTime}");
-            return mostRecentProcessTime;
+            Console.WriteLine($"Most recent process create time: {mostRecentProcessTime.ToUniversalTime()}");
+            return mostRecentProcessTime.ToUniversalTime();
         }
 
         internal string GetParentPidHash(int pid, string processName)
