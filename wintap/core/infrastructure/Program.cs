@@ -148,8 +148,8 @@ try
     string ai_url = Settings.Default.AiApiUrl;
     WintapLogger.Log.Append($"URL to MCP Server: {ai_url}", LogLevel.Info);
     OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
-    openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api.llnl.gov/v1")};
-    //openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri(ai_url) };
+    //openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api.llnl.gov/v1")};
+    openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri(ai_url) };
 
     string? key = "";
     // key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
@@ -180,7 +180,7 @@ catch(Exception ex)
     WintapLogger.Log.Append($"Error loading MCP Client: {ex.Message}", LogLevel.Error);
 }
 
-
+WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
 FileInfo mainDBInfo = new FileInfo(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb"));
 mainDBInfo.Delete();
 mainDBInfo = new FileInfo(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
@@ -189,6 +189,7 @@ mainDBInfo.Delete();
 CallDatabaseRecovery();
 
 // Configuration for Windows Service and Hosted Service
+WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
 builder.Services.AddWindowsService();
 builder.Services.AddHostedService<WinTapSvc>();
 
@@ -197,6 +198,7 @@ builder.Services.AddHostedService<WinTapSvc>();
 
 builder.Services.AddSignalR();
 
+WintapLogger.Log.Append("Building app container", LogLevel.Info);
 var app = builder.Build();
 // make available as singleton 
 ServiceProviderAccessor.Services = app.Services;
@@ -218,6 +220,7 @@ app.MapControllers();  // This will map the routes to the API controllers
 //    }
 //});
 
+WintapLogger.Log.Append("setting up API endpoints", LogLevel.Info);
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
@@ -226,7 +229,7 @@ app.UseEndpoints(endpoints =>
 });
 
 
-
+WintapLogger.Log.Append("running app", LogLevel.Info);
 app.Run();
 
 

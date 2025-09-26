@@ -2,7 +2,10 @@
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using System.Text.Json.Serialization;
 
+// Add this record/class definition
+public record NotificationMessage(string Level, string Data);
 
 public class LoggingUpdateMessageSender(IMcpServer server, Func<LoggingLevel> getMinLevel) : BackgroundService
 {
@@ -24,17 +27,17 @@ public class LoggingUpdateMessageSender(IMcpServer server, Func<LoggingLevel> ge
         {
             var newLevel = (LoggingLevel)Random.Shared.Next(_loggingLevelMap.Count);
 
-            var message = new
+            // Use Dictionary instead of custom type
+            var message = new Dictionary<string, object>
             {
-                Level = newLevel.ToString().ToLower(),
-                Data = _loggingLevelMap[newLevel],
+                ["level"] = newLevel.ToString().ToLower(),
+                ["data"] = _loggingLevelMap[newLevel]
             };
 
             if (newLevel > getMinLevel())
             {
                 await server.SendNotificationAsync("notifications/message", message, cancellationToken: stoppingToken);
             }
-
             await Task.Delay(15000, stoppingToken);
         }
     }
