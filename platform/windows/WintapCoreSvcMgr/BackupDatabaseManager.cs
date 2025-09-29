@@ -754,7 +754,9 @@ namespace WintapCoreSvcMgr.Database
         {
             var countSql = "SELECT create_time FROM live_processes ORDER BY create_time DESC LIMIT 1";
             using var countCmd = new DuckDBCommand(countSql, _connection);
-            DateTime mostRecentProcessTime = DateTime.Parse(countCmd.ExecuteScalar().ToString());
+
+            DateTime mostRecentProcessTime = DateTime.SpecifyKind(DateTime.Parse(countCmd.ExecuteScalar().ToString()), DateTimeKind.Utc);
+
             Console.WriteLine($"Most recent process create time: {mostRecentProcessTime.ToUniversalTime()}");
             return mostRecentProcessTime.ToUniversalTime();
         }
