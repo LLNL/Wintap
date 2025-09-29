@@ -205,7 +205,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 try
                 {
-                    ProcessRecord owningProcess = gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(currentInfo.ProcessId, DateTime.UtcNow);
+                    ProcessRecord owningProcess = gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(currentInfo.ProcessId, DateTime.UtcNow, "detect_changes");
                     if (owningProcess.ProcessName != "unknown")
                     {
                         string pidHash = owningProcess.PidHash;

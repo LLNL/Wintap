@@ -145,7 +145,7 @@ try
     // Connect to an MCP server
     WintapLogger.Log.Append("Connecting client to MCP Server", LogLevel.Info);
 
-    string ai_url = Settings.Default.AiApiUrl;
+    string ai_url = Settings.Default.AiApiUrl.Replace("\"", "");
     WintapLogger.Log.Append($"URL to MCP Server: {ai_url}", LogLevel.Info);
     OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
     //openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api.llnl.gov/v1")};

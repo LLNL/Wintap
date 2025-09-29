@@ -25,16 +25,16 @@ namespace gov.llnl.wintap
         public static int Main(string[] args)
         {
 
-            //if (args.Length == 0)
-            //{
-            //    WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
-            //    return 1;
-            //}
+            if (args.Length == 0)
+            {
+                WintapLogger.Log.Append("WintapSvcMgr was invoked with zero arguments.  Process terminating.", LogLevel.Info);
+                return 1;
+            }
 
-            //var command = args[0].ToUpperInvariant();
-            //WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
+            var command = args[0].ToUpperInvariant();
+            WintapLogger.Log.Append("WintapSvcMgr was started with command: " + command, LogLevel.Info);
 
-            string command = "RECOVER_DATABASE";
+            //string command = "RECOVER_DATABASE";
 
             BackupDatabaseManager.DatabaseTargetEnum target = BackupDatabaseManager.DatabaseTargetEnum.RECOVERY;
             if(command.ToLower().Contains("process_minitrace"))

@@ -82,7 +82,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     string targetProcessName = "Unknown";
                     try
                     {
-                        targetProcessName = ProcessSensor.ResolveProcessAtTime(msg.PID, obj.TimeStamp).ProcessName;
+                        targetProcessName = ProcessSensor.ResolveProcessAtTime(msg.PID, obj.TimeStamp.ToUniversalTime(), msg.MessageType.ToString()).ProcessName;
                     }
                     catch (Exception ex)
                     {

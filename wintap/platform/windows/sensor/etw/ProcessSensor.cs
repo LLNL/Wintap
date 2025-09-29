@@ -29,6 +29,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using TraceReloggerLib;
 using WintapCoreSvcMgr.Database;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
@@ -69,7 +70,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// <param name="pid">Process ID</param>
         /// <param name="eventTime">Time when the event occurred</param>
         /// <returns>ProcessRecord if found, null otherwise</returns>
-        internal static ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime)
+        internal static ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime, string eventType)
         {
             eventTime = eventTime.ToUniversalTime();
             try
@@ -105,8 +106,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                             ProcessName = reader["process_name"]?.ToString(),
                             ProcessPath = reader["image_path"]?.ToString(),
                             CommandLine = reader["command_line"]?.ToString(),
-                            CreateTime = Convert.ToDateTime(reader["create_time"]),
-                            ExitTime = reader["exit_time"] != DBNull.Value ? Convert.ToDateTime(reader["exit_time"]) : null,
+                            CreateTime = Convert.ToDateTime(reader["create_time"]).ToUniversalTime(),
+                            ExitTime = reader["exit_time"] != DBNull.Value ? Convert.ToDateTime(reader["exit_time"]).ToUniversalTime() : null,
                             UserName = reader["user_name"]?.ToString()
                         };
 
@@ -115,7 +116,41 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     }
                 }
 
-                WintapLogger.Log.Append($"Could not resolve PID {pid} at {eventTime}", LogLevel.Warn);
+                WintapLogger.Log.Append($"Could not resolve PID {pid} at {eventTime} for {eventType}, attempting to poll security log for resolution", LogLevel.Warn);
+                // attempt get missing process from security log
+                ProcessRecord processInfo = GetLatestProcessInstanceFromSecurityLog(pid, eventTime);
+                if (processInfo != null)
+                {
+                    ProcessHash processHash = new ProcessHash();
+                    var wintapMessage = new WintapMessage(processInfo.CreateTime.ToUniversalTime(), processInfo.ProcessId, WintapMessage.MessageTypeEnum.Process)
+                    {
+                        EventTime = eventTime.ToFileTimeUtc(),
+                        MessageType = WintapMessage.MessageTypeEnum.Process,
+                        ActivityType = WintapMessage.ActivityTypeEnum.Start,
+                        PID = processInfo.ProcessId,
+                        PidHash = processHash.GenPidHash(processInfo.ProcessId, processInfo.CreateTime.ToFileTimeUtc()),
+                        ProcessName = processInfo.ProcessName,
+                        ProcessPath = processInfo.ProcessPath,
+                        Process = new gov.llnl.wintap.collect.models.WintapMessage.ProcessObject
+                        {
+                            PID = processInfo.ProcessId,
+                            ParentPID = processInfo.ParentProcessId,
+                            Name = processInfo.ProcessName,
+                            Path = processInfo.ProcessPath,
+                            CommandLine = processInfo.CommandLine,
+                            User = processInfo.UserName,
+                        }
+                    };
+                    // send this MIA process event so downstream knows about it, call the underlying esper send method directly to avoid the duckdb process lookup 
+                    EventChannel.EsperRuntime.EventService.SendEventBean(wintapMessage, "WintapMessage");
+                    // insert into duckdb for subsequent lookups.
+                    processInfo.PidHash = wintapMessage.PidHash;
+                    processInfo.ParentPidHash = wintapMessage.Process.ParentPidHash;
+                    InsertProcessStart(processInfo);
+                    WintapLogger.Log.Append($"***SUCCESS on security log resolution for PID {pid} at {eventTime}", LogLevel.Info);
+                    return processInfo;
+                }
+                WintapLogger.Log.Append($"***FAIL on security log resolution for PID {pid} at {eventTime}", LogLevel.Info);
                 return null;
             }
             catch (Exception ex)
@@ -134,7 +169,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// <returns>PidHash if found, null otherwise</returns>
         public static string ResolvePidHash(int pid, DateTime eventTime)
         {
-            var processRecord = ResolveProcessAtTime(pid, eventTime);
+            var processRecord = ResolveProcessAtTime(pid, eventTime.ToUniversalTime(), "resolve_pidhash");
             return processRecord?.PidHash;
         }
 
@@ -198,11 +233,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 // Convert each ProcessRecord to WintapMessage and send to EventChannel
                 foreach (var processRecord in processes)
                 {
-                    var wintapMessage = ConvertProcessRecordToWintapMessage(processRecord);
-                    wintapMessage.ActivityType = WintapMessage.ActivityTypeEnum.Refresh; // Mark as existing process
+                    if(processRecord.CreateTime.ToUniversalTime() > StateManager.MachineBootTime.ToUniversalTime())
+                    {
+                        var wintapMessage = ConvertProcessRecordToWintapMessage(processRecord);
+                        wintapMessage.ActivityType = WintapMessage.ActivityTypeEnum.Refresh; // Mark as existing process
 
-                    // Send to EventChannel for Esper processing
-                    EventChannel.Send(wintapMessage);
+                        // Send to EventChannel for Esper processing
+                        EventChannel.Send(wintapMessage);
+                    }
                 }
 
                 WintapLogger.Log.Append("Process tree successfully sent to Esper", LogLevel.Info);
@@ -366,6 +404,134 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
 
+        // eventTimeUtc should be the cutoff time (DateTime.UtcNow or as needed)
+        internal static ProcessRecord GetLatestProcessInstanceFromSecurityLog(int pid, DateTime eventTimeUtc)
+        {
+            ProcessRecord latestProcess = null;
+            DateTime? latestCreateTime = null;
+            try
+            {
+                string queryString = @"
+            <QueryList>
+              <Query Id='0' Path='Security'>
+                <Select Path='Security'>*[System[(EventID=4688)]]</Select>
+              </Query>
+            </QueryList>";
+
+                var query = new EventLogQuery("Security", PathType.LogName, queryString)
+                {
+                    ReverseDirection = true // Read newest events first
+                };
+
+                using (var reader = new EventLogReader(query))
+                {
+                    EventRecord ev;
+                    while ((ev = reader.ReadEvent()) != null)
+                    {
+                        try
+                        {
+                            DateTime test = ev.TimeCreated.Value.ToUniversalTime();
+                            if (ev.TimeCreated == null || ev.TimeCreated.Value.ToUniversalTime() > eventTimeUtc)
+                                continue; // Only consider events before or at target time
+                            ProcessInfo pi = ExtractProcessInfoFromSecurityEvent2(ev);
+                            latestProcess = new ProcessRecord();
+                            latestProcess.ProcessPath = pi.ImagePath;
+                            latestProcess.ParentProcessId = pi.ParentProcessId;
+                            latestProcess.ProcessId = pi.ProcessId;
+                            latestProcess.ProcessName = pi.ProcessName;
+                            latestProcess.CreateTime = pi.CreateTime;
+                            latestProcess.CommandLine = pi.CommandLine;
+                            latestProcess.UserName = pi.UserName;
+                        }
+                        catch(Exception ex)
+                        {
+                            int j = 0;
+                        }
+                        finally
+                        {
+                            ev.Dispose();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error searching Security Log for PID {pid}: {ex.Message}", LogLevel.Error);
+            }
+            return latestProcess;
+        }
+
+        internal static ProcessInfo ExtractProcessInfoFromSecurityEvent2(EventRecord eventRecord)
+        {
+            try
+            {
+                var processInfo = new ProcessInfo();
+
+                // Parse XML data from the event record
+                if (eventRecord.ToXml() != null)
+                {
+                    var xmlDoc = new System.Xml.XmlDocument();
+                    xmlDoc.LoadXml(eventRecord.ToXml());
+                    var nsmgr = new System.Xml.XmlNamespaceManager(xmlDoc.NameTable);
+                    nsmgr.AddNamespace("ns", "http://schemas.microsoft.com/win/2004/08/events/event");
+
+                    // Extract key fields from Event Data
+                    var dataNodes = xmlDoc.SelectNodes("//ns:Data", nsmgr);
+                    foreach (System.Xml.XmlNode node in dataNodes)
+                    {
+                        var name = node.Attributes?["Name"]?.Value;
+                        var value = node.InnerText;
+
+                        switch (name)
+                        {
+                            case "NewProcessId":
+                                if (value.StartsWith("0x"))
+                                    processInfo.ProcessId = Convert.ToInt32(value, 16);
+                                else
+                                    processInfo.ProcessId = Convert.ToInt32(value);
+                                break;
+                            case "ProcessId":
+                                if (value.StartsWith("0x"))
+                                    processInfo.ParentProcessId = Convert.ToInt32(value, 16);
+                                else
+                                    processInfo.ParentProcessId = Convert.ToInt32(value);
+                                break;
+                            case "NewProcessName":
+                                processInfo.ImagePath = value;
+                                processInfo.ProcessName = System.IO.Path.GetFileName(value);
+                                break;
+                            case "CommandLine":
+                                processInfo.CommandLine = value;
+                                break;
+                            case "SubjectUserName":
+                                processInfo.UserName = value;
+                                break;
+                            case "SubjectDomainName":
+                                if (!string.IsNullOrEmpty(value) && value != "-")
+                                    processInfo.UserName = $"{value}\\{processInfo.UserName}";
+                                break;
+                        }
+                    }
+
+                    // Use event creation time as process creation time
+                    processInfo.CreateTime = eventRecord.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow;
+                }
+
+                // Validate we have minimum required info
+                if (processInfo.ProcessId > 0 && !string.IsNullOrEmpty(processInfo.ProcessName))
+                {
+                    return processInfo;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error extracting process info from Security event: {ex.Message}", LogLevel.Debug);
+            }
+
+            return null;
+        }
+
+
         /// <summary>
         /// Process a Security log Event ID 4688 and convert to WintapMessage
         /// </summary>
@@ -398,10 +564,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         Name = processInfo.ProcessName,
                         Path = processInfo.ImagePath,
                         CommandLine = processInfo.CommandLine,
-                        //User = processInfo.UserName,
+                        User = processInfo.UserName,
                     }
                 };
-                WintapLogger.Log.Append($"Sourcing Process record from security log subscription on pid: ${wintapMessage.PID}  name: ${wintapMessage.ProcessName}", LogLevel.Info);
+                WintapLogger.Log.Append($"Sourcing Process record from security log subscription on pid: ${wintapMessage.PID}  name: ${wintapMessage.ProcessName}", LogLevel.Debug);
                 PublishProcess(wintapMessage);
             }
             catch (Exception ex)
@@ -485,7 +651,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// <summary>
         /// Helper class for process information extraction
         /// </summary>
-        private class ProcessInfo
+        public class ProcessInfo
         {
             public int ProcessId { get; set; }
             public int ParentProcessId { get; set; }
@@ -507,32 +673,36 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// </summary>
         private void Kernel_ProcessStart(ProcessTraceData obj)
         {
-            base.Process_Event(obj);
-            try
-            {
-                DateTime recvTime = DateTime.Now;
-                (string path, string arguments) = base.TranslateProcessPath(obj.ImageFileName, obj.CommandLine);
-                if (path == null) { path = "NA"; }
-                if (path == "NA") { path = GetProcessPathFromPID(obj.ProcessID); }
-                if (string.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Info); }
-                if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Info); }
+            //base.Process_Event(obj);
+            //try
+            //{
+            //    DateTime recvTime = DateTime.UtcNow;
+            //    if(DateTime.Now.Subtract(obj.TimeStamp) > new TimeSpan(1,0,0))
+            //    {
+            //        WintapLogger.Log.Append("WTF!", LogLevel.Info);
+            //    }
+            //    (string path, string arguments) = base.TranslateProcessPath(obj.ImageFileName, obj.CommandLine);
+            //    if (path == null) { path = "NA"; }
+            //    if (path == "NA") { path = GetProcessPathFromPID(obj.ProcessID); }
+            //    if (string.IsNullOrEmpty(path)) { WintapLogger.Log.Append("WARNING: path is null or empty on pid: " + obj.ProcessID + "  imagename: " + obj.ImageFileName, LogLevel.Info); }
+            //    if (path == "NA") { WintapLogger.Log.Append("ERROR no path: " + obj.ProcessID + "  imagename: " + obj.ImageFileName + ",  command line: " + obj.CommandLine + ", kernelImageFileName: " + obj.KernelImageFileName, LogLevel.Info); }
 
-                WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Start };
-                msg.PidHash = processHash.GenPidHash(msg.PID, msg.EventTime);
-                msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments };
-                msg.ReceiveTime = msg.EventTime;
-                msg.ProcessName = msg.Process.Name;
-                msg.ProcessPath = msg.Process.Path;
-                ProcessRecord parentProcess = ResolveProcessAtTime(msg.Process.ParentPID, DateTime.FromFileTimeUtc(msg.EventTime));
-                msg.Process.ParentPidHash = parentProcess.PidHash;
-                msg.Process.ParentProcessName = parentProcess.ProcessName;
-                WintapLogger.Log.Append($"Sourcing Process record from ETW on pid: ${msg.PID}  name: ${msg.ProcessName}", LogLevel.Info);
-                PublishProcess(msg);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("Error handling process event from ETW: " + ex.Message, LogLevel.Error);
-            }
+            //    WintapMessage msg = new WintapMessage(obj.TimeStamp, obj.ProcessID, WintapMessage.MessageTypeEnum.Process) { ActivityType = WintapMessage.ActivityTypeEnum.Start };
+            //    msg.PidHash = processHash.GenPidHash(msg.PID, msg.EventTime);
+            //    msg.Process = new WintapMessage.ProcessObject() { Name = obj.PayloadByName("ImageFileName").ToString().ToLower(), Path = path.ToLower(), ParentPID = obj.ParentID, CommandLine = obj.CommandLine, Arguments = arguments };
+            //    msg.ReceiveTime = recvTime.ToFileTimeUtc();
+            //    msg.ProcessName = msg.Process.Name;
+            //    msg.ProcessPath = msg.Process.Path;
+            //    ProcessRecord parentProcess = ResolveProcessAtTime(msg.Process.ParentPID, DateTime.FromFileTimeUtc(msg.EventTime), msg.MessageType.ToString());
+            //    msg.Process.ParentPidHash = parentProcess.PidHash;
+            //    msg.Process.ParentProcessName = parentProcess.ProcessName;
+            //    WintapLogger.Log.Append($"Sourcing Process record from ETW on pid: ${msg.PID}  name: ${msg.ProcessName}", LogLevel.Info);
+            //    PublishProcess(msg);
+            //}
+            //catch (Exception ex)
+            //{
+            //    WintapLogger.Log.Append("Error handling process event from ETW: " + ex.Message, LogLevel.Error);
+            //}
         }
 
         /// <summary>

@@ -196,7 +196,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 streamedEvent.AgentId = StateManager.AgentId.ToString();
                 if(streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
                 {
-                    ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                    ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), streamedEvent.MessageType.ToString()); 
                     streamedEvent.PidHash = ownerProcess.PidHash;
                     if (streamedEvent.ProcessName != null)
                     {
@@ -213,7 +213,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 else
                 {
-                    ProcessRecord parentProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.Process.ParentPID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                    ProcessRecord parentProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.Process.ParentPID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), "ParentProcessFinder");
                     streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
                     streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
                 }
