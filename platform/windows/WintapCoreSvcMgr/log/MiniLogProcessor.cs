@@ -189,6 +189,8 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 var startTimeXml = startTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                 var endTimeXml = endTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
 
+                LogInfo($"startTime is of kind: {startTime.Kind}");
+
                 var queryXml = $@"
                     <QueryList>
                         <Query Id='0' Path='Security'>
@@ -326,7 +328,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 eventData.TryGetValue("ParentProcessName", out parentProcessName);
 
                 // Create time from event timestamp
-                var createTime = eventRecord.TimeCreated ?? DateTime.UtcNow;
+                var createTime = eventRecord.TimeCreated.Value.ToUniversalTime();
 
                 // Generate PidHash (same algorithm as existing)
                 var pidHash = _processHash.GenPidHash(processId, createTime.ToFileTimeUtc());
