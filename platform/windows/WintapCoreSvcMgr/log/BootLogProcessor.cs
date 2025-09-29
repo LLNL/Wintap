@@ -77,21 +77,19 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 LogInfo("Starting boot process collection from Windows Security Log");
 
                 // Get machine boot time from StateManager (same as existing code)
-                var bootTime = GetMachineBootTime();
-                if (!bootTime.HasValue)
-                {
-                    throw new InvalidOperationException("Cannot determine machine boot time");
-                }
+                var bootTime = GetMachineBootTime().Value.ToUniversalTime();
 
                 var endTime = _processAllEventsToNow ?
                     DateTime.UtcNow :
-                    bootTime.Value.Add(_bootProcessingWindow);
+                    bootTime.Add(_bootProcessingWindow);
 
-                LogInfo($"Processing Security Log events from {bootTime.Value:yyyy-MM-dd HH:mm:ss} to {endTime:yyyy-MM-dd HH:mm:ss}");
+                endTime = endTime.ToUniversalTime();
+
+                LogInfo($"Processing Security Log events from {bootTime:yyyy-MM-dd HH:mm:ss} to {endTime:yyyy-MM-dd HH:mm:ss}");
 
                 if (_processAllEventsToNow)
                 {
-                    var timeSinceBoot = DateTime.UtcNow.Subtract(bootTime.Value);
+                    var timeSinceBoot = DateTime.UtcNow.Subtract(bootTime);
                     LogInfo($"Processing ALL events from boot to now ({timeSinceBoot.TotalMinutes:F1} minutes of history)");
                     LogInfo("This ensures complete coverage with no gaps before real-time monitoring begins");
                 }
@@ -100,7 +98,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 List<ProcessRecord> processRecords = AddSystemProcesses();
 
                 // Query Security Log for process events during boot window
-                processRecords = await ExtractProcessEventsFromSecurityLog(bootTime.Value, endTime, processRecords);
+                processRecords = await ExtractProcessEventsFromSecurityLog(bootTime, endTime, processRecords);
 
                 LogInfo($"Extracted {processRecords.Count} process records from Security Log");
 
@@ -307,7 +305,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 if (eventData.TryGetValue("ProcessId", out string processIdHex))
                 {
                     var processId = Convert.ToInt32(processIdHex, 16);
-                    var exitTime = eventRecord.TimeCreated ?? DateTime.UtcNow;
+                    var exitTime = eventRecord.TimeCreated.Value.ToUniversalTime();
 
                     // Find matching process record
                     var matchingProcess = activeProcesses.Values
