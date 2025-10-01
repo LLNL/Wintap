@@ -12,6 +12,7 @@ using gov.llnl.wintap.platform.windows.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 //using gov.llnl.wintap.shared.models;
 //using Wintap.ProcessTree.Shared.Configuration;
 
@@ -55,7 +56,7 @@ namespace WintapCoreSvcMgr.Database
             LogInfo("BackupDatabaseManager initialized for WintapCoreSvcMgr.exe");
         }
 
-        public bool InsertProcessStart(ProcessRecord process)
+        internal bool InsertProcessStart(ProcessRecord process)
         {
             try
             {
@@ -109,7 +110,7 @@ namespace WintapCoreSvcMgr.Database
         /// Insert boot trace ProcessRecord - INSERT ONLY, never update
         /// Boot trace records are historical one-time events from system startup
         /// </summary>
-        public bool InsertBootTraceRecord(ProcessRecord process)
+        internal bool InsertBootTraceRecord(ProcessRecord process)
         {
             try
             {

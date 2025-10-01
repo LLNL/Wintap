@@ -15,6 +15,7 @@
     <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.8" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.8" />
+    <PackageReference Include="TaskScheduler" Version="2.12.2" />
   </ItemGroup>
 
 </Project>

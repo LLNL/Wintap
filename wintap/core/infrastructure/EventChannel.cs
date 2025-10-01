@@ -23,6 +23,7 @@ using System.Linq;
 using gov.llnl.wintap.platform.windows.collect.etw;
 using System.Timers;
 using Amazon.S3.Model;
+using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -524,7 +525,6 @@ namespace gov.llnl.wintap.core.infrastructure
     {
         public readonly ConcurrentQueue<PendingEvent> _bufferedEvents = new();
         private readonly Timer _flushTimer;
-        private readonly ProcessTreeDatabase _database;
         private const int BUFFER_WINDOW_MS = 2000;
 
         public EventReorderBuffer()
@@ -547,7 +547,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 if (pendingEvent.BufferedAt <= cutoffTime)
                 {
                     // Time's up - process this event (final attempt)
-                    WintapLogger.Log.Append($"Retrying buffered event: {pendingEvent.Message.MessageType} pid: {pendingEvent.Message.PID} buffered at: {pendingEvent.BufferedAt.ToLocalTime()}", LogLevel.Info);
+                    WintapLogger.Log.Append($"Retrying buffered event: {pendingEvent.Message.MessageType} pid: {pendingEvent.Message.PID} buffered at: {pendingEvent.BufferedAt.ToLocalTime()}", LogLevel.Debug);
                     EventChannel.SendImmediately(pendingEvent.Message);
                 }
                 else
