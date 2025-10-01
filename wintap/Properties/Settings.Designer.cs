@@ -326,7 +326,7 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        [global::System.Configuration.DefaultSettingValueAttribute("http://localhost:11434")]
         public string AiApiUrl {
             get {
                 return ((string)(this["AiApiUrl"]));
@@ -338,13 +338,25 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        [global::System.Configuration.DefaultSettingValueAttribute("none")]
         public string AiApiKey {
             get {
                 return ((string)(this["AiApiKey"]));
             }
             set {
                 this["AiApiKey"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("gpt-4.1")]
+        public string AiModel {
+            get {
+                return ((string)(this["AiModel"]));
+            }
+            set {
+                this["AiModel"] = value;
             }
         }
     }

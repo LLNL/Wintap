@@ -43,29 +43,52 @@ WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
 // Configure AI Provider selection
 string aiProvider = "OpenAI"; // "OpenAI" or "Ollama"
+if(Settings.Default.AiApiUrl.Contains("localhost"))
+{
+    aiProvider = "Ollama";
+}
 
 IMcpClient mcpClient;
 IChatClient chatClient;
 
 try
 {
-    // Initialize MCP Client
+    string fileRootPath = Strings.FileRootPath;
+    string exeName;
+
+    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+    {
+        exeName = "wintap_mcp_server.exe";
+    }
+    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
+             RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+    {
+        exeName = "wintap_mcp_server"; // No .exe extension
+    }
+    else
+    {
+        throw new PlatformNotSupportedException("Unsupported OS");
+    }
+
+    string commandPath = Path.Combine(fileRootPath, "mcp", exeName);
+
     mcpClient = await McpClientFactory.CreateAsync(
         new StdioClientTransport(new()
         {
-            Command = "C:\\Repos\\BCB-AI\\ai_mcp_server\\bin\\debug\\net8.0\\ai_mcp_server.exe",
+            Command = commandPath,
             Arguments = [],
             Name = "ai_mcp_server",
         })
     );
+
 
     Console.WriteLine("Connecting client to MCP server");
 
     // Configure based on provider
     if (aiProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
     {
-        string ollamaEndpoint = "http://localhost:11434";
-        string ollamaModel = "gpt-oss:20b";
+        string ollamaEndpoint = Settings.Default.AiApiUrl;
+        string ollamaModel = Settings.Default.AiModel;
 
         WintapLogger.Log.Append($"Using Ollama provider: {ollamaEndpoint} with model {ollamaModel}", LogLevel.Info);
 
@@ -82,13 +105,13 @@ try
     {
         OpenAIClientOptions openAIOptions = new OpenAIClientOptions()
         {
-            Endpoint = new Uri("https://livai-api.llnl.gov/v1")
+            Endpoint = new Uri(Settings.Default.AiApiUrl)
         };
 
-        string key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
+        string key = Settings.Default.AiApiKey;
         ApiKeyCredential cred = new ApiKeyCredential(key!);
 
-        string model = "gpt-5-mini";
+        string model = Settings.Default.AiModel;
         WintapLogger.Log.Append($"Using OpenAI provider with model {model}", LogLevel.Info);
 
         var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient(model);

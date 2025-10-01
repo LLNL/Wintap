@@ -79,10 +79,13 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="AiApiUrl" Type="System.String" Scope="User">
-      <Value Profile="(Default)" />
+      <Value Profile="(Default)">http://localhost:11434</Value>
     </Setting>
     <Setting Name="AiApiKey" Type="System.String" Scope="User">
-      <Value Profile="(Default)" />
+      <Value Profile="(Default)">none</Value>
+    </Setting>
+    <Setting Name="AiModel" Type="System.String" Scope="User">
+      <Value Profile="(Default)">gpt-4.1</Value>
     </Setting>
   </Settings>
 </SettingsFile>
