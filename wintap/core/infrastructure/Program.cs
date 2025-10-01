@@ -41,145 +41,82 @@ builder.Services.AddControllers();
 
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
-#region Local Ollama Implementation
-//       for SLMs 
-// Match the configuration settings from the embedding generator app
-//string DatabasePath = @"c:\program files\wintap7\embeddings.db";
-//string CollectionName = "Wintap";
-//string OllamaEndpoint = "http://localhost:11434";
-//string EmbeddingModel = "mxbai-embed-large";
-//string llm = "llama3.1:8b";
-
-// Create a builder with both chat completion and embedding services
-//var aiBuilder = Kernel.CreateBuilder();
-
-//       for SLMs 
-// Add the Ollama chat completion service
-//aiBuilder.AddOllamaChatCompletion(
-//    modelId: llm,
-//    endpoint: new Uri(OllamaEndpoint)
-//);
-
-//       for SLMs 
-// Add the Ollama embedding service - using the same model as in the embedding generator
-//aiBuilder.AddOllamaTextEmbeddingGeneration(
-//    modelId: EmbeddingModel,
-//    endpoint: new Uri(OllamaEndpoint)
-//);
-
-// Build the kernel with both services
-//var kernel = aiBuilder.Build();
-
-//kernel.Plugins.AddFromType<TimePlugin>();
-
-//var chatService = kernel.GetRequiredService<IChatCompletionService>();
-//var embeddingService = kernel.GetRequiredService<ITextEmbeddingGenerationService>();
-
-//     For SLMs
-// Create memory using the embedding service and SQLite
-// Use the same database path as the embedding generator
-//  var sqliteMemoryStore = SqliteMemoryStore.ConnectAsync(DatabasePath).GetAwaiter().GetResult();
-
-//ISemanticTextMemory memory = new MemoryBuilder()
-//    .WithLoggerFactory(kernel.LoggerFactory)
-//    .WithMemoryStore(sqliteMemoryStore)
-//    .WithTextEmbeddingGeneration(embeddingService)
-//    .Build();
-
-//builder.Services.AddSingleton<ISemanticTextMemory>(provider =>
-//{
-//    return memory;
-//});
-
-//builder.Services.AddSingleton<IChatCompletionService>(provider =>
-//{
-//    return chatService;
-//});
-
-//builder.Services.AddSingleton<Kernel>(provider =>
-//{
-//    return kernel; 
-//});
-
-
-//builder.Services.AddSingleton<ChatHistory>(provider =>
-//{
-//    string systemPrompt = Settings.Default.SystemPrompt;
-//    ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
-//    WintapLogger.Log.Append(systemPrompt, LogLevel.Info);
-//    return chat;
-//}); 
-#endregion
+// Configure AI Provider selection
+string aiProvider = "OpenAI"; // "OpenAI" or "Ollama"
 
 IMcpClient mcpClient;
+IChatClient chatClient;
+
 try
 {
-    string fileRootPath = Strings.FileRootPath;
-    string exeName;
-
-    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-    {
-        exeName = "wintap_mcp_server.exe";
-    }
-    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
-             RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-    {
-        exeName = "wintap_mcp_server"; // No .exe extension
-    }
-    else
-    {
-        throw new PlatformNotSupportedException("Unsupported OS");
-    }
-
-    string commandPath = Path.Combine(fileRootPath, "mcp", exeName);
-
+    // Initialize MCP Client
     mcpClient = await McpClientFactory.CreateAsync(
         new StdioClientTransport(new()
         {
-            Command = commandPath,
+            Command = "C:\\Repos\\BCB-AI\\ai_mcp_server\\bin\\debug\\net8.0\\ai_mcp_server.exe",
             Arguments = [],
             Name = "ai_mcp_server",
         })
     );
 
-    // Connect to an MCP server
-    WintapLogger.Log.Append("Connecting client to MCP Server", LogLevel.Info);
+    Console.WriteLine("Connecting client to MCP server");
 
-    string ai_url = Settings.Default.AiApiUrl.Replace("\"", "");
-    WintapLogger.Log.Append($"URL to MCP Server: {ai_url}", LogLevel.Info);
-    OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
-    //openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api.llnl.gov/v1")};
-    openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri(ai_url) };
+    // Configure based on provider
+    if (aiProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+    {
+        string ollamaEndpoint = "http://localhost:11434";
+        string ollamaModel = "gpt-oss:20b";
 
-    string? key = "";
-    // key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
-    key = Settings.Default.AiApiKey;
+        WintapLogger.Log.Append($"Using Ollama provider: {ollamaEndpoint} with model {ollamaModel}", LogLevel.Info);
 
-    ApiKeyCredential cred = new ApiKeyCredential(key!);
-    //var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-5-mini");
-    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-oss:20b");
+        // Create custom Ollama client (already implements IChatClient)
+        IChatClient ollamaClient = new OllamaChatClient(ollamaEndpoint, ollamaModel);
 
-    WintapLogger.Log.Append("Creating chat client", LogLevel.Info);
-    // Create a sampling client.
-    using IChatClient chatClient = openAIClient.AsIChatClient()
-        .AsBuilder()
-        .UseFunctionInvocation()
-        .Build();
+        // Add function invocation support for MCP tools
+        chatClient = ollamaClient
+            .AsBuilder()
+            .UseFunctionInvocation()
+            .Build();
+    }
+    else
+    {
+        OpenAIClientOptions openAIOptions = new OpenAIClientOptions()
+        {
+            Endpoint = new Uri("https://livai-api.llnl.gov/v1")
+        };
 
-    WintapLogger.Log.Append("Reading system prompt", LogLevel.Info);
+        string key = File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt")).Trim();
+        ApiKeyCredential cred = new ApiKeyCredential(key!);
+
+        string model = "gpt-5-mini";
+        WintapLogger.Log.Append($"Using OpenAI provider with model {model}", LogLevel.Info);
+
+        var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient(model);
+
+        // Convert to IChatClient and add function invocation support
+        chatClient = openAIClient
+            .AsIChatClient()
+            .AsBuilder()
+            .UseFunctionInvocation()
+            .Build();
+    }
+
+    // Initialize chat history (same for both providers)
     List<ChatMessage> chatHistory = [
-        new ChatMessage(ChatRole.System, System.IO.File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),
+        new ChatMessage(ChatRole.System,
+            File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),
     ];
-    builder.Services.AddSingleton(chatHistory);
 
+    // Register services
+    builder.Services.AddSingleton(chatHistory);
     builder.Services.AddSingleton<IMcpClient>(mcpClient);
-    builder.Services.AddSingleton(chatClient);
-    WintapLogger.Log.Append("Done with MCP setup", LogLevel.Info);
+    builder.Services.AddSingleton<IChatClient>(chatClient);
 }
-catch(Exception ex)
+catch (Exception ex)
 {
-    WintapLogger.Log.Append($"Error loading MCP Client: {ex.Message}", LogLevel.Error);
+    WintapLogger.Log.Append($"Error loading AI Client: {ex.Message}", LogLevel.Error);
 }
+
 
 WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
 FileInfo mainDBInfo = new FileInfo(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb"));

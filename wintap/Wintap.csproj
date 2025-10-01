@@ -140,6 +140,7 @@
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.23" />
     <PackageReference Include="Microsoft.DotNet.PlatformAbstractions" Version="3.1.6" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="9.9.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.Ollama" Version="9.7.0-preview.1.25356.2" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.8.0-preview.1.25412.6" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
@@ -148,7 +149,7 @@
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.64.0" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.Chroma" Version="1.64.0-alpha" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.HuggingFace" Version="1.55.0-preview" />
-    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.55.0-alpha" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.65.0-alpha" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.Sqlite" Version="1.51.0-preview" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.55.0-alpha" />
     <PackageReference Include="Microsoft.Windows.Compatibility" Version="8.0.4" />

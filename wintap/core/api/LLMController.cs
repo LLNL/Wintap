@@ -84,8 +84,8 @@ namespace gov.llnl.wintap.core.api
             string question = promptModel.Prompt;
             WintapLogger.Log.Append($"Got inference request with question: {question}", LogLevel.Info);
 
-            // system prompt override
-            if(question == "An application recently stopped working, can you help me diagnose it?")
+            // System prompt override
+            if (question == "An application recently stopped working, can you help me diagnose it?")
             {
                 string existingPrompt = chatHistory.First().Text;
                 chatHistory.RemoveAt(0);
@@ -93,17 +93,14 @@ namespace gov.llnl.wintap.core.api
             }
 
             IList<McpClientTool> tools = await mcpClient.ListToolsAsync();
-            // Create the message list with our time question
-            ChatMessage userQuestion = new ChatMessage(ChatRole.User, question);
-            chatHistory.Add(userQuestion);
+            chatHistory.Add(new ChatMessage(ChatRole.User, question));
 
             try
             {
                 var chatOptions = new ChatOptions
                 {
-                    Tools = [.. tools], // Make MCP tools available to the model
+                    Tools = [.. tools], // MCP tools work with both providers!
                     Temperature = 1.0f,
-                    // Remove AllowMultipleToolCalls entirely
                     ToolMode = ChatToolMode.Auto
                 };
 
@@ -111,23 +108,31 @@ namespace gov.llnl.wintap.core.api
                 {
                     chatOptions.AdditionalProperties = new AdditionalPropertiesDictionary()
                     {
-                        ["reasoning_effort"] = "minimal"  // Set to desired level: minimal, low, medium, or high
+                        ["reasoning_effort"] = "minimal"  // OpenAI-specific, ignored by Ollama
                     };
                 }
+
                 chatOptions.AdditionalProperties["disabled_params"] = new Dictionary<string, object>
                 {
                     ["parallel_tool_calls"] = null
                 };
 
-
+                // This works for BOTH OpenAI and Ollama!
                 var response = await chatClient.GetResponseAsync(
                     chatHistory,
                     chatOptions
                 );
 
-                Inference inf = new Inference() { Prompt = question, Response = response.Text, TokensUsed = 0 };
+                Inference inf = new Inference()
+                {
+                    Prompt = question,
+                    Response = response.Text,
+                    TokensUsed = 0
+                };
+
                 string jsonString = JsonConvert.SerializeObject(inf);
                 await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
+
                 chatHistory.Add(new ChatMessage(ChatRole.Assistant, response.Messages[0].Text));
             }
             catch (Exception ex)
@@ -135,8 +140,9 @@ namespace gov.llnl.wintap.core.api
                 WintapLogger.Log.Append($"Error on inference: {ex.Message}", LogLevel.Error);
             }
 
-            WintapLogger.Log.Append($"inference complete", LogLevel.Info);
+            WintapLogger.Log.Append($"Inference complete", LogLevel.Info);
         }
+
 
         [HttpPost("Clear")]
         public void Post()
