@@ -89,12 +89,7 @@ namespace gov.llnl.wintap.core.api
             {
                 string existingPrompt = chatHistory.First().Text;
                 chatHistory.RemoveAt(0);
-                chatHistory.Add(new ChatMessage(ChatRole.System, existingPrompt + " " + @"To answer this particular question, you should prompt the user for the name of the process to analyse then, once you have it, follow these steps:
-
-Retrieve the process activity logs for both the failed run (most recent) and the most recent successful run of the identified process (you should assume the successful run is the run occuring just before the failed run containing the same command line parameters).
-Align the two sets of logs by event time to create a side-by-side timeline of events.
-Perform a temporal analysis to determine where the failed run deviated from—or stopped compared to—the successful run.
-Using the successful run’s sequence as a benchmark, infer which event should have occurred next in the failed run, and use this information to identify the potential root cause."));
+                chatHistory.Add(new ChatMessage(ChatRole.System, existingPrompt));
             }
 
             IList<McpClientTool> tools = await mcpClient.ListToolsAsync();

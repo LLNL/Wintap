@@ -156,7 +156,8 @@ try
     key = Settings.Default.AiApiKey;
 
     ApiKeyCredential cred = new ApiKeyCredential(key!);
-    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-5-mini");
+    //var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-5-mini");
+    var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-oss:20b");
 
     WintapLogger.Log.Append("Creating chat client", LogLevel.Info);
     // Create a sampling client.
