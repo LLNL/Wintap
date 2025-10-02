@@ -1079,8 +1079,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             )";
 
                     using var cmd = new DuckDBCommand(sql, connection);
-                    cmd.ExecuteNonQuery();
-                    return true;
+                    if(cmd.ExecuteNonQuery() > 0)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
                 }
             }
             catch (Exception ex)

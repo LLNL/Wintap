@@ -1,4 +1,10 @@
 ﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+/*
  * SimpleEventPlugin - Example of a Wintap plugin with isolated dependencies
  */
 

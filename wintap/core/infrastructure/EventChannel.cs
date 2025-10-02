@@ -1,28 +1,24 @@
-// EventChannel.cs - Complete implementation using ProcessTreeDatabaseManager
+/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
 using com.espertech.esper.common.client;
 using com.espertech.esper.common.client.configuration;
 using com.espertech.esper.compat;
 using com.espertech.esper.compiler.client;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.core.api.helpers;
-using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.infrastructure.helpers;
 using gov.llnl.wintap.core.shared;
-using gov.llnl.wintap.platform.linux.collect.test;
-using gov.llnl.wintap.platform.windows.infrastructure;
-using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using gov.llnl.wintap.platform.windows.collect.etw;
-using System.Timers;
-using Amazon.S3.Model;
 using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.core.infrastructure
@@ -37,11 +33,10 @@ namespace gov.llnl.wintap.core.infrastructure
         private static DateTime maxEventTime;
         private static long totalEvents;
         private static long lastTotalEvents;
-        private static Stopwatch stopWatch;
-        private static EventReorderBuffer eventBuffer;
-        private static Stopwatch bufferProcessingInterval;
         private static int droppedEventCount;
-        private static int MAX_BUFFER_SIZE = 5000;
+
+
+        private static Stopwatch stopWatch;
 
         // Esper configuration and runtime
         private static Configuration esperConfig;
@@ -54,7 +49,6 @@ namespace gov.llnl.wintap.core.infrastructure
         public static long TotalEvents => totalEvents;
         public static string Runtime => stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss");
         public static int DroppedEventCount => droppedEventCount;
-        public static int BufferedEventCount => eventBuffer._bufferedEvents.Count;
 
         /// <summary>
         /// Esper configuration accessor
@@ -89,12 +83,9 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private EventChannel()
         {
-            eventBuffer = new EventReorderBuffer();
-
+            //  tracks total runtime
             stopWatch = new Stopwatch();
             stopWatch.Start();
-            bufferProcessingInterval = new Stopwatch();
-            bufferProcessingInterval.Start();
 
             // Start statistics worker
             BackgroundWorker statsWorker = new BackgroundWorker();
@@ -175,18 +166,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
 
-            if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
-            {
-                eventBuffer.TryProcessEvent(streamedEvent);             
-            }
-            else
-            {
-                SendImmediately(streamedEvent);
-            }
-        }
-
-        internal static void SendImmediately(WintapMessage streamedEvent)
-        {
             // Send to Esper (filter out Wintap's own events)
             try
             {
@@ -195,9 +174,9 @@ namespace gov.llnl.wintap.core.infrastructure
                     return;
                 }
                 streamedEvent.AgentId = StateManager.AgentId.ToString();
-                if(streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
+                if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
                 {
-                    ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), streamedEvent.MessageType.ToString()); 
+                    ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), streamedEvent.MessageType.ToString());
                     streamedEvent.PidHash = ownerProcess.PidHash;
                     if (streamedEvent.ProcessName != null)
                     {
@@ -218,16 +197,12 @@ namespace gov.llnl.wintap.core.infrastructure
                     streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
                     streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
                 }
-                    
-
-                
                 EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
             }
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error sending event for {streamedEvent.MessageType}: {ex.Message}", LogLevel.Error);
             }
-           
         }
 
         /// <summary>
@@ -488,12 +463,6 @@ namespace gov.llnl.wintap.core.infrastructure
                     maxEventsPerSecond = eventsPerSecond;
                     maxEventTime = DateTime.Now;
                 }
-
-                // Check for buffer overflow
-                if (eventBuffer._bufferedEvents.Count >= MAX_BUFFER_SIZE)
-                {
-                    WintapLogger.Log.Append($"ERROR: Event buffer full! Size: {eventBuffer._bufferedEvents.Count}, Dropped: {droppedEventCount}", LogLevel.Error);
-                }
             }
         }
         internal static void setWorkbenchState(Dictionary<string, EsperQuery> esperQueries)
@@ -520,90 +489,6 @@ namespace gov.llnl.wintap.core.infrastructure
         }
     }
 
-
-    internal class EventReorderBuffer
-    {
-        public readonly ConcurrentQueue<PendingEvent> _bufferedEvents = new();
-        private readonly Timer _flushTimer;
-        private const int BUFFER_WINDOW_MS = 2000;
-
-        public EventReorderBuffer()
-        {
-            _flushTimer = new Timer(BUFFER_WINDOW_MS);
-            _flushTimer.Elapsed += _flushTimer_Elapsed;
-            _flushTimer.AutoReset = true;
-            _flushTimer.Start();
-        }
-
-        internal void _flushTimer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            var cutoffTime = DateTime.UtcNow.AddMilliseconds(-BUFFER_WINDOW_MS);
-            var eventsToProcess = new List<PendingEvent>();
-            var eventsToKeepBuffered = new List<PendingEvent>();
-
-            // Drain all events from the queue
-            while (_bufferedEvents.TryDequeue(out var pendingEvent))
-            {
-                if (pendingEvent.BufferedAt <= cutoffTime)
-                {
-                    // Time's up - process this event (final attempt)
-                    WintapLogger.Log.Append($"Retrying buffered event: {pendingEvent.Message.MessageType} pid: {pendingEvent.Message.PID} buffered at: {pendingEvent.BufferedAt.ToLocalTime()}", LogLevel.Debug);
-                    EventChannel.SendImmediately(pendingEvent.Message);
-                }
-                else
-                {
-                    // Still within buffer window - keep it buffered
-                    eventsToKeepBuffered.Add(pendingEvent);
-                }
-            }
-
-            // Re-queue events that should stay buffered
-            foreach (var evt in eventsToKeepBuffered)
-            {
-                _bufferedEvents.Enqueue(evt);
-            }
-        }
-
-        public bool TryProcessEvent(WintapMessage message)
-        {
-            // Check if process exists in cache or database
-            if (platform.windows.collect.etw.ProcessSensor.ProcessExistsForPid(message.PID, message.EventTime))
-            {
-                EventChannel.SendImmediately(message);
-                return true;
-            }
-
-            // Buffer the event
-            WintapLogger.Log.Append($"Process not found for event {message.MessageType} pid: {message.PID}, buffering for retry", LogLevel.Warn);
-            _bufferedEvents.Enqueue(new PendingEvent
-            {
-
-                Message = message,
-                BufferedAt = DateTime.UtcNow
-            });
-            return false;
-        }
-
-        private void FlushExpiredEvents(object state)
-        {
-            var cutoff = DateTime.UtcNow.AddMilliseconds(-BUFFER_WINDOW_MS);
-
-            while (_bufferedEvents.TryDequeue(out var evt))
-            {
-                if (evt.BufferedAt <= cutoff)
-                {
-                    // Time expired - send it anyway (process might exist now, or fail gracefully)
-                    EventChannel.SendImmediately(evt.Message);
-                }
-                else
-                {
-                    // Put back - not ready to flush yet
-                    _bufferedEvents.Enqueue(evt);
-                    break;
-                }
-            }
-        }
-    }
     public class EsperQuery
     {
         //public enum EsperState { ACTIVE, STARTED, STOPPED, CREATED, DELETED }

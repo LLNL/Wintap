@@ -229,7 +229,7 @@
     <None Include="core\etl\ETLConfig.json" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\WintapAPI\WintapAPI.csproj" />
+    <ProjectReference Include="..\shared\WintapAPI\WintapAPI.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <PreBuildEvent>reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy /v Enabled /t REG_DWORD /d 0 /f</PreBuildEvent>

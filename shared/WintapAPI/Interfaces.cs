@@ -34,7 +34,7 @@ namespace gov.llnl.wintap
         }
 
         /// <summary>
-        /// Event subscription of currated and enriched ETW event data parsed onto domain specific POCOs within WintapMessage.  Required events are defined in in the EventFlags bitmask and returned from the Startup method.
+        /// Event subscription of Wintap event data.  Required events are defined in in the EventFlags bitmask and returned from the Startup method.
         /// </summary>
         public interface ISubscribe
         {
@@ -49,7 +49,7 @@ namespace gov.llnl.wintap
         }
 
         /// <summary>
-        /// Simple, repeated task execution.  
+        /// Interval based simple task execution.  
         /// </summary>
         public interface IRun
         {

@@ -1,4 +1,10 @@
-﻿using System;
+﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
@@ -6,6 +12,11 @@ using System.Reflection;
 
 namespace gov.llnl.wintap.collect.models
 {
+
+    /// <summary>
+    /// Represents a unified message structure for capturing system events including 
+    /// process activity, network connections, file operations, registry changes, and system metrics.
+    /// </summary>
     public class WintapMessage
     {
         public enum FailureCodeType { ERROR_INSUFFICIENT_RESOURCES, ERROR_TOO_MANY_ADDRESSES, ERROR_ADDRESS_EXISTS, ERROR_INVALID_ADDRESS, ERROR_OTHER, ERROR_TIMEWAIT_ADDRESS_EXIST };
