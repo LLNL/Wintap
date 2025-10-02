@@ -1,4 +1,11 @@
-﻿using gov.llnl.wintap.core.infrastructure;
+﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+
+using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

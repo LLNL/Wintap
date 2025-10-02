@@ -3,10 +3,8 @@
  */
 
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
-using System.Xml;
 using gov.llnl.wintap;
 using gov.llnl.wintap.collect.models;
 using Newtonsoft.Json;

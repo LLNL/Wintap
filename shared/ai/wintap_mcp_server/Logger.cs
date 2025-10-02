@@ -1,4 +1,10 @@
-﻿using System;
+﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+using System;
 using System.Text;
 using System.IO;
 using System.Reflection;

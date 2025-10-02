@@ -1,4 +1,10 @@
-﻿using ModelContextProtocol.Server;
+﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+using ModelContextProtocol.Server;
 using System.ComponentModel;
 
 namespace gov.llnl.wintap.ai.mcp

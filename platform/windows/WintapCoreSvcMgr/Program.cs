@@ -1,4 +1,10 @@
-﻿using gov.llnl.wintap.core.infrastructure;
+﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.platform.windows.infrastructure;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;

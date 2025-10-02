@@ -1,4 +1,10 @@
-﻿using DuckDB.NET.Data;
+﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+using DuckDB.NET.Data;
 using System.Text;
 
 /// <summary>

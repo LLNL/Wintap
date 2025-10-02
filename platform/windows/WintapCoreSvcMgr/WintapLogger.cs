@@ -1,4 +1,9 @@
-// Legacy-compatible logger delegating to ComponentLogger
+/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
