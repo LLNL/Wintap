@@ -1,6 +1,70 @@
 ﻿using DuckDB.NET.Data;
 using System.Text;
 
+/// <summary>
+/// Provides centralized management of DuckDB connections and views for querying Wintap telemetry data from MCP.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The DuckDBManager creates an in-memory DuckDB instance that provides SQL views over Parquet files
+/// containing Wintap telemetry data. This enables efficient querying of process, network, file, registry,
+/// and other system activity data using standard SQL.
+/// </para>
+/// 
+/// <para><strong>Architecture:</strong></para>
+/// <list type="bullet">
+/// <item><description>Uses a singleton in-memory DuckDB connection for the application lifetime</description></item>
+/// <item><description>Automatically creates SQL views that reference Parquet files on disk</description></item>
+/// <item><description>Supports cross-platform paths (Windows: %ProgramData%, Unix: /var/lib)</description></item>
+/// <item><description>Provides cancellation support for long-running queries</description></item>
+/// </list>
+/// 
+/// <para><strong>Available Views:</strong></para>
+/// <list type="bullet">
+/// <item><description><c>Wintap_Process</c> - Process lifecycle events (start, stop)</description></item>
+/// <item><description><c>Wintap_Tcp</c> - TCP connection events</description></item>
+/// <item><description><c>Wintap_Udp</c> - UDP connection events</description></item>
+/// <item><description><c>Wintap_Registry</c> - Registry access events</description></item>
+/// <item><description><c>Wintap_File</c> - File system activity</description></item>
+/// <item><description><c>Wintap_WMI</c> - WMI query events</description></item>
+/// <item><description><c>Wintap_APICalls</c> - Windows API call monitoring</description></item>
+/// <item><description><c>Wintap_Memory</c> - Memory mapping events</description></item>
+/// <item><description><c>Wintap_ImageLoad</c> - DLL/binary load events</description></item>
+/// <item><description><c>Wintap_FocusChange</c> - Window focus change events</description></item>
+/// <item><description><c>Wintap_CpuTrigger</c> - CPU threshold trigger events</description></item>
+/// </list>
+/// 
+/// <para><strong>Cross-Platform Paths:</strong></para>
+/// <list type="bullet">
+/// <item><description>Windows: <c>C:\ProgramData\wintap\parquet\merged\</c></description></item>
+/// <item><description>Unix: <c>/var/lib/wintap/parquet/merged/</c></description></item>
+/// </list>
+/// 
+/// <para><strong>Usage Example:</strong></para>
+/// <code>
+/// // Initialize the manager (call once at application startup)
+/// DuckDBManager.Initialize();
+/// 
+/// // Execute SQL query
+/// string query = "SELECT * FROM Wintap_Process WHERE ProcessName = 'chrome.exe' LIMIT 10";
+/// string results = DuckDBManager.ExecuteSQL(query, cancellationToken);
+/// </code>
+/// 
+/// <para><strong>Thread Safety:</strong></para>
+/// <para>
+/// This class uses a singleton pattern with lazy initialization. The Initialize() method should be called
+/// once during application startup. The ExecuteSQL() method is thread-safe for concurrent read operations,
+/// as DuckDB supports multiple concurrent readers on the same connection.
+/// </para>
+/// 
+/// 
+/// <para><strong>Error Handling:</strong></para>
+/// <para>
+/// The CreateOrReplaceProcessViews() method silently catches exceptions when creating individual views,
+/// allowing the application to continue even if some telemetry types are unavailable. ExecuteSQL()
+/// returns error messages as strings for display to users.
+/// </para>
+/// </remarks>
 public static class DuckDBManager
 {
     private static DuckDBConnection _connection;
@@ -17,7 +81,10 @@ public static class DuckDBManager
 
     private static void CreateOrReplaceProcessViews()
     {
-        string parquetDir = Path.Combine(@"c:\programdata\wintap", "parquet", "merged");
+
+        string baseDir = OperatingSystem.IsWindows() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "wintap"): Path.Combine("/var/lib", "wintap");
+        string parquetDir = Path.Combine(baseDir, "parquet", "merged");
+
         string processParquet = Path.Combine(parquetDir, "*+raw_process+*.parquet");
         string tcpParquet = Path.Combine(parquetDir, "*+raw_tcp_process_conn_incr+*.parquet");
         string udpParquet = Path.Combine(parquetDir, "*+raw_udp_process_conn_incr+*.parquet");

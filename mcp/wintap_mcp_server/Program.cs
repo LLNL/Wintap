@@ -1,14 +1,14 @@
-﻿using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ModelContextProtocol;
-using ModelContextProtocol.Protocol;
 using gov.llnl.wintap.helpers;
 using gov.llnl.wintap.ai.mcp;
-using ModelContextProtocol.Server;
 
-Logit.Instance.LogDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap", "Logs");
+string baseDir = OperatingSystem.IsWindows()
+    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap")
+    : Path.Combine("/var/lib", "wintap");
+
+Logit.Instance.LogDir = Path.Combine(baseDir, "Logs");
 Logit.Instance.Init();
 Logit.Instance.Append("MCP Server is starting", LogVerboseLevel.Normal);
 

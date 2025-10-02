@@ -8,7 +8,9 @@ using System.ComponentModel;
 namespace gov.llnl.wintap.helpers
 {
 
-
+    /// <summary>
+    /// Provides simple, dependency free text logging
+    /// </summary>
     public sealed class Logit
     {
         private string logName;
