@@ -22,10 +22,10 @@ using WintapCoreSvcMgr.Database;
 namespace gov.llnl.wintap.platform.windows.infrastructure
 {
     /// <summary>
-    /// BootLogProcessor - Drop-in replacement for BootTraceProcessor using Windows Security Log
-    /// Processes Security Event Log entries from boot time until current time to generate complete process tree
-    /// Since this only runs at system boot, it processes ALL events to ensure no gaps before real-time monitoring begins
-    /// Much simpler than ETL approach - no need to correlate ImageLoad/ProcessStart events
+    /// Processes Windows Security Log events (4688/4689) at system boot to build a complete process tree.
+    /// Runs once at startup, processing all events from boot time to present to ensure no gaps before 
+    /// real-time monitoring begins. Drop-in replacement for ETL-based BootTraceProcessor with simplified
+    /// implementation requiring no event correlation.
     /// </summary>
     public class BootLogProcessor : IDisposable
     {
@@ -57,10 +57,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             LogInfo($"BootLogProcessor initialized - {modeDescription}");
         }
 
-        /// <summary>
-        /// Process boot events from Windows Security Log - drop-in replacement for ProcessBootTraceAsync
-        /// Processes ALL events from boot to now by default to ensure complete coverage before real-time monitoring begins
-        /// </summary>
         public async Task<BootTraceProcessingResult> ProcessBootTraceAsync()
         {
             var startTime = DateTime.Now;
@@ -94,7 +90,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     LogInfo("This ensures complete coverage with no gaps before real-time monitoring begins");
                 }
 
-                // Add system processes (same as existing implementation)
+                // Add system processes
                 List<ProcessRecord> processRecords = AddSystemProcesses();
 
                 // Query Security Log for process events during boot window
@@ -102,7 +98,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                 LogInfo($"Extracted {processRecords.Count} process records from Security Log");
 
-                // Insert into database (same interface as existing)
+                // Insert into database 
                 foreach (var processRecord in processRecords)
                 {
                     _database.InsertBootTraceRecord(processRecord);
@@ -127,11 +123,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             return result;
         }
 
-        /// <summary>
-        /// Extract process events from Windows Security Log from boot until now
-        /// Much simpler than ETL - each event contains all needed information
-        /// Provides complete coverage with no gaps before real-time monitoring takes over
-        /// </summary>
         private async Task<List<ProcessRecord>> ExtractProcessEventsFromSecurityLog(DateTime startTime, DateTime endTime, List<ProcessRecord> processRecords)
         {
             var activeProcesses = new Dictionary<string, ProcessRecord>(); // Key: ProcessId-CreateTime
@@ -267,7 +258,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 }
 
 
-                // Create ProcessRecord (same structure as existing)
+                // Create ProcessRecord
                 var processRecord = new ProcessRecord
                 {
                     ProcessId = processId,
@@ -377,7 +368,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             // Add System Idle Process (PID 0)
             processRecords.Add(CreateSystemProcess(0, "System Idle Process", "idle", StateManager.MachineBootTime.ToUniversalTime()));
 
-            // Add System Process (PID 4)  
+            // Add System Process (PID 4)  -- this is not a native process but one that can be a catch-all parent in the event Wintap fails to maintain a consistent tree.
             processRecords.Add(CreateSystemProcess(-1, "Unknown", "unknown", StateManager.MachineBootTime.ToUniversalTime()));
 
             LogInfo("Added system processes (PID 0 and 4)");
@@ -427,27 +418,12 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             try
             {
-                // Use same StateManager approach as existing code
                 return StateManager.MachineBootTime;
             }
             catch (Exception ex)
             {
                 LogError($"Failed to get machine boot time: {ex.Message}");
                 return null;
-            }
-        }
-
-        private Guid GetAgentId()
-        {
-            // Return same agent ID logic as existing implementation
-            try
-            {
-                // Use existing StateManager if available
-                return StateManager.AgentId;
-            }
-            catch
-            {
-                throw new Exception("Agent ID not found");
             }
         }
 
@@ -477,17 +453,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 // Clean up any resources
                 _disposed = true;
             }
-        }
-    }
-
-    /// <summary>
-    /// Extension methods for Dictionary
-    /// </summary>
-    public static class DictionaryExtensions
-    {
-        public static TValue GetValueOrDefault<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TKey key, TValue defaultValue = default(TValue))
-        {
-            return dictionary.TryGetValue(key, out TValue value) ? value : defaultValue;
         }
     }
 }

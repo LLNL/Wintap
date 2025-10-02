@@ -60,6 +60,7 @@ Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench(1)", "shar
 		Release.AspNetCompiler.FixedNames = "false"
 		Release.AspNetCompiler.Debug = "False"
 		VWDPort = "59548"
+		SlnRelativePath = "shared\Wintap-Workbench\"
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wintap_mcp_server", "shared\ai\wintap_mcp_server\wintap_mcp_server.csproj", "{842F3621-DD13-8A76-286D-0514EBE1E9A2}"

@@ -64,7 +64,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         #region Real-time Monitoring Interface (replaces MiniTraceETWSession)
 
         /// <summary>
-        /// Start real-time process monitoring - replaces StartMiniTraceSession()
+        /// Start real-time process monitoring
         /// </summary>
         public bool StartProcessMonitoring()
         {
@@ -104,7 +104,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         /// <summary>
-        /// Stop real-time process monitoring - replaces StopMiniTraceSession()
+        /// Stop real-time process monitoring
         /// </summary>
         public bool StopProcessMonitoring()
         {
@@ -138,7 +138,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         /// <summary>
-        /// Check if monitoring session is active - replaces IsSessionActive()
+        /// Check if monitoring session is active
         /// </summary>
         public bool IsSessionActive()
         {
@@ -160,7 +160,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     if (processRecord != null)
                     {
                         // Insert into database immediately for real-time processing
-                        //_database.InsertProcessStart(processRecord);
+                        _database.InsertProcessStart(processRecord.Result);
                     }
                 }
             }
@@ -175,7 +175,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         #region Batch Processing Interface (replaces ETL file processing)
 
         /// <summary>
-        /// Process Security Log events from a time range - replaces ProcessCapturedEvents()
+        /// Process Security Log events from a time range
         /// </summary>
         public async Task<List<ProcessRecord>> ProcessEventsFromTimeRange(DateTime startTime, DateTime endTime)
         {
@@ -250,7 +250,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         }
 
         /// <summary>
-        /// Process Security Log events since last checkpoint - replaces hourly ETL processing
+        /// Process Security Log events since last checkpoint
         /// </summary>
         public async Task<List<ProcessRecord>> ProcessEventsSinceLastCheckpoint()
         {
@@ -264,32 +264,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
             return processRecords;
         }
-
-        /// <summary>
-        /// Process captured events with callback - replaces MiniTraceETWSession.ProcessCapturedEvents()
-        /// </summary>
-        //public bool ProcessCapturedEvents(Action<ProcessEvent> eventProcessor)
-        //{
-        //    try
-        //    {
-        //        // Process events from the last hour if no specific time range given
-        //        var processRecords = ProcessEventsSinceLastCheckpoint().GetAwaiter().GetResult();
-
-        //        // Convert ProcessRecord to ProcessEvent for compatibility
-        //        foreach (var record in processRecords)
-        //        {
-        //            var processEvent = ConvertToProcessEvent(record);
-        //            eventProcessor?.Invoke(processEvent);
-        //        }
-
-        //        return true;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        LogError($"Error processing captured events: {ex.Message}");
-        //        return false;
-        //    }
-        //}
 
         #endregion
 
@@ -330,7 +304,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 // Create time from event timestamp
                 var createTime = eventRecord.TimeCreated.Value.ToUniversalTime();
 
-                // Generate PidHash (same algorithm as existing)
+                // Generate PidHash
                 var pidHash = _processHash.GenPidHash(processId, createTime.ToFileTimeUtc());
 
                 // Extract command line if available
@@ -347,7 +321,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 }
 
 
-                // Create ProcessRecord (same structure as existing)
+                // Create ProcessRecord
                 var processRecord = new ProcessRecord
                 {
                     ProcessId = processId,
@@ -412,7 +386,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 if (parentProcessId > 0)
                 {
                     // TODO:  create support for this in the database mananager
-                    //parentPidHash = await LookupParentPidHashFromDatabase(parentProcessId, createTime);
+                    // parentPidHash = await LookupParentPidHashFromDatabase(parentProcessId, createTime);
                 }
 
                 // Create ProcessRecord
@@ -438,40 +412,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             {
                 LogError($"Error parsing process creation event: {ex.Message}");
                 return null;
-            }
-        }
-
-        /// <summary>
-        /// Handle Security Event 4689 (Process Termination)
-        /// Updates existing process record in database
-        /// </summary>
-        private async Task UpdateProcessTerminationEvent(EventRecord eventRecord)
-        {
-            try
-            {
-                var eventData = ParseEventData(eventRecord.ToXml());
-
-                if (eventData.TryGetValue("ProcessId", out string processIdHex))
-                {
-                    var processId = Convert.ToInt32(processIdHex, 16);
-                    var exitTime = eventRecord.TimeCreated ?? DateTime.UtcNow;
-
-                    // Extract exit code if available
-                    int? exitCode = null;
-                    if (eventData.TryGetValue("ExitStatus", out string exitStatusHex))
-                    {
-                        exitCode = Convert.ToInt32(exitStatusHex, 16);
-                    }
-
-                    // TODO:  use PidHash to Update process record in database
-                    // await _database.UpdateProcessStop(processId, exitTime, exitCode);
-
-                    LogInfo($"TODO: Update process termination: PID={processId}, ExitTime={exitTime}, ExitCode={exitCode}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error processing process termination event: {ex.Message}");
             }
         }
 
@@ -518,7 +458,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         //    {
         //        // Query database for parent process that was active at child creation time
         //        // This is more accurate than ETL approach which lacks parent timing info
-        //        var parentProcess = await _database.FindProcessByPidAndTimeAsync(parentProcessId, childCreateTime);
+        //        var parentProcess = await _database.GetParentPidHash(parentProcessId, childCreateTime);
         //        return parentProcess?.PidHash;
         //    }
         //    catch (Exception ex)
@@ -528,58 +468,9 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         //    }
         //}
 
-        /// <summary>
-        /// Convert ProcessRecord to ProcessEvent for compatibility with existing code
-        /// </summary>
-        //private ProcessEvent ConvertToProcessEvent(ProcessRecord record)
-        //{
-        //    return new ProcessEvent
-        //    {
-        //        EventType = record.ExitTime.HasValue ? ProcessEventType.Stop : ProcessEventType.Start,
-        //        ProcessId = record.ProcessId,
-        //        ParentProcessId = record.ParentProcessId,
-        //        ProcessName = record.ProcessName,
-        //        ImagePath = record.ProcessPath,
-        //        CommandLine = record.CommandLine,
-        //        CreateTime = record.CreateTime,
-        //        ExitTime = record.ExitTime,
-        //        ExitCode = record.ExitCode,
-        //        PidHash = record.PidHash,
-        //        ParentPidHash = record.ParentPidHash,
-        //        UniqueProcessKey = (ulong)record.UniqueProcessKey
-        //    };
-        //}
-
         #endregion
 
         #region Status and Configuration Methods
-
-        /// <summary>
-        /// Check if Security Log auditing is properly configured
-        /// </summary>
-        //public bool IsSecurityAuditingConfigured()
-        //{
-        //    return true;
-        //    try
-        //    {
-        //        // Check if process auditing is enabled by looking for recent process creation events
-        //        using (EventLogQuery query = new EventLogQuery(_logName, PathType.LogName,
-        //            $"*[System[EventID={PROCESS_CREATION_EVENT_ID}]]"))
-        //        {
-        //            using (var reader = new EventLogReader(query))
-        //            {
-        //                reader.BatchSize = 1; // Only need to check if events exist
-        //                var testEvent = reader.ReadEvent();
-        //                return testEvent != null;
-        //            }
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        LogError($"Error checking security auditing configuration: {ex.Message}");
-        //        return false;
-        //    }
-        //}
 
         /// <summary>
         /// Get status information about Security Log monitoring
@@ -613,19 +504,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         #endregion
 
         #region Helper Methods
-
-        private Guid GetAgentId()
-        {
-            try
-            {
-                // Use existing StateManager if available
-                return StateManager.AgentId;
-            }
-            catch
-            {
-                throw new Exception("Agent ID not found");
-            }
-        }
 
         private void LogInfo(string message)
         {
@@ -689,15 +567,4 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         Start,
         Stop
     }
-
-    /// <summary>
-    /// Extension methods for Dictionary
-    /// </summary>
-    //public static class DictionaryExtensions
-    //{
-    //    public static TValue GetValueOrDefault<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TKey key, TValue defaultValue = default(TValue))
-    //    {
-    //        return dictionary.TryGetValue(key, out TValue value) ? value : defaultValue;
-    //    }
-    //}
 }

@@ -20,6 +20,14 @@ namespace gov.llnl.wintap
         public string FullPath { get; set; }
     }
 
+
+    /// <summary>
+    /// WintapCoreSvcMgr - Self-healing infrastructure manager for Wintap's process monitoring system.
+    /// Handles database recovery operations, configures Windows Security audit policies for process 
+    /// lifecycle events (4688/4689), and maintains an hourly scheduled task for recovery database updates.
+    /// Automatically ensures proper system configuration on every startup, providing resilient process 
+    /// tree reconstruction from Security log events or ETW boot traces.
+    /// </summary>
     internal class Program
     {
         private static BackupDatabaseManager backupDbManager;
@@ -40,8 +48,6 @@ namespace gov.llnl.wintap
             EnsureScheduledTaskExists();
             EnsureProcessMonitoringEnabled();
 
-            //string command = "RECOVER_DATABASE";
-
             BackupDatabaseManager.DatabaseTargetEnum target = BackupDatabaseManager.DatabaseTargetEnum.RECOVERY;
             if(command.ToLower().Contains("process_minitrace"))
             {
@@ -60,7 +66,6 @@ namespace gov.llnl.wintap
         {
             return command switch
             {
-                //"COMPACT_BACKUP_DB" => CompactBackupDb(),
                 "RECOVER_DATABASE" => RecoverDB().Result,  // only called by Wintap on startup
                 "PROCESS_MINITRACE" => ProcessMiniTrace().Result, // only called by scheduled task to update recovery
                 "RUNDOWN" => DoETWRundown().Result,
@@ -129,8 +134,6 @@ namespace gov.llnl.wintap
             Console.WriteLine();
             Console.WriteLine("Commands:");
             Console.WriteLine("  RECOVER_DATABASE           - Complete database recovery (main command)");
-            Console.WriteLine("  PROCESS_MINITRACE           - Database gap recovery (hourly command)");
-            //Console.WriteLine("  COMPACT_BACKUP_DB          - Compact backup database");
             Console.WriteLine("  HELP, /?                   - Show this help");
             Console.WriteLine();
             Console.WriteLine("Examples:");
@@ -142,7 +145,7 @@ namespace gov.llnl.wintap
         /// <summary>
         /// Ensures Windows Security Audit policies are enabled for process monitoring.
         /// Enables both process creation (4688) and process termination (4689) events.
-        /// Safe to call repeatedly - setting these policies is idempotent.
+        /// Safe to call repeatedly 
         /// </summary>
         private static void EnsureProcessMonitoringEnabled()
         {
@@ -417,20 +420,6 @@ namespace gov.llnl.wintap
             WintapLogger.Log.Append("Rundown complete.  ETL File Path: " + etlFilePath, core.infrastructure.LogLevel.Info);
             return returnCode;
         }
-
-        //private static int CompactBackupDb()
-        //{
-        //    int resultCode = 0;
-        //    try
-        //    {
-        //        backupDbManager.CompactBackupDatabase();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        resultCode = 1;
-        //    }
-        //    return resultCode;
-        //}
 
         internal static bool IsSystemBoot()
         {

@@ -9,19 +9,13 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;  // For StateManager
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.models;  // For ProcessHash
-//using gov.llnl.wintap.shared.models;
-//using Wintap.ProcessTree.Shared.Configuration;
+using System.IO;
 
 namespace WintapCoreSvcMgr.Database
 {
-    /// <summary>
-    /// BackupDatabaseManager - Manages backup-trace.duckdb operations for WintapCoreSvcMgr
-    /// Handles ETL processing, database synchronization, and maintenance operations
-    /// Now includes MiniTraceETWSession management for gap recovery
-    /// </summary>
+
     public class BackupDatabaseManager : IDisposable
     {
-        //private readonly ProcessTreeDatabaseConfig _config;
 
         // ProcessHash for consistent PidHash generation
         private readonly ProcessHash _processHash;
@@ -29,11 +23,10 @@ namespace WintapCoreSvcMgr.Database
 
         private bool _disposed = false;
 
-        // File paths
-        private const string RECOVERY_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb";
-        private const string MAIN_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\main.duckdb";
-        private const string MINI_TRACE_ETL_PATH = @"C:\ProgramData\Wintap\ProcessTrace\mini-trace.etl";
-        private const string BOOT_TRACE_ETL_PATH = @"C:\ProgramData\Wintap\BootTrace\boot-trace.etl";
+        // File path
+        private string RECOVERY_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb";
+        private string MAIN_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\main.duckdb";
+        
         private string DB_PATH;
         private DuckDBConnection _connection;
 
@@ -45,6 +38,10 @@ namespace WintapCoreSvcMgr.Database
 
         public BackupDatabaseManager(DatabaseTargetEnum target)
         {
+            RECOVERY_DB_PATH = Path.Combine(Environment.GetEnvironmentVariable("PROGRAMDATA"), "Wintap", "ProcessTree", "recovery.duckdb");
+            MAIN_DB_PATH = Path.Combine(Environment.GetEnvironmentVariable("PROGRAMDATA"), "Wintap", "ProcessTree", "main.duckdb");
+
+
             DB_PATH = MAIN_DB_PATH;
             if (target == DatabaseTargetEnum.RECOVERY)
             {
@@ -55,9 +52,6 @@ namespace WintapCoreSvcMgr.Database
             _processHash = new ProcessHash();
 
             InitializeDatabase();
-
-            // Create backup database configuration
-            //_config = ProcessTreeDatabaseConfig.CreateBackupDatabaseConfig();
 
             LogInfo("BackupDatabaseManager initialized for WintapCoreSvcMgr.exe");
         }
@@ -86,7 +80,7 @@ namespace WintapCoreSvcMgr.Database
         {
             try
             {
-                // Helper methods (same as before)
+                // Helper methods
                 string EscapeString(string value)
                 {
                     if (value == null) return "NULL";
@@ -109,7 +103,7 @@ namespace WintapCoreSvcMgr.Database
                 {EscapeString(process.ParentPidHash)},
                 {process.ProcessId},
                 {process.ParentProcessId},
-                {process.UniqueProcessKey},                    -- Added this!
+                {process.UniqueProcessKey},
                 {EscapeString(process.ProcessName)},
                 {EscapeString(process.ProcessPath)},
                 {EscapeString(process.CommandLine)},
@@ -154,7 +148,6 @@ namespace WintapCoreSvcMgr.Database
                     return "'" + dateTime.ToString("yyyy-MM-dd HH:mm:ss.fff") + "'";
                 }
 
-                // Use INSERT (not INSERT OR REPLACE) - boot trace records should never be duplicated
                 var sql = $@"
         INSERT INTO live_processes (
             pid_hash, parent_pid_hash, process_id, parent_process_id,
@@ -194,40 +187,6 @@ namespace WintapCoreSvcMgr.Database
                     LogError($"DUPLICATE PidHash detected during boot trace insert: {process.PidHash} - this indicates a processing error");
                 }
 
-                return false;
-            }
-        }
-
-        public bool UpdateProcessStop(ulong uniqueProcessKey, DateTime exitTime, int? exitCode = null)
-        {
-            try
-            {
-                // Use UniqueProcessKey instead of PID for lookup - much more reliable!
-                var sql = $@"
-            UPDATE live_processes 
-            SET 
-                exit_time = '{exitTime:yyyy-MM-dd HH:mm:ss.fff}',
-                exit_code = {(exitCode?.ToString() ?? "NULL")},
-                is_active = false
-            WHERE unique_process_key = {uniqueProcessKey} AND is_active = true";
-
-                using var cmd = new DuckDBCommand(sql, _connection);
-                var rowsAffected = cmd.ExecuteNonQuery();
-
-                if (rowsAffected > 0)
-                {
-                    LogInfo($"Successfully updated process exit for UniqueProcessKey {uniqueProcessKey}");
-                    return true;
-                }
-                else
-                {
-                    LogWarning($"No active process found to update for UniqueProcessKey {uniqueProcessKey}");
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to update process stop for UniqueProcessKey {uniqueProcessKey}: {ex.Message}");
                 return false;
             }
         }
@@ -290,207 +249,9 @@ namespace WintapCoreSvcMgr.Database
             }
         }
 
-        public void RegisterPidMapping(int pid, string pidHash)
-        {
-            lock (_cacheLock)
-            {
-                _activePidToPidHash[pid] = pidHash;
-            }
-        }
-
-        public void UnregisterPidMapping(int pid)
-        {
-            lock (_cacheLock)
-            {
-                _activePidToPidHash.Remove(pid);
-            }
-        }
-
-
-        /// <summary>
-        /// Compact the backup database
-        /// Called by WintapCoreSvcMgr.exe COMPACT_BACKUP_DB command
-        /// </summary>
-        //public DatabaseOperationResult CompactBackupDatabase()
-        //{
-        //    try
-        //    {
-        //        LogInfo("Starting backup database compaction");
-
-        //        var statsBefore = GetDatabaseStats();
-        //        CompactDatabase();
-        //        var statsAfter = GetDatabaseStats();
-
-        //        var spaceReclaimed = statsBefore.DatabaseSizeBytes - statsAfter.DatabaseSizeBytes;
-
-        //        LogInfo($"Backup database compaction completed. Space reclaimed: {spaceReclaimed / (1024 * 1024)} MB");
-
-        //        return DatabaseOperationResult.DBSuccess(0, new
-        //        {
-        //            SpaceReclaimedBytes = spaceReclaimed,
-        //            SizeBefore = statsBefore.DatabaseSizeBytes,
-        //            SizeAfter = statsAfter.DatabaseSizeBytes
-        //        });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        LogError($"Failed to compact backup database: {ex.Message}");
-        //        return DatabaseOperationResult.Failure(ex.Message);
-        //    }
-        //}
-
-
-
-        /// <summary>
-        /// Perform smart compaction - tested and verified working!
-        /// </summary>
-        public int PerformSmartCompaction()
-        {
-            try
-            {
-                LogInfo("Starting smart database compaction");
-
-                // Step 1: Update live descendants status
-                UpdateLiveDescendantsStatus();
-
-                // Step 2: Count processes to be deleted
-                var countSql = "SELECT COUNT(*) FROM live_processes WHERE has_live_descendants = false AND is_active = false";
-                using var countCmd = new DuckDBCommand(countSql, _connection);
-                var deletedCount = (int)countCmd.ExecuteScalar();
-
-                // Step 3: Delete processes without live descendants  
-                var deleteSql = "DELETE FROM live_processes WHERE has_live_descendants = false AND is_active = false";
-                ExecuteNonQuery(deleteSql);
-
-                // Step 4: Optimize database file
-                ExecuteNonQuery("VACUUM");
-
-                LogInfo($"Smart compaction completed, removed {deletedCount} processes");
-                return deletedCount;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Smart compaction failed: {ex.Message}");
-                return 0;
-            }
-        }
-
-        /// <summary>
-        /// Update has_live_descendants using recursive CTE (CONFIRMED WORKING!)
-        /// </summary>
-        public bool UpdateLiveDescendantsStatus()
-        {
-            try
-            {
-                LogInfo("Updating live descendants status using recursive CTE");
-
-                var sql = @"
-            WITH RECURSIVE live_lineages AS (
-                SELECT pid_hash, parent_pid_hash
-                FROM live_processes 
-                WHERE is_active = true
-                
-                UNION ALL
-                
-                SELECT p.pid_hash, p.parent_pid_hash
-                FROM live_processes p
-                INNER JOIN live_lineages l ON p.pid_hash = l.parent_pid_hash
-            )
-            UPDATE live_processes 
-            SET has_live_descendants = (pid_hash IN (SELECT pid_hash FROM live_lineages))";
-
-                ExecuteNonQuery(sql);
-                LogInfo("Live descendants status updated successfully");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to update live descendants status: {ex.Message}");
-                return false;
-            }
-        }
-
-        //public void RemoveStaleProcesses(DateTime cutoffTime)
-        //{
-        //    try
-        //    {
-        //        var sql = $@"
-        //            DELETE FROM {_config.TableName} 
-        //            WHERE is_active = false 
-        //              AND exit_time < ? 
-        //              AND has_live_descendants = false";
-
-        //        using var cmd = new DuckDBCommand(sql, _connection);
-        //        cmd.Parameters.Add(new DuckDBParameter("cutoff_time", cutoffTime));
-        //        cmd.ExecuteNonQuery();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        LogError($"Failed to remove stale processes: {ex.Message}");
-        //        throw;
-        //    }
-        //}
-
-        public void CompactDatabase()
-        {
-            try
-            {
-                ExecuteNonQuery("VACUUM");
-                LogInfo("Database compaction completed");
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to compact database: {ex.Message}");
-                throw;
-            }
-        }
-
-        //public DatabaseStats GetDatabaseStats()
-        //{
-        //    try
-        //    {
-        //        var stats = new DatabaseStats
-        //        {
-        //            CollectedAt = DateTime.UtcNow,
-        //            IsHealthy = true
-        //        };
-
-        //        // Get process counts
-        //        stats.TotalProcesses = ExecuteScalar<int>($"SELECT COUNT(*) FROM {_config.TableName}");
-        //        stats.ActiveProcesses = ExecuteScalar<int>($"SELECT COUNT(*) FROM {_config.TableName} WHERE is_active = true");
-        //        stats.ExitedProcesses = stats.TotalProcesses - stats.ActiveProcesses;
-
-        //        // Get database file size
-        //        if (File.Exists(_config.DatabasePath))
-        //        {
-        //            stats.DatabaseSizeBytes = new FileInfo(_config.DatabasePath).Length;
-        //        }
-
-        //        stats.HealthDetails = $"Total: {stats.TotalProcesses}, Active: {stats.ActiveProcesses}, Size: {stats.DatabaseSizeBytes / (1024 * 1024)} MB";
-        //        return stats;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        LogError($"Failed to get database stats: {ex.Message}");
-        //        return new DatabaseStats
-        //        {
-        //            CollectedAt = DateTime.UtcNow,
-        //            IsHealthy = false,
-        //            HealthDetails = ex.Message
-        //        };
-        //    }
-        //}
-
-        private T ExecuteScalar<T>(string sql)
-        {
-            using var cmd = new DuckDBCommand(sql, _connection);
-            var result = cmd.ExecuteScalar();
-            return (T)Convert.ChangeType(result, typeof(T));
-        }
-
         /// <summary>
         /// Synchronize databases (copy recovery.duckdb → main-trace.duckdb)
-        /// Called by WintapCoreSvcMgr.exe SYNCHRONIZE_DATABASES command
+        ///
         /// </summary>
         public DatabaseOperationResult SynchronizeDatabases()
         {
@@ -541,55 +302,10 @@ namespace WintapCoreSvcMgr.Database
         }
 
         /// <summary>
-        /// Get backup database status
-        /// Called by WintapCoreSvcMgr.exe BACKUP_DB_STATUS command
-        /// </summary>
-        //public BackupDatabaseStatus GetBackupDatabaseStatus()
-        //{
-        //    try
-        //    {
-        //        var stats = GetDatabaseStats();
-
-        //        return new BackupDatabaseStatus
-        //        {
-        //            IsHealthy = stats.IsHealthy,
-        //            DatabaseExists = File.Exists(RECOVERY_DB_PATH),
-        //            DatabasePath = RECOVERY_DB_PATH,
-        //            TotalProcesses = stats.TotalProcesses,
-        //            ActiveProcesses = stats.ActiveProcesses,
-        //            DatabaseSizeMB = stats.DatabaseSizeBytes / (1024.0 * 1024.0),
-        //            LastModified = File.Exists(RECOVERY_DB_PATH) ? File.GetLastWriteTime(RECOVERY_DB_PATH) : null,
-        //            CheckedAt = DateTime.UtcNow,
-        //            HealthDetails = stats.HealthDetails
-        //        };
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        LogError($"Failed to get backup database status: {ex.Message}");
-        //        return new BackupDatabaseStatus
-        //        {
-        //            IsHealthy = false,
-        //            DatabaseExists = File.Exists(RECOVERY_DB_PATH),
-        //            ErrorMessage = ex.Message,
-        //            CheckedAt = DateTime.UtcNow
-        //        };
-        //    }
-        //}
-
-        /// <summary>
         /// this method determines whether or not the Recovery DB has a valid root of the process tree,
         /// meaning that the existence of the essential boot process tree (ntoskrnl -> smss -> etc) is within a reasonable time after boot
         /// </summary>
         /// <returns>True if Recovery DB contains valid boot process tree, false otherwise</returns>
-        /// <remarks>
-        /// Required using statements:
-        /// using DuckDB.NET.Data;
-        /// using gov.llnl.wintap.core.infrastructure;
-        /// using gov.llnl.wintap.core.shared;
-        /// 
-        /// Required constant (add to class):
-        /// private const string RECOVERY_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\recovery.duckdb";
-        /// </remarks>
         internal bool DuckHasValidRoot()
         {
             

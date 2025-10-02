@@ -9,6 +9,9 @@ using System;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
+    /// <summary>
+    /// super simple and dependency free text file logger 
+    /// </summary>
     public sealed class WintapLogger
     {
         private static readonly WintapLogger _instance = new WintapLogger();
