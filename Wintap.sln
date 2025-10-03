@@ -10,26 +10,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "platform", "platform", "{94
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "windows", "windows", "{F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{39BB107A-F80C-49B8-BCDA-11C080592E99}"
-	ProjectSection(SolutionItems) = preProject
-		Docs\Advanced Guide on the Esper Query Language and Wintap.txt = Docs\Advanced Guide on the Esper Query Language and Wintap.txt
-		Docs\CONTRIBUTIONS.md = Docs\CONTRIBUTIONS.md
-		Docs\ETL Flow in Wintap.md = Docs\ETL Flow in Wintap.md
-		Docs\Introduction on Using Esper with Wintap.txt = Docs\Introduction on Using Esper with Wintap.txt
-		Docs\LICENSE = Docs\LICENSE
-		Docs\LICENSE.md = Docs\LICENSE.md
-		Docs\LICENSE.rtf = Docs\LICENSE.rtf
-		Docs\NOTICE.txt = Docs\NOTICE.txt
-		Docs\README.md = Docs\README.md
-		Docs\Wintap 7 Developer Guide.docx = Docs\Wintap 7 Developer Guide.docx
-		Docs\Wintap 7 Developer Guide.pdf = Docs\Wintap 7 Developer Guide.pdf
-		Docs\Wintap Process Tree Design.md = Docs\Wintap Process Tree Design.md
-		Docs\wintap-architecture.svg = Docs\wintap-architecture.svg
-		Docs\wintap-developer-guide.md = Docs\wintap-developer-guide.md
-		Docs\wintap.ico = Docs\wintap.ico
-		Docs\Wintap.png = Docs\Wintap.png
-	EndProjectSection
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapCoreSvcMgr", "platform\windows\WintapCoreSvcMgr\WintapCoreSvcMgr.csproj", "{81FBD822-2DC1-2331-8CA9-BC480052207F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shared", "shared", "{ABD96F32-1616-418C-B9BA-3AD8305B3F0A}"
@@ -45,27 +25,46 @@ EndProject
 Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench(1)", "shared\Wintap-Workbench\", "{344A6B60-2229-B8C0-6F95-B52EB1014BFB}"
 	ProjectSection(WebsiteProperties) = preProject
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
-		Debug.AspNetCompiler.VirtualPath = "/localhost_59548"
+		Debug.AspNetCompiler.VirtualPath = "/localhost_55769"
 		Debug.AspNetCompiler.PhysicalPath = "shared\Wintap-Workbench\"
-		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_59548\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_55769\"
 		Debug.AspNetCompiler.Updateable = "true"
 		Debug.AspNetCompiler.ForceOverwrite = "true"
 		Debug.AspNetCompiler.FixedNames = "false"
 		Debug.AspNetCompiler.Debug = "True"
-		Release.AspNetCompiler.VirtualPath = "/localhost_59548"
+		Release.AspNetCompiler.VirtualPath = "/localhost_55769"
 		Release.AspNetCompiler.PhysicalPath = "shared\Wintap-Workbench\"
-		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_59548\"
+		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_55769\"
 		Release.AspNetCompiler.Updateable = "true"
 		Release.AspNetCompiler.ForceOverwrite = "true"
 		Release.AspNetCompiler.FixedNames = "false"
 		Release.AspNetCompiler.Debug = "False"
-		VWDPort = "59548"
-		SlnRelativePath = "shared\Wintap-Workbench\"
+		VWDPort = "55769"
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wintap_mcp_server", "shared\ai\wintap_mcp_server\wintap_mcp_server.csproj", "{842F3621-DD13-8A76-286D-0514EBE1E9A2}"
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "WintapSetup", "platform\windows\WintapSetup\WintapSetup.vdproj", "{D1BD19A0-93CA-91D9-A70F-0DD0634A2793}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "documentation", "documentation", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		documentation\Advanced Guide on the Esper Query Language and Wintap.txt = documentation\Advanced Guide on the Esper Query Language and Wintap.txt
+		documentation\CONTRIBUTIONS.md = documentation\CONTRIBUTIONS.md
+		documentation\ETL Flow in Wintap.md = documentation\ETL Flow in Wintap.md
+		documentation\Introduction on Using Esper with Wintap.txt = documentation\Introduction on Using Esper with Wintap.txt
+		documentation\LICENSE = documentation\LICENSE
+		documentation\LICENSE.md = documentation\LICENSE.md
+		documentation\LICENSE.rtf = documentation\LICENSE.rtf
+		documentation\NOTICE.txt = documentation\NOTICE.txt
+		documentation\README.md = documentation\README.md
+		documentation\Wintap 7 Developer Guide.docx = documentation\Wintap 7 Developer Guide.docx
+		documentation\Wintap 7 Developer Guide.pdf = documentation\Wintap 7 Developer Guide.pdf
+		documentation\Wintap Process Tree Design.md = documentation\Wintap Process Tree Design.md
+		documentation\wintap-architecture.svg = documentation\wintap-architecture.svg
+		documentation\wintap-developer-guide.md = documentation\wintap-developer-guide.md
+		documentation\wintap.ico = documentation\wintap.ico
+		documentation\Wintap.png = documentation\Wintap.png
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
