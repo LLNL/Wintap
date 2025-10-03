@@ -232,12 +232,6 @@
     <ProjectReference Include="..\shared\WintapAPI\WintapAPI.csproj" />
   </ItemGroup>
   <PropertyGroup>
-    <PreBuildEvent>reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy /v Enabled /t REG_DWORD /d 0 /f</PreBuildEvent>
-  </PropertyGroup>
-  <PropertyGroup>
-    <PostBuildEvent>reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy /v Enabled /t REG_DWORD /d 1 /f</PostBuildEvent>
-  </PropertyGroup>
-  <PropertyGroup>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
 	  <StartupObject></StartupObject>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
