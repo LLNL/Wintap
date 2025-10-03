@@ -69,7 +69,7 @@ namespace gov.llnl.wintap.core.shared
             {
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.UseShellExecute = false;
-                psi.FileName = Strings.FileRootPath + "\\WintapCoreSvcMgr.exe";
+                psi.FileName = Env.FileRootPath + "\\WintapCoreSvcMgr.exe";
                 psi.Arguments = "RESTART";
                 psi.WindowStyle = ProcessWindowStyle.Hidden;
                 Process p = new Process();

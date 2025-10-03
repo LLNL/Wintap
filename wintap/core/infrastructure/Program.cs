@@ -1,49 +1,45 @@
-/*
+﻿/*
  * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
  */
 
+//  these disables are required for the semantic kernel libraries
 #pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020, SKEXP0070;
 
-using DuckDB.NET.Data;
-using DuckDB.NET.Data;
 using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
-using gov.llnl.wintap.platform.windows.infrastructure;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.Sqlite;
-using Microsoft.SemanticKernel.Embeddings;
-using Microsoft.SemanticKernel.Memory;
 using ModelContextProtocol.Client;
 using OpenAI;
 using System;
 using System.ClientModel;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// APPLICATION INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
-
-//System.Diagnostics.Debugger.Launch();
-
 WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
-// Configure AI Provider selection
+// ═══════════════════════════════════════════════════════════════════════════
+// AI INTEGRATION CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── AI Provider Selection ─────────────────────────────────────────────────
 string aiProvider = "OpenAI"; // "OpenAI" or "Ollama"
-if(Settings.Default.AiApiUrl.Contains("localhost"))
+if (Settings.Default.AiApiUrl.Contains("localhost"))
 {
     aiProvider = "Ollama";
 }
@@ -53,7 +49,8 @@ IChatClient chatClient;
 
 try
 {
-    string fileRootPath = Strings.FileRootPath;
+    // ─── MCP Server Configuration ──────────────────────────────────────────
+    string fileRootPath = Env.FileRootPath;
     string exeName;
 
     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -81,21 +78,17 @@ try
         })
     );
 
-
-    Console.WriteLine("Connecting client to MCP server");
-
-    // Configure based on provider
+    // ─── Chat Client Configuration (Provider-Specific) ────────────────────
     if (aiProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
     {
+        // Ollama (Local LLM) Configuration
         string ollamaEndpoint = Settings.Default.AiApiUrl;
         string ollamaModel = Settings.Default.AiModel;
 
         WintapLogger.Log.Append($"Using Ollama provider: {ollamaEndpoint} with model {ollamaModel}", LogLevel.Info);
 
-        // Create custom Ollama client (already implements IChatClient)
         IChatClient ollamaClient = new OllamaChatClient(ollamaEndpoint, ollamaModel);
 
-        // Add function invocation support for MCP tools
         chatClient = ollamaClient
             .AsBuilder()
             .UseFunctionInvocation()
@@ -103,6 +96,7 @@ try
     }
     else
     {
+        // OpenAI-Compatible API Configuration
         OpenAIClientOptions openAIOptions = new OpenAIClientOptions()
         {
             Endpoint = new Uri(Settings.Default.AiApiUrl)
@@ -110,13 +104,12 @@ try
 
         string key = Settings.Default.AiApiKey;
         ApiKeyCredential cred = new ApiKeyCredential(key!);
-
         string model = Settings.Default.AiModel;
+
         WintapLogger.Log.Append($"Using OpenAI provider with model {model}", LogLevel.Info);
 
         var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient(model);
 
-        // Convert to IChatClient and add function invocation support
         chatClient = openAIClient
             .AsIChatClient()
             .AsBuilder()
@@ -124,13 +117,13 @@ try
             .Build();
     }
 
-    // Initialize chat history (same for both providers)
+    // ─── Chat History Initialization ───────────────────────────────────────
     List<ChatMessage> chatHistory = [
         new ChatMessage(ChatRole.System,
-            File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),
+            File.ReadAllText(Path.Combine(Env.FileRootPath, "systemprompt.txt"))),
     ];
 
-    // Register services
+    // ─── AI Service Registration ──────────────────────────────────────────
     builder.Services.AddSingleton(chatHistory);
     builder.Services.AddSingleton<IMcpClient>(mcpClient);
     builder.Services.AddSingleton<IChatClient>(chatClient);
@@ -140,48 +133,65 @@ catch (Exception ex)
     WintapLogger.Log.Append($"Error loading AI Client: {ex.Message}", LogLevel.Error);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DATABASE INFRASTRUCTURE
+// ═══════════════════════════════════════════════════════════════════════════
 
 WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
-FileInfo mainDBInfo = new FileInfo(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb"));
+
+// Clean up existing database files before recovery
+FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
 mainDBInfo.Delete();
-mainDBInfo = new FileInfo(Path.Combine(Strings.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
+mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
 mainDBInfo.Delete();
 
+// Execute database recovery process
 CallDatabaseRecovery();
 
-// Configuration for Windows Service and Hosted Service
+// ═══════════════════════════════════════════════════════════════════════════
+// SERVICE CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
 WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
+
+// ─── Windows Service & Hosted Services ─────────────────────────────────────
 builder.Services.AddWindowsService();
 builder.Services.AddHostedService<WinTapSvc>();
 
-//builder.Services.AddSingleton<ProcessTreeDatabaseManager>();
-//builder.Services.AddHostedService<ProcessTreeDatabaseManager>(provider => provider.GetService<ProcessTreeDatabaseManager>());
-
+// ─── SignalR Configuration ─────────────────────────────────────────────────
 builder.Services.AddSignalR();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// APPLICATION PIPELINE CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 WintapLogger.Log.Append("Building app container", LogLevel.Info);
 var app = builder.Build();
-// make available as singleton 
+
+// Make service provider available as singleton for dependency access
 ServiceProviderAccessor.Services = app.Services;
 
+// ─── Middleware Pipeline ───────────────────────────────────────────────────
 //app.UseStaticFiles();
 //app.UseSpaStaticFiles();
 
 app.UseRouting();
 app.UseAuthorization();
-app.MapControllers();  // This will map the routes to the API controllers
+app.MapControllers();  // Map routes to API controllers
 
-//   Uncomment for deployment
+// ─── SPA Configuration (Deployment) ────────────────────────────────────────
+// Uncomment for deployment with production build
 //app.UseSpa(spa =>
 //{
 //    spa.Options.SourcePath = "C:\\Program Files\\Wintap\\Workbench";
 //    if (app.Environment.IsDevelopment())
 //    {
-//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099"); // URL of the prod server
+//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099");
 //    }
 //});
 
-WintapLogger.Log.Append("setting up API endpoints", LogLevel.Info);
+// ─── SignalR Hub Endpoints ─────────────────────────────────────────────────
+WintapLogger.Log.Append("Setting up API endpoints", LogLevel.Info);
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
@@ -189,26 +199,26 @@ app.UseEndpoints(endpoints =>
     endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// APPLICATION STARTUP
+// ═══════════════════════════════════════════════════════════════════════════
 
-WintapLogger.Log.Append("running app", LogLevel.Info);
+WintapLogger.Log.Append("Running app", LogLevel.Info);
 app.Run();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER METHODS
+// ═══════════════════════════════════════════════════════════════════════════
 
-//public class TimePlugin
-//{
-//    [KernelFunction]
-//    [Description("Returns the current time")]
-//    public string GetCurrentTime()
-//    {
-//        return DateTime.Now.ToShortTimeString();
-//    }
-//}
-
+/// <summary>
+/// Executes the database recovery process via WintapCoreSvcMgr.exe.
+/// Ensures process tree database integrity on startup.
+/// </summary>
+/// <returns>True if recovery completed successfully, false otherwise.</returns>
 bool CallDatabaseRecovery()
 {
     try
     {
-        //System.Diagnostics.Debugger.Launch();
         var processInfo = new ProcessStartInfo
         {
             FileName = "WintapCoreSvcMgr.exe",
@@ -223,10 +233,13 @@ bool CallDatabaseRecovery()
         wintapSvcMgr.StartInfo = processInfo;
         wintapSvcMgr.Start();
         wintapSvcMgr.WaitForExit();
+
+        // Wait for process to fully exit
         while (System.Diagnostics.Process.GetProcessesByName("WintapCoreSvcMgr").Length > 0)
         {
             System.Threading.Thread.Sleep(100);
         }
+
         if (wintapSvcMgr.ExitCode == 0)
         {
             WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);

@@ -14,9 +14,9 @@ using System.Threading.Tasks;
 namespace gov.llnl.wintap.core.shared
 {
     /// <summary>
-    /// Consolidated string definitions
+    /// Wintap environment paths
     /// </summary>
-    static internal class Strings
+    static internal class Env
     {
         /// <summary>
         /// Root path for Wintap persistency in the Windows registry

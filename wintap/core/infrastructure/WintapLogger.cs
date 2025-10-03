@@ -1,4 +1,9 @@
-// Legacy-compatible logger delegating to ComponentLogger
+/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -9,6 +14,9 @@ using System;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
+    /// <summary>
+    /// super simple and dependency free text file logger 
+    /// </summary>
     public sealed class WintapLogger
     {
         private static readonly WintapLogger _instance = new WintapLogger();

@@ -1,9 +1,3 @@
-using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.core.shared;
-using System;
-using System.Diagnostics;
-
 namespace gov.llnl.wintap.core.collect
 {
     public abstract class BaseSensor

@@ -153,7 +153,7 @@ namespace gov.llnl.wintap.core.api
             openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api-dev.llnl.gov/v1") };
 
             string? key = "";
-            key = System.IO.File.ReadAllText(Path.Combine(Strings.FileDataRoot, "ai", "api-key.txt"));
+            key = System.IO.File.ReadAllText(Path.Combine(Env.FileDataRoot, "ai", "api-key.txt"));
 
             ApiKeyCredential cred = new ApiKeyCredential(key!);
             var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4.1");
@@ -164,7 +164,7 @@ namespace gov.llnl.wintap.core.api
                 .UseFunctionInvocation()
                 .Build();
 
-            List<ChatMessage> chatHistory = [new ChatMessage(ChatRole.System, System.IO.File.ReadAllText(Path.Combine(Strings.FileRootPath, "systemprompt.txt"))),];
+            List<ChatMessage> chatHistory = [new ChatMessage(ChatRole.System, System.IO.File.ReadAllText(Path.Combine(Env.FileRootPath, "systemprompt.txt"))),];
         }
     }
 

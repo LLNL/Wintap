@@ -57,11 +57,6 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             wintapRunning = true;
             runMethodRunning = false;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                WintapLogger.Log.Append("Setting up Wintap Service Manager...", LogLevel.Info);
-                setupSvcMgr();
-            }
             WintapLogger.Log.Append("Wintap profile: " + WintapProfile.Name, LogLevel.Info);
             WintapLogger.Log.Append("Max Memory: " + WintapProfile.MaxMem, LogLevel.Info);
             if (WintapProfile.Name != WintapProfile.ProfileEnum.Developer)
@@ -69,29 +64,11 @@ namespace gov.llnl.wintap.core.infrastructure
                 WintapLogger.Log.Append("Max CPU: " + WintapProfile.MaxCPU, LogLevel.Info);
             }
 
+            // todo  refactor for multiplatform or remove
             BackgroundWorker perfCheckWorker = new BackgroundWorker();
             perfCheckWorker.DoWork += Watchdog_DoWork;
             perfCheckWorker.RunWorkerCompleted += Watchdog_RunWorkCompleted;
             //perfCheckWorker.RunWorkerAsync();
-        }
-
-        private void setupSvcMgr()
-        {
-            if (WintapProfile.Name == WintapProfile.ProfileEnum.Developer)
-            {
-                ProcessStartInfo schTaskInfo = new ProcessStartInfo();
-                schTaskInfo.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\system32\\schtasks.exe";
-                schTaskInfo.Arguments = "/Create /SC DAILY /TN WintapUpdate /TR \"'" + Strings.FileRootPath + "\\WintapCoreSvcMgr.exe' UPDATE\" /ST 12:00 /RI 10 /F /RL HIGHEST /ru \"Builtin\\users\"";
-                Process schTasks = new Process();
-                schTasks.StartInfo = schTaskInfo;
-                schTasks.Start();
-            }
-            ProcessStartInfo schTaskInfo2 = new ProcessStartInfo();
-            schTaskInfo2.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\system32\\schtasks.exe";
-            schTaskInfo2.Arguments = "/Create /SC DAILY /TN WintapHealthCheck /TR \"'" + Strings.FileRootPath + "\\WintapCoreSvcMgr.exe' HEALTHCHECK\" /ST 12:00 /F /RL HIGHEST /ru \"Builtin\\users\"";
-            Process schTasks2 = new Process();
-            schTasks2.StartInfo = schTaskInfo2;
-            schTasks2.Start();
         }
 
 

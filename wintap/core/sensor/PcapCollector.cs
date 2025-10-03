@@ -1,7 +1,6 @@
 using SharpPcap;
 using SharpPcap.LibPcap;
 using PacketDotNet;
-using Antlr4.Runtime.Misc;
 using System;
 using System.IO;
 using gov.llnl.wintap.core.infrastructure;

@@ -110,7 +110,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 watchdog = _watchdog;
                 watchdog.Start();
-                WintapLogger.Log.Append($"Loading plugins from: {Strings.FilePluginPath}", LogLevel.Info);
+                WintapLogger.Log.Append($"Loading plugins from: {Env.FilePluginPath}", LogLevel.Info);
 
                 LoadPluginAssemblies();
                 RegisterEventHandlers();
@@ -216,7 +216,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             try
             {
-                isolatedCatalog = new IsolatedPluginCatalog(Strings.FilePluginPath);
+                isolatedCatalog = new IsolatedPluginCatalog(Env.FilePluginPath);
                 mefContainer = new CompositionContainer(isolatedCatalog);
                 mefContainer.ComposeParts(this);
                 PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
@@ -623,6 +623,11 @@ namespace gov.llnl.wintap.core.infrastructure
 
         #region Helper Methods
 
+        /// <summary>
+        /// this section allows plugins to enable certain sensors at runtime (as opposed to config)
+        /// todo:  make dynamic or extend to full sensor list
+        /// </summary>
+        /// <param name="eventFlags"></param>
         private void enableEventFlags(EventFlags eventFlags)
         {
             var flagsStr = eventFlags.ToString();
@@ -688,7 +693,7 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 using (var pluginKey = Registry.LocalMachine.CreateSubKey(
-                    Strings.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name,
+                    Env.RegistryPluginPath + "\\" + runnable.RunPlugin.Metadata.Name,
                     RegistryKeyPermissionCheck.ReadWriteSubTree))
                 {
                     pluginKey.SetValue("LastRan", lastRan.ToString());
@@ -719,7 +724,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 // Try to get last run time from registry
                 try
                 {
-                    using (var pluginKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryPluginPath + "\\" + runPlugin.Metadata.Name))
+                    using (var pluginKey = Registry.LocalMachine.OpenSubKey(Env.RegistryPluginPath + "\\" + runPlugin.Metadata.Name))
                     {
                         if (pluginKey != null)
                         {

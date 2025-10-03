@@ -23,11 +23,28 @@ using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
+    /// <summary>
+    /// Central event routing and processing hub for Wintap telemetry data using the Esper Complex Event Processing (CEP) engine.
+    /// Manages event enrichment, statistics tracking, and interactive query workbench functionality for real-time telemetry analysis.
+    /// </summary>
+    /// <remarks>
+    /// Core Responsibilities (todo: map these to seperate classes):
+    /// - Event Processing: Routes telemetry events to Esper CEP engine with process lineage enrichment
+    /// - Performance Monitoring: Tracks throughput metrics including events/second, peak rates, and total event counts
+    /// - Query Management: Compiles, deploys, and manages user-defined EPL (Event Processing Language) queries
+    /// - Workbench State: Persists and restores interactive analysis queries across sessions
+    /// 
+    /// Query Workbench:
+    /// The workbench allows researchers to interactively create and test EPL queries against live telemetry streams.
+    /// Only one query can be active at a time, with state persisted to workbench-state.json.
+    /// </remarks>
     public sealed class EventChannel
     {
         private static readonly EventChannel instance = new EventChannel();
 
-        // Statistics tracking
+        // **************************************************************************
+        // ***  STATISTICS TRACKING
+        // **************************************************************************
         private static long eventsPerSecond;
         private static long maxEventsPerSecond;
         private static DateTime maxEventTime;
@@ -96,6 +113,28 @@ namespace gov.llnl.wintap.core.infrastructure
             ResetWorkbench();
         }
 
+        private static void StatsWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            while (true)
+            {
+                System.Threading.Thread.Sleep(1000);
+
+                // Calculate events per second
+                eventsPerSecond = totalEvents - lastTotalEvents;
+                lastTotalEvents = totalEvents;
+
+                if (eventsPerSecond > maxEventsPerSecond)
+                {
+                    maxEventsPerSecond = eventsPerSecond;
+                    maxEventTime = DateTime.Now;
+                }
+            }
+        }
+
+
+        // **************************************************************************
+        // ***  ESPER INFRASTRUCTURE LIFECYCLE
+        // **************************************************************************
         /// <summary>
         /// Initialize Esper configuration
         /// </summary>
@@ -146,13 +185,32 @@ namespace gov.llnl.wintap.core.infrastructure
         }
 
 
+        // **************************************************************************
+        // ***  EVENT ROUTING & ENRICHMENT
+        // **************************************************************************
+
         /// <summary>
-        /// Enhanced Send method using ProcessTreeDatabaseManager
+        /// Sends a telemetry event to the Esper event processing engine after enriching it with process lineage information.
+        /// This method filters out Wintap's own events, resolves process ownership details, and tracks event throughput metrics.
         /// </summary>
+        /// <param name="streamedEvent">The telemetry event to send. Events from Wintap's own process (PID matching StateManager.WintapPID) are silently discarded.</param>
+        /// <remarks>
+        /// Event Processing:
+        /// - For non-Process events: Resolves and attaches the owning process's PidHash and ProcessName
+        /// - For Process events: Resolves and attaches the parent process's PidHash and ParentProcessName
+        /// - All events are tagged with the current AgentId
+        /// 
+        /// Performance Tracking:
+        /// - Maintains running counts of total events processed
+        /// - Calculates events per second and tracks peak throughput
+        /// 
+        /// Error Handling:
+        /// - Exceptions during process resolution or event transmission are logged but do not throw, preventing data collection interruption
+        /// </remarks>
         public static void Send(WintapMessage streamedEvent)
         {
-            totalEvents++;
             // Update events per second calculation
+            totalEvents++;
             var now = DateTime.Now;
             if (now.Second != lastTotalEvents)
             {
@@ -178,18 +236,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), streamedEvent.MessageType.ToString());
                     streamedEvent.PidHash = ownerProcess.PidHash;
-                    if (streamedEvent.ProcessName != null)
-                    {
-                        if (streamedEvent.ProcessName.ToLower() != ownerProcess.ProcessName.ToLower())
-                        {
-                            WintapLogger.Log.Append($"Process owner mismatch, processname on event is {streamedEvent.ProcessName} but processname pulled from DB is {ownerProcess.ProcessName}, overriding native event value to match DB", LogLevel.Error);
-                            streamedEvent.ProcessName = ownerProcess.ProcessName;
-                        }
-                    }
-                    else
-                    {
-                        streamedEvent.ProcessName = ownerProcess.ProcessName;
-                    }
+                    streamedEvent.ProcessName = ownerProcess.ProcessName;
                 }
                 else
                 {
@@ -204,6 +251,11 @@ namespace gov.llnl.wintap.core.infrastructure
                 WintapLogger.Log.Append($"Error sending event for {streamedEvent.MessageType}: {ex.Message}", LogLevel.Error);
             }
         }
+
+
+        // **************************************************************************
+        // ***  QUERY COMPILATION & DEPLOYMENT
+        // **************************************************************************
 
         /// <summary>
         /// Compile and deploy EPL statements
@@ -273,6 +325,11 @@ namespace gov.llnl.wintap.core.infrastructure
                 return epl;
             }
         }
+
+
+        // **************************************************************************
+        // ***  WORKBENCH STATE MANAGEMENT
+        // **************************************************************************
 
         /// <summary>
         /// Manage workbench queries
@@ -381,7 +438,7 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 var queries = new Dictionary<string, EsperQuery>();
-                string stateFile = Path.Combine(Strings.FileDataRoot, "workbench-state.json");
+                string stateFile = Path.Combine(Env.FileDataRoot, "workbench-state.json");
 
                 if (File.Exists(stateFile))
                 {
@@ -413,7 +470,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             try
             {
-                string stateFile = Path.Combine(Strings.FileDataRoot, "workbench-state.json");
+                string stateFile = Path.Combine(Env.FileDataRoot, "workbench-state.json");
                 var queryList = queries.Values.ToList();
                 string json = JsonConvert.SerializeObject(queryList, Formatting.Indented);
 
@@ -445,26 +502,6 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        /// <summary>
-        /// Statistics worker thread
-        /// </summary>
-        private static void StatsWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            while (true)
-            {
-                System.Threading.Thread.Sleep(1000);
-
-                // Calculate events per second
-                eventsPerSecond = totalEvents - lastTotalEvents;
-                lastTotalEvents = totalEvents;
-
-                if (eventsPerSecond > maxEventsPerSecond)
-                {
-                    maxEventsPerSecond = eventsPerSecond;
-                    maxEventTime = DateTime.Now;
-                }
-            }
-        }
         internal static void setWorkbenchState(Dictionary<string, EsperQuery> esperQueries)
         {
             string jsonString = JsonConvert.SerializeObject(esperQueries.Values, Formatting.Indented);
@@ -497,11 +534,5 @@ namespace gov.llnl.wintap.core.infrastructure
         public string Id { get; set; }
         public string Query { get; set; }
         public EsperState State { get; set; }
-    }
-
-    public class PendingEvent
-    {
-        public WintapMessage Message { get; set; }
-        public DateTime BufferedAt { get; set; }
     }
 }

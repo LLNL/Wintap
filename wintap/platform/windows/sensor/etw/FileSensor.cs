@@ -82,7 +82,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
             WintapLogger.Log.Append("Doing ETW event rundown", LogLevel.Always);
             ProcessStartInfo rundownPsi = new ProcessStartInfo();
-            rundownPsi.FileName = Strings.FileRootPath + "\\WintapCoreSvcMgr.exe";
+            rundownPsi.FileName = Env.FileRootPath + "\\WintapCoreSvcMgr.exe";
             rundownPsi.Arguments = "RUNDOWN";
             System.Diagnostics.Process rundown = new Process();
             rundown.StartInfo = rundownPsi;

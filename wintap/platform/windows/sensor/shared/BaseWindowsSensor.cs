@@ -78,7 +78,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             try
             {
                 bool usePersistedStats = false;
-                RegistryKey wintapKey = Registry.LocalMachine.OpenSubKey(Strings.RegistryRootPath);
+                RegistryKey wintapKey = Registry.LocalMachine.OpenSubKey(Env.RegistryRootPath);
                 if (wintapKey.GetValueNames().Contains("WatchdogRestart"))
                 {
                     if (wintapKey.GetValue("WatchdogRestart").ToString() == "1")
@@ -90,7 +90,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
                 wintapKey.Dispose();
                 if (usePersistedStats)
                 {
-                    RegistryKey providerKey = Registry.LocalMachine.CreateSubKey(Strings.RegistryCollectorPath + "\\" + SensorName);
+                    RegistryKey providerKey = Registry.LocalMachine.CreateSubKey(Env.RegistryCollectorPath + "\\" + SensorName);
                     DateTime statsAge = DateTime.Parse(providerKey.GetValue("LastUpdate").ToString());
                     TimeSpan fiveMinutes = new TimeSpan(0, 5, 0);
                     if (DateTime.Now.Subtract(statsAge) < fiveMinutes)  // only evaluate recent statistics so that high volume providers can be retried.
@@ -131,7 +131,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
                     WintapLogger.Log.Append(SensorName + ", total events over 10/sec: " + Counter, LogLevel.Debug);
                     if (Properties.Settings.Default.Profile != "Developer")  // don't throttle providers if running in dev mode.
                     {
-                        RegistryKey wintapKey = Registry.LocalMachine.CreateSubKey(Strings.RegistryCollectorPath + "\\" + SensorName);
+                        RegistryKey wintapKey = Registry.LocalMachine.CreateSubKey(Env.RegistryCollectorPath + "\\" + SensorName);
                         wintapKey.SetValue("EventsPerSecond", rollingAverage);
                         wintapKey.SetValue("LastUpdate", lastAveraged);
                         wintapKey.Flush();

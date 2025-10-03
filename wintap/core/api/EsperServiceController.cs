@@ -54,7 +54,7 @@ namespace gov.llnl.wintap.core.api
             bool wintapLogOK = false;
             try
             {
-                wintapLogOK = ReadTail(Path.Combine(Strings.FileDataRoot, "Logs", "Wintap.log"));
+                wintapLogOK = ReadTail(Path.Combine(Env.FileDataRoot, "Logs", "Wintap.log"));
             }
             catch (Exception ex)
             {
@@ -70,7 +70,7 @@ namespace gov.llnl.wintap.core.api
             bool collectorOK = false;
             try
             {
-                collectorOK = ReadTail(Path.Combine(Strings.FileDataRoot, "Logs", "WintapETL.log"));
+                collectorOK = ReadTail(Path.Combine(Env.FileDataRoot, "Logs", "WintapETL.log"));
             }
             catch (Exception ex)
             {
