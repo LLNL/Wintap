@@ -137,16 +137,27 @@ catch (Exception ex)
 // DATABASE INFRASTRUCTURE
 // ═══════════════════════════════════════════════════════════════════════════
 
-WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
+// Only run database recovery on Windows (uses Security Event Logs & ETW)
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
 
-// Clean up existing database files before recovery
-FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
-mainDBInfo.Delete();
-mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
-mainDBInfo.Delete();
+    // Clean up existing database files before recovery
+    FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
+    mainDBInfo.Delete();
+    mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
+    mainDBInfo.Delete();
 
-// Execute database recovery process
-CallDatabaseRecovery();
+    // Execute database recovery process
+    CallDatabaseRecovery();
+}
+else
+{
+    WintapLogger.Log.Append("Database recovery skipped on non-Windows platform", LogLevel.Info);
+
+    // Initialize empty database for Linux/macOS
+    // (OSquery events will populate it as they come in)
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SERVICE CONFIGURATION
