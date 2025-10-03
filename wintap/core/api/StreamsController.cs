@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -19,6 +19,8 @@ using System.Web;
 using System.Threading.Tasks;
 using com.espertech.esper.runtime.client;
 using com.espertech.esper.common.client;
+using gov.llnl.wintap.core.api.helpers;
+using gov.llnl.wintap.core.infrastructure.helpers;
 
 namespace gov.llnl.wintap.core.api
 {
@@ -35,6 +37,18 @@ namespace gov.llnl.wintap.core.api
     }
 
 
+    [ApiController]
+    [Route("api/test")]
+    public class DiagnosticController : ControllerBase
+    {
+        [HttpGet]
+        public IActionResult Get()
+        {
+            WintapLogger.Log.Append("Diagnostic API endpoint called", core.infrastructure.LogLevel.Always);
+            return Ok(new { message = "API is working", timestamp = DateTime.Now });
+        }
+    }
+
     /// <summary>
     /// API for interfacing Esper with the Workbench
     /// </summary>
@@ -48,25 +62,58 @@ namespace gov.llnl.wintap.core.api
             StateManager.LastWorkbenchActivity = DateTime.Now;
         }
 
-        /// <summary>
-        /// Activate, Stop or Delete handling
-        /// </summary>
-        /// <param name="q"></param>
-        /// <returns></returns>
+
+
         [HttpPost]
         [Route("api/streams")]
         public IActionResult Post([FromBody] EsperQuery q)
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
             string responseMsg = "OK";
-            bool error = false;     
+            bool error = false;
             try
             {
                 q = EventChannel.ManageWorkbenchQuery(q);
-                EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
-                esperDeployment.Statements[0].Events += ActiveQuery_Events;
+
+                // if query is ACTIVE, attach listeners
+                if (q.State == EsperQuery.EsperState.ACTIVE)
+                {
+                    try
+                    {
+                        EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
+                        if (esperDeployment != null)
+                        {
+                            esperDeployment.Statements[0].Events += ActiveQuery_Events;
+                        }
+                        else
+                        {
+                            // need to getAllDeployments and find the match by name, workaround here to just recreate it
+
+                        }
+                    }
+                    catch (Exception deploymentEx)
+                    {
+                        // Log the error but don't treat it as a fatal error
+                        WintapLogger.Log.Append($"Note: Could not attach to deployment: {deploymentEx.Message}", LogLevel.Debug);
+
+                        // Only throw if it's an actual critical error, not just a first-time deployment
+                        if (!deploymentEx.Message.Contains("No deployment found for deploymentId"))
+                        {
+                            throw;
+                        }
+                    }
+                }
+                else
+                {
+                    EPDeployment esperDeployment = EventChannel.EsperRuntime.DeploymentService.GetDeployment(q.Id);
+                    if (esperDeployment != null)
+                    {
+                        esperDeployment.Statements[0].Events -= ActiveQuery_Events;
+                        EventChannel.EsperRuntime.DeploymentService.Undeploy(esperDeployment.DeploymentId);
+                    }
+                }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 responseMsg = ex.Message;
                 error = true;
@@ -74,7 +121,7 @@ namespace gov.llnl.wintap.core.api
 
             IActionResult result = Ok(new
             {
-                response = responseMsg
+                response = q
             });
             if (error)
             {
@@ -92,7 +139,7 @@ namespace gov.llnl.wintap.core.api
         public IActionResult GetAllStatements()
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
-            List<EsperQuery> allStatements = EventChannel.getWorkbenchState();
+            List<EsperQuery> allStatements = EventChannel.getWorkbenchState().Values.ToList();
             IActionResult result = Ok(new
             {
                 response = allStatements
@@ -114,8 +161,8 @@ namespace gov.llnl.wintap.core.api
             string responseMsg = "OK";
             try
             {
-                var statement = EventChannel.getWorkbenchState().Where(s => s.Name ==  name).FirstOrDefault();
-                responseMsg = statement.Query;
+                var statement = EventChannel.getWorkbenchState().Where(s => s.Key == name).FirstOrDefault();
+                responseMsg = statement.Value.Query;
             }
             catch (Exception ex)
             {
@@ -140,6 +187,7 @@ namespace gov.llnl.wintap.core.api
         /// </summary>
         /// <returns></returns>
         [HttpDelete]
+        [Route("api/Streams")]
         public IActionResult Delete()
         {
             StateManager.LastWorkbenchActivity = DateTime.Now;
@@ -147,12 +195,21 @@ namespace gov.llnl.wintap.core.api
             string responseMsg = "OK";
             try
             {
-                foreach (EsperQuery esperQuery in EventChannel.getWorkbenchState())
+                foreach (EsperQuery esperQuery in EventChannel.getWorkbenchState().Values)
                 {
-                    esperQuery.State = EsperQuery.EsperState.DELETED;
-                    EventChannel.ManageWorkbenchQuery(esperQuery);
+                    try
+                    {
+                        esperQuery.State = EsperQuery.EsperState.DELETED;
+                        EventChannel.ManageWorkbenchQuery(esperQuery);
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"Could not delete workbench query {esperQuery.Id} message: {ex.Message}", LogLevel.Warn);
+                    }
+
                 }
 
+                EventChannel.setWorkbenchState(new Dictionary<string, EsperQuery>());
             }
             catch (Exception ex)
             {
@@ -171,19 +228,12 @@ namespace gov.llnl.wintap.core.api
             return result;
         }
 
-     
-
-        /// <summary>
-        /// web sockets method for broadcasting query results
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void ActiveQuery_Events(object sender, UpdateEventArgs e)
         {
-            foreach(var esperObject in e.NewEvents)
+            foreach (var esperObject in e.NewEvents)
             {
                 StringBuilder sb = new StringBuilder();
-                
+
                 foreach (string prop in esperObject.EventType.PropertyNames)
                 {
                     try
@@ -196,14 +246,28 @@ namespace gov.llnl.wintap.core.api
                         {
                             sb.Append(prop.ToString() + "=" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().ToLongTimeString() + " +" + DateTime.FromFileTimeUtc(Int64.Parse((esperObject[prop].ToString()))).ToLocalTime().Millisecond + "ms, ");
                         }
+                        else if (prop.ToString().Equals("MessageType"))
+                        {
+                            string formattedValue = EnumFormatter.FormatEnumForDisplay("MessageType", esperObject[prop]);
+                            sb.Append(prop.ToString() + "=\"" + formattedValue + "\", ");
+                        }
+                        else if (prop.ToString().Equals("ActivityType"))
+                        {
+                            string formattedValue = EnumFormatter.FormatEnumForDisplay("ActivityType", esperObject[prop]);
+                            sb.Append(prop.ToString() + "=\"" + formattedValue + "\", ");
+                        }
                         else
                         {
                             sb.Append(prop.ToString() + "=" + esperObject[prop].ToString() + ", ");
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log the error but continue processing other properties
+                        WintapLogger.Log.Append($"Error formatting property {prop}: {ex.Message}", LogLevel.Debug);
+                    }
                 }
-                string resultRow = sb.ToString().TrimEnd(new char[] { ',' });
+                string resultRow = sb.ToString().TrimEnd(',', ' ');
                 EsperResult esperResult = new EsperResult();
                 esperResult.Result = resultRow;
                 hubContext.Clients.All.SendAsync("ReceiveMessage", esperResult, "OK");

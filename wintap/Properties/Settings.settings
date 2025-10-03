@@ -14,50 +14,50 @@
     <Setting Name="EnableWorkbench" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="ProcessCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="ProcessSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="FileCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="FileSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="TcpCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="TcpSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="UdpCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="UdpSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MicrosoftWindowsKernelRegistryCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="RegistrySensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="SensCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="SensSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="ImageLoadCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="ImageLoadSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MicrosoftWindowsKernelProcessCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="ProcessStopSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MicrosoftWindowsWin32kCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="UISensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MicrosoftWindowsWMIActivityCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="WMISensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="WindowsEventlogCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="EventlogSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MicrosoftWindowsCpuTriggerCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="CpuTriggerSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="WebActivityCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="WebActivitySensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="GenericProviders" Type="System.Collections.Specialized.StringCollection" Scope="User">
       <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
 &lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
     </Setting>
-    <Setting Name="MicrosoftWindowsGroupPolicyCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="GroupPolicySensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="CollectFileRead" Type="System.Boolean" Scope="User">
@@ -72,20 +72,20 @@
     <Setting Name="ConfigVersion" Type="System.String" Scope="User">
       <Value Profile="(Default)">1.0.0.0</Value>
     </Setting>
-    <Setting Name="KernelAPICallCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="ApiCallSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MemoryMapCollector" Type="System.Boolean" Scope="User">
+    <Setting Name="MemoryMapSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="MinRelevance" Type="System.Single" Scope="User">
-      <Value Profile="(Default)">0.7</Value>
+    <Setting Name="AiApiUrl" Type="System.String" Scope="User">
+      <Value Profile="(Default)">http://localhost:11434</Value>
     </Setting>
-    <Setting Name="SystemPrompt" Type="System.String" Scope="User">
-      <Value Profile="(Default)">You are an AI assistant that analyzes and interprets host-based Windows telemetry and offers guidance to improve performance and security of the system.</Value>
+    <Setting Name="AiApiKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)">none</Value>
     </Setting>
-    <Setting Name="ModelId" Type="System.String" Scope="User">
-      <Value Profile="(Default)">phi3</Value>
+    <Setting Name="AiModel" Type="System.String" Scope="User">
+      <Value Profile="(Default)">gpt-4.1</Value>
     </Setting>
   </Settings>
 </SettingsFile>

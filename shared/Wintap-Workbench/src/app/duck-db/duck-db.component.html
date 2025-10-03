@@ -1,0 +1,128 @@
+<div class="duck-db-container">
+    <div class="card">
+        <div class="duck-db-status" [class.available]="isAvailable" [class.unavailable]="!isAvailable">
+            <div class="status-content">
+                <i class="pi" [class.pi-check-circle]="isAvailable" [class.pi-exclamation-triangle]="!isAvailable"></i>
+                <span>DuckDB UI is {{ isAvailable ? 'available' : 'not available' }}</span>
+            </div>
+
+            <!-- Enhanced prominent launch button -->
+            <button pButton
+                    type="button"
+                    [disabled]="!isAvailable"
+                    label="Launch DuckDB UI"
+                    class="p-button-raised p-button-primary p-button-large launch-button"
+                    (click)="openDuckDb()">
+                <i class="pi pi-external-link mr-2"></i>
+            </button>
+        </div>
+
+        <!-- Main content -->
+        <div class="p-4">
+            <h5>Getting Started with DuckDB</h5>
+
+            <div class="quick-instructions">
+                <h6>What is DuckDB?</h6>
+                <p>DuckDB is an in-process database management system that allows you to analyze and query stored Wintap data.</p>
+
+                <h6>Accessing Wintap Data</h6>
+                <p>Wintap stores collected data in Parquet files at <code>C:\ProgramData\Wintap\parquet\merged</code>, organized by event type:</p>
+
+                <ul>
+                    <li><code>*raw_process*.parquet</code> - Process creation events</li>
+                    <li><code>*raw_tcp_process_conn_incr*</code> - TCP network activity</li>
+                    <li><code>*raw_udp_process_conn_incr*</code> - UDP network activity</li>
+                    <li><code>*raw_process_file*</code> - File system operations</li>
+                    <li><code>*raw_process_registry*</code> - Registry operations</li>
+                    <li><code>*raw_process_imageload*</code> - Module/DLL load events</li>
+                </ul>
+                <p>Wintap maintains a limit of 256MB of cached parquet data on disk until it begins pruning individual files on a first-in-first-out basis.</p>
+
+                <h6>Example Queries</h6>
+                <div class="example-query">
+                    <div class="code-header">
+                        <span>All processes</span>
+                    </div>
+                    <pre><code>
+    -- Load process events from parquet files
+    CREATE OR REPLACE VIEW process_events AS
+    SELECT * FROM read_parquet('C:\\ProgramData\\Wintap\\parquet\\merged\\*+raw_process*.parquet');;
+
+    -- Query the view
+    SELECT
+    EventTime,
+    ProcessName,
+    PID,
+    CommandLine
+    FROM process_events
+    ORDER BY EventTime DESC
+    LIMIT 100;
+</code></pre>
+                </div>
+                <div class="example-query">
+                    <div class="code-header">
+                        <span>All processes that connected to the internet</span>
+                    </div>
+                    <pre><code>
+    -- Load network events from parquet files
+    CREATE OR REPLACE VIEW tcp_events AS
+    SELECT * FROM read_parquet('C:\\ProgramData\\Wintap\\parquet\\merged\\*+raw_tcp_process_conn_incr*.parquet');;
+
+    -- Query the view, converting IP addresses to dotted quad
+    SELECT
+        ProcessName,
+        ActivityType,
+        RemotePort,
+        RemoteIp,
+        SUM(MaxPacketSize) AS TotalBytes,
+        MAX(EventTime) AS MostRecentEventTimeUTC,
+        (TO_TIMESTAMP(MAX(EventTime)) AT TIME ZONE 'UTC') AT TIME ZONE 'America/Los_Angeles' AS MostRecentEventTimeLocal
+    FROM (
+        SELECT
+            ProcessName,
+            ActivityType,
+            RemotePort,
+            MaxPacketSize,
+            EventTime,
+            CONCAT(
+                CAST((RemoteIpAddr >> 24) & 255 AS VARCHAR), '.',
+                CAST((RemoteIpAddr >> 16) & 255 AS VARCHAR), '.',
+                CAST((RemoteIpAddr >> 8) & 255 AS VARCHAR), '.',
+                CAST(RemoteIpAddr & 255 AS VARCHAR)
+            ) AS RemoteIp
+        FROM tcp_events
+    ) t
+        WHERE RemoteIp NOT LIKE '127.0.0.1'
+        AND RemoteIp NOT LIKE '192.168%'
+        AND RemoteIp NOT LIKE '128.15.%'
+        AND RemoteIp NOT LIKE '128.115.%'
+        AND RemoteIp NOT LIKE '134.9.%'
+        AND RemoteIp NOT LIKE '10.0.%'
+    GROUP BY
+        ProcessName,
+        ActivityType,
+        RemotePort,
+        RemoteIp
+    ORDER BY
+    TotalBytes DESC;
+</code></pre>
+                </div>
+
+                <!-- Additional prominent launch button at the bottom -->
+                <div class="action-container mt-4">
+                    <button pButton
+                            type="button"
+                            [disabled]="!isAvailable"
+                            label="Launch DuckDB UI"
+                            class="p-button-raised p-button-primary launch-button-large"
+                            (click)="openDuckDb()">
+                        <i class="pi pi-external-link mr-2"></i>
+                    </button>
+                    <div class="button-hint" *ngIf="isAvailable">
+                        Click to open the DuckDB interface in a new window
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

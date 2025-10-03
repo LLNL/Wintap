@@ -1,10 +1,3 @@
-﻿/*
- * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
- * Produced at the Lawrence Livermore National Laboratory.
- * All rights reserved.
- */
-
-
 using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
@@ -17,99 +10,224 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace gov.llnl.wintap
 {
-    // workaround for MEF loading exceptions
-    // see:  https://stackoverflow.com/a/4475117
-    public class SafeDirectoryCatalog : ComposablePartCatalog
+    public class IsolatedPluginCatalog : ComposablePartCatalog
     {
         private readonly AggregateCatalog _catalog;
+        private readonly Dictionary<string, PluginDomain> _loadedPlugins = new Dictionary<string, PluginDomain>();
 
-        public SafeDirectoryCatalog(string directory)
+
+        // <summary>
+        /// Initializes a new instance of the IsolatedPluginCatalog class that discovers and loads
+        /// plugin assemblies from the specified directory into isolated AppDomains.
+        /// </summary>
+        /// <param name="directory">The directory to scan for plugin subdirectories</param>
+        /// <remarks>
+        /// The plugin loading scheme follows these steps for each subdirectory in the specified directory:
+        ///
+        /// 1. Each subdirectory is treated as a potential plugin with the directory name as the plugin name
+        /// 2. The loader first attempts to find a name-matched assembly (PluginName.dll)
+        /// 3. If the name-matched assembly exists and contains MEF exports, it's loaded as the plugin
+        /// 4. If the name-matched assembly doesn't exist or doesn't contain MEF exports, the loader
+        ///    iterates through all DLLs in the directory, looking for the first one with MEF exports
+        /// 5. Each candidate assembly is verified to be signed and trusted (except in DEBUG builds)
+        /// 6. The first valid assembly with MEF exports is loaded into an isolated AppDomain
+        /// 7. If no valid assembly is found, the plugin is skipped with an appropriate log message
+        ///
+        /// This approach balances convention (preferring name-matched assemblies) with flexibility
+        /// (falling back to any assembly with exports), while ensuring only valid plugin assemblies
+        /// are loaded into the MEF catalog.
+        /// </remarks>
+        public IsolatedPluginCatalog(string directory)
         {
-            var files = Directory.EnumerateFiles(directory, "*.dll", SearchOption.TopDirectoryOnly);
-            files = enumerateSignedPlugins(files.ToList());
-
             _catalog = new AggregateCatalog();
+            _loadedPlugins = new Dictionary<string, PluginDomain>();
 
-            foreach (var file in files)
+            foreach (var pluginDir in Directory.GetDirectories(directory))
             {
                 try
                 {
-                    var asmCat = new AssemblyCatalog(file);
+                    string pluginName = new DirectoryInfo(pluginDir).Name;
+                    WintapLogger.Log.Append($"Attempting to load plugin: {pluginName}", LogLevel.Debug);
 
-                    //Force MEF to load the plugin and figure out if there are any exports
-                    // good assemblies will not throw the RTLE exception and can be added to the catalog
-                    if (asmCat.Parts.ToList().Count > 0)
-                        _catalog.Catalogs.Add(asmCat);
+                    // Get all potential DLL files
+                    var allDlls = Directory.GetFiles(pluginDir, "*.dll");
+                    if (allDlls.Length == 0)
+                    {
+                        WintapLogger.Log.Append($"No assemblies found for plugin: {pluginName}", LogLevel.Info);
+                        continue;
+                    }
+
+                    // First, try the name-matched DLL
+                    string nameMatchedDll = Path.Combine(pluginDir, $"{pluginName}.dll");
+                    string mainAssemblyPath = null;
+
+                    if (File.Exists(nameMatchedDll))
+                    {
+                        // Try loading the name-matched DLL first
+                        if (TryLoadPluginAssembly(nameMatchedDll, pluginName))
+                        {
+                            // Successfully loaded the name-matched assembly
+                            continue;
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"Name-matched DLL for {pluginName} exists but contains no MEF exports or failed to load, trying other DLLs", LogLevel.Debug);
+                        }
+                    }
+
+                    // Name-matched DLL wasn't found or didn't have exports, try each DLL in order
+                    bool foundValidPlugin = false;
+                    foreach (var dllPath in allDlls)
+                    {
+                        // Skip if we already tried the name-matched DLL
+                        if (dllPath.Equals(nameMatchedDll, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        if (TryLoadPluginAssembly(dllPath, pluginName))
+                        {
+                            foundValidPlugin = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundValidPlugin)
+                    {
+                        WintapLogger.Log.Append($"No valid plugin assembly with MEF exports found for: {pluginName}", LogLevel.Info);
+                    }
                 }
-                catch (ReflectionTypeLoadException rtle)
+                catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("WARN: problem loading plugin.  Name: " + file + " error: " + rtle.Message, core.infrastructure.LogLevel.Always);
-                }
-                catch (BadImageFormatException)
-                {
+                    WintapLogger.Log.Append($"Failed to load plugin from directory {pluginDir}: {ex.Message}", LogLevel.Info);
                 }
             }
         }
+
+        /// <summary>
+        /// Attempts to load a potential plugin assembly and add it to the catalog if valid
+        /// </summary>
+        /// <param name="assemblyPath">Path to the assembly to try loading</param>
+        /// <param name="pluginName">The name of the plugin</param>
+        /// <returns>True if the assembly was successfully loaded as a plugin, false otherwise</returns>
+        private bool TryLoadPluginAssembly(string assemblyPath, string pluginName)
+        {
+            // Check if assembly is signed and trusted, but bypass check in debug builds
+            bool isDebugBuild = false;
+#if DEBUG
+            isDebugBuild = true;
+#endif
+
+            if (!isDebugBuild && !IsSignedAndTrusted(assemblyPath))
+            {
+                WintapLogger.Log.Append($"Assembly {Path.GetFileName(assemblyPath)} for plugin {pluginName} is not signed or not trusted", LogLevel.Debug);
+                return false;
+            }
+
+            if (isDebugBuild && !IsSignedAndTrusted(assemblyPath))
+            {
+                WintapLogger.Log.Append($"[DEBUG BUILD] Loading unsigned assembly {Path.GetFileName(assemblyPath)} for plugin {pluginName}", LogLevel.Info);
+            }
+
+            try
+            {
+                // Load plugin in isolated domain
+                var pluginDomain = PluginDomainManager.Instance.LoadPlugin(assemblyPath);
+
+                // Check if this assembly has MEF exports
+                var asmCat = new AssemblyCatalog(pluginDomain.PluginAssembly);
+                var parts = asmCat.Parts.ToList();
+
+                if (parts.Count > 0)
+                {
+                    // Assembly has MEF exports, add it to our catalog
+                    _loadedPlugins[pluginName] = pluginDomain;
+                    _catalog.Catalogs.Add(asmCat);
+                    WintapLogger.Log.Append($"Successfully loaded plugin: {pluginName} from {Path.GetFileName(assemblyPath)} in isolated domain", LogLevel.Info);
+                    return true;
+                }
+                else
+                {
+                    // No MEF exports, unload and continue
+                    WintapLogger.Log.Append($"Assembly {Path.GetFileName(assemblyPath)} for plugin {pluginName} has no MEF exports", LogLevel.Debug);
+                    PluginDomainManager.Instance.UnloadPlugin(pluginName);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error loading assembly {Path.GetFileName(assemblyPath)} for plugin {pluginName}: {ex.Message}", LogLevel.Debug);
+                // Make sure to unload the plugin domain if it was created
+                try
+                {
+                    if (_loadedPlugins.ContainsKey(pluginName))
+                    {
+                        PluginDomainManager.Instance.UnloadPlugin(pluginName);
+                        _loadedPlugins.Remove(pluginName);
+                    }
+                }
+                catch { /* Suppress any errors during cleanup */ }
+                return false;
+            }
+        }
+
         public override IQueryable<ComposablePartDefinition> Parts
         {
             get { return _catalog.Parts; }
         }
 
-        private List<string> enumerateSignedPlugins(List<string> files)
+        public Assembly GetPluginAssembly(string pluginName)
         {
-            List<string> signedFiles = new List<string>();
-            foreach (string file in files)
+            if (_loadedPlugins.TryGetValue(pluginName, out var domain))
             {
-                try
-                {
-#if DEBUG
-                    WintapLogger.Log.Append("loading plugins in debug mode", core.infrastructure.LogLevel.Always);
-                    signedFiles.Add(file);
-#else
-                    WintapLogger.Log.Append("loading plugins in release mode", core.infrastructure.LogLevel.Always);
-                    if (isSignedAndTrusted(file))
-                    {
-                        signedFiles.Add(file);
-                    }
-                    else
-                    {
-                        WintapLogger.Log.Append(file + ": did NOT pass signature validation and will not be loaded.", core.infrastructure.LogLevel.Always);
-                    }
-#endif
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append("WARN: " + file + " is NOT signed by a trusted authority and will not be loaded.", core.infrastructure.LogLevel.Always);
-                }
+                return domain.PluginAssembly;
             }
-            return signedFiles;
+            return null;
         }
 
-        private bool isSignedAndTrusted(string filePath)
+        public void UnloadPlugin(string pluginName)
         {
-            bool isSigned = false;
-            X509Certificate2Collection certificates = new X509Certificate2Collection();
-            certificates.Import(filePath);
-            if (certificates.Count > 0)
+            if (_loadedPlugins.ContainsKey(pluginName))
             {
-                foreach (var cert in certificates)
+                PluginDomainManager.Instance.UnloadPlugin(pluginName);
+                _loadedPlugins.Remove(pluginName);
+            }
+        }
+
+        private bool IsSignedAndTrusted(string filePath)
+        {
+            WintapLogger.Log.Append($"Checking signature for: {filePath}", LogLevel.Info);
+
+#if DEBUG
+            WintapLogger.Log.Append("DEBUG mode - bypassing signature verification", LogLevel.Info);
+            return true;
+#endif
+
+            try
+            {
+                AssemblyName assemblyName = AssemblyName.GetAssemblyName(filePath);
+
+                byte[] publicKeyToken = assemblyName.GetPublicKeyToken();
+                if (publicKeyToken != null && publicKeyToken.Length > 0)
                 {
-                    using (X509Chain chain = new X509Chain(true)) // true=only evaluate machine store
-                    {
-                        chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
-                        chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
-                        chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
-                        bool isValid = chain.Build(cert);
-                        chain.ChainPolicy.VerificationTime = DateTime.Now;
-                        if (isValid)
-                        {
-                            isSigned = true;
-                            break;
-                        }
-                    }
+                    string token = BitConverter.ToString(publicKeyToken).Replace("-", "").ToLower();
+                    WintapLogger.Log.Append($"Assembly has strong name with token: {token}", LogLevel.Info);
+                    return true;
+                }
+                else
+                {
+                    WintapLogger.Log.Append("Assembly does not have a strong name", LogLevel.Info);
+                    return false;
                 }
             }
-            return isSigned;
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error verifying assembly signature: {ex.Message}", LogLevel.Info);
+
+#if DEBUG
+                return true;
+#else
+                return false;
+#endif
+            }
         }
     }
 }

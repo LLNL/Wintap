@@ -1,0 +1,96 @@
+<div class="chat-container">
+    <!-- Chat Header -->
+    <div class="chat-header">
+        <h2>Wintap Chat</h2>
+        <div class="header-actions">
+            <button type="button" class="icon-button" title="Clear Chat" (click)="clearChat()">
+                <i class="pi pi-trash"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div class="messages-area" #messagesContainer>
+        <div *ngIf="messages.length === 0" class="empty-chat">
+            <img src="assets/wintap.svg" alt="Wintap Logo" class="empty-chat-logo">
+            <h3>Welcome to Wintap Chat</h3>
+            <p>Ask a question to start chatting</p>
+
+            <!-- Example prompts section -->
+            <div class="example-prompts">
+                <h4>Examples</h4>
+                <div class="example-prompts-grid">
+                    <div class="example-prompt-card" *ngFor="let example of examplePrompts" (click)="useExamplePrompt(example)">
+                        {{ example }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div *ngFor="let message of messages" class="message-wrapper" [ngClass]="{'user-message-wrapper': message.isUser, 'assistant-message-wrapper': !message.isUser}">
+            <div class="message" [ngClass]="{'user-message': message.isUser, 'assistant-message': !message.isUser}">
+                <div class="message-header">
+                    <div class="message-avatar">
+                        <img *ngIf="!message.isUser" src="assets/wintap.svg" alt="Wintap" class="avatar-img">
+                        <i *ngIf="message.isUser" class="pi pi-user avatar-icon"></i>
+                    </div>
+                    <div class="message-source">{{ message.isUser ? 'You' : 'Wintap' }}</div>
+                    <div class="message-timestamp">{{ message.timestamp | date:'shortTime' }}</div>
+                </div>
+                <div class="message-content markdown-content" [innerHTML]="formatMessageContent(message.text)"></div>
+            </div>
+        </div>
+
+        <!-- Typing Indicator -->
+        <div *ngIf="isResponding" class="typing-indicator-container">
+            <div class="message assistant-message typing-message">
+                <div class="message-header">
+                    <div class="message-avatar">
+                        <img src="assets/wintap.svg" alt="Wintap" class="avatar-img">
+                    </div>
+                    <div class="message-source">Wintap</div>
+                </div>
+                <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+        <div class="input-container">
+            <textarea #messageInput
+                      class="message-input"
+                      placeholder="Type a message..."
+                      [(ngModel)]="userPrompt"
+                      (keydown.enter)="$event.preventDefault(); sendMessage()"
+                      (input)="adjustTextareaHeight($event)"
+                      [disabled]="isResponding"
+                      rows="1"></textarea>
+
+            <div class="input-actions">
+                <button type="button" class="icon-button send-button" (click)="fileInput.click()" [disabled]="isResponding">
+                    <i class="pi pi-upload"></i>
+                </button>
+                <button type="button" class="icon-button send-button" (click)="sendMessage()" [disabled]="!userPrompt.trim() || isResponding">
+                    <i class="pi pi-send"></i>
+                </button>
+                <button type="button" class="icon-button send-button" (click)="clearChat()">
+                    <i class="pi pi-refresh"></i>
+                </button>
+            </div>
+
+            <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;">
+        </div>
+
+        <div class="input-footer">
+            <span class="input-tip">Press <kbd>Enter</kbd> to send</span>
+        </div>
+    </div>
+</div>
+
+<!-- Error Notification -->
+<p-toast position="top-right"></p-toast>

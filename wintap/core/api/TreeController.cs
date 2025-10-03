@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -13,6 +13,8 @@ namespace gov.llnl.wintap.core.api
     /// <summary>
     /// API for interfacing Esper with the Workbench
     /// </summary>
+    [ApiController]
+    [Route("api/[controller]")]
     public class TreeController : ControllerBase
     {
 

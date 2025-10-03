@@ -1,0 +1,121 @@
+# A Tutorial on Using Esper to Query Wintap Data
+
+## Introduction to Esper in Wintap
+
+Wintap is a powerful host-based telemetry collection tool that uses Esper as its event query engine. Esper is a Complex Event Processing (CEP) engine that allows you to analyze streams of events in real-time. This tutorial will help you understand how to create effective Esper queries to analyze Wintap data.
+
+## The Basics of Esper EPL
+
+Esper uses Event Processing Language (EPL), which is similar to SQL but designed for event streams. The basic syntax looks like:
+
+```sql
+SELECT field1, field2, ... 
+FROM EventStream 
+WHERE condition
+```
+
+## Common Wintap Event Types
+
+Wintap collects various event types including:
+
+- PROCESS (process creation/termination)
+- TCP_CONNECTION (network connections)
+- UDP_PACKET (UDP traffic)
+- FILE (file activity)
+- REGISTRY (registry operations)
+- IMAGE_LOAD (DLL/module loading)
+- FOCUS_CHANGE (application focus)
+
+## Creating Basic Queries
+
+### Simple Selection
+
+This query selects all process start events:
+
+```sql
+SELECT * FROM WintapMessage 
+WHERE MessageType = 'PROCESS' 
+AND ActivityType = 'Start'
+```
+
+### Using Time Windows
+
+To analyze events over a specific time window:
+
+```sql
+SELECT * FROM WintapMessage.win:time(10 sec)
+WHERE MessageType = 'TCP_CONNECTION'
+```
+
+### Aggregation
+
+Count the number of file operations by process:
+
+```sql
+SELECT ProcessName, count(*) as FileOpCount 
+FROM WintapMessage.win:time(30 sec)
+WHERE MessageType = 'FILE'
+GROUP BY ProcessName
+```
+
+## Advanced Query Techniques
+
+### Pattern Matching
+
+Detect suspicious sequence of events:
+
+```sql
+SELECT * FROM PATTERN [
+  every a=WintapMessage(MessageType='PROCESS' AND ActivityType='Start') ->
+  b=WintapMessage(MessageType='REGISTRY' AND Path LIKE '%Run%' AND PID=a.PID)
+  WHERE timer:within(10 seconds)
+]
+```
+
+### Join Operations
+
+Correlate network connections with processes:
+
+```sql
+SELECT proc.ProcessName, conn.DestinationAddress, conn.DestinationPort
+FROM WintapMessage(MessageType='PROCESS').win:keepall() as proc
+JOIN WintapMessage(MessageType='TCP_CONNECTION') as conn
+ON proc.PID = conn.PID
+```
+
+## Best Practices
+
+1. **Be specific**: Filter events as early as possible in your query
+2. **Use time windows**: Avoid `win:keepall()` for high-volume events
+3. **Test incrementally**: Start with simple queries and build complexity
+4. **Limit result sets**: Use TOP or LIMIT clauses for high-volume data
+5. **Consider performance**: Complex patterns can consume significant resources
+
+## Example Use Cases
+
+### Detecting Process Injection
+
+```sql
+SELECT p.ProcessName as TargetProcess, p2.ProcessName as SourceProcess
+FROM WintapMessage(MessageType='PROCESS').win:keepall() as p
+JOIN WintapMessage(MessageType='KERNEL_API_CALL' AND ActivityType='OpenProcess') as k
+ON p.PID = k.TargetPid
+JOIN WintapMessage(MessageType='PROCESS').win:keepall() as p2
+ON p2.PID = k.PID
+WHERE k.DesiredAccess & 0x0008 != 0
+```
+
+### File Creation Following Network Activity
+
+```sql
+SELECT n.DestinationAddress, f.Path
+FROM PATTERN [
+  every n=WintapMessage(MessageType='TCP_CONNECTION') ->
+  f=WintapMessage(MessageType='FILE' AND ActivityType='Write' AND PID=n.PID)
+  WHERE timer:within(5 seconds)
+]
+```
+
+## Conclusion
+
+Esper queries in Wintap offer powerful capabilities for real-time analysis of system activity. By starting with simple queries and gradually building complexity, you can create sophisticated detection and monitoring capabilities. Remember to consider performance implications when working with high-volume event streams.

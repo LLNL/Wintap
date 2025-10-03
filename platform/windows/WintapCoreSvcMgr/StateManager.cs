@@ -1,0 +1,131 @@
+/*
+ * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+
+using System.Management;
+using gov.llnl.wintap.core.infrastructure;
+using Newtonsoft.Json;
+
+namespace gov.llnl.wintap.core.shared
+{
+    /// <summary>
+    /// State cache for system attributes
+    /// </summary>
+    public sealed class StateManager
+    {
+        private static readonly StateManager state = new StateManager();
+
+        public static Guid AgentId { get; private set; }
+
+        /// <summary>
+        /// The enablement state for all wintap event providers
+        /// </summary>
+        public static Dictionary<string, bool> WintapSettings { get; internal set; }
+
+       
+
+        /// <summary>
+        /// Last boot time as reported by WMI
+        /// </summary>
+        public static DateTime MachineBootTime { get; set; }
+
+        public static int WintapPID { get; set; }
+
+
+        private StateManager()
+        {
+            WintapLogger.Log.Append($"StateManager is starting", LogLevel.Info);
+            MachineBootTime = getBootTime();
+
+            WintapLogger.Log.Append($"StateManager is getting AgentId", LogLevel.Info);
+            AgentId = getAgentId(readState());
+            WintapLogger.Log.Append($"StateManager is initialized.", LogLevel.Info);
+        }
+
+        private DateTime getBootTime()
+        {
+            try
+            {
+                var uptimeMs = Environment.TickCount64;
+                var uptime = TimeSpan.FromMilliseconds(uptimeMs);
+                return DateTime.Now.Subtract(uptime);
+            }
+            catch (Exception ex)
+            {
+                // Fallback to WMI like in Program.cs
+                try
+                {
+                    SelectQuery query = new SelectQuery(@"SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
+                    ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
+                    foreach (ManagementObject mo in searcher.Get())
+                    {
+                        return ManagementDateTimeConverter.ToDateTime(mo.Properties["LastBootUpTime"].Value.ToString());
+                    }
+                }
+                catch
+                {
+                    // Last resort fallback
+                    return DateTime.Now.AddHours(-1);
+                }
+                return DateTime.Now.AddHours(-1);
+            }
+        }
+
+        private Guid getAgentId(WintapState state)
+        {
+            Guid agentId = new Guid();
+            try
+            {
+                agentId = Guid.Parse(state.AgentId);
+            }
+            catch (Exception ex) { }
+
+            if (agentId == new Guid())
+            {
+                WintapLogger.Log.Append("Generating new Agent Id for this sensor.", LogLevel.Info);
+                agentId = Guid.NewGuid();
+                state.AgentId = agentId.ToString();
+            }
+            return agentId;
+        }
+
+        public static StateManager State
+        {
+            get
+            {
+                return state;
+            }
+        }
+
+        private WintapState readState()
+        {
+            FileInfo stateInfo = new FileInfo(Path.Combine(Environment.CurrentDirectory, "wintapstate.json"));
+            WintapState wintapState = new WintapState();
+            if (stateInfo.Exists)
+            {
+                string readJsonString = File.ReadAllText(Path.Combine(Environment.CurrentDirectory, "wintapstate.json"));
+                WintapState deserializedState = JsonConvert.DeserializeObject<WintapState>(readJsonString);
+                wintapState = deserializedState;
+            }
+
+            return wintapState;
+        }
+    }
+
+    public class DiskVolume
+    {
+        public int VolumeNumber { get; set; }
+        public char VolumeLetter { get; set; }
+        public string VolumeLabel { get; set; }
+        public string FileSystem { get; set; }
+        public string VolumeType { get; set; }
+    }
+
+    public class WintapState
+    {
+        public string AgentId { get; set; }
+    }
+}

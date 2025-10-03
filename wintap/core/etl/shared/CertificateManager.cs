@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,13 +26,13 @@ namespace gov.llnl.wintap.core.etl.shared
         /// <param name="_storeName"></param>
         /// <param name="certificateNameSuffix"></param>
         /// <exception cref="Exception"></exception>
-        internal CertificateManager(string _storeName, string _certificateNameSuffix) 
+        internal CertificateManager(string _storeName, string _certificateNameSuffix)
         {
             // we support certificates installed to the personal folder of the local machine store or PFX files on disk
             this.storeName = _storeName;
             certificateType = CertificateTypeEnum.Unknown;
             DirectoryInfo directoryInfo = new DirectoryInfo(this.storeName);
-            if(directoryInfo.Exists)
+            if (directoryInfo.Exists)
             {
                 resolvePfxCert(_certificateNameSuffix);
             }
@@ -55,9 +55,9 @@ namespace gov.llnl.wintap.core.etl.shared
                 certificateNameSuffix += "*.pfx";
             }
             DirectoryInfo storeDir = new DirectoryInfo(this.storeName);
-            if(storeDir.Exists)
+            if (storeDir.Exists)
             {
-                if(storeDir.GetFileSystemInfos(certificateNameSuffix).Length > 0)
+                if (storeDir.GetFileSystemInfos(certificateNameSuffix).Length > 0)
                 {
                     deviceCertificate = new X509Certificate2(storeDir.GetFileSystemInfos(certificateNameSuffix).First().FullName, "");
                     certificateType = CertificateTypeEnum.File;

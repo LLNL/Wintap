@@ -12,7 +12,7 @@ namespace gov.llnl.wintap.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.10.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.14.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -74,156 +74,156 @@ namespace gov.llnl.wintap.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool ProcessCollector {
+        public bool ProcessSensor {
             get {
-                return ((bool)(this["ProcessCollector"]));
+                return ((bool)(this["ProcessSensor"]));
             }
             set {
-                this["ProcessCollector"] = value;
+                this["ProcessSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool FileCollector {
+        public bool FileSensor {
             get {
-                return ((bool)(this["FileCollector"]));
+                return ((bool)(this["FileSensor"]));
             }
             set {
-                this["FileCollector"] = value;
+                this["FileSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool TcpCollector {
+        public bool TcpSensor {
             get {
-                return ((bool)(this["TcpCollector"]));
+                return ((bool)(this["TcpSensor"]));
             }
             set {
-                this["TcpCollector"] = value;
+                this["TcpSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool UdpCollector {
+        public bool UdpSensor {
             get {
-                return ((bool)(this["UdpCollector"]));
+                return ((bool)(this["UdpSensor"]));
             }
             set {
-                this["UdpCollector"] = value;
+                this["UdpSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MicrosoftWindowsKernelRegistryCollector {
+        public bool RegistrySensor {
             get {
-                return ((bool)(this["MicrosoftWindowsKernelRegistryCollector"]));
+                return ((bool)(this["RegistrySensor"]));
             }
             set {
-                this["MicrosoftWindowsKernelRegistryCollector"] = value;
+                this["RegistrySensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool SensCollector {
+        public bool SensSensor {
             get {
-                return ((bool)(this["SensCollector"]));
+                return ((bool)(this["SensSensor"]));
             }
             set {
-                this["SensCollector"] = value;
+                this["SensSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool ImageLoadCollector {
+        public bool ImageLoadSensor {
             get {
-                return ((bool)(this["ImageLoadCollector"]));
+                return ((bool)(this["ImageLoadSensor"]));
             }
             set {
-                this["ImageLoadCollector"] = value;
+                this["ImageLoadSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MicrosoftWindowsKernelProcessCollector {
+        public bool ProcessStopSensor {
             get {
-                return ((bool)(this["MicrosoftWindowsKernelProcessCollector"]));
+                return ((bool)(this["ProcessStopSensor"]));
             }
             set {
-                this["MicrosoftWindowsKernelProcessCollector"] = value;
+                this["ProcessStopSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MicrosoftWindowsWin32kCollector {
+        public bool UISensor {
             get {
-                return ((bool)(this["MicrosoftWindowsWin32kCollector"]));
+                return ((bool)(this["UISensor"]));
             }
             set {
-                this["MicrosoftWindowsWin32kCollector"] = value;
+                this["UISensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MicrosoftWindowsWMIActivityCollector {
+        public bool WMISensor {
             get {
-                return ((bool)(this["MicrosoftWindowsWMIActivityCollector"]));
+                return ((bool)(this["WMISensor"]));
             }
             set {
-                this["MicrosoftWindowsWMIActivityCollector"] = value;
+                this["WMISensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool WindowsEventlogCollector {
+        public bool EventlogSensor {
             get {
-                return ((bool)(this["WindowsEventlogCollector"]));
+                return ((bool)(this["EventlogSensor"]));
             }
             set {
-                this["WindowsEventlogCollector"] = value;
+                this["EventlogSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool MicrosoftWindowsCpuTriggerCollector {
+        public bool CpuTriggerSensor {
             get {
-                return ((bool)(this["MicrosoftWindowsCpuTriggerCollector"]));
+                return ((bool)(this["CpuTriggerSensor"]));
             }
             set {
-                this["MicrosoftWindowsCpuTriggerCollector"] = value;
+                this["CpuTriggerSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool WebActivityCollector {
+        public bool WebActivitySensor {
             get {
-                return ((bool)(this["WebActivityCollector"]));
+                return ((bool)(this["WebActivitySensor"]));
             }
             set {
-                this["WebActivityCollector"] = value;
+                this["WebActivitySensor"] = value;
             }
         }
         
@@ -243,12 +243,12 @@ namespace gov.llnl.wintap.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MicrosoftWindowsGroupPolicyCollector {
+        public bool GroupPolicySensor {
             get {
-                return ((bool)(this["MicrosoftWindowsGroupPolicyCollector"]));
+                return ((bool)(this["GroupPolicySensor"]));
             }
             set {
-                this["MicrosoftWindowsGroupPolicyCollector"] = value;
+                this["GroupPolicySensor"] = value;
             }
         }
         
@@ -303,61 +303,60 @@ namespace gov.llnl.wintap.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool KernelAPICallCollector {
+        public bool ApiCallSensor {
             get {
-                return ((bool)(this["KernelAPICallCollector"]));
+                return ((bool)(this["ApiCallSensor"]));
             }
             set {
-                this["KernelAPICallCollector"] = value;
+                this["ApiCallSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool MemoryMapCollector {
+        public bool MemoryMapSensor {
             get {
-                return ((bool)(this["MemoryMapCollector"]));
+                return ((bool)(this["MemoryMapSensor"]));
             }
             set {
-                this["MemoryMapCollector"] = value;
+                this["MemoryMapSensor"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0.7")]
-        public float MinRelevance {
+        [global::System.Configuration.DefaultSettingValueAttribute("http://localhost:11434")]
+        public string AiApiUrl {
             get {
-                return ((float)(this["MinRelevance"]));
+                return ((string)(this["AiApiUrl"]));
             }
             set {
-                this["MinRelevance"] = value;
+                this["AiApiUrl"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("You are an AI assistant that analyzes and interprets host-based Windows telemetry" +
-            " and offers guidance to improve performance and security of the system.")]
-        public string SystemPrompt {
+        [global::System.Configuration.DefaultSettingValueAttribute("none")]
+        public string AiApiKey {
             get {
-                return ((string)(this["SystemPrompt"]));
+                return ((string)(this["AiApiKey"]));
             }
             set {
-                this["SystemPrompt"] = value;
+                this["AiApiKey"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("phi3")]
-        public string ModelId {
+        [global::System.Configuration.DefaultSettingValueAttribute("gpt-4.1")]
+        public string AiModel {
             get {
-                return ((string)(this["ModelId"]));
+                return ((string)(this["AiModel"]));
             }
             set {
-                this["ModelId"] = value;
+                this["AiModel"] = value;
             }
         }
     }

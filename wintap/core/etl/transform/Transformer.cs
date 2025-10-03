@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -25,8 +25,8 @@ namespace gov.llnl.wintap.core.etl.transform
         {
             List<string> inboundActivities = new List<string>() { "TcpIp/Accept", "TcpIp/Recv", "TcpIp/TCPCopy", "UdpIp/Recv" };
             LoHi5Tuple loHi = createLoHi5TupleFrom(newEvent);
-            string loGW = derivePrivateGateway(loHi.LoIPV4LongVal, HOST_SENSOR.Instance.HostId.Hostname, activeNics);
-            string hiGW = derivePrivateGateway(loHi.HiIPV4LongVal, HOST_SENSOR.Instance.HostId.Hostname, activeNics);
+            string loGW = derivePrivateGateway(loHi.LoIPV4LongVal, HostSerializer.Instance.HostId.Hostname, activeNics);
+            string hiGW = derivePrivateGateway(loHi.HiIPV4LongVal, HostSerializer.Instance.HostId.Hostname, activeNics);
             IpV4Addr loIp = createIpAddr(loHi.LoAddrStr, (uint)loHi.LoIPV4LongVal, loGW);
             IpV4Addr hiIp = createIpAddr(loHi.HiAddrStr, (uint)loHi.HiIPV4LongVal, hiGW);
             IdGenerator idgen = new IdGenerator();
@@ -35,7 +35,7 @@ namespace gov.llnl.wintap.core.etl.transform
             pci.ConnId = connId;
             pci.LocalIpPrivateGateway = loGW;
             pci.RemoteIpPrivateGateway = hiGW;
-            
+
             pci.PID = Convert.ToInt32(newEvent["PID"].ToString());
             pci.PidHash = _pidhash;
             if (inboundActivities.Contains(newEvent["activityType"].ToString()))
@@ -103,7 +103,7 @@ namespace gov.llnl.wintap.core.etl.transform
                 {
                     pg = activeNics.Where(n => n.IPAddrAsLong == ipAddr).FirstOrDefault().GW;
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                 }
             }

@@ -1,220 +1,275 @@
-﻿/*
- * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
- * Produced at the Lawrence Livermore National Laboratory.
- * All rights reserved.
- */
-#pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050;
-
+﻿using DuckDB.NET.Data;
+using gov.llnl.wintap.core.api;
+using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.Properties;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 using System;
 using System.ComponentModel;
-using System.ServiceProcess;
-using System.IO;
-using Microsoft.Win32;
-using gov.llnl.wintap.Properties;
-using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.core.api;
-using gov.llnl.wintap.core.shared;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Options;
-using System.Threading.Tasks;
-using System.Threading;
-using Microsoft.Extensions.Logging;
-using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
-using Codeblaze.SemanticKernel.Connectors.Ollama;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Text;
-using Microsoft.SemanticKernel;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Text;
-using gov.llnl.wintap.core.etl;
-using Org.BouncyCastle.Asn1.Pkcs;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace gov.llnl.wintap
 {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SERVICE INFRASTRUCTURE
+    // ═══════════════════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Windows Service main entry point.
+    /// Provides global access to the dependency injection service provider.
+    /// Used by components that need DI services outside the normal injection flow.
     /// </summary>
+    public static class ServiceProviderAccessor
+    {
+        public static IServiceProvider Services { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MAIN SERVICE IMPLEMENTATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
     public partial class WinTapSvc : BackgroundService
     {
-        
+        // ─── Instance Fields ───────────────────────────────────────────────────
+        private readonly ILogger<WinTapSvc> _logger;
         private PluginManager pluginMgr;
         private SubscriptionManager subscriptionMgr;
-        private string[] args;
 
+        // ─── Static Initialization ─────────────────────────────────────────────
+        static WinTapSvc()
+        {
+            // Ensure WintapLogger is initialized before any static constructors
+            try
+            {
+                WintapLogger.Log.Init();
+                WintapLogger.Log.Append("WintapLogger static initialization complete",
+                    core.infrastructure.LogLevel.Info, true, EventLogEntryType.SuccessAudit, 100);
+            }
+            catch (Exception ex)
+            {
+                // Can't use WintapLogger here since initialization failed
+                Console.WriteLine($"Failed to initialize WintapLogger: {ex}");
+                throw;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // SERVICE LIFECYCLE
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Initializes a new instance of the WinTapSvc service.
+        /// </summary>
         public WinTapSvc(ILoggerFactory loggerFactory)
         {
-            Logger = loggerFactory.CreateLogger<WinTapSvc>();
+            try
+            {
+                _logger = loggerFactory.CreateLogger<WinTapSvc>();
+                WintapLogger.Log.Append("WinTapSvc constructor starting", core.infrastructure.LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in WinTapSvc constructor: {ex}");
+                throw;
+            }
         }
 
-        public ILogger Logger { get; }
-
+        /// <summary>
+        /// Main service execution loop. Starts initialization in background worker
+        /// and keeps service alive until cancellation is requested.
+        /// </summary>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            WintapLogger.Log.Append("Creating startup thread.", LogLevel.Always);
+            try
+            {
+                WintapLogger.Log.Append("WinTapSvc ExecuteAsync starting", core.infrastructure.LogLevel.Info);
 
-            BackgroundWorker startupWorker = new BackgroundWorker();
-            startupWorker.DoWork += startupWorker_DoWork;
-            startupWorker.RunWorkerAsync();
-            WintapLogger.Log.Append("Startup method complete.", core.infrastructure.LogLevel.Always);
+                // Start initialization in background to avoid blocking service startup
+                BackgroundWorker startupWorker = new BackgroundWorker();
+                startupWorker.DoWork += startupWorker_DoWork;
+                startupWorker.RunWorkerAsync();
+                WintapLogger.Log.Append("Started background worker", core.infrastructure.LogLevel.Info);
 
+                // Keep service running until stop is requested
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(1000, stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error in ExecuteAsync: {ex}", core.infrastructure.LogLevel.Error);
+                throw;
+            }
         }
-        
-        //protected override void OnStop()
-        //{
-        //    WintapLogger.Log.Append("Stop command received.  Attempting to shutdown plugins", LogLevel.Always);
-        //    try
-        //    {
-        //        RegistryKey wintapKey = Registry.LocalMachine.CreateSubKey(Strings.RegistryRootPath);
-        //        wintapKey.SetValue("LastRestart", DateTime.Now, RegistryValueKind.String);
-        //        wintapKey.SetValue("WatchdogRestart", Watchdog.PerformanceBreach, RegistryValueKind.DWord);
-        //        wintapKey.Flush();
-        //        wintapKey.Close();
-        //        wintapKey.Dispose();
-        //        try
-        //        {
-        //            pluginMgr.UnregisterPlugins();
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            WintapLogger.Log.Append("exception in plugin shutdown: " + ex.Message, LogLevel.Always);
-        //        }
-        //        subscriptionMgr.Stop();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        WintapLogger.Log.Append("Error in shutdown: " + ex.Message, LogLevel.Always);
-        //    }
-        //    StreamsController.Stop();
-        //    WintapLogger.Log.Append("Shutdown complete.", LogLevel.Always);
-        //    WintapLogger.Log.Close();
-        //}
 
+        /// <summary>
+        /// Handles graceful shutdown of all Wintap components.
+        /// </summary>
+        public override async Task StopAsync(CancellationToken cancellationToken)
+        {
+            WintapLogger.Log.Append("Stop command received. Attempting to shutdown plugins",
+                core.infrastructure.LogLevel.Info);
+
+            try
+            {
+                // Record shutdown metadata in registry
+                using (var wintapKey = Registry.LocalMachine.CreateSubKey(Env.RegistryRootPath))
+                {
+                    wintapKey.SetValue("LastRestart", DateTime.Now, RegistryValueKind.String);
+                    wintapKey.SetValue("WatchdogRestart", Watchdog.PerformanceBreach, RegistryValueKind.DWord);
+                    wintapKey.Flush();
+                }
+
+                // Shutdown plugins
+                try
+                {
+                    if (pluginMgr != null)
+                    {
+                        pluginMgr.UnregisterPlugins();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Exception in plugin shutdown: {ex.Message}",
+                        core.infrastructure.LogLevel.Info);
+                }
+
+                // Stop data collectors
+                if (subscriptionMgr != null)
+                {
+                    subscriptionMgr.Stop();
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error in shutdown: {ex.Message}", core.infrastructure.LogLevel.Info);
+            }
+
+            WintapLogger.Log.Append("Shutdown complete.", core.infrastructure.LogLevel.Info);
+            WintapLogger.Log.Close();
+
+            await base.StopAsync(cancellationToken);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // INITIALIZATION & STARTUP
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Background worker that handles all service initialization tasks.
+        /// Runs asynchronously to prevent blocking the main service startup.
+        /// </summary>
         private void startupWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             try
             {
+                WintapLogger.Log.Append("StartupWorker beginning initialization", core.infrastructure.LogLevel.Info);
+
+                // ─── Platform-Specific Configuration ───────────────────────────
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    Utilities.SetDirectoryPermissions(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
+                    bool isDebugBuild = false;
+#if DEBUG
+                    isDebugBuild = true;
+#endif
+                    if (isDebugBuild)
+                    {
+                        WintapLogger.Log.Append("DEBUG build detected, not setting NTFS permissions on wintap data",
+                            core.infrastructure.LogLevel.Warn);
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append("Setting NTFS permissions on Wintap data directory",
+                            core.infrastructure.LogLevel.Info);
+                        Utilities.SetDirectoryPermissions(
+                            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("NOT setting permissions on Wintap data path, cannot continue.  Message: " + ex.Message, LogLevel.Always);
-            }
 
+                // ─── Agent Identification ──────────────────────────────────────
+                WintapLogger.Log.Append($"Wintap Agent ID: {StateManager.AgentId}",
+                    core.infrastructure.LogLevel.Info);
 
-            WintapLogger.Log.Append("Wintap Agent ID: " + StateManager.AgentId.ToString(), LogLevel.Always);
+                // ─── Plugin Management ─────────────────────────────────────────
+                WintapLogger.Log.Append("Loading plugin manager...", core.infrastructure.LogLevel.Info);
+                pluginMgr = new PluginManager();
 
-            WintapLogger.Log.Append("loading plugin manager...!", LogLevel.Always);
-            pluginMgr = new PluginManager();
+                // ─── Performance Monitoring ────────────────────────────────────
+                WintapLogger.Log.Append("Creating performance monitor", core.infrastructure.LogLevel.Info);
+                Watchdog watchdog = new Watchdog();
 
-            WintapLogger.Log.Append("Creating performance monitor", LogLevel.Always);
-            Watchdog watchdog = new Watchdog();
-            try
-            {
-                WintapLogger.Log.Append("attempting to register plugins...", LogLevel.Always);
-                pluginMgr.RegisterPlugins(watchdog);
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                foreach (Exception loaderException in ex.LoaderExceptions)
+                // ─── Plugin Registration ───────────────────────────────────────
+                try
                 {
-                    WintapLogger.Log.Append("Loader exception: " + loaderException.ToString(), LogLevel.Always);
+                    WintapLogger.Log.Append("Attempting to register plugins...", core.infrastructure.LogLevel.Info);
+                    pluginMgr.RegisterPlugins(watchdog);
                 }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("Error loading plugin: " + ex.Message, LogLevel.Always);
-            }
-
-            WintapLogger.Log.Append("workbench config value: " + Properties.Settings.Default.EnableWorkbench, LogLevel.Always);
-            if (Properties.Settings.Default.EnableWorkbench)
-            {
-                WintapLogger.Log.Append("Starting Workbench", LogLevel.Always);
-                startWorkbench(args);
-            }
-
-            // ETW rundown to resolve file paths.  TODO:  only do if FILE events are enabled.
-            WintapLogger.Log.Append("NOT Doing ETW File path rundown", LogLevel.Always);
-            //ProcessStartInfo rundownPsi = new ProcessStartInfo();
-            //rundownPsi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
-            //rundownPsi.Arguments = "RUNDOWN";
-            //System.Diagnostics.Process rundown = new Process();
-            //rundown.StartInfo = rundownPsi;
-            //rundown.Start();
-            //rundown.WaitForExit();
-
-
-            System.Threading.Thread.Sleep(5000);  // allow plugins to init
-
-
-
-            try
-            {
-                WintapLogger.Log.Append("Starting Wintap collectors", LogLevel.Always);
-                subscriptionMgr = new SubscriptionManager();
-                subscriptionMgr.Start();
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("ERROR starting event subscription manager: " + ex.Message, LogLevel.Always);
-            }
-
-            WintapLogger.Log.Append("Startup complete.", LogLevel.Always);
-        }
-        private void startWorkbench(string[] args)
-        {
-            WintapLogger.Log.Append("extracting workbench", LogLevel.Always);
-            try
-            {
-
-                string wintapDir = Strings.FileRootPath + "\\";
-                DirectoryInfo workbenchInfo = new DirectoryInfo(wintapDir + "\\Workbench");
-                if (!workbenchInfo.Exists)
+                catch (ReflectionTypeLoadException ex)
                 {
-                    workbenchInfo.Create();
-                    WintapLogger.Log.Append("extraction path: " + wintapDir, LogLevel.Always);
-                    System.IO.Compression.ZipFile.ExtractToDirectory(wintapDir + "workbench.zip", wintapDir);
+                    foreach (Exception loaderException in ex.LoaderExceptions)
+                    {
+                        WintapLogger.Log.Append($"Loader exception: {loaderException}",
+                            core.infrastructure.LogLevel.Info);
+                    }
                 }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Error loading plugin: {ex.Message}",
+                        core.infrastructure.LogLevel.Info);
+                }
+
+                // ─── DuckDB UI Server ──────────────────────────────────────────
+                WintapLogger.Log.Append("Starting DuckDB UI server", core.infrastructure.LogLevel.Info);
+                try
+                {
+                    var duckDBConnection = new DuckDBConnection("Data Source=:memory:");
+                    duckDBConnection.Open();
+                    var command = duckDBConnection.CreateCommand();
+                    command.CommandText = "CALL start_ui_server()";
+                    WintapLogger.Log.Append("Duck db command: " + command.CommandText,
+                        core.infrastructure.LogLevel.Info);
+                    var executeNonQuery = command.ExecuteNonQuery();
+                    WintapLogger.Log.Append("DuckDB UI server started", core.infrastructure.LogLevel.Info);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Could not start DuckDB UI: {ex.Message}",
+                        core.infrastructure.LogLevel.Error);
+                }
+
+                // ─── Plugin Initialization Delay ───────────────────────────────
+                // Allow plugins to initialize before starting collectors
+                Thread.Sleep(5000);
+
+                // ─── Collector Startup ─────────────────────────────────────────
+                try
+                {
+                    WintapLogger.Log.Append("Starting Wintap collectors", core.infrastructure.LogLevel.Info);
+                    subscriptionMgr = new SubscriptionManager();
+                    subscriptionMgr.Start();
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"ERROR starting event subscription manager: {ex.Message}",
+                        core.infrastructure.LogLevel.Error);
+                }
+
+                WintapLogger.Log.Append("Startup complete.", core.infrastructure.LogLevel.Info);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("error in workbench extraction: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append($"Error in startup worker: {ex.Message}",
+                    core.infrastructure.LogLevel.Error);
+                _logger.LogError(ex, "Fatal error in startup worker");
+                throw;
             }
-
-            string baseAddress = "http://127.0.0.1:" + Properties.Settings.Default.ApiPort + "/";
-
-            try
-            {
-                // previous location for starting Owin
-                //CreateHostBuilder(args).Build().Run();
-
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append("Error starting local web api: " + ex.Message, LogLevel.Always);
-            }
-            WintapLogger.Log.Append("accepting connections at: " + baseAddress, LogLevel.Always);
         }
-
-    //    public static IHostBuilder CreateHostBuilder(string[] args) =>
-    //    Host.CreateDefaultBuilder(args)
-    //        .ConfigureWebHostDefaults(webBuilder =>
-    //        {
-    //            webBuilder.UseStartup<Startup>();
-    //        })
-    //        .UseWindowsService(options =>
-    //        {
-    //            options.ServiceName = "Wintap";
-    //        });
-
-
     }
 }

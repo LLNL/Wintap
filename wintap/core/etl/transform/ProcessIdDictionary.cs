@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2022, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
@@ -28,7 +28,7 @@ namespace gov.llnl.wintap.core.etl.transform
             ProcessId newProcessId = new ProcessId();
             newProcessId.FirstEventTime = firstEventTime;
             newProcessId.OsPid = pid;
-            newProcessId.Hostname = HOST_SENSOR.Instance.HostId.Hostname;
+            newProcessId.Hostname = HostSerializer.Instance.HostId.Hostname;
             AddProcessKey(newProcessId);
         }
 
@@ -80,7 +80,7 @@ namespace gov.llnl.wintap.core.etl.transform
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Exception in addProcessKey: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Exception in addProcessKey: " + ex.Message, LogLevel.Info);
             }
         }
     }

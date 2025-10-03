@@ -1,18 +1,18 @@
 ﻿select istream
   "Registry" as protocol,
-  regActivity.path as path,
-  regActivity.dataType as dataType,
-  regActivity.valueName as valueName,
-  regActivity.data as data,
+  registry.path as path,
+  registry.dataType as dataType,
+  registry.valueName as valueName,
+  registry.data as data,
   PidHash,
   ProcessName,
   PID,
-  activityType,
-  min(receiveTime) as firstSeen,
-  max(receiveTime) as lastSeen,
+  CAST(ActivityType, string) as activityType,
+  min(eventTime) as firstSeen,
+  max(eventTime) as lastSeen,
   count(*) as eventCount,
   'Registry' as MessageType,
   AgentId
-from WintapMessage(messageType='Registry').win:time_batch(10 sec) as msg
-group by regActivity.path, regActivity.dataType, regActivity.valueName, regActivity.data, PidHash, PID, activityType, ProcessName
+from WintapMessage(CAST(messageType, string) = 'Registry').win:time_batch(10 sec) as msg
+group by registry.path, registry.dataType, registry.valueName, registry.data, PidHash, PID, activityType, ProcessName
 having count(*) > 0

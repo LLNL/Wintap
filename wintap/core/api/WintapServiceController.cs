@@ -1,4 +1,4 @@
-﻿using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.core.shared;
 using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;

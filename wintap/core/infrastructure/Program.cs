@@ -1,124 +1,208 @@
 ﻿/*
- * Copyright (c) 2021, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
  */
 
-#pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020;
+//  these disables are required for the semantic kernel libraries
+#pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050, SKEXP0020, SKEXP0070;
 
 using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
+using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Text.Json;
-using System.Web.Services.Description;
-using System.Runtime.CompilerServices;
-using Codeblaze.SemanticKernel.Connectors.Ollama;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Text;
-using Microsoft.SemanticKernel;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Text;
+using ModelContextProtocol.Client;
+using OpenAI;
 using System;
+using System.ClientModel;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Text;
-using Microsoft.SemanticKernel.Embeddings;
-using Codeblaze.SemanticKernel.Connectors.Ollama;
-using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.Properties;
-using System.Linq;
-using static System.Net.Mime.MediaTypeNames;
-using System.ComponentModel;
-using Microsoft.SemanticKernel.Connectors.Chroma;
+// ═══════════════════════════════════════════════════════════════════════════
+// APPLICATION INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 var builder = WebApplication.CreateBuilder(args);
-
 builder.Services.AddControllers();
+WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
 
-//builder.Services.AddSpaStaticFiles(configuration =>
-//{
-//    configuration.RootPath = @"C:\Program Files\Wintap\Workbench";
-//});
+// ═══════════════════════════════════════════════════════════════════════════
+// AI INTEGRATION CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
 
-WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Always);
-
-var kernelBuilder = Kernel.CreateBuilder();
-var kernel = kernelBuilder.AddOpenAIChatCompletion(modelId: "phi3", apiKey: null, endpoint: new Uri("http://127.0.0.1:11434")).Build();
-
-HttpClient httpClient = new HttpClient();
-httpClient.Timeout = new TimeSpan(0, 5, 0);
-
-//string rag_data = "C:\\programdata\\wintap\\ragdata.txt";
-//WintapLogger.Log.Append($"Attempting to load RAG data from file: {rag_data}", LogLevel.Always);
-
-
-// use use with in-memory vector store
-ISemanticTextMemory memory = new MemoryBuilder()
-    .WithLoggerFactory(kernel.LoggerFactory)
-    .WithMemoryStore(new VolatileMemoryStore())
-    .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
-    .Build();
-
-// use a persistent memory store:
-//var chromaMemoryStore = new ChromaMemoryStore("http://127.0.0.1:8000");
-//ISemanticTextMemory memory = new MemoryBuilder()
-//    .WithLoggerFactory(kernel.LoggerFactory)
-//    .WithMemoryStore(chromaMemoryStore)
-//    .WithTextEmbeddingGeneration(new OllamaTextEmbeddingGeneration("nomic-embed-text", "http://127.0.0.1:11434", httpClient, kernel.LoggerFactory)) // Replace with your Ollama API URL
-//    .Build();
-
-builder.Services.AddSingleton<ISemanticTextMemory>(provider =>
+// ─── AI Provider Selection ─────────────────────────────────────────────────
+string aiProvider = "OpenAI"; // "OpenAI" or "Ollama"
+if (Settings.Default.AiApiUrl.Contains("localhost"))
 {
-    return memory;
-});
+    aiProvider = "Ollama";
+}
 
+IMcpClient mcpClient;
+IChatClient chatClient;
 
-builder.Services.AddSingleton<IChatCompletionService>(provider =>
+try
 {
-    IChatCompletionService ai = kernel.GetRequiredService<IChatCompletionService>();
-    return ai;
-});
+    // ─── MCP Server Configuration ──────────────────────────────────────────
+    string fileRootPath = Env.FileRootPath;
+    string exeName;
 
-builder.Services.AddSingleton<ChatHistory>(provider =>
+    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+    {
+        exeName = "wintap_mcp_server.exe";
+    }
+    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
+             RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+    {
+        exeName = "wintap_mcp_server"; // No .exe extension
+    }
+    else
+    {
+        throw new PlatformNotSupportedException("Unsupported OS");
+    }
+
+    string commandPath = Path.Combine(fileRootPath, "mcp", exeName);
+
+    mcpClient = await McpClientFactory.CreateAsync(
+        new StdioClientTransport(new()
+        {
+            Command = commandPath,
+            Arguments = [],
+            Name = "ai_mcp_server",
+        })
+    );
+
+    // ─── Chat Client Configuration (Provider-Specific) ────────────────────
+    if (aiProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+    {
+        // Ollama (Local LLM) Configuration
+        string ollamaEndpoint = Settings.Default.AiApiUrl;
+        string ollamaModel = Settings.Default.AiModel;
+
+        WintapLogger.Log.Append($"Using Ollama provider: {ollamaEndpoint} with model {ollamaModel}", LogLevel.Info);
+
+        IChatClient ollamaClient = new OllamaChatClient(ollamaEndpoint, ollamaModel);
+
+        chatClient = ollamaClient
+            .AsBuilder()
+            .UseFunctionInvocation()
+            .Build();
+    }
+    else
+    {
+        // OpenAI-Compatible API Configuration
+        OpenAIClientOptions openAIOptions = new OpenAIClientOptions()
+        {
+            Endpoint = new Uri(Settings.Default.AiApiUrl)
+        };
+
+        string key = Settings.Default.AiApiKey;
+        ApiKeyCredential cred = new ApiKeyCredential(key!);
+        string model = Settings.Default.AiModel;
+
+        WintapLogger.Log.Append($"Using OpenAI provider with model {model}", LogLevel.Info);
+
+        var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient(model);
+
+        chatClient = openAIClient
+            .AsIChatClient()
+            .AsBuilder()
+            .UseFunctionInvocation()
+            .Build();
+    }
+
+    // ─── Chat History Initialization ───────────────────────────────────────
+    List<ChatMessage> chatHistory = [
+        new ChatMessage(ChatRole.System,
+            File.ReadAllText(Path.Combine(Env.FileRootPath, "systemprompt.txt"))),
+    ];
+
+    // ─── AI Service Registration ──────────────────────────────────────────
+    builder.Services.AddSingleton(chatHistory);
+    builder.Services.AddSingleton<IMcpClient>(mcpClient);
+    builder.Services.AddSingleton<IChatClient>(chatClient);
+}
+catch (Exception ex)
 {
-    string systemPrompt = Settings.Default.SystemPrompt;
-    ChatHistory chat = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemPrompt);
-    return chat;
-});
+    WintapLogger.Log.Append($"Error loading AI Client: {ex.Message}", LogLevel.Error);
+}
 
-// If you still need views along with APIs, use:
-// builder.Services.AddControllersWithViews();
+// ═══════════════════════════════════════════════════════════════════════════
+// DATABASE INFRASTRUCTURE
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Configuration for Windows Service and Hosted Service
+// Only run database recovery on Windows (uses Security Event Logs & ETW)
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
+
+    // Clean up existing database files before recovery
+    FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
+    mainDBInfo.Delete();
+    mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
+    mainDBInfo.Delete();
+
+    // Execute database recovery process
+    CallDatabaseRecovery();
+}
+else
+{
+    WintapLogger.Log.Append("Database recovery skipped on non-Windows platform", LogLevel.Info);
+
+    // Initialize empty database for Linux/macOS
+    // (OSquery events will populate it as they come in)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SERVICE CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
+
+// ─── Windows Service & Hosted Services ─────────────────────────────────────
 builder.Services.AddWindowsService();
 builder.Services.AddHostedService<WinTapSvc>();
+
+// ─── SignalR Configuration ─────────────────────────────────────────────────
 builder.Services.AddSignalR();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// APPLICATION PIPELINE CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+WintapLogger.Log.Append("Building app container", LogLevel.Info);
 var app = builder.Build();
 
+// Make service provider available as singleton for dependency access
+ServiceProviderAccessor.Services = app.Services;
+
+// ─── Middleware Pipeline ───────────────────────────────────────────────────
 //app.UseStaticFiles();
 //app.UseSpaStaticFiles();
 
 app.UseRouting();
 app.UseAuthorization();
-app.MapControllers();  // This will map the routes to the API controllers
+app.MapControllers();  // Map routes to API controllers
 
+// ─── SPA Configuration (Deployment) ────────────────────────────────────────
+// Uncomment for deployment with production build
 //app.UseSpa(spa =>
 //{
 //    spa.Options.SourcePath = "C:\\Program Files\\Wintap\\Workbench";
 //    if (app.Environment.IsDevelopment())
 //    {
-//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099"); // URL of the dev server
+//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099");
 //    }
 //});
 
+// ─── SignalR Hub Endpoints ─────────────────────────────────────────────────
+WintapLogger.Log.Append("Setting up API endpoints", LogLevel.Info);
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
@@ -126,6 +210,62 @@ app.UseEndpoints(endpoints =>
     endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });
 
-app.Run(); 
+// ═══════════════════════════════════════════════════════════════════════════
+// APPLICATION STARTUP
+// ═══════════════════════════════════════════════════════════════════════════
 
+WintapLogger.Log.Append("Running app", LogLevel.Info);
+app.Run();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER METHODS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Executes the database recovery process via WintapCoreSvcMgr.exe.
+/// Ensures process tree database integrity on startup.
+/// </summary>
+/// <returns>True if recovery completed successfully, false otherwise.</returns>
+bool CallDatabaseRecovery()
+{
+    try
+    {
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "WintapCoreSvcMgr.exe",
+            Arguments = "RECOVER_DATABASE",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = false,
+            RedirectStandardError = true
+        };
+
+        System.Diagnostics.Process wintapSvcMgr = new System.Diagnostics.Process();
+        wintapSvcMgr.StartInfo = processInfo;
+        wintapSvcMgr.Start();
+        wintapSvcMgr.WaitForExit();
+
+        // Wait for process to fully exit
+        while (System.Diagnostics.Process.GetProcessesByName("WintapCoreSvcMgr").Length > 0)
+        {
+            System.Threading.Thread.Sleep(100);
+        }
+
+        if (wintapSvcMgr.ExitCode == 0)
+        {
+            WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);
+            return true;
+        }
+        else
+        {
+            var error = wintapSvcMgr.StandardError.ReadToEnd();
+            WintapLogger.Log.Append($"Database recovery failed: {error}", LogLevel.Error);
+            return false;
+        }
+    }
+    catch (Exception ex)
+    {
+        WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
+        return false;
+    }
+}

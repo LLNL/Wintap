@@ -1,4 +1,4 @@
-﻿using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -64,12 +64,12 @@ namespace gov.llnl.wintap.core.shared
 
         internal static void RestartWintap(string reason)
         {
-            WintapLogger.Log.Append($"Wintap restart called because: {reason} ", LogLevel.Always);
+            WintapLogger.Log.Append($"Wintap restart called because: {reason} ", LogLevel.Info);
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.UseShellExecute = false;
-                psi.FileName = Strings.FileRootPath + "\\WintapSvcMgr.exe";
+                psi.FileName = Env.FileRootPath + "\\WintapCoreSvcMgr.exe";
                 psi.Arguments = "RESTART";
                 psi.WindowStyle = ProcessWindowStyle.Hidden;
                 Process p = new Process();
@@ -79,13 +79,13 @@ namespace gov.llnl.wintap.core.shared
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error calling WintapSvcMgr for wintap restart: " + ex.Message, LogLevel.Always);
+                WintapLogger.Log.Append("Error calling WintapCoreSvcMgr for wintap restart: " + ex.Message, LogLevel.Info);
             }
         }
 
         internal static void SetDirectoryPermissions(string directoryPath)
         {
-            WintapLogger.Log.Append($"Attempting to set permissions on {directoryPath}", LogLevel.Always);
+            WintapLogger.Log.Append($"Attempting to set permissions on {directoryPath}", LogLevel.Info);
 
             if (!Directory.Exists(directoryPath))
             {
@@ -112,7 +112,7 @@ namespace gov.llnl.wintap.core.shared
             directorySecurity.AddAccessRule(adminAccessRule);
             directoryInfo.SetAccessControl(directorySecurity);
 
-            WintapLogger.Log.Append($"Permissions for {directoryPath} have been successfully updated.", LogLevel.Always);
+            WintapLogger.Log.Append($"Permissions for {directoryPath} have been successfully updated.", LogLevel.Info);
         }
 
         public static DateTime FromSysdigTime(long nanoseconds)
