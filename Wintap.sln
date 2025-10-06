@@ -36,6 +36,7 @@ Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench", "shared\
 		Release.AspNetCompiler.FixedNames = "false"
 		Release.AspNetCompiler.Debug = "False"
 		VWDPort = "63685"
+		SlnRelativePath = "shared\Wintap-Workbench\"
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wintap_mcp_server", "shared\ai\wintap_mcp_server\wintap_mcp_server.csproj", "{842F3621-DD13-8A76-286D-0514EBE1E9A2}"
@@ -46,18 +47,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "documentation", "documentat
 	ProjectSection(SolutionItems) = preProject
 		documentation\Advanced Guide on the Esper Query Language and Wintap.txt = documentation\Advanced Guide on the Esper Query Language and Wintap.txt
 		documentation\CONTRIBUTIONS.md = documentation\CONTRIBUTIONS.md
-		documentation\ETL Flow in Wintap.md = documentation\ETL Flow in Wintap.md
 		documentation\Introduction on Using Esper with Wintap.txt = documentation\Introduction on Using Esper with Wintap.txt
 		documentation\LICENSE = documentation\LICENSE
 		documentation\LICENSE.md = documentation\LICENSE.md
 		documentation\LICENSE.rtf = documentation\LICENSE.rtf
 		documentation\NOTICE.txt = documentation\NOTICE.txt
 		documentation\README.md = documentation\README.md
-		documentation\Wintap 7 Developer Guide.docx = documentation\Wintap 7 Developer Guide.docx
-		documentation\Wintap 7 Developer Guide.pdf = documentation\Wintap 7 Developer Guide.pdf
-		documentation\Wintap Process Tree Design.md = documentation\Wintap Process Tree Design.md
-		documentation\wintap-architecture.svg = documentation\wintap-architecture.svg
-		documentation\wintap-developer-guide.md = documentation\wintap-developer-guide.md
 		documentation\wintap.ico = documentation\wintap.ico
 		documentation\Wintap.png = documentation\Wintap.png
 	EndProjectSection
