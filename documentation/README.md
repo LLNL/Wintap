@@ -2,16 +2,24 @@
 
 # Wintap
 A researcher-first data collection and analytics platform to assist with understanding the behavior of software
-Developed at Lawrence Livermore National Laboratory (LLNL)
+<br> Developed at Lawrence Livermore National Laboratory (LLNL)
 
-Overview
+## Overview
 Wintap is designed for security research, behavioral analysis, and exploratory investigations. It provides full-fidelity host telemetry with an extensible plugin architecture, enabling researchers to rapidly prototype detection logic and analyze system behavior without the constraints of enterprise tooling.
 
-Wintap vs. Traditional EDR
-Enterprise EDRWintapScaleEnterprise-wide deploymentLab/research environmentData CollectionOptimized for efficiencyFull-fidelity captureData FormatProprietary/optimizedOpen (Parquet, CSV)Source CodeClosed-sourceOpen-sourceFeaturesMature, production-hardenedExperimental, research-oriented
+## Wintap vs. Traditional EDR
+| Feature | Enterprise EDR | Wintap |
+|---------|----------------|--------|
+| **Deployment Scale** | Enterprise-wide (1,000s-100,000s hosts) | Lab/research (1-100s hosts) |
+| **Data Collection** | Optimized for efficiency | Full-fidelity capture |
+| **Data Format** | Proprietary/optimized | Open (Parquet, CSV) |
+| **Source Code** | Closed-source | Open-source |
+| **Feature Maturity** | Production-hardened | Experimental, research-oriented |
+| **Primary Use Case** | Security operations, compliance | Cyber research, data science |
+
 Wintap is not designed to replace enterprise EDR solutions. It serves a different purpose: providing researchers with complete control over data collection, analysis, and experimentation.
 
-# Wintap Architecture Diagram
+## Wintap Architecture Diagram
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -57,14 +65,21 @@ Wintap is not designed to replace enterprise EDR solutions. It serves a differen
     └──────────────────────────────────────────────────────┘
 ```
 
+## Key Capabilities
 
-# Key Capabilities
-Plugin Architecture: Write small .NET assemblies that subscribe to the events you need (process, network, file, registry). The framework handles infrastructure.
-Unified Data Model: All telemetry uses a consistent WintapMessage structure, making it straightforward to correlate across different data sources.
-Real-Time Analysis: Built-in Esper CEP engine allows live queries against event streams using EPL (Event Processing Language).
-Platform Support: Windows (stable), Linux (in development). Core infrastructure is platform-agnostic.
+- **Plugin Architecture**  
+  Write small .NET assemblies that subscribe to the events you need (process, network, file, registry). The framework handles infrastructure.
 
-# System Requirements
+- **Unified Data Model**  
+  All telemetry uses a consistent `WintapMessage` structure, making it straightforward to correlate across different data sources.
+
+- **Real-Time Analysis**  
+  Built-in Esper CEP engine allows live queries against event streams using EPL (Event Processing Language).
+
+- **Platform Support**  
+  Windows (stable), Linux (in development). Core infrastructure is platform-agnostic.
+
+## System Requirements
 .NET 8.0 or later
 Windows 10/11 or Server 2019+ (64-bit)
 Linux Ubuntu 24.04+ (in development)
@@ -72,7 +87,7 @@ Linux Ubuntu 24.04+ (in development)
 Administrator/root privileges
 
 
-# Quick Start
+## Quick Start
 git clone https://github.com/LLNL/wintap.git
 cd wintap
 dotnet build -c Release
@@ -84,11 +99,11 @@ sc.exe start Wintap
 Linux deployment: 
 See docs/LINUX_DEPLOYMENT.md
 
-# Documentation
+### Documentation
 Developer Guide - see documents folder in repo
 
-# Technology
+### Technology
 .NET 8.0 | MEF | Esper CEP | DuckDB | TraceEvent | Parquet
 
-# LLNL-CODE-837816
+### LLNL-CODE-837816
 https://github.com/LLNL/wintap
