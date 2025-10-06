@@ -15,7 +15,7 @@ Wintap is not designed to replace enterprise EDR solutions. It serves a differen
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              WINTAP 7 SERVICE                              │
+│                              WINTAP SERVICE                              │
 │                                .NET 8.0                                  │
 └─────────────────────────────────────────────────────────────────────────┘
                                      │
@@ -44,22 +44,25 @@ Wintap is not designed to replace enterprise EDR solutions. It serves a differen
                          │  • Network       │
                          │  • File          │
                          │  • Default       │
+                         │                  │
+                         │  Format: Parquet │
                          └──────────────────┘
                                    │
                                    ▼
                          ┌──────────────────┐
                          │  Data Adapters   │
                          │  ═════════════   │
-                         │  • Parquet       │
-                         │  • CSV           │
-                         │  • IUpload       │
+                         │  • S3            │
+                         │  • SMB Share     │
+                         │  • Custom        │
+                         │    (IUpload)     │
                          └──────────────────┘
                                    │
         ┌──────────────────────────┼──────────────────────────┐
         ▼                          ▼                          ▼
 ┌─────────────┐          ┌─────────────┐          ┌─────────────┐
-│   Storage   │          │  Databases  │          │  HTTP/APIs  │
-│  (Parquet)  │          │  (Custom)   │          │   (Custom)  │
+│  S3 Bucket  │          │  SMB Share  │          │   Custom    │
+│  (Parquet)  │          │  (Parquet)  │          │ Destination │
 └─────────────┘          └─────────────┘          └─────────────┘
 
 
@@ -89,17 +92,19 @@ Administrator/root privileges
 
 
 # Quick Start
-bashgit clone https://github.com/LLNL/wintap.git
+git clone https://github.com/LLNL/wintap.git
 cd wintap
 dotnet build -c Release
+
 Windows deployment:
 powershellsc.exe create Wintap binPath= "C:\Path\To\Wintap.exe" start=auto
 sc.exe start Wintap
-Linux deployment: See docs/LINUX_DEPLOYMENT.md
+
+Linux deployment: 
+See docs/LINUX_DEPLOYMENT.md
 
 # Documentation
-Developer Guide - Complete technical reference
-Linux Deployment - systemd service setup
+Developer Guide - see documents folder in repo
 
 # Technology
 .NET 8.0 | MEF | Esper CEP | DuckDB | TraceEvent | Parquet
