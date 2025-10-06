@@ -15,46 +15,46 @@ Wintap is not designed to replace enterprise EDR solutions. It serves a differen
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│                         WINTAP SERVICE                              │
+│                         WINTAP SERVICE                             │
 │                        (WinTapSvc.cs)                              │
 └────────────────────────────────────────────────────────────────────┘
                                   │
                 ┌─────────────────┼─────────────────┐
                 │                 │                 │
                 ▼                 ▼                 ▼
-    ┌──────────────────┐  ┌─────────────┐  ┌──────────────┐
-    │  PluginManager   │  │   EventChannel │ │ Subscription │
-    │                  │  │   (Esper CEP)  │ │   Manager    │
-    │ - Load Plugins   │  │                │ │              │
-    │ - MEF Discovery  │  │ - Route Events │ │ - Windows ETW│
-    │ - Isolation      │  │ - Enrich Data  │ │ - Linux      │
-    │ - Scheduler      │  │ - Statistics   │ │ - macOS      │
-    └──────────────────┘  └─────────────┘  └──────────────┘
+    ┌──────────────────┐  ┌─────────────┐ ┌─────────────--─┐
+    │  PluginManager   │  │EventChannel │ │ Subscription   │
+    │                  │  │(Esper CEP)  │ │   Manager      │
+    │ - Load Plugins   │  │             │ │                │
+    │ - MEF Discovery  │  │Route Events │ │ - Windows ETW  │
+    │ - Isolation      │  │Enrich Data  │ │ - Linux        │
+    │ - Scheduler      │  │Statistics   │ │ - macOS        │
+    └──────────────────┘  └─────────────┘ └────────────--──┘
             │                     │                 │
             │                     │                 │
             ▼                     ▼                 ▼
-    ┌──────────────────────────────────────────────────────┐
-    │                   PLUGIN LAYER                        │
+    ┌─────────────────────────────────────────────────────┐
+    │                   PLUGIN LAYER                      │
     │  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
     │  │ISubscribe│  │   IRun   │  │ IQuery   │  ...      │
     │  └──────────┘  └──────────┘  └──────────┘           │
-    └──────────────────────────────────────────────────────┘
+    └─────────────────────────────────────────────────────┘
                                   │
                                   ▼
     ┌──────────────────────────────────────────────────────┐
-    │              ETL / SERIALIZATION LAYER                │
+    │              ETL / SERIALIZATION LAYER               │
     │  - DefaultSerializer, ProcessSerializer, etc.        │
     │  - Parquet/CSV Writers                               │
     └──────────────────────────────────────────────────────┘
                                   │
                                   ▼
     ┌──────────────────────────────────────────────────────┐
-    │              DATA ADAPTER LAYER                       │
+    │              DATA ADAPTER LAYER                      │
     │  - File System (Parquet, CSV)                        │
     │  - Upload Adapters (IUpload interface)               │
     │  - Database Adapters                                 │
     │  - Network/API Adapters                              │
-    └──────────────────────────────────────────────────────┘────────────────┘
+    └──────────────────────────────────────────────────────┘
 ```
 
 
