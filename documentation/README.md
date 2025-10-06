@@ -14,66 +14,47 @@ Wintap is not designed to replace enterprise EDR solutions. It serves a differen
 # Wintap Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              WINTAP SERVICE                              │
-│                                .NET 8.0                                  │
-└─────────────────────────────────────────────────────────────────────────┘
-                                     │
-        ┌────────────────────────────┼────────────────────────────┐
-        │                            │                            │
-        ▼                            ▼                            ▼
-┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
-│ Platform Sensors │      │  EventChannel    │      │  Wintap Plugins  │
-│                  │      │  ═════════════    │      │  ══════════════  │
-│  Windows:        │──────│  • Esper CEP     │──────│  • ISubscribe    │
-│  • ETW           │      │  • Process       │      │  • ISubscribeEtw │
-│  • Security Logs │      │    Enrichment    │      │  • IRun          │
-│  • WMI           │      │  • Statistics    │      │  • IQuery        │
-│                  │      │                  │      │  • IProvide      │
-│  Linux:          │      │                  │      │                  │
-│  • procfs        │      │ WintapMessage    │      │  MEF Framework   │
-│  • eBPF          │      │                  │      │                  │
-│  • OSQuery       │      └──────────────────┘      └──────────────────┘
-│                  │               │
-└──────────────────┘               │
-                                   ▼
-                         ┌──────────────────┐
-                         │   Serializers    │
-                         │   ═══════════    │
-                         │  • Process       │
-                         │  • Network       │
-                         │  • File          │
-                         │  • Default       │
-                         │                  │
-                         │  Format: Parquet │
-                         └──────────────────┘
-                                   │
-                                   ▼
-                         ┌──────────────────┐
-                         │  Data Adapters   │
-                         │  ═════════════   │
-                         │  • S3            │
-                         │  • SMB Share     │
-                         │  • Custom        │
-                         │    (IUpload)     │
-                         └──────────────────┘
-                                   │
-        ┌──────────────────────────┼──────────────────────────┐
-        ▼                          ▼                          ▼
-┌─────────────┐          ┌─────────────┐          ┌─────────────┐
-│  S3 Bucket  │          │  SMB Share  │          │   Custom    │
-│  (Parquet)  │          │  (Parquet)  │          │ Destination │
-└─────────────┘          └─────────────┘          └─────────────┘
-
-
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          ANALYSIS INTERFACE                              │
-│                                                                          │
-│                    Wintap Workbench (Web-based)                         │
-│                    • Live EPL Query Execution                           │
-│                    • Process Tree Visualization                         │
-│                    • Real-time Event Streaming                          │
-└─────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                         WINTAP SERVICE                              │
+│                        (WinTapSvc.cs)                              │
+└────────────────────────────────────────────────────────────────────┘
+                                  │
+                ┌─────────────────┼─────────────────┐
+                │                 │                 │
+                ▼                 ▼                 ▼
+    ┌──────────────────┐  ┌─────────────┐  ┌──────────────┐
+    │  PluginManager   │  │   EventChannel │ │ Subscription │
+    │                  │  │   (Esper CEP)  │ │   Manager    │
+    │ - Load Plugins   │  │                │ │              │
+    │ - MEF Discovery  │  │ - Route Events │ │ - Windows ETW│
+    │ - Isolation      │  │ - Enrich Data  │ │ - Linux      │
+    │ - Scheduler      │  │ - Statistics   │ │ - macOS      │
+    └──────────────────┘  └─────────────┘  └──────────────┘
+            │                     │                 │
+            │                     │                 │
+            ▼                     ▼                 ▼
+    ┌──────────────────────────────────────────────────────┐
+    │                   PLUGIN LAYER                        │
+    │  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
+    │  │ISubscribe│  │   IRun   │  │ IQuery   │  ...      │
+    │  └──────────┘  └──────────┘  └──────────┘           │
+    └──────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+    ┌──────────────────────────────────────────────────────┐
+    │              ETL / SERIALIZATION LAYER                │
+    │  - DefaultSerializer, ProcessSerializer, etc.        │
+    │  - Parquet/CSV Writers                               │
+    └──────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+    ┌──────────────────────────────────────────────────────┐
+    │              DATA ADAPTER LAYER                       │
+    │  - File System (Parquet, CSV)                        │
+    │  - Upload Adapters (IUpload interface)               │
+    │  - Database Adapters                                 │
+    │  - Network/API Adapters                              │
+    └──────────────────────────────────────────────────────┘────────────────┘
 ```
 
 
