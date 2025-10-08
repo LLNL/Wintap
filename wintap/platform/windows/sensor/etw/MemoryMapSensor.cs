@@ -138,21 +138,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                                 DateTime sweepStartTime = DateTime.Now;
                                 int totalProcessScanCount = detectChanges(commitInfos, obj.TimeStamp);
                                 scanInProgress = false;
-                            }
-
-                            //if (scanningMemory == false)
-                            //{
-                            //    if (isStarting || refreshTimer.ElapsedMilliseconds > 2000)
-                            //    {
-                            //        refreshTimer.Restart();
-                            //        isStarting = false;
-                            //        WintapLogger.Log.Append("******* SCANNING PROCESS MEMORY  **********", LogLevel.Info);
-                            //        string commitInfoString = obj.PayloadStringByName("WSCommitInfo");
-                            //        List<CommitInfo> commitInfos = JsonConvert.DeserializeObject<List<CommitInfo>>(commitInfoString);
-                            //        detectChanges(commitInfos, obj.TimeStamp);
-                            //        WintapLogger.Log.Append("------ DONE SCANNING PROCESS MEMORY   err count: " + scanErrors + " --------", LogLevel.Info);
-                            //    }
-                            //}                         
+                            }                    
                         }
                         break;
                     default:
@@ -242,7 +228,16 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             // clean up history
             foreach (CommitInfo historicalCommitInfo in commitHistory.Values)
             {
-                // todo
+                // clean up history - remove entries for dead processes
+                var deadProcessKeys = commitHistory
+                    .Where(kvp => !processRunning(kvp.Value.ProcessId))
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var key in deadProcessKeys)
+                {
+                    commitHistory.Remove(key);
+                }
             }
             return scanCount;
         }
@@ -273,7 +268,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     wm.ActivityType = ((ActivityTypeEnum)memInfo.State);
                     wm.MemoryMap = new MemoryMapData();
                     wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
-                    wm.MemoryMap.PageProtect = ((WintapMessage.PageProtectEnum)memInfo.AllocationProtect);
+                    wm.MemoryMap.AllocationProtect = ((WintapMessage.PageProtectEnum)memInfo.AllocationProtect);
                     wm.MemoryMap.PageType = ((WintapMessage.PageTypeEnum)memInfo.Type);
                     wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
                     wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
