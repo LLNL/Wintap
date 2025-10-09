@@ -5,6 +5,9 @@
  */
 
 
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Management;
 using gov.llnl.wintap.core.infrastructure;
 using Newtonsoft.Json;

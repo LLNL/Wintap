@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+using System;
+
 namespace gov.llnl.wintap.platform.windows.models
 {
     /// <summary>

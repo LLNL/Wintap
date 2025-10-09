@@ -9,6 +9,8 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;  // For StateManager
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.models;  // For ProcessHash
+using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace WintapCoreSvcMgr.Database

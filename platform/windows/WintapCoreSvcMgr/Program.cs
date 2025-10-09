@@ -9,8 +9,12 @@ using gov.llnl.wintap.platform.windows.infrastructure;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
 using Microsoft.Win32.TaskScheduler;
+using System;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using WintapCoreSvcMgr.Database;
 using LogLevel = gov.llnl.wintap.core.infrastructure.LogLevel;
 
@@ -110,6 +114,8 @@ namespace gov.llnl.wintap
                 WintapLogger.Log.Append("Process tree root not found in DB.  Attempting complete process tree rebuild and reset of recovery database", LogLevel.Info);
                 //backupDbManager = new BackupDatabaseManager(BackupDatabaseManager.DatabaseTargetEnum.RECOVERY);
                 // Process existing boot trace
+                backupDbManager.DeleteRecoveryDb();
+                backupDbManager = new BackupDatabaseManager(BackupDatabaseManager.DatabaseTargetEnum.RECOVERY);
                 BootLogProcessor btp = new BootLogProcessor(backupDbManager);
                 var bootTraceResult = btp.ProcessBootTraceAsync().Result;
                 if (!bootTraceResult.Success)
@@ -255,8 +261,16 @@ namespace gov.llnl.wintap
             }
             catch (Exception ex)
             {
-                // Log error but don't prevent startup
+                // Log full error details
                 WintapLogger.Log.Append($"Warning: Failed to ensure scheduled task exists: {ex.Message}", LogLevel.Warn);
+                WintapLogger.Log.Append($"Exception Type: {ex.GetType().Name}", LogLevel.Warn);
+                WintapLogger.Log.Append($"Stack Trace: {ex.StackTrace}", LogLevel.Debug);
+
+                if (ex.InnerException != null)
+                {
+                    WintapLogger.Log.Append($"Inner Exception: {ex.InnerException.Message}", LogLevel.Warn);
+                }
+
                 WintapLogger.Log.Append("Wintap will continue, but hourly maintenance may not run", LogLevel.Warn);
             }
         }
@@ -372,7 +386,7 @@ namespace gov.llnl.wintap
             td.Triggers.Add(dailyTrigger);
 
             // Create action to run WintapCoreSvcMgr.exe PROCESS_MINITRACE
-            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            string exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
             string workingDir = Path.GetDirectoryName(exePath);
 
             td.Actions.Add(new ExecAction(exePath, "PROCESS_MINITRACE", workingDir));
