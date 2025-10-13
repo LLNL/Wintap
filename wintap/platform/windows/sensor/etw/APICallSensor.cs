@@ -4,6 +4,7 @@ using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using System;
 using System.Collections.Generic;
+using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -79,22 +80,18 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     
                     string desiredAccessString = translateDesiredAccessToEnum(Convert.ToUInt32(obj.PayloadByName("DesiredAccess")));
-                    string targetProcessName = "Unknown";
-                    try
-                    {
-                        targetProcessName = ProcessSensor.ResolveProcessAtTime(msg.PID, obj.TimeStamp.ToUniversalTime(), msg.MessageType.ToString()).ProcessName;
-                    }
-                    catch (Exception ex)
-                    {
-                        WintapLogger.Log.Append("Could not get target process name for OpenProcess event ", LogLevel.Debug);
-                    }
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID, targetProcessName, desiredAccessString);
+                    ProcessRecord pr = ProcessSensor.ResolveProcessAtTime(Convert.ToInt32(obj.PayloadByName("TargetProcessId")), obj.TimeStamp, msg.MessageType.ToString());
+                    string target = pr.ProcessName;
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID, target, desiredAccessString);
                 }
                 else if (obj.EventName.Contains("EventID(6)"))
                 {
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.OpenThread;
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, Convert.ToUInt32(obj.PayloadByName("TargetThreatId")), obj.ThreadID, obj.PayloadByName("TargetProcessName").ToString(), obj.PayloadByName("DesiredAccessString").ToString());
+                    ProcessRecord pr = ProcessSensor.ResolveProcessAtTime(Convert.ToInt32(obj.PayloadByName("TargetProcessId")), obj.TimeStamp, msg.MessageType.ToString());
+                    string target = pr.ProcessName;
+                    string desiredAccessStr = translateDesiredAccessToEnum(Convert.ToUInt32(obj.PayloadByName("DesiredAccess")));
+                    msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, Convert.ToUInt32(obj.PayloadByName("TargetThreatId")), obj.ThreadID, target, desiredAccessStr);
                 }
                 EventChannel.Send(msg);
             }
