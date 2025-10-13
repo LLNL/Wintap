@@ -13,6 +13,7 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,8 +31,12 @@ using System.Runtime.InteropServices;
 // ═══════════════════════════════════════════════════════════════════════════
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── Configure Wintap to listen on port 8099 ───────────────────────────────
+builder.WebHost.UseUrls("http://localhost:8099");
+
 builder.Services.AddControllers();
-WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
+WintapLogger.Log.Append($"Wintap is starting on http://localhost:8099", LogLevel.Info);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AI INTEGRATION CONFIGURATION
@@ -145,6 +150,10 @@ builder.Services.AddHostedService<WinTapSvc>();
 
 // ─── SignalR Configuration ─────────────────────────────────────────────────
 builder.Services.AddSignalR();
+builder.Services.AddSpaStaticFiles(configuration =>
+{
+    configuration.RootPath = Path.Combine(Env.FileRootPath, "Workbench");
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APPLICATION PIPELINE CONFIGURATION
@@ -157,23 +166,29 @@ var app = builder.Build();
 ServiceProviderAccessor.Services = app.Services;
 
 // ─── Middleware Pipeline ───────────────────────────────────────────────────
-//app.UseStaticFiles();
-//app.UseSpaStaticFiles();
+if (Settings.Default.EnableWorkbench)
+{
+    app.UseStaticFiles();
+    app.UseSpaStaticFiles();
+}
 
 app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();  // Map routes to API controllers
 
-// ─── SPA Configuration (Deployment) ────────────────────────────────────────
-// Uncomment for deployment with production build
-//app.UseSpa(spa =>
-//{
-//    spa.Options.SourcePath = "C:\\Program Files\\Wintap\\Workbench";
-//    if (app.Environment.IsDevelopment())
-//    {
-//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099");
-//    }
-//});
+// ─── SPA Configuration (Serve Angular Static Files) ───────────────────────
+if (Settings.Default.EnableWorkbench)
+{
+    app.UseSpa(spa =>
+    {
+        spa.Options.SourcePath = Path.Combine(Env.FileRootPath, "Workbench");
+        WintapLogger.Log.Append($"Workbench enabled, serving static files from {spa.Options.SourcePath}", LogLevel.Info);
+    });
+}
+else
+{
+    WintapLogger.Log.Append("Workbench disabled and will not be served.", LogLevel.Info);
+}
 
 // ─── SignalR Hub Endpoints ─────────────────────────────────────────────────
 WintapLogger.Log.Append("Setting up API endpoints", LogLevel.Info);

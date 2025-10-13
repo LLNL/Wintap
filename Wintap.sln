@@ -18,7 +18,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleEventPlugin", "shared
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapAPI", "shared\WintapAPI\WintapAPI.csproj", "{056C2F16-8367-32F2-E4C1-D09B9D833071}"
 EndProject
-Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench", "shared\Wintap-Workbench\", "{344A6B60-2229-B8C0-6F95-B52EB1014BFB}"
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench(1)", "shared\Wintap-Workbench\", "{344A6B60-2229-B8C0-6F95-B52EB1014BFB}"
 	ProjectSection(WebsiteProperties) = preProject
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
 		Debug.AspNetCompiler.VirtualPath = "/localhost_63685"
@@ -61,6 +61,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wintap", "wintap\Wintap.csproj", "{030F9B85-37E9-D684-9317-91C54B490A01}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapRecorder", "platform\windows\WintapRecorder\WintapRecorder.csproj", "{E8B4A565-3B0F-2AB4-1D3A-2CD061AB6A69}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "wintapv7setup", "platform\windows\WintapSetup\wintapv7setup\wintapv7setup.vdproj", "{F1EA10C7-5326-A613-7990-82F5C4851336}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -202,6 +204,14 @@ Global
 		{E8B4A565-3B0F-2AB4-1D3A-2CD061AB6A69}.Release|x64.Build.0 = Release|x64
 		{E8B4A565-3B0F-2AB4-1D3A-2CD061AB6A69}.Release|x86.ActiveCfg = Release|Any CPU
 		{E8B4A565-3B0F-2AB4-1D3A-2CD061AB6A69}.Release|x86.Build.0 = Release|Any CPU
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Debug|Any CPU.ActiveCfg = Debug
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Debug|ARM64.ActiveCfg = Debug
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Debug|x64.ActiveCfg = Debug
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Debug|x86.ActiveCfg = Debug
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Release|Any CPU.ActiveCfg = Release
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Release|ARM64.ActiveCfg = Release
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Release|x64.ActiveCfg = Release
+		{F1EA10C7-5326-A613-7990-82F5C4851336}.Release|x86.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -217,6 +227,7 @@ Global
 		{842F3621-DD13-8A76-286D-0514EBE1E9A2} = {BE997054-8931-4693-9FA8-9F3DF42ADB1F}
 		{D1BD19A0-93CA-91D9-A70F-0DD0634A2793} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
 		{E8B4A565-3B0F-2AB4-1D3A-2CD061AB6A69} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
+		{F1EA10C7-5326-A613-7990-82F5C4851336} = {F2A6335E-0AE8-41E1-90C6-A282CFFCEFBD}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B820FE25-5EEE-4E31-A6AE-C417551BE27C}
