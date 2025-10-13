@@ -13,6 +13,7 @@ using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,8 +31,12 @@ using System.Runtime.InteropServices;
 // ═══════════════════════════════════════════════════════════════════════════
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── Configure Wintap to listen on port 8099 ───────────────────────────────
+builder.WebHost.UseUrls("http://localhost:8099");
+
 builder.Services.AddControllers();
-WintapLogger.Log.Append($"Wintap is starting.", LogLevel.Info);
+WintapLogger.Log.Append($"Wintap is starting on http://localhost:8099", LogLevel.Info);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AI INTEGRATION CONFIGURATION
@@ -134,32 +139,6 @@ catch (Exception ex)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DATABASE INFRASTRUCTURE
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Only run database recovery on Windows (uses Security Event Logs & ETW)
-if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-{
-    WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
-
-    // Clean up existing database files before recovery
-    FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
-    mainDBInfo.Delete();
-    mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
-    mainDBInfo.Delete();
-
-    // Execute database recovery process
-    CallDatabaseRecovery();
-}
-else
-{
-    WintapLogger.Log.Append("Database recovery skipped on non-Windows platform", LogLevel.Info);
-
-    // Initialize empty database for Linux/macOS
-    // (OSquery events will populate it as they come in)
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // SERVICE CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -171,6 +150,10 @@ builder.Services.AddHostedService<WinTapSvc>();
 
 // ─── SignalR Configuration ─────────────────────────────────────────────────
 builder.Services.AddSignalR();
+builder.Services.AddSpaStaticFiles(configuration =>
+{
+    configuration.RootPath = Path.Combine(Env.FileRootPath, "Workbench");
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APPLICATION PIPELINE CONFIGURATION
@@ -183,23 +166,29 @@ var app = builder.Build();
 ServiceProviderAccessor.Services = app.Services;
 
 // ─── Middleware Pipeline ───────────────────────────────────────────────────
-//app.UseStaticFiles();
-//app.UseSpaStaticFiles();
+if (Settings.Default.EnableWorkbench)
+{
+    app.UseStaticFiles();
+    app.UseSpaStaticFiles();
+}
 
 app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();  // Map routes to API controllers
 
-// ─── SPA Configuration (Deployment) ────────────────────────────────────────
-// Uncomment for deployment with production build
-//app.UseSpa(spa =>
-//{
-//    spa.Options.SourcePath = "C:\\Program Files\\Wintap\\Workbench";
-//    if (app.Environment.IsDevelopment())
-//    {
-//        spa.UseProxyToSpaDevelopmentServer("http://localhost:8099");
-//    }
-//});
+// ─── SPA Configuration (Serve Angular Static Files) ───────────────────────
+if (Settings.Default.EnableWorkbench)
+{
+    app.UseSpa(spa =>
+    {
+        spa.Options.SourcePath = Path.Combine(Env.FileRootPath, "Workbench");
+        WintapLogger.Log.Append($"Workbench enabled, serving static files from {spa.Options.SourcePath}", LogLevel.Info);
+    });
+}
+else
+{
+    WintapLogger.Log.Append("Workbench disabled and will not be served.", LogLevel.Info);
+}
 
 // ─── SignalR Hub Endpoints ─────────────────────────────────────────────────
 WintapLogger.Log.Append("Setting up API endpoints", LogLevel.Info);
@@ -216,56 +205,3 @@ app.UseEndpoints(endpoints =>
 
 WintapLogger.Log.Append("Running app", LogLevel.Info);
 app.Run();
-
-// ═══════════════════════════════════════════════════════════════════════════
-// HELPER METHODS
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// <summary>
-/// Executes the database recovery process via WintapCoreSvcMgr.exe.
-/// Ensures process tree database integrity on startup.
-/// </summary>
-/// <returns>True if recovery completed successfully, false otherwise.</returns>
-bool CallDatabaseRecovery()
-{
-    try
-    {
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = "WintapCoreSvcMgr.exe",
-            Arguments = "RECOVER_DATABASE",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = false,
-            RedirectStandardError = true
-        };
-
-        System.Diagnostics.Process wintapSvcMgr = new System.Diagnostics.Process();
-        wintapSvcMgr.StartInfo = processInfo;
-        wintapSvcMgr.Start();
-        wintapSvcMgr.WaitForExit();
-
-        // Wait for process to fully exit
-        while (System.Diagnostics.Process.GetProcessesByName("WintapCoreSvcMgr").Length > 0)
-        {
-            System.Threading.Thread.Sleep(100);
-        }
-
-        if (wintapSvcMgr.ExitCode == 0)
-        {
-            WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);
-            return true;
-        }
-        else
-        {
-            var error = wintapSvcMgr.StandardError.ReadToEnd();
-            WintapLogger.Log.Append($"Database recovery failed: {error}", LogLevel.Error);
-            return false;
-        }
-    }
-    catch (Exception ex)
-    {
-        WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
-        return false;
-    }
-}

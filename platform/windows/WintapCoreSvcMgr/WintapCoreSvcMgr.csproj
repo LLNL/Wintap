@@ -1,10 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- Basic Configuration -->
     <OutputType>Exe</OutputType>
+    <RootNamespace>WintapCoreSvcMgr</RootNamespace>
+    
+    <!-- Framework-Dependent Single-File Configuration -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    
+    <!-- Preserve Compilation Context (if using DuckDB with dynamic features) -->
+    <PreserveCompilationContext>true</PreserveCompilationContext>
+    
+    <!-- Prevent copying .NET BCL assemblies -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

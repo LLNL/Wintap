@@ -290,7 +290,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading subscriber {pluginName}: {ex.Message}", LogLevel.Info);
+                WintapLogger.Log.Append($"Problem loading subscriber {pluginName}: {ex.Message}", LogLevel.Warn);
             }
         }
 
@@ -309,7 +309,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading ETW subscriber {pluginName}: {ex.Message}", LogLevel.Info);
+                WintapLogger.Log.Append($"Problem loading ETW subscriber {pluginName}: {ex.Message}", LogLevel.Warn);
             }
         }
 
@@ -332,7 +332,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading Runner {pluginName}: {ex.Message}", LogLevel.Info);
+                WintapLogger.Log.Append($"Problem loading Runner {pluginName}: {ex.Message}", LogLevel.Warn);
             }
         }
 
@@ -351,7 +351,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading provider plugin {pluginName}: {ex.Message}", LogLevel.Info);
+                WintapLogger.Log.Append($"Problem loading provider plugin {pluginName}: {ex.Message}", LogLevel.Warn);
             }
         }
 
@@ -373,7 +373,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error loading Query plugin {pluginName}: {ex.Message}", LogLevel.Info);
+                WintapLogger.Log.Append($"Problem loading Query plugin {pluginName}: {ex.Message}", LogLevel.Warn);
             }
         }
 

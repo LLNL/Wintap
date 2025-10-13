@@ -50,9 +50,6 @@
     <Setting Name="CpuTriggerSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="WebActivitySensor" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
-    </Setting>
     <Setting Name="GenericProviders" Type="System.Collections.Specialized.StringCollection" Scope="User">
       <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
 &lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
@@ -85,7 +82,7 @@
       <Value Profile="(Default)">none</Value>
     </Setting>
     <Setting Name="AiModel" Type="System.String" Scope="User">
-      <Value Profile="(Default)">gpt-4.1</Value>
+      <Value Profile="(Default)">none</Value>
     </Setting>
   </Settings>
 </SettingsFile>

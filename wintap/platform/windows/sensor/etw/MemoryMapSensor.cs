@@ -250,7 +250,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             DateTime startScanTime = DateTime.Now;
             Process process = Process.GetProcessById(_owningProcess.ProcessId);
             nint baseAddress = new nint(0);
-            WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.ProcessId, MessageTypeEnum.MemoryMap);
+
             MEMORY_BASIC_INFORMATION memInfo = new MEMORY_BASIC_INFORMATION();
             while (true)
             {
@@ -262,10 +262,22 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     {
                         break;
                     }
+
+                    WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.ProcessId, MessageTypeEnum.MemoryMap);
                     wm.PidHash = _owningProcess.PidHash;
                     wm.ProcessName = _owningProcess.ProcessName;
-                    //wm.ActivityType = ((StateEnum)memInfo.State);
-                    wm.ActivityType = ((ActivityTypeEnum)memInfo.State);
+                    if(memInfo.State == 4096)
+                    {
+                        wm.ActivityType = ActivityTypeEnum.MemCommit;
+                    }
+                    else if(memInfo.State == 8192)
+                    {
+                        wm.ActivityType = ActivityTypeEnum.MemReserve;
+                    }
+                    else if(memInfo.State == 65536)
+                    {
+                        wm.ActivityType = ActivityTypeEnum.MemFree;
+                    }
                     wm.MemoryMap = new MemoryMapData();
                     wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
                     wm.MemoryMap.AllocationProtect = ((WintapMessage.PageProtectEnum)memInfo.AllocationProtect);
