@@ -303,7 +303,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error compiling/deploying EPL '{epl}': {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Problem compiling/deploying EPL '{epl}': {ex.Message}", LogLevel.Warn);
                 throw;
             }
         }

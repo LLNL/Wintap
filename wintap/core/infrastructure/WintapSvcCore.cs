@@ -221,8 +221,8 @@ namespace gov.llnl.wintap
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Error loading plugin: {ex.Message}",
-                        core.infrastructure.LogLevel.Info);
+                    WintapLogger.Log.Append($"Problem loading plugin: {ex.Message}",
+                        core.infrastructure.LogLevel.Warn);
                 }
 
                 // ─── DuckDB UI Server ──────────────────────────────────────────
@@ -251,7 +251,7 @@ namespace gov.llnl.wintap
                 // ─── Collector Startup ─────────────────────────────────────────
                 try
                 {
-                    WintapLogger.Log.Append("Starting Wintap collectors", core.infrastructure.LogLevel.Info);
+                    WintapLogger.Log.Append("Starting Wintap sensors", core.infrastructure.LogLevel.Info);
                     subscriptionMgr = new SubscriptionManager();
                     subscriptionMgr.Start();
                 }

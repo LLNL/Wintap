@@ -134,32 +134,6 @@ catch (Exception ex)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DATABASE INFRASTRUCTURE
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Only run database recovery on Windows (uses Security Event Logs & ETW)
-if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-{
-    WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
-
-    // Clean up existing database files before recovery
-    FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
-    mainDBInfo.Delete();
-    mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
-    mainDBInfo.Delete();
-
-    // Execute database recovery process
-    CallDatabaseRecovery();
-}
-else
-{
-    WintapLogger.Log.Append("Database recovery skipped on non-Windows platform", LogLevel.Info);
-
-    // Initialize empty database for Linux/macOS
-    // (OSquery events will populate it as they come in)
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // SERVICE CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -216,56 +190,3 @@ app.UseEndpoints(endpoints =>
 
 WintapLogger.Log.Append("Running app", LogLevel.Info);
 app.Run();
-
-// ═══════════════════════════════════════════════════════════════════════════
-// HELPER METHODS
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// <summary>
-/// Executes the database recovery process via WintapCoreSvcMgr.exe.
-/// Ensures process tree database integrity on startup.
-/// </summary>
-/// <returns>True if recovery completed successfully, false otherwise.</returns>
-bool CallDatabaseRecovery()
-{
-    try
-    {
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = "WintapCoreSvcMgr.exe",
-            Arguments = "RECOVER_DATABASE",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = false,
-            RedirectStandardError = true
-        };
-
-        System.Diagnostics.Process wintapSvcMgr = new System.Diagnostics.Process();
-        wintapSvcMgr.StartInfo = processInfo;
-        wintapSvcMgr.Start();
-        wintapSvcMgr.WaitForExit();
-
-        // Wait for process to fully exit
-        while (System.Diagnostics.Process.GetProcessesByName("WintapCoreSvcMgr").Length > 0)
-        {
-            System.Threading.Thread.Sleep(100);
-        }
-
-        if (wintapSvcMgr.ExitCode == 0)
-        {
-            WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);
-            return true;
-        }
-        else
-        {
-            var error = wintapSvcMgr.StandardError.ReadToEnd();
-            WintapLogger.Log.Append($"Database recovery failed: {error}", LogLevel.Error);
-            return false;
-        }
-    }
-    catch (Exception ex)
-    {
-        WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
-        return false;
-    }
-}

@@ -1,14 +1,18 @@
-using gov.llnl.wintap.core.collect;
+﻿using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw;
 using gov.llnl.wintap.platform.windows.collect.shared;
+using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
-using System.ComponentModel;
-using System.Configuration;
-using System.Reflection;
 using System;
 using System.Collections.Generic;
-using Microsoft.Diagnostics.Tracing;
+using System.ComponentModel;
+using System.Configuration;
+using System.Diagnostics;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace gov.llnl.wintap.platform.windows.infrastructure
 {
@@ -22,7 +26,20 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
 
             List<BaseWindowsSensor> baseSensors = new List<BaseWindowsSensor>();
-            // start process collector first for process attribution
+
+            // initialize process tree database
+            WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
+
+            // Clean up existing database files before recovery
+            FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
+            mainDBInfo.Delete();
+            mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
+            mainDBInfo.Delete();
+
+            // Execute database recovery process
+            CallDatabaseRecovery();
+
+            // start process sensor first for process attribution
             WintapLogger.Log.Append("Starting Process sensor", LogLevel.Info);
             ProcessSensor pc = new ProcessSensor();
             pc.Start();
@@ -72,7 +89,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     }
                     catch (Exception ex)
                     {
-                        WintapLogger.Log.Append(sp.Name + " error loading sensor: " + ex.Message, LogLevel.Info);
+                        WintapLogger.Log.Append(sp.Name + " problem loading sensor: " + ex.Message, LogLevel.Warn);
                     }
 
                 }
@@ -138,6 +155,59 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 WintapLogger.Log.Append("ERROR starting ETW kernel mode session: " + ex.Message, LogLevel.Info);
             }
 
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // HELPER METHODS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Executes the database recovery process via WintapCoreSvcMgr.exe.
+        /// Ensures process tree database integrity on startup.
+        /// </summary>
+        /// <returns>True if recovery completed successfully, false otherwise.</returns>
+        bool CallDatabaseRecovery()
+        {
+            try
+            {
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = "WintapCoreSvcMgr.exe",
+                    Arguments = "RECOVER_DATABASE",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = true
+                };
+
+                System.Diagnostics.Process wintapSvcMgr = new System.Diagnostics.Process();
+                wintapSvcMgr.StartInfo = processInfo;
+                wintapSvcMgr.Start();
+                wintapSvcMgr.WaitForExit();
+
+                // Wait for process to fully exit
+                while (System.Diagnostics.Process.GetProcessesByName("WintapCoreSvcMgr").Length > 0)
+                {
+                    System.Threading.Thread.Sleep(100);
+                }
+
+                if (wintapSvcMgr.ExitCode == 0)
+                {
+                    WintapLogger.Log.Append("Database recovery completed successfully", LogLevel.Info);
+                    return true;
+                }
+                else
+                {
+                    var error = wintapSvcMgr.StandardError.ReadToEnd();
+                    WintapLogger.Log.Append($"Database recovery failed: {error}", LogLevel.Error);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
+                return false;
+            }
         }
     }
 }
