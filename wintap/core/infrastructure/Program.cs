@@ -144,6 +144,10 @@ catch (Exception ex)
 
 WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
 
+// ─── Logger Registration ───────────────────────────────────────────────────
+// Register WintapLogger as IWintapLogger for plugin dependency injection
+builder.Services.AddSingleton<IWintapLogger>(sp => WintapLogger.Log);
+
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
 builder.Services.AddWindowsService();
 builder.Services.AddHostedService<WinTapSvc>();

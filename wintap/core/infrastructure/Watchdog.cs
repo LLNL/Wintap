@@ -168,7 +168,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             WintapLogger.Log.Append(v, LogLevel.Info);
             EventLog appLog = new EventLog("Application", ".", "Wintap");
-            appLog.WriteEntry(v, EventLogEntryType.Warning, eventID);
+            appLog.WriteEntry(v, (System.Diagnostics.EventLogEntryType)EventLogEntryType.Warning, eventID);
 
         }
 

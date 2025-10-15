@@ -221,7 +221,7 @@ namespace gov.llnl.wintap.core.etl.shared
         internal static void LogEvent(int eventID, string v, EventLogEntryType eventType)
         {
             EventLog appLog = new EventLog("Application", ".", "WintapETL");
-            appLog.WriteEntry(v, eventType, eventID);
+            appLog.WriteEntry(v, (System.Diagnostics.EventLogEntryType)EventLogEntryType.Warning, eventID);
         }
     }
 

@@ -6,10 +6,86 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using gov.llnl.wintap.collect.models;
 
 namespace gov.llnl.wintap
 {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LOGGING INTERFACE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Log severity levels.
+    /// </summary>
+    public enum LogLevel
+    {
+        Always = -1,  // Legacy compatibility
+        Trace = 0,
+        Debug = 1,
+        Info = 2,
+        Warn = 3,
+        Error = 4,
+        Fatal = 5
+    }
+
+    /// <summary>
+    /// Windows Event Log entry types.
+    /// Matches System.Diagnostics.EventLogEntryType values.
+    /// </summary>
+    public enum EventLogEntryType
+    {
+        Error = 1,
+        Warning = 2,
+        Information = 4,
+        SuccessAudit = 8,
+        FailureAudit = 16
+    }
+
+    /// <summary>
+    /// Interface for Wintap logging functionality.
+    /// Provides structured logging with multiple severity levels and optional Windows Event Log integration.
+    /// </summary>
+    public interface IWintapLogger
+    {
+        /// <summary>
+        /// Appends a log entry with optional caller information and event log writing.
+        /// </summary>
+        /// <param name="message">The message to log</param>
+        /// <param name="level">The severity level of the log entry</param>
+        /// <param name="member">Caller member name (auto-populated)</param>
+        /// <param name="file">Caller file path (auto-populated)</param>
+        /// <param name="alsoToEventLog">Whether to also write to Windows Event Log</param>
+        /// <param name="eventLogType">The Event Log entry type (if writing to Event Log)</param>
+        /// <param name="eventId">The Event ID (if writing to Event Log)</param>
+        void Append(string message,
+            LogLevel level = LogLevel.Info,
+            [CallerMemberName] string member = "",
+            [CallerFilePath] string file = "",
+            bool alsoToEventLog = false,
+            EventLogEntryType? eventLogType = null,
+            int eventId = 0);
+
+        /// <summary>
+        /// Closes the log file and flushes any pending entries.
+        /// </summary>
+        void Close();
+
+        /// <summary>
+        /// Gets or sets the minimum logging verbosity level.
+        /// </summary>
+        LogLevel Verbosity { get; set; }
+
+        /// <summary>
+        /// Gets the name of the log.
+        /// </summary>
+        string LogName { get; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PLUGIN INTERFACES
+    // ═══════════════════════════════════════════════════════════════════════════
+
     public class Interfaces
     {
         [Flags]
@@ -18,6 +94,9 @@ namespace gov.llnl.wintap
         /// <summary>
         /// Event subscription of raw, unmodelled ETW providers.  For use when a plugin wants ETW data from a provider that is not defined in EventFlags (e.g. Process, TcpConnection, UdpPacket, FileActivity, etc.)
         /// The plugin needs to return a list of one or more ETW providers, for example:  Windows-Microsoft-Winlogon
+        /// 
+        /// PLUGIN CONSTRUCTOR PATTERN: Plugins should implement a constructor accepting IWintapLogger:
+        /// public MyEtwPlugin(IWintapLogger logger) { ... }
         /// </summary>
         public interface ISubscribeEtw
         {
@@ -25,6 +104,7 @@ namespace gov.llnl.wintap
             List<string> Startup();
             void Shutdown();
         }
+
         /// <summary>
         /// Metadata about the plugin
         /// </summary>
@@ -35,6 +115,9 @@ namespace gov.llnl.wintap
 
         /// <summary>
         /// Event subscription of Wintap event data.  Required events are defined in in the EventFlags bitmask and returned from the Startup method.
+        /// 
+        /// PLUGIN CONSTRUCTOR PATTERN: Plugins should implement a constructor accepting IWintapLogger:
+        /// public MySubscriberPlugin(IWintapLogger logger) { ... }
         /// </summary>
         public interface ISubscribe
         {
@@ -42,14 +125,17 @@ namespace gov.llnl.wintap
             EventFlags Startup();
             void Shutdown();
         }
+
         public interface ISubscribeData
         {
             string Name { get; }
-
         }
 
         /// <summary>
-        /// Interval based simple task execution.  
+        /// Interval based simple task execution.
+        /// 
+        /// PLUGIN CONSTRUCTOR PATTERN: Plugins should implement a constructor accepting IWintapLogger:
+        /// public MyRunnerPlugin(IWintapLogger logger) { ... }
         /// </summary>
         public interface IRun
         {
@@ -63,11 +149,13 @@ namespace gov.llnl.wintap
             /// </summary>
             /// <returns>RunManifest object which defines the execution interval and network requirements</returns>
             RunManifest RunStartup();
+
             /// <summary>
-            /// Shutodwn code (if any).  Called once at Wintap shutdown.
+            /// Shutdown code (if any).  Called once at Wintap shutdown.
             /// </summary>
             void RunShutdown();
         }
+
         public interface IRunData
         {
             string Name { get; }
@@ -75,6 +163,9 @@ namespace gov.llnl.wintap
 
         /// <summary>
         /// Esper query submission and result delivery
+        /// 
+        /// PLUGIN CONSTRUCTOR PATTERN: Plugins should implement a constructor accepting IWintapLogger:
+        /// public MyQueryPlugin(IWintapLogger logger) { ... }
         /// </summary>
         public interface IQuery
         {
@@ -91,11 +182,18 @@ namespace gov.llnl.wintap
 
             void Shutdown();
         }
+
         public interface IQueryData
         {
             string Name { get; }
         }
 
+        /// <summary>
+        /// Provider interface for plugins that generate events.
+        /// 
+        /// PLUGIN CONSTRUCTOR PATTERN: Plugins should implement a constructor accepting IWintapLogger:
+        /// public MyProviderPlugin(IWintapLogger logger) { ... }
+        /// </summary>
         public interface IProvide
         {
             void Startup();
@@ -110,8 +208,11 @@ namespace gov.llnl.wintap
         {
             string Name { get; }
         }
-
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SUPPORTING TYPES
+    // ═══════════════════════════════════════════════════════════════════════════
 
     public class ProviderEventArgs
     {
@@ -128,6 +229,7 @@ namespace gov.llnl.wintap
         /// Do a ping check for this host before calling Run method.  Leave empty or set to "NONE" to skip this check.
         /// </summary>
         public string RequiredHost { get; set; }
+
         /// <summary>
         /// Interval between consecutive calls to the Run method.  Minimum value is 1 minute.
         /// </summary>
@@ -159,7 +261,7 @@ namespace gov.llnl.wintap
         /// <summary>
         /// Name of the plugin that generates this query and to which results will be delivered
         /// </summary>
-        public string Source { get; set; }  
+        public string Source { get; set; }
 
         /// <summary>
         /// EPStatement query
@@ -174,16 +276,14 @@ namespace gov.llnl.wintap
         /// </summary>
         public string Name { get; set; }
 
-        public List<KeyValuePair<string,string>> EventDetails { get; set; }
+        public List<KeyValuePair<string, string>> EventDetails { get; set; }
 
         public List<WintapMessage> Activity { get; set; }
 
         public QueryResult()
         {
-            EventDetails = new List<KeyValuePair<string,string>>();
+            EventDetails = new List<KeyValuePair<string, string>>();
             Activity = new List<WintapMessage>();
         }
     }
-
-
 }

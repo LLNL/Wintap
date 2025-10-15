@@ -44,7 +44,7 @@ namespace gov.llnl.wintap.core.api
         [HttpGet]
         public IActionResult Get()
         {
-            WintapLogger.Log.Append("Diagnostic API endpoint called", core.infrastructure.LogLevel.Always);
+            WintapLogger.Log.Append("Diagnostic API endpoint called", LogLevel.Always);
             return Ok(new { message = "API is working", timestamp = DateTime.Now });
         }
     }

@@ -212,14 +212,34 @@ namespace gov.llnl.wintap.core.infrastructure
 
         #region Plugin Registration Methods
 
+
         private void LoadPluginAssemblies()
         {
             try
             {
+                // Get the logger from DI container for plugin injection
+                var logger = ServiceProviderAccessor.Services?.GetService(typeof(IWintapLogger)) as IWintapLogger;
+
+                if (logger == null)
+                {
+                    WintapLogger.Log.Append("Warning: Could not retrieve IWintapLogger from DI container. Plugins may not have logger access.", LogLevel.Warn);
+                    logger = WintapLogger.Log; // Fallback to static instance
+                }
+
                 isolatedCatalog = new IsolatedPluginCatalog(Env.FilePluginPath);
                 mefContainer = new CompositionContainer(isolatedCatalog);
+
+                // Make the logger available for MEF to inject into plugin constructors
+                var batch = new CompositionBatch();
+                batch.AddExportedValue<IWintapLogger>(logger);
+                mefContainer.Compose(batch);
+
+                // Compose the PluginManager (imports all plugins)
                 mefContainer.ComposeParts(this);
+
                 PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
+
+                WintapLogger.Log.Append($"Loaded {PluginCount} plugins with logger injection support", LogLevel.Info);
             }
             catch (ReflectionTypeLoadException ex)
             {
