@@ -226,12 +226,26 @@ namespace gov.llnl.wintap.core.infrastructure
                     logger = WintapLogger.Log; // Fallback to static instance
                 }
 
+                // Get the inference service from DI container for plugin injection
+                var inference = ServiceProviderAccessor.Services?.GetService(typeof(IInfer)) as IInfer;
+
+                if (inference == null)
+                {
+                    WintapLogger.Log.Append("Warning: Could not retrieve IInfer from DI container. Plugins will not have AI inference access.", LogLevel.Warn);
+                }
+
                 isolatedCatalog = new IsolatedPluginCatalog(Env.FilePluginPath);
                 mefContainer = new CompositionContainer(isolatedCatalog);
 
-                // Make the logger available for MEF to inject into plugin constructors
+                // Make the logger and inference service available for MEF to inject into plugin constructors
                 var batch = new CompositionBatch();
                 batch.AddExportedValue<IWintapLogger>(logger);
+
+                if (inference != null)
+                {
+                    batch.AddExportedValue<IInfer>(inference);
+                }
+
                 mefContainer.Compose(batch);
 
                 // Compose the PluginManager (imports all plugins)
@@ -239,7 +253,8 @@ namespace gov.llnl.wintap.core.infrastructure
 
                 PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
 
-                WintapLogger.Log.Append($"Loaded {PluginCount} plugins with logger injection support", LogLevel.Info);
+                string servicesAvailable = inference != null ? "logger and AI inference" : "logger only";
+                WintapLogger.Log.Append($"Loaded {PluginCount} plugins with {servicesAvailable} support", LogLevel.Info);
             }
             catch (ReflectionTypeLoadException ex)
             {

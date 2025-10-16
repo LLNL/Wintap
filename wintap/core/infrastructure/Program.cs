@@ -25,6 +25,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using static gov.llnl.wintap.Interfaces;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APPLICATION INITIALIZATION
@@ -147,6 +148,23 @@ WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
 // ─── Logger Registration ───────────────────────────────────────────────────
 // Register WintapLogger as IWintapLogger for plugin dependency injection
 builder.Services.AddSingleton<IWintapLogger>(sp => WintapLogger.Log);
+
+// ─── Inference Registration ────────────────────────────────────────────────
+// Register WintapInference as IInfer for plugin AI access
+builder.Services.AddSingleton<IInfer>(sp =>
+{
+    var chatClient = sp.GetService<IChatClient>();
+    var mcpClient = sp.GetService<IMcpClient>();
+    var logger = sp.GetService<IWintapLogger>();
+
+    if (chatClient == null)
+    {
+        WintapLogger.Log.Append("Warning: IChatClient not available. IInfer will not be available to plugins.", LogLevel.Warn);
+        return null;
+    }
+
+    return new WintapInference(chatClient, mcpClient, logger);
+});
 
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
 builder.Services.AddWindowsService();

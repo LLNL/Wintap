@@ -4,10 +4,11 @@
  * All rights reserved.
  */
 
+using gov.llnl.wintap.collect.models;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using gov.llnl.wintap.collect.models;
+using System.Threading.Tasks;
 
 namespace gov.llnl.wintap
 {
@@ -207,6 +208,56 @@ namespace gov.llnl.wintap
         public interface IProvideData
         {
             string Name { get; }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // INFERENCE INTERFACE
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Interface for AI inference services.
+        /// Provides plugins with access to chat completions and MCP tools.
+        /// </summary>
+        public interface IInfer
+        {
+            /// <summary>
+            /// Sends a prompt to the AI and gets a response.
+            /// Simple method for basic inference without conversation history.
+            /// </summary>
+            /// <param name="prompt">The user's question or prompt</param>
+            /// <returns>The AI's response text</returns>
+            Task<string> AskAsync(string prompt);
+
+            /// <summary>
+            /// Sends a prompt with custom options (temperature, tool usage, history).
+            /// </summary>
+            /// <param name="prompt">The user's question or prompt</param>
+            /// <param name="temperature">Creativity level (0.0-2.0, default 1.0)</param>
+            /// <param name="useTools">Whether to enable MCP tool calling (default true)</param>
+            /// <param name="includeHistory">Whether to include conversation history (default false)</param>
+            /// <returns>The AI's response text</returns>
+            Task<string> AskAsync(string prompt, float temperature = 1.0f, bool useTools = true, bool includeHistory = false);
+
+            /// <summary>
+            /// Sends a prompt and gets a structured JSON response deserialized to type T.
+            /// The AI will return data conforming to the structure of T.
+            /// </summary>
+            /// <typeparam name="T">The type to deserialize the response into</typeparam>
+            /// <param name="prompt">The user's question or prompt</param>
+            /// <param name="temperature">Creativity level (0.0-2.0, default 1.0)</param>
+            /// <returns>Deserialized object of type T</returns>
+            Task<T> AskStructuredAsync<T>(string prompt, float temperature = 1.0f) where T : class;
+
+            /// <summary>
+            /// Clears the conversation history for this plugin's context.
+            /// </summary>
+            void ClearHistory();
+
+            /// <summary>
+            /// Gets the names of available MCP tools.
+            /// </summary>
+            /// <returns>List of tool names that can be invoked by the AI</returns>
+            Task<List<string>> GetAvailableToolsAsync();
         }
     }
 
