@@ -248,6 +248,7 @@ namespace gov.llnl.wintap
             /// <returns>Deserialized object of type T</returns>
             Task<T> AskStructuredAsync<T>(string prompt, float temperature = 1.0f) where T : class;
 
+
             /// <summary>
             /// Clears the conversation history for this plugin's context.
             /// </summary>
