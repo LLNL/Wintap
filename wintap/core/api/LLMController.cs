@@ -1,44 +1,20 @@
 
 #pragma warning disable SKEXP0010, SKEXP0001, SKEXP0050;
 
-using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
-using gov.llnl.wintap.Properties;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
-//using Microsoft.SemanticKernel;
-//using Microsoft.SemanticKernel.ChatCompletion;
-//using Microsoft.SemanticKernel.Memory;
-//using Microsoft.SemanticKernel.Text;
-using Microsoft.SemanticKernel.Embeddings;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
 using Newtonsoft.Json;
 using OpenAI;
 using System;
 using System.ClientModel;
-using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Json;
-using System.ServiceModel.Channels;
-using System.Speech.Synthesis;
-using System.Text;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Web.Configuration;
-using WinTAP.Properties;
 
 
 
@@ -150,13 +126,13 @@ namespace gov.llnl.wintap.core.api
             WintapLogger.Log.Append($"LLM Clear method called", LogLevel.Info);
 
             OpenAIClientOptions openAIOptions = new OpenAIClientOptions();
-            openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri("https://livai-api-dev.llnl.gov/v1") };
+            openAIOptions = new OpenAIClientOptions() { Endpoint = new Uri(Properties.Settings.Default.AiApiUrl) };
 
             string? key = "";
             key = System.IO.File.ReadAllText(Path.Combine(Env.FileDataRoot, "ai", "api-key.txt"));
 
             ApiKeyCredential cred = new ApiKeyCredential(key!);
-            var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient("gpt-4.1");
+            var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient(Properties.Settings.Default.AiModel);
 
             // Create a sampling client.
             using IChatClient chatClient = openAIClient.AsIChatClient()

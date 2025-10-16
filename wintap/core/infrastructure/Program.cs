@@ -37,7 +37,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://localhost:8099");
 
 builder.Services.AddControllers();
-WintapLogger.Log.Append($"Wintap is starting on http://localhost:8099", LogLevel.Info);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AI INTEGRATION CONFIGURATION
@@ -128,6 +127,8 @@ try
         new ChatMessage(ChatRole.System,
             File.ReadAllText(Path.Combine(Env.FileRootPath, "systemprompt.txt"))),
     ];
+
+    WintapLogger.Log.Append($"Wintap is starting on {Settings.Default.AiApiUrl}", LogLevel.Info);
 
     // ─── AI Service Registration ──────────────────────────────────────────
     builder.Services.AddSingleton(chatHistory);
