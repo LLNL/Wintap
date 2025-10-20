@@ -37,6 +37,7 @@ namespace gov.llnl.wintap.core.infrastructure
     /// <summary>
     /// Manages the loading, execution, and lifecycle of Wintap plugins.
     /// Provides MEF-based plugin discovery and isolated plugin execution.
+    /// Supports plugin-specific MCP servers with automatic tool namespacing.
     /// </summary>
     public class PluginManager
     {
@@ -84,7 +85,6 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             WintapLogger.Log.Append("Plugin manager is starting", LogLevel.Info);
 
-
             runQueue = new ConcurrentQueue<Runnable>();
             loadedPluginNames = new HashSet<string>();
             etl = new WintapETL();
@@ -102,9 +102,10 @@ namespace gov.llnl.wintap.core.infrastructure
 
         /// <summary>
         /// Registers and initializes all discovered plugins.
+        /// Async to support MCP client initialization.
         /// </summary>
         /// <param name="_watchdog">The watchdog instance to monitor plugin execution.</param>
-        internal void RegisterPlugins(Watchdog _watchdog)
+        internal async Task RegisterPluginsAsync(Watchdog _watchdog)
         {
             try
             {
@@ -113,6 +114,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 WintapLogger.Log.Append($"Loading plugins from: {Env.FilePluginPath}", LogLevel.Info);
 
                 LoadPluginAssemblies();
+                await RegisterPluginMcpServersAsync();  // Register plugin MCP servers
                 RegisterEventHandlers();
                 StartPluginScheduler();
 
@@ -127,13 +129,21 @@ namespace gov.llnl.wintap.core.infrastructure
 
         /// <summary>
         /// Unregisters and performs cleanup for all plugins.
+        /// Async to support MCP client shutdown.
         /// </summary>
-        internal void UnregisterPlugins()
+        internal async Task UnregisterPluginsAsync()
         {
             watchdog.Stop();
 
             try
             {
+                // Shutdown plugin MCP servers FIRST
+                var mcpManager = ServiceProviderAccessor.Services?.GetService(typeof(PluginMcpManager)) as PluginMcpManager;
+                if (mcpManager != null)
+                {
+                    await mcpManager.ShutdownAllAsync();
+                }
+
                 // Unregister providers
                 foreach (var provider in providers.Reverse())
                 {
@@ -212,7 +222,6 @@ namespace gov.llnl.wintap.core.infrastructure
 
         #region Plugin Registration Methods
 
-
         private void LoadPluginAssemblies()
         {
             try
@@ -226,26 +235,12 @@ namespace gov.llnl.wintap.core.infrastructure
                     logger = WintapLogger.Log; // Fallback to static instance
                 }
 
-                // Get the inference service from DI container for plugin injection
-                var inference = ServiceProviderAccessor.Services?.GetService(typeof(IInfer)) as IInfer;
-
-                if (inference == null)
-                {
-                    WintapLogger.Log.Append("Warning: Could not retrieve IInfer from DI container. Plugins will not have AI inference access.", LogLevel.Warn);
-                }
-
                 isolatedCatalog = new IsolatedPluginCatalog(Env.FilePluginPath);
                 mefContainer = new CompositionContainer(isolatedCatalog);
 
-                // Make the logger and inference service available for MEF to inject into plugin constructors
+                // Make the logger available for MEF to inject into plugin constructors
                 var batch = new CompositionBatch();
                 batch.AddExportedValue<IWintapLogger>(logger);
-
-                if (inference != null)
-                {
-                    batch.AddExportedValue<IInfer>(inference);
-                }
-
                 mefContainer.Compose(batch);
 
                 // Compose the PluginManager (imports all plugins)
@@ -253,8 +248,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
                 PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
 
-                string servicesAvailable = inference != null ? "logger and AI inference" : "logger only";
-                WintapLogger.Log.Append($"Loaded {PluginCount} plugins with {servicesAvailable} support", LogLevel.Info);
+                WintapLogger.Log.Append($"Loaded {PluginCount} plugins with logger injection support", LogLevel.Info);
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -264,6 +258,98 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Registers MCP servers for plugins that implement IProvideMCP.
+        /// Plugin MCP tools are automatically namespaced as "PluginName_ToolName".
+        /// </summary>
+        private async Task RegisterPluginMcpServersAsync()
+        {
+            try
+            {
+                // Get the PluginMcpManager from DI
+                var mcpManager = ServiceProviderAccessor.Services?.GetService(typeof(PluginMcpManager)) as PluginMcpManager;
+
+                if (mcpManager == null)
+                {
+                    WintapLogger.Log.Append("PluginMcpManager not available, skipping plugin MCP server registration", LogLevel.Debug);
+                    return;
+                }
+
+                int mcpPluginCount = 0;
+
+                // Check all plugin types for IProvideMCP implementation
+                mcpPluginCount += await RegisterMcpForPluginType(subscribers, mcpManager);
+                mcpPluginCount += await RegisterMcpForPluginType(subscribersEtw, mcpManager);
+                mcpPluginCount += await RegisterMcpForPluginType(runners, mcpManager);
+
+                if (queryPlugins != null)
+                {
+                    mcpPluginCount += await RegisterMcpForPluginType(queryPlugins, mcpManager);
+                }
+
+                mcpPluginCount += await RegisterMcpForPluginType(providers, mcpManager);
+
+                WintapLogger.Log.Append($"Registered MCP servers for {mcpPluginCount} plugins", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error registering plugin MCP servers: {ex.Message}", LogLevel.Error);
+            }
+        }
+
+        /// <summary>
+        /// Registers MCP servers for a collection of plugins of type T.
+        /// </summary>
+        /// <returns>Count of plugins with MCP servers registered</returns>
+        private async Task<int> RegisterMcpForPluginType<T, TData>(IEnumerable<Lazy<T, TData>> plugins, PluginMcpManager mcpManager)
+            where TData : class
+        {
+            if (plugins == null) return 0;
+
+            int count = 0;
+
+            foreach (var plugin in plugins)
+            {
+                try
+                {
+                    // Check if this plugin provides an MCP server
+                    if (plugin.Value is IProvideMCP mcpProvider)
+                    {
+                        string pluginName = GetPluginName(plugin.Metadata);
+                        string mcpServerPath = mcpProvider.GetMcpServerPath();
+
+                        if (!string.IsNullOrWhiteSpace(mcpServerPath))
+                        {
+                            WintapLogger.Log.Append($"Plugin {pluginName} provides MCP server at {mcpServerPath}", LogLevel.Info);
+
+                            bool success = await mcpManager.RegisterPluginMcpServerAsync(pluginName, mcpServerPath);
+
+                            if (success)
+                            {
+                                count++;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Error checking plugin for MCP server: {ex.Message}", LogLevel.Warn);
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Helper method to extract plugin name from metadata.
+        /// </summary>
+        private string GetPluginName(object metadata)
+        {
+            // Use reflection to get the Name property from metadata
+            var nameProperty = metadata.GetType().GetProperty("Name");
+            return nameProperty?.GetValue(metadata)?.ToString() ?? "Unknown";
         }
 
         private void RegisterEventHandlers()

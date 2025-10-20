@@ -119,12 +119,19 @@ namespace gov.llnl.wintap
         /// 
         /// PLUGIN CONSTRUCTOR PATTERN: Plugins should implement a constructor accepting IWintapLogger:
         /// public MySubscriberPlugin(IWintapLogger logger) { ... }
+        /// 
+        /// OPTIONAL MCP SERVER: Plugins can provide their own MCP server by implementing GetMcpServerPath().
         /// </summary>
         public interface ISubscribe
         {
             void Subscribe(WintapMessage eventMsg);
             EventFlags Startup();
             void Shutdown();
+
+            /// <summary>
+            /// Optional: Returns the path to a plugin-specific MCP server executable.
+            /// </summary>
+            string GetMcpServerPath() => null;
         }
 
         public interface ISubscribeData
@@ -208,6 +215,21 @@ namespace gov.llnl.wintap
         public interface IProvideData
         {
             string Name { get; }
+        }
+
+        /// <summary>
+        /// Optional interface for plugins that provide their own MCP server.
+        /// Plugins implement this to expose custom MCP tools alongside core Wintap tools.
+        /// Plugin MCP tools are automatically namespaced as "PluginName_ToolName" to prevent conflicts.
+        /// </summary>
+        public interface IProvideMCP
+        {
+            /// <summary>
+            /// Returns the full path to the plugin's MCP server executable.
+            /// The MCP server will be started when the plugin loads and stopped when it shuts down.
+            /// </summary>
+            /// <returns>Full path to MCP server executable (e.g., "C:\Plugins\MyPlugin\my_mcp_server.exe")</returns>
+            string GetMcpServerPath();
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
