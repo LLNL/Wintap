@@ -80,72 +80,82 @@ namespace gov.llnl.wintap
             }
         }
 
+        /// <summary>
+        /// Main service execution loop. Starts initialization asynchronously
+        /// and keeps service alive until cancellation is requested.
+        /// </summary>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             try
             {
-                // ─── Plugin Manager Initialization ─────────────────────────────────
-                WintapLogger.Log.Append("Loading plugin manager...", LogLevel.Info);
-                pluginMgr = new PluginManager();
+                WintapLogger.Log.Append("WinTapSvc ExecuteAsync starting", LogLevel.Info);
 
-                // ─── Performance Monitoring ────────────────────────────────────────
-                WintapLogger.Log.Append("Creating performance monitor", LogLevel.Info);
-                Watchdog watchdog = new Watchdog();
+                // Start initialization asynchronously (no longer using BackgroundWorker)
+                _ = Task.Run(async () => await StartupWorkerAsync(), stoppingToken);
+                WintapLogger.Log.Append("Started async startup task", LogLevel.Info);
 
-                // ─── Plugin Registration ───────────────────────────────────────────
-                try
-                {
-                    WintapLogger.Log.Append("Attempting to register plugins...", LogLevel.Info);
-                    await pluginMgr.RegisterPluginsAsync(watchdog);  // NOW ASYNC
-                }
-                catch (ReflectionTypeLoadException ex)
-                {
-                    foreach (Exception loaderException in ex.LoaderExceptions)
-                    {
-                        WintapLogger.Log.Append($"Loader exception: {loaderException}", LogLevel.Info);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append($"Error loading plugin: {ex.Message}", LogLevel.Info);
-                }
-
-                // ─── Subscription Manager ──────────────────────────────────────────
-                WintapLogger.Log.Append("Creating subscription manager", LogLevel.Info);
-                subscriptionMgr = new SubscriptionManager();
-
-                // ─── Service Loop ──────────────────────────────────────────────────
+                // Keep service running until stop is requested
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                    await Task.Delay(1000, stoppingToken);
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Fatal error in WinTapSvc: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Error in ExecuteAsync: {ex}", LogLevel.Error);
                 throw;
             }
         }
 
+        /// <summary>
+        /// Handles graceful shutdown of all Wintap components.
+        /// </summary>
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
-            WintapLogger.Log.Append("WinTap service is stopping...", LogLevel.Info);
+            WintapLogger.Log.Append("Stop command received. Attempting to shutdown plugins",
+                LogLevel.Info);
 
             try
             {
-                if (pluginMgr != null)
+                // Record shutdown metadata in registry
+                using (var wintapKey = Registry.LocalMachine.CreateSubKey(Env.RegistryRootPath))
                 {
-                    await pluginMgr.UnregisterPluginsAsync();  
+                    wintapKey.SetValue("LastRestart", DateTime.Now, RegistryValueKind.String);
+                    wintapKey.SetValue("WatchdogRestart", Watchdog.PerformanceBreach, RegistryValueKind.DWord);
+                    wintapKey.Flush();
+                }
+
+                // Shutdown plugins (now async)
+                try
+                {
+                    if (pluginMgr != null)
+                    {
+                        WintapLogger.Log.Append("Shutting down plugin manager (async)...", LogLevel.Info);
+                        await pluginMgr.UnregisterPluginsAsync();
+                        WintapLogger.Log.Append("Plugin manager shutdown complete", LogLevel.Info);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Exception in plugin shutdown: {ex.Message}",
+                        LogLevel.Info);
+                }
+
+                // Stop data collectors
+                if (subscriptionMgr != null)
+                {
+                    subscriptionMgr.Stop();
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error during shutdown: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Error in shutdown: {ex.Message}", LogLevel.Info);
             }
 
-            await base.StopAsync(cancellationToken);
+            WintapLogger.Log.Append("Shutdown complete.", LogLevel.Info);
+            WintapLogger.Log.Close();
 
-            WintapLogger.Log.Append("WinTap service stopped", LogLevel.Info);
+            await base.StopAsync(cancellationToken);
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -153,10 +163,10 @@ namespace gov.llnl.wintap
         // ═══════════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Background worker that handles all service initialization tasks.
+        /// Async startup worker that handles all service initialization tasks.
         /// Runs asynchronously to prevent blocking the main service startup.
         /// </summary>
-        private async void startupWorker_DoWork(object sender, DoWorkEventArgs e)
+        private async Task StartupWorkerAsync()
         {
             try
             {
@@ -195,11 +205,12 @@ namespace gov.llnl.wintap
                 WintapLogger.Log.Append("Creating performance monitor", LogLevel.Info);
                 Watchdog watchdog = new Watchdog();
 
-                // ─── Plugin Registration ───────────────────────────────────────
+                // ─── Plugin Registration (NOW ASYNC) ───────────────────────────
                 try
                 {
-                    WintapLogger.Log.Append("Attempting to register plugins...", LogLevel.Info);
+                    WintapLogger.Log.Append("Attempting to register plugins (async)...", LogLevel.Info);
                     await pluginMgr.RegisterPluginsAsync(watchdog);
+                    WintapLogger.Log.Append("Plugin registration complete", LogLevel.Info);
                 }
                 catch (ReflectionTypeLoadException ex)
                 {
@@ -213,6 +224,7 @@ namespace gov.llnl.wintap
                 {
                     WintapLogger.Log.Append($"Problem loading plugin: {ex.Message}",
                         LogLevel.Warn);
+                    WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
                 }
 
                 // ─── DuckDB UI Server ──────────────────────────────────────────
@@ -236,7 +248,8 @@ namespace gov.llnl.wintap
 
                 // ─── Plugin Initialization Delay ───────────────────────────────
                 // Allow plugins to initialize before starting collectors
-                Thread.Sleep(5000);
+                WintapLogger.Log.Append("Waiting for plugin initialization (5 seconds)...", LogLevel.Info);
+                await Task.Delay(5000);
 
                 // ─── Collector Startup ─────────────────────────────────────────
                 try

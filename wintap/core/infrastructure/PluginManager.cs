@@ -1,4 +1,4 @@
-using com.espertech.esper.client;
+﻿using com.espertech.esper.client;
 using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
@@ -14,6 +14,7 @@ using System.ComponentModel.Composition.Hosting;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.IO;
 using gov.llnl.wintap.core.etl;
 using static gov.llnl.wintap.Interfaces;
 using com.espertech.esper.runtime.client;
@@ -38,6 +39,11 @@ namespace gov.llnl.wintap.core.infrastructure
     /// Manages the loading, execution, and lifecycle of Wintap plugins.
     /// Provides MEF-based plugin discovery and isolated plugin execution.
     /// Supports plugin-specific MCP servers with automatic tool namespacing.
+    /// 
+    /// PLUGIN CONVENTION:
+    /// Each plugin must follow the directory structure: .\Plugins\PluginName\PluginName.dll
+    /// Only DLLs matching their parent directory name will be loaded as plugins.
+    /// All plugin dependencies should reside in the same directory.
     /// </summary>
     public class PluginManager
     {
@@ -102,7 +108,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         /// <summary>
         /// Registers and initializes all discovered plugins.
-        /// Async to support MCP client initialization.
+        /// Async to support MCP server initialization.
         /// </summary>
         /// <param name="_watchdog">The watchdog instance to monitor plugin execution.</param>
         internal async Task RegisterPluginsAsync(Watchdog _watchdog)
@@ -129,7 +135,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         /// <summary>
         /// Unregisters and performs cleanup for all plugins.
-        /// Async to support MCP client shutdown.
+        /// Async to support MCP server shutdown.
         /// </summary>
         internal async Task UnregisterPluginsAsync()
         {
@@ -222,6 +228,11 @@ namespace gov.llnl.wintap.core.infrastructure
 
         #region Plugin Registration Methods
 
+        /// <summary>
+        /// Discovers and loads plugin assemblies using directory-based convention.
+        /// Only loads DLLs that match their parent directory name (e.g., .\Plugins\MyPlugin\MyPlugin.dll).
+        /// This prevents accidental loading of dependency DLLs as plugins.
+        /// </summary>
         private void LoadPluginAssemblies()
         {
             try
@@ -235,12 +246,41 @@ namespace gov.llnl.wintap.core.infrastructure
                     logger = WintapLogger.Log; // Fallback to static instance
                 }
 
-                isolatedCatalog = new IsolatedPluginCatalog(Env.FilePluginPath);
+                // Get the inference service from DI container for plugin injection
+                var inference = ServiceProviderAccessor.Services?.GetService(typeof(IInfer)) as IInfer;
+
+                if (inference == null)
+                {
+                    WintapLogger.Log.Append("Warning: Could not retrieve IInfer from DI container. Plugins will not have AI inference access.", LogLevel.Warn);
+                }
+                else
+                {
+                    WintapLogger.Log.Append("IInfer service retrieved successfully for plugin injection", LogLevel.Debug);
+                }
+
+                // Discover plugins using directory-based convention
+                var pluginPaths = DiscoverPlugins(Env.FilePluginPath);
+
+                if (!pluginPaths.Any())
+                {
+                    WintapLogger.Log.Append($"No plugins discovered in {Env.FilePluginPath}", LogLevel.Warn);
+                    WintapLogger.Log.Append(@"Plugin convention: .\Plugins\PluginName\PluginName.dll", LogLevel.Info);
+                }
+
+                // Create isolated catalog with discovered plugin paths
+                isolatedCatalog = new IsolatedPluginCatalog(Env.FilePluginPath, pluginPaths);
                 mefContainer = new CompositionContainer(isolatedCatalog);
 
-                // Make the logger available for MEF to inject into plugin constructors
+                // Make the logger and inference service available for MEF to inject into plugin constructors
                 var batch = new CompositionBatch();
                 batch.AddExportedValue<IWintapLogger>(logger);
+
+                if (inference != null)
+                {
+                    batch.AddExportedValue<IInfer>(inference);
+                    WintapLogger.Log.Append("IInfer added to MEF composition batch", LogLevel.Debug);
+                }
+
                 mefContainer.Compose(batch);
 
                 // Compose the PluginManager (imports all plugins)
@@ -248,7 +288,8 @@ namespace gov.llnl.wintap.core.infrastructure
 
                 PluginCount = subscribers.Count() + subscribersEtw.Count() + runners.Count();
 
-                WintapLogger.Log.Append($"Loaded {PluginCount} plugins with logger injection support", LogLevel.Info);
+                string servicesAvailable = inference != null ? "logger and AI inference" : "logger only";
+                WintapLogger.Log.Append($"Loaded {PluginCount} plugins with {servicesAvailable} support", LogLevel.Info);
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -258,6 +299,62 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 throw;
             }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error loading plugin assemblies: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Discovers plugins using directory-based convention.
+        /// CONVENTION: .\Plugins\PluginName\PluginName.dll
+        /// Only DLLs matching their parent directory name are considered plugins.
+        /// </summary>
+        /// <param name="pluginsBasePath">Base path to the Plugins directory</param>
+        /// <returns>List of paths to valid plugin DLLs</returns>
+        private List<string> DiscoverPlugins(string pluginsBasePath)
+        {
+            var pluginPaths = new List<string>();
+
+            try
+            {
+                if (!Directory.Exists(pluginsBasePath))
+                {
+                    WintapLogger.Log.Append($"Plugins directory not found: {pluginsBasePath}", LogLevel.Warn);
+                    return pluginPaths;
+                }
+
+                WintapLogger.Log.Append($"Discovering plugins using directory-based convention...", LogLevel.Info);
+
+                // Iterate through each subdirectory in the Plugins folder
+                foreach (var pluginDir in Directory.GetDirectories(pluginsBasePath))
+                {
+                    var dirName = Path.GetFileName(pluginDir);
+                    var expectedDllPath = Path.Combine(pluginDir, $"{dirName}.dll");
+
+                    if (File.Exists(expectedDllPath))
+                    {
+                        WintapLogger.Log.Append($"  ✓ Found plugin: {dirName} at {expectedDllPath}", LogLevel.Info);
+                        pluginPaths.Add(expectedDllPath);
+                        loadedPluginNames.Add(dirName);
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append($"  ✗ Skipping directory '{dirName}': no matching DLL found (expected: {expectedDllPath})", LogLevel.Debug);
+                    }
+                }
+
+                WintapLogger.Log.Append($"Plugin discovery complete. Found {pluginPaths.Count} valid plugins.", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error during plugin discovery: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+            }
+
+            return pluginPaths;
         }
 
         /// <summary>
@@ -296,11 +393,13 @@ namespace gov.llnl.wintap.core.infrastructure
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error registering plugin MCP servers: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
             }
         }
 
         /// <summary>
         /// Registers MCP servers for a collection of plugins of type T.
+        /// Uses reflection to check for IProvideMCP across isolated domains.
         /// </summary>
         /// <returns>Count of plugins with MCP servers registered</returns>
         private async Task<int> RegisterMcpForPluginType<T, TData>(IEnumerable<Lazy<T, TData>> plugins, PluginMcpManager mcpManager)
@@ -314,28 +413,62 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 try
                 {
-                    // Check if this plugin provides an MCP server
-                    if (plugin.Value is IProvideMCP mcpProvider)
+                    string pluginName = GetPluginName(plugin.Metadata);
+
+                    // Get the plugin instance
+                    var pluginValue = plugin.Value;
+                    var pluginType = pluginValue.GetType();
+
+                    // Check if plugin implements IProvideMCP using reflection
+                    // This works across AssemblyLoadContext boundaries
+                    var provideMcpInterface = pluginType.GetInterface("IProvideMCP");
+
+                    if (provideMcpInterface != null)
                     {
-                        string pluginName = GetPluginName(plugin.Metadata);
-                        string mcpServerPath = mcpProvider.GetMcpServerPath();
+                        WintapLogger.Log.Append($"Plugin {pluginName} implements IProvideMCP", LogLevel.Debug);
 
-                        if (!string.IsNullOrWhiteSpace(mcpServerPath))
+                        // Call GetMcpServerPath() using reflection
+                        var getMcpServerPathMethod = pluginType.GetMethod("GetMcpServerPath");
+
+                        if (getMcpServerPathMethod != null)
                         {
-                            WintapLogger.Log.Append($"Plugin {pluginName} provides MCP server at {mcpServerPath}", LogLevel.Info);
+                            var mcpServerPath = getMcpServerPathMethod.Invoke(pluginValue, null) as string;
 
-                            bool success = await mcpManager.RegisterPluginMcpServerAsync(pluginName, mcpServerPath);
-
-                            if (success)
+                            if (!string.IsNullOrWhiteSpace(mcpServerPath))
                             {
-                                count++;
+                                WintapLogger.Log.Append($"Plugin {pluginName} provides MCP server at {mcpServerPath}", LogLevel.Info);
+
+                                bool success = await mcpManager.RegisterPluginMcpServerAsync(pluginName, mcpServerPath);
+
+                                if (success)
+                                {
+                                    count++;
+                                    WintapLogger.Log.Append($"Successfully registered MCP server for plugin {pluginName}", LogLevel.Info);
+                                }
+                                else
+                                {
+                                    WintapLogger.Log.Append($"Failed to register MCP server for plugin {pluginName}", LogLevel.Warn);
+                                }
+                            }
+                            else
+                            {
+                                WintapLogger.Log.Append($"Plugin {pluginName} returned empty MCP server path", LogLevel.Debug);
                             }
                         }
+                        else
+                        {
+                            WintapLogger.Log.Append($"Plugin {pluginName} implements IProvideMCP but GetMcpServerPath method not found", LogLevel.Warn);
+                        }
+                    }
+                    else
+                    {
+                        WintapLogger.Log.Append($"Plugin {pluginName} does not implement IProvideMCP", LogLevel.Debug);
                     }
                 }
                 catch (Exception ex)
                 {
                     WintapLogger.Log.Append($"Error checking plugin for MCP server: {ex.Message}", LogLevel.Warn);
+                    WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
                 }
             }
 

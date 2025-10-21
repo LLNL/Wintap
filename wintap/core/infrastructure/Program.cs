@@ -164,25 +164,6 @@ try
 
     WintapLogger.Log.Append("AI services registered in DI container", LogLevel.Info);
 
-    // ─── Test AI Connection ────────────────────────────────────────────────
-    WintapLogger.Log.Append("Testing AI connection...", LogLevel.Info);
-    try
-    {
-        var testHistory = new List<ChatMessage>
-        {
-            new ChatMessage(ChatRole.User, "Respond with 'OK' if you can read this.")
-        };
-
-        var testOptions = new ChatOptions { Temperature = 0.0f };
-        var testResponse = await chatClient.GetResponseAsync(testHistory, testOptions);
-
-        WintapLogger.Log.Append($"AI connection test successful. Response: {testResponse.Text}", LogLevel.Info);
-    }
-    catch (Exception testEx)
-    {
-        WintapLogger.Log.Append($"AI connection test FAILED: {testEx.Message}", LogLevel.Error);
-        WintapLogger.Log.Append($"AI connection test stack trace: {testEx.StackTrace}", LogLevel.Error);
-    }
 }
 catch (Exception ex)
 {

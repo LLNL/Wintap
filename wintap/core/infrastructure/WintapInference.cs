@@ -62,8 +62,8 @@ namespace gov.llnl.wintap.core.infrastructure
 
             try
             {
-                _logger.Append($"Processing inference request: {prompt.Substring(0, Math.Min(50, prompt.Length))}...",
-                    LogLevel.Debug);
+                _logger.Append($"Plugin inference request: useTools={useTools}, includeHistory={includeHistory}, temp={temperature}", LogLevel.Debug);
+                _logger.Append($"Prompt preview: {prompt.Substring(0, Math.Min(100, prompt.Length))}...", LogLevel.Debug);
 
                 // Build chat history for this request
                 var chatHistory = new List<ChatMessage>();
@@ -71,6 +71,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 if (includeHistory && _pluginHistory.Any())
                 {
                     chatHistory.AddRange(_pluginHistory);
+                    _logger.Append($"Including {_pluginHistory.Count} messages from history", LogLevel.Debug);
                 }
 
                 chatHistory.Add(new ChatMessage(ChatRole.User, prompt));
@@ -81,23 +82,15 @@ namespace gov.llnl.wintap.core.infrastructure
                     Temperature = temperature
                 };
 
-                // Add all MCP tools if requested
+                // Add MCP tools if requested (includes both core and plugin tools)
                 if (useTools)
                 {
                     try
                     {
                         var tools = await LoadAllToolsAsync();
-                        _logger.Append($"Loaded {tools.Count} total tools for request", LogLevel.Info);
-
                         if (tools.Count > 0)
                         {
-                            // Log each tool being made available
-                            foreach (var tool in tools)
-                            {
-                                _logger.Append($"  Tool available: {tool.Name} - {tool.Description}", LogLevel.Debug);
-                            }
-
-                            chatOptions.Tools = [.. tools];
+                            chatOptions.Tools = [.. tools];  // Spread operator for conversion
                             chatOptions.ToolMode = ChatToolMode.Auto;
 
                             // OpenAI-specific settings (ignored by Ollama)
@@ -114,16 +107,12 @@ namespace gov.llnl.wintap.core.infrastructure
                                 ["parallel_tool_calls"] = null
                             };
 
-                            _logger.Append($"Chat options configured with {tools.Count} tools", LogLevel.Info);
-                        }
-                        else
-                        {
-                            _logger.Append("No tools available for this request", LogLevel.Warn);
+                            _logger.Append($"Loaded {tools.Count} MCP tools (core + plugin)", LogLevel.Debug);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.Append($"Warning: Could not load tools: {ex.Message}", LogLevel.Warn);
+                        _logger.Append($"Warning: Could not load MCP tools: {ex.Message}", LogLevel.Warn);
                         _logger.Append($"Tool loading stack trace: {ex.StackTrace}", LogLevel.Debug);
                     }
                 }
@@ -175,114 +164,6 @@ namespace gov.llnl.wintap.core.infrastructure
         }
 
         /// <summary>
-        /// Simple inference using only specific MCP tools by name.
-        /// </summary>
-        public async Task<string> AskWithToolsAsync(string prompt, List<string> toolNames, float temperature = 1.0f)
-        {
-            if (string.IsNullOrWhiteSpace(prompt))
-            {
-                throw new ArgumentException("Prompt cannot be empty", nameof(prompt));
-            }
-
-            if (toolNames == null || toolNames.Count == 0)
-            {
-                throw new ArgumentException("At least one tool name must be provided", nameof(toolNames));
-            }
-
-            try
-            {
-                _logger.Append($"Processing inference with specific tools: {string.Join(", ", toolNames)}", LogLevel.Debug);
-
-                var chatHistory = new List<ChatMessage>
-                {
-                    new ChatMessage(ChatRole.User, prompt)
-                };
-
-                // Load all tools and filter to requested names
-                var allTools = await LoadAllToolsAsync();
-                _logger.Append($"Total tools available: {allTools.Count}", LogLevel.Info);
-
-                var selectedTools = allTools.Where(t => toolNames.Contains(t.Name)).ToList();
-
-                _logger.Append($"Requested tools: {string.Join(", ", toolNames)}", LogLevel.Info);
-                _logger.Append($"Matched tools: {selectedTools.Count}", LogLevel.Info);
-
-                if (selectedTools.Count == 0)
-                {
-                    var availableNames = string.Join(", ", allTools.Select(t => t.Name));
-                    _logger.Append($"WARNING: None of the requested tools were found!", LogLevel.Warn);
-                    _logger.Append($"Available tools: {availableNames}", LogLevel.Warn);
-                }
-                else
-                {
-                    foreach (var tool in selectedTools)
-                    {
-                        _logger.Append($"  Using tool: {tool.Name}", LogLevel.Debug);
-                    }
-                }
-
-                var chatOptions = new ChatOptions
-                {
-                    Temperature = temperature,
-                    Tools = [.. selectedTools],
-                    ToolMode = ChatToolMode.Auto
-                };
-
-                // OpenAI-specific settings
-                if (chatOptions.AdditionalProperties == null)
-                {
-                    chatOptions.AdditionalProperties = new AdditionalPropertiesDictionary()
-                    {
-                        ["reasoning_effort"] = "minimal"
-                    };
-                }
-
-                chatOptions.AdditionalProperties["disabled_params"] = new Dictionary<string, object>
-                {
-                    ["parallel_tool_calls"] = null
-                };
-
-                _logger.Append($"Using {selectedTools.Count} tools", LogLevel.Debug);
-
-                _logger.Append("Sending request to AI with selected tools...", LogLevel.Debug);
-                var response = await _chatClient.GetResponseAsync(chatHistory, chatOptions);
-                _logger.Append($"Received response from AI", LogLevel.Debug);
-
-                // Log tool calls if any were made
-                if (response.Messages != null && response.Messages.Any())
-                {
-                    foreach (var msg in response.Messages)
-                    {
-                        if (msg.Contents != null)
-                        {
-                            foreach (var content in msg.Contents)
-                            {
-                                if (content is FunctionCallContent toolCall)
-                                {
-                                    _logger.Append($"AI called tool: {toolCall.Name} with args: {toolCall.Arguments}", LogLevel.Info);
-                                }
-                                else if (content is FunctionResultContent toolResult)
-                                {
-                                    var resultPreview = toolResult.Result?.ToString()?.Substring(0, Math.Min(100, toolResult.Result?.ToString()?.Length ?? 0)) ?? "";
-                                    _logger.Append($"Tool result from {toolResult.CallId}: {resultPreview}", LogLevel.Info);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                _logger.Append($"Inference with tools completed", LogLevel.Debug);
-
-                return response.Text;
-            }
-            catch (Exception ex)
-            {
-                _logger.Append($"Error during inference with tools: {ex.Message}", LogLevel.Error);
-                throw new InvalidOperationException($"Inference with tools failed: {ex.Message}", ex);
-            }
-        }
-
-        /// <summary>
         /// Gets a structured JSON response deserialized to type T.
         /// Instructs the AI to return data matching the structure of T.
         /// </summary>
@@ -316,7 +197,7 @@ Respond with valid JSON only.";
                 var chatOptions = new ChatOptions
                 {
                     Temperature = temperature,
-                    ResponseFormat = ChatResponseFormat.Json
+                    ResponseFormat = ChatResponseFormat.Json  // Request JSON format
                 };
 
                 // Add all MCP tools if available
@@ -380,108 +261,6 @@ Respond with valid JSON only.";
             {
                 _logger.Append($"Error during structured inference: {ex.Message}", LogLevel.Error);
                 throw new InvalidOperationException($"Structured inference failed: {ex.Message}", ex);
-            }
-        }
-
-        /// <summary>
-        /// Structured inference using only specific MCP tools by name.
-        /// Combines tool selection with structured JSON output.
-        /// </summary>
-        public async Task<T> AskWithToolsAsync<T>(string prompt, List<string> toolNames, float temperature = 1.0f) where T : class
-        {
-            if (string.IsNullOrWhiteSpace(prompt))
-            {
-                throw new ArgumentException("Prompt cannot be empty", nameof(prompt));
-            }
-
-            if (toolNames == null || toolNames.Count == 0)
-            {
-                throw new ArgumentException("At least one tool name must be provided", nameof(toolNames));
-            }
-
-            try
-            {
-                _logger.Append($"Processing structured inference with tools: {string.Join(", ", toolNames)}", LogLevel.Debug);
-
-                // Enhance prompt for structured output
-                var structuredPrompt = $@"{prompt}
-
-IMPORTANT: You must respond with valid JSON matching this structure. Do not include any explanation or markdown, just the raw JSON.
-
-Expected JSON structure based on C# type {typeof(T).Name}:
-{GetTypeDescription<T>()}
-
-Respond with valid JSON only.";
-
-                var chatHistory = new List<ChatMessage>
-                {
-                    new ChatMessage(ChatRole.User, structuredPrompt)
-                };
-
-                // Load all tools and filter to requested names
-                var allTools = await LoadAllToolsAsync();
-                var selectedTools = allTools.Where(t => toolNames.Contains(t.Name)).ToList();
-
-                if (selectedTools.Count == 0)
-                {
-                    var availableNames = string.Join(", ", allTools.Select(t => t.Name));
-                    _logger.Append($"WARNING: None of the requested tools were found!", LogLevel.Warn);
-                    _logger.Append($"Available tools: {availableNames}", LogLevel.Warn);
-                }
-
-                var chatOptions = new ChatOptions
-                {
-                    Temperature = temperature,
-                    ResponseFormat = ChatResponseFormat.Json,
-                    Tools = [.. selectedTools],
-                    ToolMode = ChatToolMode.Auto
-                };
-
-                // OpenAI-specific settings
-                if (chatOptions.AdditionalProperties == null)
-                {
-                    chatOptions.AdditionalProperties = new AdditionalPropertiesDictionary()
-                    {
-                        ["reasoning_effort"] = "minimal"
-                    };
-                }
-
-                chatOptions.AdditionalProperties["disabled_params"] = new Dictionary<string, object>
-                {
-                    ["parallel_tool_calls"] = null
-                };
-
-                _logger.Append($"Using {selectedTools.Count} tools for structured response", LogLevel.Debug);
-
-                var response = await _chatClient.GetResponseAsync(chatHistory, chatOptions);
-
-                _logger.Append($"Received structured response, deserializing to {typeof(T).Name}", LogLevel.Debug);
-
-                // Deserialize the JSON response
-                var result = JsonSerializer.Deserialize<T>(response.Text, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    AllowTrailingCommas = true
-                });
-
-                if (result == null)
-                {
-                    throw new InvalidOperationException("Failed to deserialize AI response to requested type");
-                }
-
-                _logger.Append($"Successfully deserialized to {typeof(T).Name}", LogLevel.Debug);
-
-                return result;
-            }
-            catch (JsonException ex)
-            {
-                _logger.Append($"JSON deserialization error: {ex.Message}", LogLevel.Error);
-                throw new InvalidOperationException($"AI response was not valid JSON for type {typeof(T).Name}: {ex.Message}", ex);
-            }
-            catch (Exception ex)
-            {
-                _logger.Append($"Error during structured inference with tools: {ex.Message}", LogLevel.Error);
-                throw new InvalidOperationException($"Structured inference with tools failed: {ex.Message}", ex);
             }
         }
 
