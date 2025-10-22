@@ -25,6 +25,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using static gov.llnl.wintap.Interfaces;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APPLICATION INITIALIZATION
@@ -36,7 +37,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://localhost:8099");
 
 builder.Services.AddControllers();
-WintapLogger.Log.Append($"Wintap is starting on http://localhost:8099", LogLevel.Info);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AI INTEGRATION CONFIGURATION
@@ -44,7 +44,11 @@ WintapLogger.Log.Append($"Wintap is starting on http://localhost:8099", LogLevel
 
 // ─── AI Provider Selection ─────────────────────────────────────────────────
 string aiProvider = "OpenAI"; // "OpenAI" or "Ollama"
-if (Settings.Default.AiApiUrl.Contains("localhost"))
+string configuredUrl = Settings.Default.AiApiUrl;
+
+WintapLogger.Log.Append($"Configured AI URL: {configuredUrl}", LogLevel.Info);
+
+if (configuredUrl.Contains("localhost"))
 {
     aiProvider = "Ollama";
 }
@@ -74,6 +78,8 @@ try
 
     string commandPath = Path.Combine(fileRootPath, "mcp", exeName);
 
+    WintapLogger.Log.Append($"MCP server path: {commandPath}", LogLevel.Info);
+
     mcpClient = await McpClientFactory.CreateAsync(
         new StdioClientTransport(new()
         {
@@ -82,6 +88,8 @@ try
             Name = "ai_mcp_server",
         })
     );
+
+    WintapLogger.Log.Append("MCP client initialized successfully", LogLevel.Info);
 
     // ─── Chat Client Configuration (Provider-Specific) ────────────────────
     if (aiProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
@@ -98,20 +106,29 @@ try
             .AsBuilder()
             .UseFunctionInvocation()
             .Build();
+
+        WintapLogger.Log.Append("Ollama chat client built successfully", LogLevel.Info);
     }
     else
     {
-        // OpenAI-Compatible API Configuration
-        OpenAIClientOptions openAIOptions = new OpenAIClientOptions()
-        {
-            Endpoint = new Uri(Settings.Default.AiApiUrl)
-        };
-
-        string key = Settings.Default.AiApiKey;
-        ApiKeyCredential cred = new ApiKeyCredential(key!);
+        // OpenAI-Compatible API Configuration (including Open-WebUI)
+        string apiUrl = Settings.Default.AiApiUrl;
+        string apiKey = Settings.Default.AiApiKey;
         string model = Settings.Default.AiModel;
 
-        WintapLogger.Log.Append($"Using OpenAI provider with model {model}", LogLevel.Info);
+        WintapLogger.Log.Append($"Configuring OpenAI-compatible endpoint", LogLevel.Info);
+        WintapLogger.Log.Append($"  Endpoint: {apiUrl}", LogLevel.Info);
+        WintapLogger.Log.Append($"  Model: {model}", LogLevel.Info);
+        WintapLogger.Log.Append($"  API Key: {(string.IsNullOrEmpty(apiKey) ? "NOT SET" : "***" + apiKey.Substring(Math.Max(0, apiKey.Length - 4)))}", LogLevel.Info);
+
+        OpenAIClientOptions openAIOptions = new OpenAIClientOptions()
+        {
+            Endpoint = new Uri(apiUrl)
+        };
+
+        ApiKeyCredential cred = new ApiKeyCredential(apiKey);
+
+        WintapLogger.Log.Append($"Creating OpenAI client...", LogLevel.Info);
 
         var openAIClient = new OpenAIClient(cred, openAIOptions).GetChatClient(model);
 
@@ -120,22 +137,38 @@ try
             .AsBuilder()
             .UseFunctionInvocation()
             .Build();
+
+        WintapLogger.Log.Append("OpenAI-compatible chat client built successfully", LogLevel.Info);
     }
 
     // ─── Chat History Initialization ───────────────────────────────────────
+    string systemPromptPath = Path.Combine(Env.FileRootPath, "systemprompt.txt");
+    WintapLogger.Log.Append($"Loading system prompt from: {systemPromptPath}", LogLevel.Info);
+
     List<ChatMessage> chatHistory = [
         new ChatMessage(ChatRole.System,
-            File.ReadAllText(Path.Combine(Env.FileRootPath, "systemprompt.txt"))),
+            File.ReadAllText(systemPromptPath)),
     ];
+
+    WintapLogger.Log.Append("System prompt loaded successfully", LogLevel.Info);
+
+    // ─── Create Plugin MCP Manager ─────────────────────────────────────────
+    WintapLogger.Log.Append("Creating Plugin MCP Manager", LogLevel.Info);
+    var pluginMcpManager = new PluginMcpManager(mcpClient, WintapLogger.Log);
 
     // ─── AI Service Registration ──────────────────────────────────────────
     builder.Services.AddSingleton(chatHistory);
     builder.Services.AddSingleton<IMcpClient>(mcpClient);
     builder.Services.AddSingleton<IChatClient>(chatClient);
+    builder.Services.AddSingleton<PluginMcpManager>(pluginMcpManager);
+
+    WintapLogger.Log.Append("AI services registered in DI container", LogLevel.Info);
+
 }
 catch (Exception ex)
 {
     WintapLogger.Log.Append($"Error loading AI Client: {ex.Message}", LogLevel.Error);
+    WintapLogger.Log.Append($"AI initialization stack trace: {ex.StackTrace}", LogLevel.Error);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -143,6 +176,31 @@ catch (Exception ex)
 // ═══════════════════════════════════════════════════════════════════════════
 
 WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
+
+// ─── Logger Registration ───────────────────────────────────────────────────
+// Register WintapLogger as IWintapLogger for plugin dependency injection
+builder.Services.AddSingleton<IWintapLogger>(sp => WintapLogger.Log);
+
+// ─── Inference Registration ────────────────────────────────────────────────
+// Register WintapInference as IInfer for plugin AI access
+builder.Services.AddSingleton<IInfer>(sp =>
+{
+    var chatClient = sp.GetService<IChatClient>();
+    var mcpManager = sp.GetRequiredService<PluginMcpManager>();
+    var logger = sp.GetService<IWintapLogger>();
+
+    if (chatClient == null)
+    {
+        WintapLogger.Log.Append("Warning: IChatClient not available. IInfer will not be available to plugins.", LogLevel.Warn);
+        return null;
+    }
+
+    return new WintapInference(chatClient, mcpManager, logger);
+});
+
+// ─── Windows Service & Hosted Services ─────────────────────────────────────
+builder.Services.AddWindowsService();
+builder.Services.AddHostedService<WinTapSvc>();
 
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
 builder.Services.AddWindowsService();

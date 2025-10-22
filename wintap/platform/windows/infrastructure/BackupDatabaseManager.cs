@@ -280,17 +280,17 @@ namespace WintapCoreSvcMgr.Database
 
         private void LogInfo(string message)
         {
-            WintapLogger.Log.Append(message, gov.llnl.wintap.core.infrastructure.LogLevel.Info);
+            WintapLogger.Log.Append(message, LogLevel.Info);
         }
 
         private void LogWarning(string message)
         {
-            WintapLogger.Log.Append(message, gov.llnl.wintap.core.infrastructure.LogLevel.Warn);
+            WintapLogger.Log.Append(message, LogLevel.Warn);
         }
 
         private void LogError(string message)
         {
-            WintapLogger.Log.Append(message, gov.llnl.wintap.core.infrastructure.LogLevel.Error);
+            WintapLogger.Log.Append(message, LogLevel.Error);
         }
 
         public void Dispose()

@@ -10,100 +10,78 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace gov.llnl.wintap
 {
+    /// <summary>
+    /// A MEF catalog that loads plugins from isolated AssemblyLoadContexts.
+    /// Supports the directory-based plugin convention: .\Plugins\PluginName\PluginName.dll
+    /// </summary>
     public class IsolatedPluginCatalog : ComposablePartCatalog
     {
         private readonly AggregateCatalog _catalog;
         private readonly Dictionary<string, PluginDomain> _loadedPlugins = new Dictionary<string, PluginDomain>();
 
-
-        // <summary>
-        /// Initializes a new instance of the IsolatedPluginCatalog class that discovers and loads
-        /// plugin assemblies from the specified directory into isolated AppDomains.
+        /// <summary>
+        /// Initializes a new instance of the IsolatedPluginCatalog class with explicit plugin paths.
+        /// This is the preferred constructor that works with the directory-based convention.
         /// </summary>
-        /// <param name="directory">The directory to scan for plugin subdirectories</param>
+        /// <param name="directory">The base plugins directory (used for context/logging)</param>
+        /// <param name="pluginPaths">List of specific plugin DLL paths to load</param>
         /// <remarks>
-        /// The plugin loading scheme follows these steps for each subdirectory in the specified directory:
-        ///
-        /// 1. Each subdirectory is treated as a potential plugin with the directory name as the plugin name
-        /// 2. The loader first attempts to find a name-matched assembly (PluginName.dll)
-        /// 3. If the name-matched assembly exists and contains MEF exports, it's loaded as the plugin
-        /// 4. If the name-matched assembly doesn't exist or doesn't contain MEF exports, the loader
-        ///    iterates through all DLLs in the directory, looking for the first one with MEF exports
-        /// 5. Each candidate assembly is verified to be signed and trusted (except in DEBUG builds)
-        /// 6. The first valid assembly with MEF exports is loaded into an isolated AppDomain
-        /// 7. If no valid assembly is found, the plugin is skipped with an appropriate log message
-        ///
-        /// This approach balances convention (preferring name-matched assemblies) with flexibility
-        /// (falling back to any assembly with exports), while ensuring only valid plugin assemblies
-        /// are loaded into the MEF catalog.
+        /// Plugin paths should follow the convention: .\Plugins\PluginName\PluginName.dll
+        /// Each plugin is loaded into its own isolated AssemblyLoadContext for proper unloading.
+        /// Only plugins with valid MEF exports will be added to the catalog.
         /// </remarks>
-        public IsolatedPluginCatalog(string directory)
+        public IsolatedPluginCatalog(string directory, List<string> pluginPaths)
         {
             _catalog = new AggregateCatalog();
             _loadedPlugins = new Dictionary<string, PluginDomain>();
 
-            foreach (var pluginDir in Directory.GetDirectories(directory))
+            if (pluginPaths == null || pluginPaths.Count == 0)
+            {
+                WintapLogger.Log.Append("IsolatedPluginCatalog: No plugin paths provided", LogLevel.Info);
+                return;
+            }
+
+            WintapLogger.Log.Append($"IsolatedPluginCatalog: Loading {pluginPaths.Count} plugin(s)", LogLevel.Info);
+
+            foreach (var pluginPath in pluginPaths)
             {
                 try
                 {
-                    string pluginName = new DirectoryInfo(pluginDir).Name;
-                    WintapLogger.Log.Append($"Attempting to load plugin: {pluginName}", LogLevel.Debug);
+                    // Extract plugin name from the path
+                    // Path format: .\Plugins\PluginName\PluginName.dll
+                    var pluginDir = Path.GetDirectoryName(pluginPath);
+                    var pluginName = Path.GetFileName(pluginDir);
 
-                    // Get all potential DLL files
-                    var allDlls = Directory.GetFiles(pluginDir, "*.dll");
-                    if (allDlls.Length == 0)
+                    WintapLogger.Log.Append($"Loading plugin: {pluginName} from {pluginPath}", LogLevel.Debug);
+
+                    if (!File.Exists(pluginPath))
                     {
-                        WintapLogger.Log.Append($"No assemblies found for plugin: {pluginName}", LogLevel.Info);
+                        WintapLogger.Log.Append($"Plugin DLL not found: {pluginPath}", LogLevel.Warn);
                         continue;
                     }
 
-                    // First, try the name-matched DLL
-                    string nameMatchedDll = Path.Combine(pluginDir, $"{pluginName}.dll");
-                    string mainAssemblyPath = null;
-
-                    if (File.Exists(nameMatchedDll))
+                    // Attempt to load the plugin
+                    if (TryLoadPluginAssembly(pluginPath, pluginName))
                     {
-                        // Try loading the name-matched DLL first
-                        if (TryLoadPluginAssembly(nameMatchedDll, pluginName))
-                        {
-                            // Successfully loaded the name-matched assembly
-                            continue;
-                        }
-                        else
-                        {
-                            WintapLogger.Log.Append($"Name-matched DLL for {pluginName} exists but contains no MEF exports or failed to load, trying other DLLs", LogLevel.Debug);
-                        }
+                        WintapLogger.Log.Append($"Successfully loaded plugin: {pluginName}", LogLevel.Info);
                     }
-
-                    // Name-matched DLL wasn't found or didn't have exports, try each DLL in order
-                    bool foundValidPlugin = false;
-                    foreach (var dllPath in allDlls)
+                    else
                     {
-                        // Skip if we already tried the name-matched DLL
-                        if (dllPath.Equals(nameMatchedDll, StringComparison.OrdinalIgnoreCase))
-                            continue;
-
-                        if (TryLoadPluginAssembly(dllPath, pluginName))
-                        {
-                            foundValidPlugin = true;
-                            break;
-                        }
-                    }
-
-                    if (!foundValidPlugin)
-                    {
-                        WintapLogger.Log.Append($"No valid plugin assembly with MEF exports found for: {pluginName}", LogLevel.Info);
+                        WintapLogger.Log.Append($"Failed to load plugin: {pluginName}", LogLevel.Warn);
                     }
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Failed to load plugin from directory {pluginDir}: {ex.Message}", LogLevel.Info);
+                    WintapLogger.Log.Append($"Error loading plugin from {pluginPath}: {ex.Message}", LogLevel.Error);
+                    WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
                 }
             }
+
+            WintapLogger.Log.Append($"IsolatedPluginCatalog: Loaded {_loadedPlugins.Count} plugin(s) successfully", LogLevel.Info);
         }
 
         /// <summary>
-        /// Attempts to load a potential plugin assembly and add it to the catalog if valid
+        /// Attempts to load a plugin assembly and add it to the catalog if valid.
         /// </summary>
         /// <param name="assemblyPath">Path to the assembly to try loading</param>
         /// <param name="pluginName">The name of the plugin</param>
@@ -141,7 +119,7 @@ namespace gov.llnl.wintap
                     // Assembly has MEF exports, add it to our catalog
                     _loadedPlugins[pluginName] = pluginDomain;
                     _catalog.Catalogs.Add(asmCat);
-                    WintapLogger.Log.Append($"Successfully loaded plugin: {pluginName} from {Path.GetFileName(assemblyPath)} in isolated domain", LogLevel.Info);
+                    WintapLogger.Log.Append($"Successfully loaded plugin: {pluginName} from {Path.GetFileName(assemblyPath)} in isolated domain ({parts.Count} MEF part(s))", LogLevel.Info);
                     return true;
                 }
                 else
@@ -155,6 +133,8 @@ namespace gov.llnl.wintap
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error loading assembly {Path.GetFileName(assemblyPath)} for plugin {pluginName}: {ex.Message}", LogLevel.Debug);
+                WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+
                 // Make sure to unload the plugin domain if it was created
                 try
                 {
@@ -165,69 +145,96 @@ namespace gov.llnl.wintap
                     }
                 }
                 catch { /* Suppress any errors during cleanup */ }
+
                 return false;
             }
         }
 
-        public override IQueryable<ComposablePartDefinition> Parts
+        /// <summary>
+        /// Checks if an assembly is signed and trusted.
+        /// </summary>
+        /// <param name="assemblyPath">Path to the assembly to check</param>
+        /// <returns>True if the assembly is signed and trusted, false otherwise</returns>
+        private bool IsSignedAndTrusted(string assemblyPath)
         {
-            get { return _catalog.Parts; }
-        }
-
-        public Assembly GetPluginAssembly(string pluginName)
-        {
-            if (_loadedPlugins.TryGetValue(pluginName, out var domain))
-            {
-                return domain.PluginAssembly;
-            }
-            return null;
-        }
-
-        public void UnloadPlugin(string pluginName)
-        {
-            if (_loadedPlugins.ContainsKey(pluginName))
-            {
-                PluginDomainManager.Instance.UnloadPlugin(pluginName);
-                _loadedPlugins.Remove(pluginName);
-            }
-        }
-
-        private bool IsSignedAndTrusted(string filePath)
-        {
-            WintapLogger.Log.Append($"Checking signature for: {filePath}", LogLevel.Info);
-
-#if DEBUG
-            WintapLogger.Log.Append("DEBUG mode - bypassing signature verification", LogLevel.Info);
-            return true;
-#endif
-
             try
             {
-                AssemblyName assemblyName = AssemblyName.GetAssemblyName(filePath);
+                // Check for Authenticode signature
+                X509Certificate cert = X509Certificate.CreateFromSignedFile(assemblyPath);
 
-                byte[] publicKeyToken = assemblyName.GetPublicKeyToken();
-                if (publicKeyToken != null && publicKeyToken.Length > 0)
+                if (cert == null)
                 {
-                    string token = BitConverter.ToString(publicKeyToken).Replace("-", "").ToLower();
-                    WintapLogger.Log.Append($"Assembly has strong name with token: {token}", LogLevel.Info);
-                    return true;
-                }
-                else
-                {
-                    WintapLogger.Log.Append("Assembly does not have a strong name", LogLevel.Info);
+                    WintapLogger.Log.Append($"Assembly {Path.GetFileName(assemblyPath)} is not signed", LogLevel.Debug);
                     return false;
                 }
+
+                // Create X509Certificate2 for more detailed validation
+                X509Certificate2 cert2 = new X509Certificate2(cert);
+
+                // Verify the certificate chain
+                X509Chain chain = new X509Chain();
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+                chain.ChainPolicy.RevocationFlag = X509RevocationFlag.ExcludeRoot;
+                chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+                chain.ChainPolicy.VerificationTime = DateTime.Now;
+                chain.ChainPolicy.UrlRetrievalTimeout = new TimeSpan(0, 0, 30);
+
+                bool chainIsValid = chain.Build(cert2);
+
+                if (!chainIsValid)
+                {
+                    WintapLogger.Log.Append($"Assembly {Path.GetFileName(assemblyPath)} certificate chain is not valid", LogLevel.Debug);
+                    foreach (X509ChainStatus chainStatus in chain.ChainStatus)
+                    {
+                        WintapLogger.Log.Append($"  Chain status: {chainStatus.Status} - {chainStatus.StatusInformation}", LogLevel.Debug);
+                    }
+                    return false;
+                }
+
+                WintapLogger.Log.Append($"Assembly {Path.GetFileName(assemblyPath)} is signed and trusted", LogLevel.Debug);
+                return true;
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error verifying assembly signature: {ex.Message}", LogLevel.Info);
-
-#if DEBUG
-                return true;
-#else
+                WintapLogger.Log.Append($"Error checking assembly signature for {Path.GetFileName(assemblyPath)}: {ex.Message}", LogLevel.Debug);
                 return false;
-#endif
             }
         }
+
+        /// <summary>
+        /// Unloads a specific plugin by name.
+        /// </summary>
+        /// <param name="pluginName">Name of the plugin to unload</param>
+        public void UnloadPlugin(string pluginName)
+        {
+            if (_loadedPlugins.TryGetValue(pluginName, out var pluginDomain))
+            {
+                try
+                {
+                    WintapLogger.Log.Append($"Unloading plugin: {pluginName}", LogLevel.Info);
+                    PluginDomainManager.Instance.UnloadPlugin(pluginName);
+                    _loadedPlugins.Remove(pluginName);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Error unloading plugin {pluginName}: {ex.Message}", LogLevel.Warn);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the parts from all loaded plugin catalogs.
+        /// </summary>
+        public override IQueryable<ComposablePartDefinition> Parts => _catalog.Parts;
+
+        /// <summary>
+        /// Gets the number of currently loaded plugins.
+        /// </summary>
+        public int LoadedPluginCount => _loadedPlugins.Count;
+
+        /// <summary>
+        /// Gets the names of all currently loaded plugins.
+        /// </summary>
+        public IEnumerable<string> LoadedPluginNames => _loadedPlugins.Keys;
     }
 }

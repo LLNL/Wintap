@@ -1,23 +1,29 @@
-/*
+﻿/*
  * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  * All rights reserved.
  */
 
+using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System;
+using SysEventLogEntryType = System.Diagnostics.EventLogEntryType;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MAIN LOGGER (Singleton, implements IWintapLogger)
+    // ═══════════════════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// super simple and dependency free text file logger 
+    /// Super simple and dependency free text file logger.
+    /// Implements IWintapLogger for plugin access.
     /// </summary>
-    public sealed class WintapLogger
+    public sealed class WintapLogger : gov.llnl.wintap.IWintapLogger
     {
         private static readonly WintapLogger _instance = new WintapLogger();
         private readonly ComponentLogger _defaultLogger;
@@ -31,18 +37,21 @@ namespace gov.llnl.wintap.core.infrastructure
 
         public void Init() { /* Legacy init kept for compatibility */ }
 
-        // Extend the Append method to include event logging capability
-        public void Append(string entry, LogLevel targetVerbosity,
-            bool logToEventLog = false, EventLogEntryType eventLogType = EventLogEntryType.Information,
-            int eventId = 1000,
-            [CallerMemberName] string memberName = "",
-            [CallerFilePath] string sourceFilePath = "")
+        // ─── IWintapLogger Implementation ──────────────────────────────────────
+
+        public void Append(string message,
+            LogLevel level = LogLevel.Info,
+            [CallerMemberName] string member = "",
+            [CallerFilePath] string file = "",
+            bool alsoToEventLog = false,
+            EventLogEntryType? eventLogType = null,
+            int eventId = 0)
         {
-            // First, log to the file as usual
-            _defaultLogger.Append(entry, targetVerbosity, memberName, sourceFilePath);
+            // Log to file
+            _defaultLogger.Append(message, level, member, file);
 
             // If requested, also log to the Windows Event Log
-            if (logToEventLog)
+            if (alsoToEventLog)
             {
                 try
                 {
@@ -53,8 +62,13 @@ namespace gov.llnl.wintap.core.infrastructure
                         EventLog.CreateEventSource("Wintap", "Application");
                     }
 
+                    // Convert our API EventLogEntryType to System.Diagnostics.EventLogEntryType
+                    var sysEventLogType = eventLogType.HasValue
+                        ? (SysEventLogEntryType)(int)eventLogType.Value
+                        : MapToEventLogEntryType(level);
+
                     // Write to the application log with the Wintap source
-                    EventLog.WriteEntry("Wintap", entry, eventLogType, eventId);
+                    EventLog.WriteEntry("Wintap", message, sysEventLogType, eventId);
                 }
                 catch (Exception ex)
                 {
@@ -62,8 +76,8 @@ namespace gov.llnl.wintap.core.infrastructure
                     _defaultLogger.Append(
                         $"Failed to write to Event Log: {ex.Message}",
                         LogLevel.Error,
-                        memberName,
-                        sourceFilePath);
+                        member,
+                        file);
                 }
             }
         }
@@ -75,14 +89,35 @@ namespace gov.llnl.wintap.core.infrastructure
 
         public LogLevel Verbosity
         {
-            get => LogLevel.Info; // static in legacy usage
-            set { /* optional setter */ }
+            get => _defaultLogger.Verbosity;
+            set => _defaultLogger.Verbosity = value;
         }
 
         public string LogName => "Wintap";
+
+        // ─── Helper Methods ────────────────────────────────────────────────────
+
+        private SysEventLogEntryType MapToEventLogEntryType(LogLevel level)
+        {
+            return level switch
+            {
+                LogLevel.Fatal => SysEventLogEntryType.Error,
+                LogLevel.Error => SysEventLogEntryType.Error,
+                LogLevel.Warn => SysEventLogEntryType.Warning,
+                LogLevel.Info => SysEventLogEntryType.Information,
+                _ => SysEventLogEntryType.Information,
+            };
+        }
     }
 
-    // ComponentLogger - The core logging implementation
+    // ═══════════════════════════════════════════════════════════════════════════
+    // COMPONENT LOGGER (Actual logging implementation)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// The core logging implementation.
+    /// Can be used to create separate log files for different components.
+    /// </summary>
     public class ComponentLogger
     {
         private readonly ConcurrentQueue<LogEntry> _pendingEntries;
@@ -90,11 +125,17 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private readonly string _logPath;
         private readonly StreamWriter _logWriter;
-        private readonly LogLevel _verbosity;
+        private LogLevel _verbosity;
         private readonly int _maxSize;
         private bool _logIsOpen;
 
         public string LogName { get; }
+
+        public LogLevel Verbosity
+        {
+            get => _verbosity;
+            set => _verbosity = value;
+        }
 
         public ComponentLogger(string logName, LogType logType = LogType.Overwrite, LogLevel verbosity = LogLevel.Info, int maxSize = 3000000)
         {
@@ -151,8 +192,8 @@ namespace gov.llnl.wintap.core.infrastructure
         }
 
         public void Append(string message, LogLevel level = LogLevel.Info,
-            [CallerMemberName] string member = "", [CallerFilePath] string file = "",
-            bool alsoToEventLog = false, EventLogEntryType? eventLogType = null)
+            [CallerMemberName] string member = "",
+            [CallerFilePath] string file = "")
         {
             if ((int)level < (int)_verbosity) return;
 
@@ -165,34 +206,6 @@ namespace gov.llnl.wintap.core.infrastructure
             };
 
             _pendingEntries.Enqueue(logEntry);
-
-            if (alsoToEventLog)
-            {
-                try
-                {
-                    if (!EventLog.SourceExists("Wintap"))
-                    {
-                        EventLog.CreateEventSource("Wintap", "Application");
-                    }
-                    EventLog.WriteEntry("Wintap", message, eventLogType ?? MapToEventLogEntryType(level));
-                }
-                catch
-                {
-                    // Silent failure for event log writing
-                }
-            }
-        }
-
-        private EventLogEntryType MapToEventLogEntryType(LogLevel level)
-        {
-            return level switch
-            {
-                LogLevel.Fatal => EventLogEntryType.Error,
-                LogLevel.Error => EventLogEntryType.Error,
-                LogLevel.Warn => EventLogEntryType.Warning,
-                LogLevel.Info => EventLogEntryType.Information,
-                _ => EventLogEntryType.Information,
-            };
         }
 
         public void Close()
@@ -219,7 +232,13 @@ namespace gov.llnl.wintap.core.infrastructure
         }
     }
 
-    // Logger manager for components to get dedicated loggers
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LOGGER MANAGER (Factory for component loggers)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Logger manager for components to get dedicated loggers.
+    /// </summary>
     public static class LoggerManager
     {
         private static readonly ConcurrentDictionary<string, ComponentLogger> _loggers = new();
@@ -232,19 +251,13 @@ namespace gov.llnl.wintap.core.infrastructure
         }
     }
 
-    // Log level enum (modernized)
-    public enum LogLevel
-    {
-        Always = -1, // Legacy compatibility
-        Trace = 0,
-        Debug = 1,
-        Info = 2,
-        Warn = 3,
-        Error = 4,
-        Fatal = 5
-    }
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SUPPORTING TYPES
+    // ═══════════════════════════════════════════════════════════════════════════
 
-    // Log type enum
+    /// <summary>
+    /// Log type enum for file handling behavior.
+    /// </summary>
     public enum LogType
     {
         Overwrite,
@@ -252,7 +265,9 @@ namespace gov.llnl.wintap.core.infrastructure
         Archive
     }
 
-    // Internal log entry representation
+    /// <summary>
+    /// Internal log entry representation.
+    /// </summary>
     internal class LogEntry
     {
         public DateTime Time { get; set; }
@@ -261,4 +276,3 @@ namespace gov.llnl.wintap.core.infrastructure
         public string CallerInfo { get; set; }
     }
 }
-

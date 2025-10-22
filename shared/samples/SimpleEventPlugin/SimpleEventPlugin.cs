@@ -16,7 +16,7 @@ using gov.llnl.wintap.collect.models;
 using Newtonsoft.Json;
 using static gov.llnl.wintap.Interfaces;  // This would be a private dependency for this plugin
 
-namespace SimpleEventPlugin
+namespace gov.llnl.wintap.plugins.samples
 {
     // Implementation of the plugin interface
     [Export(typeof(ISubscribe))]

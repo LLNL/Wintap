@@ -48,8 +48,8 @@ namespace gov.llnl.wintap
             try
             {
                 WintapLogger.Log.Init();
-                WintapLogger.Log.Append("WintapLogger static initialization complete",
-                    core.infrastructure.LogLevel.Info, true, EventLogEntryType.SuccessAudit, 100);
+                //WintapLogger.Log.Append("WintapLogger static initialization complete",
+                //    LogLevel.Info, true, EventLogEntryType.SuccessAudit, 100);
             }
             catch (Exception ex)
             {
@@ -71,7 +71,7 @@ namespace gov.llnl.wintap
             try
             {
                 _logger = loggerFactory.CreateLogger<WinTapSvc>();
-                WintapLogger.Log.Append("WinTapSvc constructor starting", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("WinTapSvc constructor starting", LogLevel.Info);
             }
             catch (Exception ex)
             {
@@ -81,20 +81,18 @@ namespace gov.llnl.wintap
         }
 
         /// <summary>
-        /// Main service execution loop. Starts initialization in background worker
+        /// Main service execution loop. Starts initialization asynchronously
         /// and keeps service alive until cancellation is requested.
         /// </summary>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             try
             {
-                WintapLogger.Log.Append("WinTapSvc ExecuteAsync starting", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("WinTapSvc ExecuteAsync starting", LogLevel.Info);
 
-                // Start initialization in background to avoid blocking service startup
-                BackgroundWorker startupWorker = new BackgroundWorker();
-                startupWorker.DoWork += startupWorker_DoWork;
-                startupWorker.RunWorkerAsync();
-                WintapLogger.Log.Append("Started background worker", core.infrastructure.LogLevel.Info);
+                // Start initialization asynchronously (no longer using BackgroundWorker)
+                _ = Task.Run(async () => await StartupWorkerAsync(), stoppingToken);
+                WintapLogger.Log.Append("Started async startup task", LogLevel.Info);
 
                 // Keep service running until stop is requested
                 while (!stoppingToken.IsCancellationRequested)
@@ -104,7 +102,7 @@ namespace gov.llnl.wintap
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error in ExecuteAsync: {ex}", core.infrastructure.LogLevel.Error);
+                WintapLogger.Log.Append($"Error in ExecuteAsync: {ex}", LogLevel.Error);
                 throw;
             }
         }
@@ -115,7 +113,7 @@ namespace gov.llnl.wintap
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
             WintapLogger.Log.Append("Stop command received. Attempting to shutdown plugins",
-                core.infrastructure.LogLevel.Info);
+                LogLevel.Info);
 
             try
             {
@@ -127,18 +125,20 @@ namespace gov.llnl.wintap
                     wintapKey.Flush();
                 }
 
-                // Shutdown plugins
+                // Shutdown plugins (now async)
                 try
                 {
                     if (pluginMgr != null)
                     {
-                        pluginMgr.UnregisterPlugins();
+                        WintapLogger.Log.Append("Shutting down plugin manager (async)...", LogLevel.Info);
+                        await pluginMgr.UnregisterPluginsAsync();
+                        WintapLogger.Log.Append("Plugin manager shutdown complete", LogLevel.Info);
                     }
                 }
                 catch (Exception ex)
                 {
                     WintapLogger.Log.Append($"Exception in plugin shutdown: {ex.Message}",
-                        core.infrastructure.LogLevel.Info);
+                        LogLevel.Info);
                 }
 
                 // Stop data collectors
@@ -149,10 +149,10 @@ namespace gov.llnl.wintap
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error in shutdown: {ex.Message}", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append($"Error in shutdown: {ex.Message}", LogLevel.Info);
             }
 
-            WintapLogger.Log.Append("Shutdown complete.", core.infrastructure.LogLevel.Info);
+            WintapLogger.Log.Append("Shutdown complete.", LogLevel.Info);
             WintapLogger.Log.Close();
 
             await base.StopAsync(cancellationToken);
@@ -163,14 +163,14 @@ namespace gov.llnl.wintap
         // ═══════════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Background worker that handles all service initialization tasks.
+        /// Async startup worker that handles all service initialization tasks.
         /// Runs asynchronously to prevent blocking the main service startup.
         /// </summary>
-        private void startupWorker_DoWork(object sender, DoWorkEventArgs e)
+        private async Task StartupWorkerAsync()
         {
             try
             {
-                WintapLogger.Log.Append("StartupWorker beginning initialization", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("StartupWorker beginning initialization", LogLevel.Info);
 
                 // ─── Platform-Specific Configuration ───────────────────────────
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -182,12 +182,12 @@ namespace gov.llnl.wintap
                     if (isDebugBuild)
                     {
                         WintapLogger.Log.Append("DEBUG build detected, not setting NTFS permissions on wintap data",
-                            core.infrastructure.LogLevel.Warn);
+                            LogLevel.Warn);
                     }
                     else
                     {
                         WintapLogger.Log.Append("Setting NTFS permissions on Wintap data directory",
-                            core.infrastructure.LogLevel.Info);
+                            LogLevel.Info);
                         Utilities.SetDirectoryPermissions(
                             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
                     }
@@ -195,38 +195,40 @@ namespace gov.llnl.wintap
 
                 // ─── Agent Identification ──────────────────────────────────────
                 WintapLogger.Log.Append($"Wintap Agent ID: {StateManager.AgentId}",
-                    core.infrastructure.LogLevel.Info);
+                    LogLevel.Info);
 
                 // ─── Plugin Management ─────────────────────────────────────────
-                WintapLogger.Log.Append("Loading plugin manager...", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("Loading plugin manager...", LogLevel.Info);
                 pluginMgr = new PluginManager();
 
                 // ─── Performance Monitoring ────────────────────────────────────
-                WintapLogger.Log.Append("Creating performance monitor", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("Creating performance monitor", LogLevel.Info);
                 Watchdog watchdog = new Watchdog();
 
-                // ─── Plugin Registration ───────────────────────────────────────
+                // ─── Plugin Registration (NOW ASYNC) ───────────────────────────
                 try
                 {
-                    WintapLogger.Log.Append("Attempting to register plugins...", core.infrastructure.LogLevel.Info);
-                    pluginMgr.RegisterPlugins(watchdog);
+                    WintapLogger.Log.Append("Attempting to register plugins (async)...", LogLevel.Info);
+                    await pluginMgr.RegisterPluginsAsync(watchdog);
+                    WintapLogger.Log.Append("Plugin registration complete", LogLevel.Info);
                 }
                 catch (ReflectionTypeLoadException ex)
                 {
                     foreach (Exception loaderException in ex.LoaderExceptions)
                     {
                         WintapLogger.Log.Append($"Loader exception: {loaderException}",
-                            core.infrastructure.LogLevel.Info);
+                            LogLevel.Info);
                     }
                 }
                 catch (Exception ex)
                 {
                     WintapLogger.Log.Append($"Problem loading plugin: {ex.Message}",
-                        core.infrastructure.LogLevel.Warn);
+                        LogLevel.Warn);
+                    WintapLogger.Log.Append($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
                 }
 
                 // ─── DuckDB UI Server ──────────────────────────────────────────
-                WintapLogger.Log.Append("Starting DuckDB UI server", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("Starting DuckDB UI server", LogLevel.Info);
                 try
                 {
                     var duckDBConnection = new DuckDBConnection("Data Source=:memory:");
@@ -234,39 +236,40 @@ namespace gov.llnl.wintap
                     var command = duckDBConnection.CreateCommand();
                     command.CommandText = "CALL start_ui_server()";
                     WintapLogger.Log.Append("Duck db command: " + command.CommandText,
-                        core.infrastructure.LogLevel.Info);
+                        LogLevel.Info);
                     var executeNonQuery = command.ExecuteNonQuery();
-                    WintapLogger.Log.Append("DuckDB UI server started", core.infrastructure.LogLevel.Info);
+                    WintapLogger.Log.Append("DuckDB UI server started", LogLevel.Info);
                 }
                 catch (Exception ex)
                 {
                     WintapLogger.Log.Append($"Could not start DuckDB UI: {ex.Message}",
-                        core.infrastructure.LogLevel.Error);
+                        LogLevel.Error);
                 }
 
                 // ─── Plugin Initialization Delay ───────────────────────────────
                 // Allow plugins to initialize before starting collectors
-                Thread.Sleep(5000);
+                WintapLogger.Log.Append("Waiting for plugin initialization (5 seconds)...", LogLevel.Info);
+                await Task.Delay(5000);
 
                 // ─── Collector Startup ─────────────────────────────────────────
                 try
                 {
-                    WintapLogger.Log.Append("Starting Wintap sensors", core.infrastructure.LogLevel.Info);
+                    WintapLogger.Log.Append("Starting Wintap sensors", LogLevel.Info);
                     subscriptionMgr = new SubscriptionManager();
                     subscriptionMgr.Start();
                 }
                 catch (Exception ex)
                 {
                     WintapLogger.Log.Append($"ERROR starting event subscription manager: {ex.Message}",
-                        core.infrastructure.LogLevel.Error);
+                        LogLevel.Error);
                 }
 
-                WintapLogger.Log.Append("Startup complete.", core.infrastructure.LogLevel.Info);
+                WintapLogger.Log.Append("Startup complete.", LogLevel.Info);
             }
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error in startup worker: {ex.Message}",
-                    core.infrastructure.LogLevel.Error);
+                    LogLevel.Error);
                 _logger.LogError(ex, "Fatal error in startup worker");
                 throw;
             }
