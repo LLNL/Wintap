@@ -66,7 +66,7 @@ namespace gov.llnl.wintap.core.etl.shared
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error accessing Wintap AgentId from registry: {ex.Message}");
+                Console.WriteLine($"Error accessing Wintap AgentId: {ex.Message}");
             }
 
             return agentId.ToString();
