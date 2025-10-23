@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Security.Principal;
 using System.Runtime.InteropServices;
+using gov.llnl.wintap.core.shared;
 
 namespace gov.llnl.wintap.core.etl.shared
 {
@@ -56,13 +57,7 @@ namespace gov.llnl.wintap.core.etl.shared
             const string registryKey = "AgentId";
             try
             {
-                using (RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath, true))
-                {
-                    if (key.GetValueNames().Contains(registryKey))
-                    {
-                        agentId = Guid.Parse(key.GetValue(registryKey).ToString());
-                    }
-                }
+                return StateManager.AgentId.ToString();
             }
             catch (Exception ex)
             {
