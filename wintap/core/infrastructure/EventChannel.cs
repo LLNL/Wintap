@@ -11,6 +11,7 @@ using com.espertech.esper.compiler.client;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure.helpers;
+using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.core.shared;
 using Newtonsoft.Json;
 using System;

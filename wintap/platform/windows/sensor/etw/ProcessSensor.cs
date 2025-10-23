@@ -20,7 +20,7 @@ using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using WintapCoreSvcMgr.Database;
-using gov.llnl.wintap.core.models
+using gov.llnl.wintap.core.models;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {

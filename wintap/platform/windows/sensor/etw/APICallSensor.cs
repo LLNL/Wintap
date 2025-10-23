@@ -1,5 +1,6 @@
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using System;

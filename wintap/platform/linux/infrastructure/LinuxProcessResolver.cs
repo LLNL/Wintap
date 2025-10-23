@@ -5,6 +5,7 @@
  */
 
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using System;
 using System.Collections.Concurrent;

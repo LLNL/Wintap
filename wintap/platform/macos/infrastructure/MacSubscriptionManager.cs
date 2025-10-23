@@ -1,5 +1,6 @@
 ﻿using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.platform.macos.sensor;
 using System;
 using System.Collections.Generic;
 
@@ -26,7 +27,7 @@ namespace gov.llnl.wintap.platform.macos.infrastructure
             {
                 // Priority 1: Process monitoring (foundation for attribution)
                 WintapLogger.Log.Append("Starting macOS ProcessSensor", LogLevel.Info);
-                var processSensor = new MacProcessSensor();
+                var processSensor = new ProcessSensor();
                 if (processSensor.Start())
                 {
                     macCollectors.Add(processSensor);
@@ -38,19 +39,19 @@ namespace gov.llnl.wintap.platform.macos.infrastructure
                 {
                     WintapLogger.Log.Append("OSQuery detected, enabling network sensors", LogLevel.Info);
 
-                    var tcpSensor = new MacTcpSensor();
+                    var tcpSensor = new TcpSensor();
                     if (tcpSensor.Start())
                     {
                         macCollectors.Add(tcpSensor);
                         WintapLogger.Log.Append("✓ macOS TcpSensor started", LogLevel.Info);
                     }
 
-                    var udpSensor = new MacUdpSensor();
-                    if (udpSensor.Start())
-                    {
-                        macCollectors.Add(udpSensor);
-                        WintapLogger.Log.Append("✓ macOS UdpSensor started", LogLevel.Info);
-                    }
+                    //var udpSensor = new MacUdpSensor();
+                    //if (udpSensor.Start())
+                    //{
+                    //    macCollectors.Add(udpSensor);
+                    //    WintapLogger.Log.Append("✓ macOS UdpSensor started", LogLevel.Info);
+                    //}
                 }
                 else
                 {

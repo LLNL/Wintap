@@ -6,6 +6,7 @@
 
 using DuckDB.NET.Data;  // For direct database access
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.core.shared;  // For StateManager
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.infrastructure;

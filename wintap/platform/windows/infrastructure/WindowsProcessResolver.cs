@@ -6,6 +6,7 @@
 
 using DuckDB.NET.Data;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.platform.windows.collect.etw;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using System;
@@ -120,6 +121,11 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         public string GetPidHash(int pid, DateTime createTime)
         {
             return _processHash.GenPidHash(pid, createTime.ToFileTimeUtc());
+        }
+
+        ProcessRecord IProcessResolver.ResolveProcessAtTime(int pid, DateTime eventTime, string eventType)
+        {
+            throw new NotImplementedException();
         }
     }
 }

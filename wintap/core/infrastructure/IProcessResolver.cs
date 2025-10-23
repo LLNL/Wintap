@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.platform.windows.collect.etw;
 using System;
 
@@ -18,7 +19,7 @@ namespace gov.llnl.wintap.core.infrastructure
         /// <summary>
         /// Resolve process information at a specific point in time (handles PID reuse)
         /// </summary>
-        ProcessSensor.ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime, string eventType);
+        ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime, string eventType);
 
         /// <summary>
         /// Check if a process exists for the given PID at the specified time
