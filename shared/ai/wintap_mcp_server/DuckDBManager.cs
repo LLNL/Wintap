@@ -102,6 +102,7 @@ public static class DuckDBManager
         string ilParquet = Path.Combine(parquetDir, "*+raw_imageload+*.parquet");
         string fcParquet = Path.Combine(parquetDir, "*+raw_focuschange+*.parquet");
         string cpuParquet = Path.Combine(parquetDir, "*+raw_cputrigger+*.parquet");
+        string eventlogParquet = Path.Combine(parquetDir, "*+raw_eventlogevent+*.parquet");
 
         string parquetGlobSql = processParquet.Replace(@"\", @"\\");
         string sqlProcess = $@"
@@ -166,6 +167,12 @@ public static class DuckDBManager
         parquetPath = cpuParquet.Replace(@"\", @"\\");
         string sqlCpu = $@"
             CREATE OR REPLACE VIEW Wintap_CpuTrigger AS
+            SELECT * FROM read_parquet('{parquetPath}');
+        ";
+
+        parquetPath = eventlogParquet.Replace(@"\", @"\\");
+        string sqlEventlog = $@"
+            CREATE OR REPLACE VIEW Wintap_Eventlog AS
             SELECT * FROM read_parquet('{parquetPath}');
         ";
 
@@ -272,6 +279,13 @@ public static class DuckDBManager
             {
                 // to do:  log the error
             }
+
+            try
+            {
+                command.CommandText = sqlEventlog;
+                command.ExecuteNonQuery();
+            }
+            catch (Exception ex) { }
         }
     }
 
