@@ -972,9 +972,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             public string UserName { get; set; }
             public string MD5Hash { get; set; }
             public string SHA2Hash { get; set; }
-
-            // For backward compatibility with existing code
-            public long UniqueProcessKey => PidHash?.GetHashCode() ?? 0;
         }
 
         /// <summary>

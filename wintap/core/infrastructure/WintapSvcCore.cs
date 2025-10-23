@@ -197,6 +197,12 @@ namespace gov.llnl.wintap
                 WintapLogger.Log.Append($"Wintap Agent ID: {StateManager.AgentId}",
                     LogLevel.Info);
 
+                // ─── Initialize EventChannel with Process Resolver ─────────────
+                WintapLogger.Log.Append("Initializing EventChannel with process resolver",
+                    LogLevel.Info);
+                var processResolver = ServiceProviderAccessor.Services.GetService(typeof(IProcessResolver)) as IProcessResolver;
+                EventChannel.Initialize(processResolver);
+
                 // ─── Plugin Management ─────────────────────────────────────────
                 WintapLogger.Log.Append("Loading plugin manager...", LogLevel.Info);
                 pluginMgr = new PluginManager();

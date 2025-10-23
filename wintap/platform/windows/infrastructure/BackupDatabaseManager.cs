@@ -79,7 +79,6 @@ namespace WintapCoreSvcMgr.Database
                 {EscapeString(process.ParentPidHash)},
                 {process.ProcessId},
                 {process.ParentProcessId},
-                {process.UniqueProcessKey},                    -- Added this!
                 {EscapeString(process.ProcessName)},
                 {EscapeString(process.ProcessPath)},
                 {EscapeString(process.CommandLine)},

@@ -11,6 +11,8 @@ using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.platform.linux.infrastructure;
+using gov.llnl.wintap.platform.windows.infrastructure;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -197,6 +199,26 @@ builder.Services.AddSingleton<IInfer>(sp =>
 
     return new WintapInference(chatClient, mcpManager, logger);
 });
+
+// ─── Process Resolver Registration (Platform-Specific) ────────────────────
+WintapLogger.Log.Append("Registering platform-specific process resolver", LogLevel.Info);
+
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    builder.Services.AddSingleton<IProcessResolver, WindowsProcessResolver>();
+    WintapLogger.Log.Append("Registered WindowsProcessResolver", LogLevel.Info);
+}
+else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+{
+    builder.Services.AddSingleton<IProcessResolver, LinuxProcessResolver>();
+    WintapLogger.Log.Append("Registered LinuxProcessResolver", LogLevel.Info);
+}
+else
+{
+    // Fallback for unsupported platforms
+    builder.Services.AddSingleton<IProcessResolver>(sp => null);
+    WintapLogger.Log.Append("No process resolver registered (unsupported platform)", LogLevel.Warn);
+}
 
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
 builder.Services.AddWindowsService();
