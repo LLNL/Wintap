@@ -98,5 +98,24 @@ namespace gov.llnl.wintap.core.shared
                 }
             }
         }
+
+        static internal string AppName
+        {
+            get
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    return "Wintap";
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    return "Mactap";
+                }
+                else // Linux and other Unix
+                {
+                    return "Lintap";
+                }
+            }
+        }
     }
 }

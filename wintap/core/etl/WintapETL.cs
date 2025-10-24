@@ -23,6 +23,8 @@ using gov.llnl.wintap.core.etl.load.interfaces;
 using gov.llnl.wintap.core.etl.model;
 using Newtonsoft.Json;
 using gov.llnl.wintap.core.etl.shared;
+using gov.llnl.wintap.core.shared;
+using Utilities = gov.llnl.wintap.core.etl.shared.Utilities;
 
 namespace gov.llnl.wintap.core.etl
 {
@@ -127,7 +129,7 @@ namespace gov.llnl.wintap.core.etl
 
         private void StatsUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            WintapLogger.Log.Append("Total wintap messages received: " + totalMessageCount, LogLevel.Info);
+            WintapLogger.Log.Append($"Total {Env.AppName} messages received: " + totalMessageCount, LogLevel.Info);
         }
 
         private void cacheManager_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
@@ -137,7 +139,7 @@ namespace gov.llnl.wintap.core.etl
 
         private void cacheManager_DoWork(object sender, DoWorkEventArgs e)
         {
-            WintapLogger.Log.Append("creating wintap data cache manager", LogLevel.Info);
+            WintapLogger.Log.Append($"creating ${Env.AppName} data cache manager", LogLevel.Info);
             List<IUpload> uploaders = new List<IUpload>();
             try
             {

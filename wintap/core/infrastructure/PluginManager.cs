@@ -532,7 +532,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private void RegisterSubscriber(Lazy<ISubscribe, ISubscribeData> subscriber)
         {
             var pluginName = subscriber.Metadata.Name;
-            WintapLogger.Log.Append($"Loading Wintap subscriber: {pluginName}", LogLevel.Info);
+            WintapLogger.Log.Append($"Loading {Env.AppName} subscriber: {pluginName}", LogLevel.Info);
 
             try
             {

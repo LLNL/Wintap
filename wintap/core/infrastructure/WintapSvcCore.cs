@@ -181,12 +181,12 @@ namespace gov.llnl.wintap
 #endif
                     if (isDebugBuild)
                     {
-                        WintapLogger.Log.Append("DEBUG build detected, not setting NTFS permissions on wintap data",
+                        WintapLogger.Log.Append($"DEBUG build detected, not setting NTFS permissions on {Env.AppName} data",
                             LogLevel.Warn);
                     }
                     else
                     {
-                        WintapLogger.Log.Append("Setting NTFS permissions on Wintap data directory",
+                        WintapLogger.Log.Append($"Setting NTFS permissions on {Env.AppName}  data directory",
                             LogLevel.Info);
                         Utilities.SetDirectoryPermissions(
                             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Wintap"));
@@ -194,7 +194,7 @@ namespace gov.llnl.wintap
                 }
 
                 // ─── Agent Identification ──────────────────────────────────────
-                WintapLogger.Log.Append($"Wintap Agent ID: {StateManager.AgentId}",
+                WintapLogger.Log.Append($"{Env.AppName} Agent ID: {StateManager.AgentId}",
                     LogLevel.Info);
 
                 // ─── Initialize EventChannel with Process Resolver ─────────────
@@ -260,7 +260,7 @@ namespace gov.llnl.wintap
                 // ─── Collector Startup ─────────────────────────────────────────
                 try
                 {
-                    WintapLogger.Log.Append("Starting Wintap sensors", LogLevel.Info);
+                    WintapLogger.Log.Append($"Starting {Env.AppName} sensors", LogLevel.Info);
                     subscriptionMgr = new SubscriptionManager();
                     subscriptionMgr.Start();
                 }

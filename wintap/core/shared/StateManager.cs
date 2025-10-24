@@ -81,7 +81,7 @@ namespace gov.llnl.wintap.core.shared
         {
             WintapLogger.Log.Append($"StateManager is starting", LogLevel.Info);
             LastWorkbenchActivity = DateTime.Now;
-            WintapLogger.Log.Append($"Getting Wintap settings from config", LogLevel.Info);
+            WintapLogger.Log.Append($"Getting {Env.AppName} settings from config", LogLevel.Info);
             WintapSettings = getWintapSettings();
             SessionId = Guid.NewGuid();
 
@@ -95,7 +95,7 @@ namespace gov.llnl.wintap.core.shared
             OnBatteryPower = false;
             UserBusy = false;
             WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
-            WintapLogger.Log.Append($"StateManager has found wintap pid: {WintapPID}", LogLevel.Info);
+            WintapLogger.Log.Append($"StateManager has found {Env.AppName} pid: {WintapPID}", LogLevel.Info);
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
             stateRefresh.Interval = 60000;
             stateRefresh.Enabled = true;
@@ -203,7 +203,7 @@ namespace gov.llnl.wintap.core.shared
                 }
             }
             saveSettings(translatedSettings);
-            Utilities.RestartWintap("Wintap settings change requested.");
+            Utilities.RestartWintap($"{Env.AppName} settings change requested.");
         }
 
         private static void saveSettings(Dictionary<string, string> settingsToUpdate)

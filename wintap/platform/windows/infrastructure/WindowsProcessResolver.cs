@@ -122,10 +122,5 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             return _processHash.GenPidHash(pid, createTime.ToFileTimeUtc());
         }
-
-        ProcessRecord IProcessResolver.ResolveProcessAtTime(int pid, DateTime eventTime, string eventType)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
