@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<!-- Import common configuration -->
+	<Import Project="Wintap.Common.props" />
+
+	<!-- macOS-specific properties -->
+	<PropertyGroup>
+		<AssemblyName>Mactap</AssemblyName>
+		<RuntimeIdentifiers>osx-x64;osx-arm64</RuntimeIdentifiers>
+		<DefineConstants>$(DefineConstants);OSX</DefineConstants>
+	</PropertyGroup>
+
+	<!-- Exclude non-macOS platform code - THIS WAS MISSING! -->
+	<ItemGroup>
+		<Compile Remove="Platform.Windows\**\*.cs" />
+		<Compile Remove="Platform.Linux\**\*.cs" />
+	</ItemGroup>
+
+	<!-- Build and copy MCP server for macOS -->
+	<Target Name="BuildMcpServer" BeforeTargets="Build" Condition="Exists('..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj')">
+		<Message Text="Building MCP server for macOS..." Importance="high" />
+		<Exec Command="dotnet publish ..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj -c $(Configuration) -r osx-arm64 --self-contained false -o $(OutputPath)mcp_temp"
+			  ContinueOnError="true"
+			  IgnoreExitCode="true" />
+	</Target>
+
+	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(OutputPath)mcp_temp\wintap_mcp_server')">
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server"
+			  DestinationFiles="$(OutputPath)mactap_mcp_server"
+			  SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.dll"
+			  DestinationFiles="$(OutputPath)mactap_mcp_server.dll"
+			  SkipUnchangedFiles="true" />
+		<RemoveDir Directories="$(OutputPath)mcp_temp" />
+		<Message Text="✓ Built and copied mactap_mcp_server" Importance="high" />
+	</Target>
+
+	<!-- Set executable permissions on macOS binaries -->
+	<Target Name="SetExecutablePermissions" AfterTargets="Publish" Condition="'$(OS)' == 'Unix'">
+		<Exec Command="chmod +x $(PublishDir)Mactap" ContinueOnError="true" />
+		<Exec Command="chmod +x $(PublishDir)mactap_mcp_server" ContinueOnError="true" Condition="Exists('$(PublishDir)mactap_mcp_server')" />
+		<Message Text="✓ Set executable permissions on Mactap binaries" Importance="high" />
+	</Target>
+
+	<!-- Optional: Ad-hoc code signing for development -->
+	<Target Name="CodeSign" AfterTargets="SetExecutablePermissions" Condition="'$(OS)' == 'Unix' AND '$(Configuration)' == 'Debug'">
+		<Exec Command="codesign --force --deep --sign - $(PublishDir)Mactap" ContinueOnError="true" IgnoreExitCode="true" />
+		<Exec Command="codesign --force --deep --sign - $(PublishDir)mactap_mcp_server" ContinueOnError="true" IgnoreExitCode="true" Condition="Exists('$(PublishDir)mactap_mcp_server')" />
+		<Message Text="✓ Applied ad-hoc code signing" Importance="high" />
+	</Target>
+
+</Project>
