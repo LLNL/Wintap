@@ -4,22 +4,14 @@
  * All rights reserved.
  */
 
-using com.espertech.esper.client;
 using com.espertech.esper.common.client;
 using com.espertech.esper.runtime.client;
 using DuckDB.NET.Data;
 using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.core.etl.transform;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
-using gov.llnl.wintap.platform.windows.infrastructure;
-using Microsoft.Diagnostics.Tracing;
-using Microsoft.Diagnostics.Tracing.AutomatedAnalysis;
-using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
-using Microsoft.Diagnostics.Tracing.StackSources;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -27,10 +19,8 @@ using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
-using System.Security.Cryptography;
-using System.Threading.Tasks;
-using TraceReloggerLib;
 using WintapCoreSvcMgr.Database;
+using gov.llnl.wintap.core.models;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -948,33 +938,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             public string UserName { get; set; }
             public DateTime CreateTime { get; set; }
             public int ExitStatus { get; set; }
-        }
-
-        /// <summary>
-        /// Process record structure for database operations
-        /// </summary>
-        public class ProcessRecord
-        {
-            public string PidHash { get; set; }
-            public string ParentPidHash { get; set; }
-            public int ProcessId { get; set; }
-            public int ParentProcessId { get; set; }
-            public string ProcessName { get; set; }
-            public string ProcessPath { get; set; }
-            public string CommandLine { get; set; }
-            public DateTime CreateTime { get; set; }
-            public DateTime? ExitTime { get; set; }
-            public int? ExitCode { get; set; }
-            public bool IsActive { get; set; }
-            public string Source { get; set; }
-            public int Depth { get; set; }
-            public bool HasLiveDescendants { get; set; }
-            public string UserName { get; set; }
-            public string MD5Hash { get; set; }
-            public string SHA2Hash { get; set; }
-
-            // For backward compatibility with existing code
-            public long UniqueProcessKey => PidHash?.GetHashCode() ?? 0;
         }
 
         /// <summary>

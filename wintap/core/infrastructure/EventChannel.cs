@@ -11,6 +11,7 @@ using com.espertech.esper.compiler.client;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure.helpers;
+using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.core.shared;
 using Newtonsoft.Json;
 using System;
@@ -51,6 +52,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private static long totalEvents;
         private static long lastTotalEvents;
         private static int droppedEventCount;
+        private static IProcessResolver _processResolver;
 
 
         private static Stopwatch stopWatch;
@@ -111,6 +113,12 @@ namespace gov.llnl.wintap.core.infrastructure
 
             // Reset workbench state
             ResetWorkbench();
+        }
+
+        internal static void Initialize(IProcessResolver processResolver)
+        {
+            _processResolver = processResolver;
+            WintapLogger.Log.Append("EventChannel initialized with process resolver", LogLevel.Info);
         }
 
         private static void StatsWorker_DoWork(object sender, DoWorkEventArgs e)
@@ -206,6 +214,7 @@ namespace gov.llnl.wintap.core.infrastructure
         /// 
         /// Error Handling:
         /// - Exceptions during process resolution or event transmission are logged but do not throw, preventing data collection interruption
+        /// - On Linux (no database), gracefully handles null process resolution results
         /// </remarks>
         public static void Send(WintapMessage streamedEvent)
         {
@@ -216,7 +225,6 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 eventsPerSecond = totalEvents - lastTotalEvents;
                 lastTotalEvents = totalEvents;
-
                 if (eventsPerSecond > maxEventsPerSecond)
                 {
                     maxEventsPerSecond = eventsPerSecond;
@@ -227,28 +235,91 @@ namespace gov.llnl.wintap.core.infrastructure
             // Send to Esper (filter out Wintap's own events)
             try
             {
+                // Skip Wintap's own events
                 if (streamedEvent.PID == StateManager.WintapPID)
                 {
                     return;
                 }
+
+                // Tag with AgentId
                 streamedEvent.AgentId = StateManager.AgentId.ToString();
-                if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
+
+                // Resolve process information using platform-specific resolver
+                if (_processResolver != null)
                 {
-                    ProcessRecord ownerProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), streamedEvent.MessageType.ToString());
-                    streamedEvent.PidHash = ownerProcess.PidHash;
-                    streamedEvent.ProcessName = ownerProcess.ProcessName;
+                    if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
+                    {
+                        // For non-Process events: resolve the owning process
+                        ProcessRecord ownerProcess = _processResolver.ResolveProcessAtTime(
+                            streamedEvent.PID,
+                            DateTime.FromFileTimeUtc(streamedEvent.EventTime),
+                            streamedEvent.MessageType.ToString());
+
+                        if (ownerProcess != null)
+                        {
+                            streamedEvent.PidHash = ownerProcess.PidHash;
+                            streamedEvent.ProcessName = ownerProcess.ProcessName;
+                        }
+                        else
+                        {
+                            // On Linux or if process not found, generate PidHash without full resolution
+                            WintapLogger.Log.Append(
+                                $"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})",
+                                LogLevel.Debug);
+
+                            // Generate a basic PidHash so events still have an identifier
+                            streamedEvent.PidHash = _processResolver.GetPidHash(
+                                streamedEvent.PID,
+                                DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                            streamedEvent.ProcessName = "Unknown";
+                        }
+                    }
+                    else
+                    {
+                        // For Process events: resolve the parent process
+                        if (streamedEvent.Process != null && streamedEvent.Process.ParentPID > 0)
+                        {
+                            ProcessRecord parentProcess = _processResolver.ResolveProcessAtTime(
+                                streamedEvent.Process.ParentPID,
+                                DateTime.FromFileTimeUtc(streamedEvent.EventTime),
+                                "ParentProcessFinder");
+
+                            if (parentProcess != null)
+                            {
+                                streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
+                                streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
+                            }
+                            else
+                            {
+                                WintapLogger.Log.Append(
+                                    $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
+                                    LogLevel.Debug);
+
+                                // Generate basic parent PidHash
+                                streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(
+                                    streamedEvent.Process.ParentPID,
+                                    DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                                streamedEvent.Process.ParentProcessName = "Unknown";
+                            }
+                        }
+                    }
                 }
                 else
                 {
-                    ProcessRecord parentProcess = platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(streamedEvent.Process.ParentPID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), "ParentProcessFinder");
-                    streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
-                    streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
+                    // No process resolver available (shouldn't happen, but handle gracefully)
+                    WintapLogger.Log.Append(
+                        "ProcessResolver not initialized in EventChannel",
+                        LogLevel.Warn);
                 }
+
+                // Send to Esper
                 EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error sending event for {streamedEvent.MessageType}: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append(
+                    $"Error sending event for {streamedEvent.MessageType}: {ex.Message}",
+                    LogLevel.Error);
             }
         }
 

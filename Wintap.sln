@@ -18,7 +18,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleEventPlugin", "shared
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WintapAPI", "shared\WintapAPI\WintapAPI.csproj", "{056C2F16-8367-32F2-E4C1-D09B9D833071}"
 EndProject
-Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench(1)", "shared\Wintap-Workbench\", "{344A6B60-2229-B8C0-6F95-B52EB1014BFB}"
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Wintap-Workbench", "shared\Wintap-Workbench\", "{344A6B60-2229-B8C0-6F95-B52EB1014BFB}"
 	ProjectSection(WebsiteProperties) = preProject
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
 		Debug.AspNetCompiler.VirtualPath = "/localhost_63685"
@@ -51,6 +51,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "documentation", "documentat
 		documentation\LICENSE = documentation\LICENSE
 		documentation\LICENSE.md = documentation\LICENSE.md
 		documentation\LICENSE.rtf = documentation\LICENSE.rtf
+		documentation\Linux Deployment Guide.md = documentation\Linux Deployment Guide.md
 		documentation\NOTICE.txt = documentation\NOTICE.txt
 		documentation\README.md = documentation\README.md
 		documentation\wintap-developer-guide.md = documentation\wintap-developer-guide.md
