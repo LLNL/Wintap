@@ -1,4 +1,3 @@
-using gov.llnl.wintap.platform.windows.collect.shared;
 using System.Collections.Generic;
 using gov.llnl.wintap.platform.linux.collect.test;
 using gov.llnl.wintap.core.collect;

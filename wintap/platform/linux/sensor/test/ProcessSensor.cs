@@ -1,13 +1,8 @@
-using com.espertech.esper.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.platform.windows.collect.etw.helpers;
-using gov.llnl.wintap.platform.windows.collect.shared;
-using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+using gov.llnl.wintap.core.shared.helpers;
 using gov.llnl.wintap.core.collect;
 using System;
-using Castle.MicroKernel;
-using System.IO;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Collections.Concurrent;

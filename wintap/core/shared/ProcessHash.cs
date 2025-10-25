@@ -13,7 +13,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace gov.llnl.wintap.platform.windows.collect.etw.helpers
+namespace gov.llnl.wintap.core.shared.helpers
 {
     internal class ProcessHash
     {

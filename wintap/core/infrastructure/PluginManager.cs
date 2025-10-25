@@ -2,7 +2,9 @@
 using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
-using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+#if WINDOWS
+using Microsoft.Diagnostics.Tracing;
+#endif
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using System;

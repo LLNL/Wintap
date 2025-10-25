@@ -3,10 +3,16 @@
 	<Import Project="Wintap.Common.props" />
 
 	<!-- Windows-specific properties -->
+	<!-- Windows-specific properties -->
 	<PropertyGroup>
 		<AssemblyName>Wintap</AssemblyName>
 		<RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+		<BaseIntermediateOutputPath>obj\Windows\</BaseIntermediateOutputPath>
 		<DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+		<UseCommonOutputDirectory>false</UseCommonOutputDirectory>
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+		<!-- Prevent duplicate assembly info generation -->
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	</PropertyGroup>
 
 	<!-- DO NOT exclude Platform.Windows - we need it! -->

@@ -1,13 +1,11 @@
-﻿using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.platform.windows.collect.etw.helpers;
+﻿using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.models;
+using gov.llnl.wintap.core.shared.helpers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using gov.llnl.wintap.core.models;
 
 namespace gov.llnl.wintap.platform.macos.infrastructure
 {

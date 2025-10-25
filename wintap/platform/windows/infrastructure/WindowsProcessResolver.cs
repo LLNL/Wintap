@@ -7,17 +7,15 @@
 using DuckDB.NET.Data;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.models;
-using gov.llnl.wintap.platform.windows.collect.etw;
-using gov.llnl.wintap.platform.windows.collect.etw.helpers;
+using gov.llnl.wintap.core.shared.helpers;
 using System;
-using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.platform.windows.infrastructure
 {
     /// <summary>
     /// Windows-specific process resolver using DuckDB process tree database
     /// </summary>
-    internal class WindowsProcessResolver : IProcessResolver
+    public class WindowsProcessResolver : IProcessResolver
     {
         private const string PROCESS_DB_PATH = @"C:\ProgramData\Wintap\ProcessTree\main.duckdb";
         private readonly ProcessHash _processHash;

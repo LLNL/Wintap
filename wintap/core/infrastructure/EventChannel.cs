@@ -20,7 +20,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
+//using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.core.infrastructure
 {

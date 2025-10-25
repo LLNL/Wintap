@@ -5,7 +5,6 @@
  */
 
 using gov.llnl.wintap.core.models;
-using gov.llnl.wintap.platform.windows.collect.etw;
 using System;
 
 namespace gov.llnl.wintap.core.infrastructure
@@ -14,7 +13,7 @@ namespace gov.llnl.wintap.core.infrastructure
     /// Internal interface for platform-specific process resolution and PID hash management.
     /// Not exposed to plugins - internal Wintap infrastructure only.
     /// </summary>
-    internal interface IProcessResolver
+    public interface IProcessResolver
     {
         /// <summary>
         /// Resolve process information at a specific point in time (handles PID reuse)
