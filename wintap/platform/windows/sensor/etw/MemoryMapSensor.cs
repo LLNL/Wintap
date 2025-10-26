@@ -267,6 +267,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     WintapMessage wm = new WintapMessage(DateTime.Now, _owningProcess.ProcessId, MessageTypeEnum.MemoryMap);
                     wm.PidHash = _owningProcess.PidHash;
                     wm.ProcessName = _owningProcess.ProcessName;
+                    // get what state the memory region is in (commmit, reserve, free)
                     if(memInfo.State == 4096)
                     {
                         wm.ActivityType = ActivityTypeEnum.MemCommit;
@@ -282,7 +283,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     wm.MemoryMap = new MemoryMapData();
                     wm.MemoryMap.AllocationBaseAddress = memInfo.AllocationBase.ToInt64().ToString("X");
                     wm.MemoryMap.AllocationProtect = ((WintapMessage.PageProtectEnum)memInfo.AllocationProtect);
-                    wm.MemoryMap.PageType = ((WintapMessage.PageTypeEnum)memInfo.Type);
+                    wm.MemoryMap.PageType = ((WintapMessage.PageTypeEnum)memInfo.Type); // get what kind of memory it is (image, mapped, private)
                     wm.MemoryMap.BaseAddress = memInfo.BaseAddress.ToString("X");
                     wm.MemoryMap.RegionSize = memInfo.RegionSize.ToInt64();
                     wm.MemoryMap.PageProtect = ((PageProtectEnum)memInfo.Protect);
