@@ -59,7 +59,7 @@ namespace gov.llnl.wintap.core.etl.load
                                     // duckdb doesn't like the '+' character in table names, so name the table as  sensorName and then rename the file on disk to our expected format
                                     duckDBConnection.Open();
                                     var command = duckDBConnection.CreateCommand();
-                                    string parquetDir = Path.Combine(Strings.ParquetDataPath, "merged");
+                                    string parquetDir = Path.Combine(Paths.ParquetDataPath, "merged");
                                     string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
                                     string tempFileName = sensorName;
                                     command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/" + defaultMergeType + "*.parquet';";
@@ -93,7 +93,7 @@ namespace gov.llnl.wintap.core.etl.load
                         // duckdb doesn't like the '+' character in table names, so name the table as  sensorName and then rename the file on disk to our expected format
                         duckDBConnection.Open();
                         var command = duckDBConnection.CreateCommand();
-                        string parquetDir = Path.Combine(Strings.ParquetDataPath, "merged");
+                        string parquetDir = Path.Combine(Paths.ParquetDataPath, "merged");
                         string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
                         string tempFileName = sensorName;
                         command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";

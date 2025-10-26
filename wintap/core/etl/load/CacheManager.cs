@@ -43,12 +43,12 @@ namespace gov.llnl.wintap.core.etl.load
             WintapLogger.Log.Append("Upload interval (sec): " + etlConfig.UploadIntervalSec, LogLevel.Info);
             svcRunning = true;
             SendQueue = new ConcurrentQueue<dynamic>();
-            DirectoryInfo parquetDir = new DirectoryInfo(Strings.ParquetDataPath);
+            DirectoryInfo parquetDir = new DirectoryInfo(Paths.ParquetDataPath);
             if (!parquetDir.Exists)
             {
                 parquetDir.Create();
             }
-            cacheDir = new DirectoryInfo(Strings.ParquetDataPath);
+            cacheDir = new DirectoryInfo(Paths.ParquetDataPath);
             mergeDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "merged"));
             bytesOnDisk = getCurrentCacheDirSize();
 
@@ -314,7 +314,7 @@ namespace gov.llnl.wintap.core.etl.load
                 hungHelper.Kill();
                 WintapLogger.Log.Append("MergeHelper killed, clearing parquet", LogLevel.Info);
 
-                DirectoryInfo parquetDir = new DirectoryInfo(Strings.ParquetDataPath);
+                DirectoryInfo parquetDir = new DirectoryInfo(Paths.ParquetDataPath);
                 long totalParquetRemoved = deleteParquetFiles(parquetDir.FullName, 0);
                 WintapLogger.Log.Append("Total parquet cleared: " + totalParquetRemoved, LogLevel.Info);
             }

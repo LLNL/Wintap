@@ -90,11 +90,11 @@ namespace gov.llnl.wintap.core.shared
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    return "/Library/Application Support/Wintap";
+                    return "/Library/Application Support/Mactap";
                 }
                 else // Linux and other Unix
                 {
-                    return "/var/lib/wintap";
+                    return "/var/lib/Lintap";
                 }
             }
         }

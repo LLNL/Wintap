@@ -33,7 +33,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private WintapLogger()
         {
-            _defaultLogger = LoggerManager.GetLogger("Wintap", LogType.Overwrite, LogLevel.Info);
+            _defaultLogger = LoggerManager.GetLogger(Env.AppName, LogType.Overwrite, LogLevel.Info);
         }
 
         public void Init() { /* Legacy init kept for compatibility */ }
@@ -94,7 +94,7 @@ namespace gov.llnl.wintap.core.infrastructure
             set => _defaultLogger.Verbosity = value;
         }
 
-        public string LogName => "Wintap";
+        public string LogName => Env.AppName;
 
         // ─── Helper Methods ────────────────────────────────────────────────────
 
@@ -168,7 +168,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
 
             _logIsOpen = true;
-            _logWriter.WriteLine($"Start of log for: {LogName} version:? at {DateTime.Now}");
+            _logWriter.WriteLine($"Start of log for: {LogName} version:{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()} at {DateTime.Now}");
             _logWriter.Flush();
 
             _loggingThread = new BackgroundWorker();
