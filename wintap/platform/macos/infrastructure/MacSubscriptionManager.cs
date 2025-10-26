@@ -1,14 +1,26 @@
-﻿using gov.llnl.wintap.core.collect;
+﻿/*
+ * Copyright (c) 2025, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * All rights reserved.
+ */
+
+using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.platform.macos.sensor;
 using System;
 using System.Collections.Generic;
 
 namespace gov.llnl.wintap.platform.macos.infrastructure
 {
     /// <summary>
-    /// Manages lifecycle of macOS security sensors
+    /// Manages lifecycle of macOS sensors
     /// Mirrors patterns from WindowsSubscriptionManager and LinuxSubscriptionManager
+    /// 
+    /// WORKSHOP TODO: Implement OSQuery-based monitoring
+    /// 
+    /// ARCHITECTURE PLAN:
+    /// - OSQuery daemon for process/network/file events
+    /// - shoot for code reuse with LinuxSubscriptionManager
+    /// - Use OSQuery's pub/sub model for real-time events
     /// </summary>
     internal class MacSubscriptionManager
     {
@@ -21,49 +33,45 @@ namespace gov.llnl.wintap.platform.macos.infrastructure
 
         internal List<BaseSensor> Start()
         {
-            WintapLogger.Log.Append("Starting MacOS sensor initialization", LogLevel.Info);
+            WintapLogger.Log.Append("═══════════════════════════════════════════", LogLevel.Info);
+            WintapLogger.Log.Append("MacSubscriptionManager.Start() called", LogLevel.Info);
+            WintapLogger.Log.Append("TODO: Implement OSQuery sensor integration", LogLevel.Warn);
+            WintapLogger.Log.Append("═══════════════════════════════════════════", LogLevel.Info);
 
             try
             {
-                // Priority 1: Process monitoring (foundation for attribution)
-                WintapLogger.Log.Append("Starting macOS ProcessSensor", LogLevel.Info);
-                var processSensor = new ProcessSensor();
-                if (processSensor.Start())
+                // TODO: Check for OSQuery availability
+                if (!IsOSQueryAvailable())
                 {
-                    macCollectors.Add(processSensor);
-                    WintapLogger.Log.Append("✓ macOS ProcessSensor started", LogLevel.Info);
+                    WintapLogger.Log.Append("✗ OSQuery not detected - sensors cannot start", LogLevel.Error);
+                    WintapLogger.Log.Append("   Install: brew install osquery", LogLevel.Error);
+                    return macCollectors;
                 }
 
-                // Priority 2: Network monitoring (if OSQuery available)
-                if (IsOSQueryAvailable())
-                {
-                    WintapLogger.Log.Append("OSQuery detected, enabling network sensors", LogLevel.Info);
+                WintapLogger.Log.Append("✓ OSQuery detected", LogLevel.Info);
 
-                    var tcpSensor = new TcpSensor();
-                    if (tcpSensor.Start())
-                    {
-                        macCollectors.Add(tcpSensor);
-                        WintapLogger.Log.Append("✓ macOS TcpSensor started", LogLevel.Info);
-                    }
+                // TODO: Initialize OSQuery connection
+                // var osqueryConnection = ConnectToOSQuery();
 
-                    //var udpSensor = new MacUdpSensor();
-                    //if (udpSensor.Start())
-                    //{
-                    //    macCollectors.Add(udpSensor);
-                    //    WintapLogger.Log.Append("✓ macOS UdpSensor started", LogLevel.Info);
-                    //}
-                }
-                else
-                {
-                    WintapLogger.Log.Append("OSQuery not found - network monitoring disabled", LogLevel.Warn);
-                }
+                // TODO:  - Process monitoring (foundation for attribution)
+                // var processSensor = new ProcessSensor(osqueryConnection, processResolver);
+                // if (processSensor.Start()) { macCollectors.Add(processSensor); }
+
+                // TODO:  - Network monitoring (TCP/UDP)
+                // var tcpSensor = new TcpSensor(osqueryConnection, processResolver);
+                // if (tcpSensor.Start()) { macCollectors.Add(tcpSensor); }
+
+                // TODO:  - File monitoring
+                // var fileSensor = new FileSensor(osqueryConnection, processResolver);
+                // if (fileSensor.Start()) { macCollectors.Add(fileSensor); }
+
+                WintapLogger.Log.Append($"MacOS sensors ready for implementation ({macCollectors.Count} active)", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error starting macOS sensors: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Error during macOS sensor initialization: {ex.Message}", LogLevel.Error);
             }
 
-            WintapLogger.Log.Append($"MacOS sensor initialization complete ({macCollectors.Count} sensors active)", LogLevel.Info);
             return macCollectors;
         }
 
@@ -87,6 +95,10 @@ namespace gov.llnl.wintap.platform.macos.infrastructure
             WintapLogger.Log.Append("MacOS sensors stopped", LogLevel.Info);
         }
 
+        /// <summary>
+        /// Check if OSQuery is installed and accessible
+        /// TODO: Also verify osqueryd daemon is running
+        /// </summary>
         private bool IsOSQueryAvailable()
         {
             try
@@ -96,9 +108,9 @@ namespace gov.llnl.wintap.platform.macos.infrastructure
                     FileName = "which",
                     Arguments = "osqueryi",
                     RedirectStandardOutput = true,
-                    UseShellExecute = false
+                    UseShellExecute = false,
+                    CreateNoWindow = true
                 });
-
                 result.WaitForExit();
                 return result.ExitCode == 0;
             }

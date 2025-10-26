@@ -10,7 +10,7 @@ using DuckDB.NET.Data;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
-using gov.llnl.wintap.platform.windows.collect.etw.helpers;
+using gov.llnl.wintap.core.shared.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using System;
 using System.Collections.Generic;

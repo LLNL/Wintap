@@ -88,6 +88,34 @@ Wintap follows these core principles:
     │  - Network/API Adapters                              │
     └──────────────────────────────────────────────────────┘
 ```
+## Building Wintap
+
+### Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- Windows: Visual Studio 2022 or VS Code
+- Linux/macOS: VS Code or command line
+
+### Quick Start
+
+# Build for your platform
+dotnet build ./wintap/Wintap.csproj  # Windows
+dotnet build ./wintap/Lintap.csproj  # Linux
+dotnet build ./wintap/Mactap.csproj  # macOS
+
+# Publish release builds
+dotnet publish ./wintap/Wintap.csproj -c Release -r win-x64
+dotnet publish ./wintap/Lintap.csproj -c Release -r linux-x64
+dotnet publish ./wintap/Mactap.csproj -c Release -r osx-arm64
+
+### Project Structure
+- `Wintap.csproj` - Windows version
+- `Lintap.csproj` - Linux version
+- `Mactap.csproj` - macOS version
+- `Wintap.Common.props` - Shared configuration
+- `Directory.Build.props` - Platform-specific exclusions
+
+All three projects share the same source code. Edit files in any project and changes apply to all platforms.
+
 
 ### 1.4 Core Components
 

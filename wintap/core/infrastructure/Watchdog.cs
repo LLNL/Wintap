@@ -57,7 +57,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             wintapRunning = true;
             runMethodRunning = false;
-            WintapLogger.Log.Append("Wintap profile: " + WintapProfile.Name, LogLevel.Info);
+            WintapLogger.Log.Append("Runtime profile: " + WintapProfile.Name, LogLevel.Info);
             WintapLogger.Log.Append("Max Memory: " + WintapProfile.MaxMem, LogLevel.Info);
             if (WintapProfile.Name != WintapProfile.ProfileEnum.Developer)
             {
@@ -100,7 +100,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 float cpu = getCpu();
                 long mem = getMem();
-                WintapLogger.Log.Append("Wintap usage stats.  CPU: " + cpu + " MEM: " + mem, LogLevel.Info);
+                WintapLogger.Log.Append($"{Env.AppName} usage stats.  CPU: " + cpu + " MEM: " + mem, LogLevel.Info);
                 if (WintapProfile.Name == WintapProfile.ProfileEnum.Production && (cpu > WintapProfile.MaxCPU || mem > WintapProfile.MaxMem))
                 {
                     WintapProfile.BreachCount++;
@@ -112,7 +112,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 else { WintapProfile.BreachCount = 0; }
                 if (WintapProfile.BreachCount >= WintapProfile.MaxBreachCount)
                 {
-                    string alertMsg = "wintap has exceeded maximum performance thresholds. cpu: " + cpu + "  memory: " + mem + "  hitcount: " + WintapProfile.BreachCount;
+                    string alertMsg = $"{Env.AppName} has exceeded maximum performance thresholds. cpu: " + cpu + "  memory: " + mem + "  hitcount: " + WintapProfile.BreachCount;
                     WintapLogger.Log.Append(alertMsg, LogLevel.Info);
                     sendWintapAlert(WintapMessage.WintapAlertData.AlertNameEnum.SYSTEM_UTILIZATION, alertMsg);
                     Utilities.RestartWintap(alertMsg);

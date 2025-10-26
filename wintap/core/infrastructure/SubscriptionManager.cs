@@ -5,10 +5,20 @@
  */
 
 using gov.llnl.wintap.core.collect;
-using gov.llnl.wintap.platform.linux.infrastructure;
-using gov.llnl.wintap.platform.macos.infrastructure;
+
+#if WINDOWS
 using gov.llnl.wintap.platform.windows.collect.shared;
 using gov.llnl.wintap.platform.windows.infrastructure;
+#endif
+
+#if LINUX
+using gov.llnl.wintap.platform.linux.infrastructure;
+#endif
+
+#if MACOS
+using gov.llnl.wintap.platform.macos.infrastructure;
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -17,26 +27,41 @@ namespace gov.llnl.wintap.core.infrastructure
 
     public class SubscriptionManager
     {
+        private List<BaseSensor> macCollectors;
+
+#if WINDOWS
         private List<EtwProviderCollector> etwCollectors;
         private List<BaseWindowsSensor> winCollectors;
         private WindowsSubscriptionManager winSubMgr;
-        private LinuxSubscriptionManager linuxSubMgr;
+#endif
+
+#if LINUX
         private List<BaseSensor> linuxCollectors;
+        private LinuxSubscriptionManager linuxSubMgr;
+#endif
+
+#if MACOS
         private MacSubscriptionManager macSubMgr;
-        private List<BaseSensor> macCollectors;
+#endif
 
         internal SubscriptionManager()
         {
-
+#if WINDOWS
             winCollectors = new List<BaseWindowsSensor>();
             etwCollectors = new List<EtwProviderCollector>();
             winSubMgr = new WindowsSubscriptionManager();
+#endif
 
+#if LINUX
             linuxCollectors = new List<BaseSensor>();
             linuxSubMgr = new LinuxSubscriptionManager();
+#endif
+
+#if MACOS
+            macSubMgr = new MacSubscriptionManager();
+#endif
 
             macCollectors = new List<BaseSensor>();
-            macSubMgr = new MacSubscriptionManager();
         }
 
         internal void Start()
@@ -44,21 +69,23 @@ namespace gov.llnl.wintap.core.infrastructure
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
+#if WINDOWS
                 WintapLogger.Log.Append("Starting WindowsSubscriptionManager", LogLevel.Info);
                 winCollectors = winSubMgr.Start();
+#endif
             }
+
+#if LINUX
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 linuxCollectors = linuxSubMgr.Start();
             }
+#endif
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                WintapLogger.Log.Append("Starting MacSubscriptionManager", LogLevel.Info);
-                macCollectors = macSubMgr.Start();
-            }
-            else
-            {
-                WintapLogger.Log.Append("Running on an unsupported platform", LogLevel.Info);
+#if MACOS
+                // macOS stuff
+#endif
             }
             WintapLogger.Log.Append("Done loading collectors", LogLevel.Info);
         }
@@ -69,19 +96,31 @@ namespace gov.llnl.wintap.core.infrastructure
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                foreach (BaseWindowsSensor collector in winCollectors)
-                {
-                    collector.Stop();
-                }
+#if WINDOWS
+        foreach (BaseWindowsSensor collector in winCollectors)
+        {
+            collector.Stop();
+        }
+#endif
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // todo:
-                // linuxSubMgr.Stop();
+#if LINUX
+        // Stop linux collectors if needed
+        foreach (BaseSensor collector in linuxCollectors)
+        {
+            collector.Stop();
+        }
+#endif
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                macSubMgr.Stop();
+#if MACOS
+                foreach (BaseSensor collector in macCollectors)
+                {
+                    collector.Stop();
+                }
+#endif
             }
 
             WintapLogger.Log.Append("Serializer shutdown", LogLevel.Info);

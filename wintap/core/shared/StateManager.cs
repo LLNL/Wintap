@@ -16,7 +16,9 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Runtime.InteropServices;
 using com.espertech.esper.runtime.client;
+#if WINDOWS
 using gov.llnl.wintap.platform.windows.infrastructure;
+#endif
 
 namespace gov.llnl.wintap.core.shared
 {
@@ -81,7 +83,7 @@ namespace gov.llnl.wintap.core.shared
         {
             WintapLogger.Log.Append($"StateManager is starting", LogLevel.Info);
             LastWorkbenchActivity = DateTime.Now;
-            WintapLogger.Log.Append($"Getting Wintap settings from config", LogLevel.Info);
+            WintapLogger.Log.Append($"Getting {Env.AppName} settings from config", LogLevel.Info);
             WintapSettings = getWintapSettings();
             SessionId = Guid.NewGuid();
 
@@ -95,7 +97,7 @@ namespace gov.llnl.wintap.core.shared
             OnBatteryPower = false;
             UserBusy = false;
             WintapPID = System.Diagnostics.Process.GetCurrentProcess().Id;
-            WintapLogger.Log.Append($"StateManager has found wintap pid: {WintapPID}", LogLevel.Info);
+            WintapLogger.Log.Append($"StateManager has found {Env.AppName} pid: {WintapPID}", LogLevel.Info);
             System.Timers.Timer stateRefresh = new System.Timers.Timer();
             stateRefresh.Interval = 60000;
             stateRefresh.Enabled = true;
@@ -117,10 +119,11 @@ namespace gov.llnl.wintap.core.shared
             }
             WintapLogger.Log.Append($"StateManager has hooked user change event notification", LogLevel.Info);
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+#if WINDOWS
             {
                 DriveMap = WindowsStateManager.RefreshDriveMap();
             }
+#endif
             MachineBootTime = refreshLastBoot();
 
             writeState(wintapState);
@@ -203,7 +206,7 @@ namespace gov.llnl.wintap.core.shared
                 }
             }
             saveSettings(translatedSettings);
-            Utilities.RestartWintap("Wintap settings change requested.");
+            Utilities.RestartWintap($"{Env.AppName} settings change requested.");
         }
 
         private static void saveSettings(Dictionary<string, string> settingsToUpdate)
@@ -272,13 +275,10 @@ namespace gov.llnl.wintap.core.shared
 
         internal static DateTime refreshLastBoot()
         {
-            //  todo: get service start time
-            //DateTime lastBoot = WintapLogger.Log.StartTime;
             DateTime lastBoot = DateTime.Now;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                lastBoot = WindowsStateManager.GetLastBootTime();
-            }
+#if WINDOWS
+            lastBoot = WindowsStateManager.GetLastBootTime();
+#endif
             return lastBoot;
         }
 
@@ -295,20 +295,18 @@ namespace gov.llnl.wintap.core.shared
         private string refreshActiveUser()
         {
             ActiveUser = "NA";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                ActiveUser = WindowsStateManager.RefreshActiveUser();
-            }
+#if WINDOWS
+            ActiveUser = WindowsStateManager.RefreshActiveUser();
+#endif
             return ActiveUser;
         }
 
         private bool refreshBatteryState()
         {
             OnBatteryPower = false;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                OnBatteryPower = WindowsStateManager.RefreshBatteryState();
-            }
+#if WINDOWS
+            OnBatteryPower = WindowsStateManager.RefreshBatteryState();
+#endif
             return OnBatteryPower;
         }
 

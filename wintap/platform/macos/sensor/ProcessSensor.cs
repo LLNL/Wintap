@@ -7,13 +7,12 @@
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.core.models;
+using gov.llnl.wintap.core.shared.helpers;
 using gov.llnl.wintap.platform.macos.infrastructure;
-using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using System;
 using System.Diagnostics;
 using System.Text.Json;
-using gov.llnl.wintap.core.models;
 using static gov.llnl.wintap.collect.models.WintapMessage;
 
 namespace gov.llnl.wintap.platform.macos.sensor

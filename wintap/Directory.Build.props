@@ -1,0 +1,27 @@
+<Project>
+  <!-- This file is automatically imported by all .csproj files in this directory -->
+  
+  <!-- Exclude Windows platform code from non-Windows builds -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Wintap'">
+    <Compile Remove="platform\windows\**\*.cs" />
+    <Compile Remove="Platform.Windows\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Exclude Linux platform code from non-Linux builds -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Lintap'">
+    <Compile Remove="platform\linux\**\*.cs" />
+    <Compile Remove="Platform.Linux\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Exclude macOS platform code from non-macOS builds -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Mactap'">
+    <Compile Remove="platform\macos\**\*.cs" />
+    <Compile Remove="platform\macOS\**\*.cs" />
+    <Compile Remove="Platform.macOS\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Exclude all test directories from all builds -->
+  <ItemGroup>
+    <Compile Remove="**\test\**\*.cs" />
+  </ItemGroup>
+</Project>

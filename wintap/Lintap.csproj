@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<!-- Import common configuration -->
+	<Import Project="Wintap.Common.props" />
+
+	<!-- Linux-specific properties (merged and cleaned up) -->
+	<PropertyGroup>
+		<AssemblyName>Lintap</AssemblyName>
+		<RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+		<BaseIntermediateOutputPath>obj\Linux\</BaseIntermediateOutputPath>
+		<DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+		<UseSharedCompilation>false</UseSharedCompilation>
+		<UseCommonOutputDirectory>false</UseCommonOutputDirectory>
+
+		<!-- Prevent duplicate assembly attributes -->
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+	</PropertyGroup>
+
+	<!-- Exclude platform code from other platforms (merged and de-duplicated) -->
+	<ItemGroup>
+		<!-- Exclude Windows platform -->
+		<Compile Remove="..\platform\windows\**\*.cs" />
+		<Compile Remove="platform\windows\**\*.cs" />
+
+		<!-- Exclude macOS platform -->
+		<Compile Remove="..\platform\macos\**\*.cs" />
+		<Compile Remove="platform\macos\**\*.cs" />
+
+		<!-- Exclude Windows-specific resolvers and managers -->
+		<Compile Remove="..\**\WindowsProcessResolver.cs" />
+		<Compile Remove="..\**\MacProcessResolver.cs" />
+		<Compile Remove="..\**\WindowsSubscriptionManager.cs" />
+		<Compile Remove="..\**\WindowsStateManager.cs" />
+
+		<!-- Mark as content so they don't cause errors -->
+		<None Include="platform\windows\**\*.cs" />
+		<None Include="platform\macos\**\*.cs" />
+	</ItemGroup>
+
+	<!-- Linux-specific packages -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="8.0.0" />
+	</ItemGroup>
+
+	<!-- Build and copy MCP server for Linux -->
+	<Target Name="BuildMcpServer" BeforeTargets="Build" Condition="Exists('..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj')">
+		<Message Text="Building MCP server for Linux..." Importance="high" />
+		<Exec Command="dotnet publish ..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj -c $(Configuration) -r linux-x64 --self-contained false -o $(OutputPath)mcp_temp"
+			  ContinueOnError="true"
+			  IgnoreExitCode="true" />
+	</Target>
+
+	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(OutputPath)mcp_temp\wintap_mcp_server')">
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server"
+			  DestinationFiles="$(OutputPath)lintap_mcp_server"
+			  SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.dll"
+			  DestinationFiles="$(OutputPath)lintap_mcp_server.dll"
+			  SkipUnchangedFiles="true" />
+		<RemoveDir Directories="$(OutputPath)mcp_temp" />
+		<Message Text="✓ Built and copied lintap_mcp_server" Importance="high" />
+	</Target>
+
+	<!-- Set executable permissions on Linux binaries -->
+	<Target Name="SetExecutablePermissions" AfterTargets="Publish" Condition="'$(OS)' == 'Unix'">
+		<Exec Command="chmod +x $(PublishDir)Lintap" ContinueOnError="true" />
+		<Exec Command="chmod +x $(PublishDir)lintap_mcp_server" ContinueOnError="true" Condition="Exists('$(PublishDir)lintap_mcp_server')" />
+		<Message Text="✓ Set executable permissions on Lintap binaries" Importance="high" />
+	</Target>
+</Project>

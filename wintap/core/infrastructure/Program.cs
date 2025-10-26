@@ -11,23 +11,40 @@ using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
-using gov.llnl.wintap.platform.linux.infrastructure;
-using gov.llnl.wintap.platform.windows.infrastructure;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using ModelContextProtocol.Client;
 using OpenAI;
 using System;
 using System.ClientModel;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using static gov.llnl.wintap.Interfaces;
+using Microsoft.Extensions.Hosting;
+
+#if WINDOWS
+using gov.llnl.wintap.platform.windows.infrastructure;
+#endif
+
+#if LINUX
+using gov.llnl.wintap.platform.linux.infrastructure;
+#endif
+
+#if MACOS
+using gov.llnl.wintap.platform.macos.infrastructure;
+#endif
+
+
+#if WINDOWS
+using gov.llnl.wintap.platform.windows.infrastructure;
+#endif
+
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APPLICATION INITIALIZATION
@@ -203,29 +220,47 @@ builder.Services.AddSingleton<IInfer>(sp =>
 // ─── Process Resolver Registration (Platform-Specific) ────────────────────
 WintapLogger.Log.Append("Registering platform-specific process resolver", LogLevel.Info);
 
+// ─── Process Resolver Registration (Platform-Specific) ────────────────────
+WintapLogger.Log.Append("Registering platform-specific process resolver", LogLevel.Info);
+
+#if WINDOWS
 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 {
     builder.Services.AddSingleton<IProcessResolver, WindowsProcessResolver>();
     WintapLogger.Log.Append("Registered WindowsProcessResolver", LogLevel.Info);
 }
-else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+#endif
+
+#if LINUX
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
 {
     builder.Services.AddSingleton<IProcessResolver, LinuxProcessResolver>();
     WintapLogger.Log.Append("Registered LinuxProcessResolver", LogLevel.Info);
 }
-else
+#endif
+
+#if MACOS
+if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
 {
-    // Fallback for unsupported platforms
-    builder.Services.AddSingleton<IProcessResolver>(sp => null);
-    WintapLogger.Log.Append("No process resolver registered (unsupported platform)", LogLevel.Warn);
+    builder.Services.AddSingleton<IProcessResolver, MacProcessResolver>();
+    WintapLogger.Log.Append("Registered MacProcessResolver", LogLevel.Info);
 }
+#endif
+
+#if !WINDOWS && !LINUX && !MACOS
+// Fallback for unsupported platforms
+builder.Services.AddSingleton<IProcessResolver>(sp => null);
+WintapLogger.Log.Append("No process resolver registered (unsupported platform)", LogLevel.Warn);
+#endif
 
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
+#if WINDOWS
 builder.Services.AddWindowsService();
-builder.Services.AddHostedService<WinTapSvc>();
-
-// ─── Windows Service & Hosted Services ─────────────────────────────────────
-builder.Services.AddWindowsService();
+#elif LINUX
+builder.Services.AddSystemd();  // For Linux systemd integration
+#elif MACOS
+// macOS doesn't need a service wrapper for now
+#endif
 builder.Services.AddHostedService<WinTapSvc>();
 
 // ─── SignalR Configuration ─────────────────────────────────────────────────
@@ -274,7 +309,13 @@ else
 WintapLogger.Log.Append("Setting up API endpoints", LogLevel.Info);
 app.UseEndpoints(endpoints =>
 {
-    endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
+    #if WINDOWS
+        {
+            // Windows-specific
+            //endpoints.MapHub<ExplorerHub>("/signalr/ExplorerHub");
+        }
+    #endif
+
     endpoints.MapHub<WorkbenchHub>("/signalr/WorkbenchHub");
     endpoints.MapHub<InferenceHub>("/signalr/inferenceHub");
 });

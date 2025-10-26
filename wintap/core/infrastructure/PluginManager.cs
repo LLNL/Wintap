@@ -2,7 +2,9 @@
 using com.espertech.esper.compat.collections;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
-using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+#if WINDOWS
+using Microsoft.Diagnostics.Tracing;
+#endif
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using System;
@@ -532,7 +534,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private void RegisterSubscriber(Lazy<ISubscribe, ISubscribeData> subscriber)
         {
             var pluginName = subscriber.Metadata.Name;
-            WintapLogger.Log.Append($"Loading Wintap subscriber: {pluginName}", LogLevel.Info);
+            WintapLogger.Log.Append($"Loading {Env.AppName} subscriber: {pluginName}", LogLevel.Info);
 
             try
             {
