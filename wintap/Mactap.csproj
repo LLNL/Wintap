@@ -34,27 +34,21 @@
 		<None Include="platform\windows\**\*.cs" />
 		<None Include="platform\linux\**\*.cs" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="platform\linux\sensor\" />
+	</ItemGroup>
 
 	<!-- macOS-specific packages -->
-	<ItemGroup>
-		<!-- Add macOS-specific packages here if needed -->
-	</ItemGroup>
 
 	<!-- Build and copy MCP server for macOS -->
 	<Target Name="BuildMcpServer" BeforeTargets="Build" Condition="Exists('..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj')">
 		<Message Text="Building MCP server for macOS..." Importance="high" />
-		<Exec Command="dotnet publish ..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj -c $(Configuration) -r osx-arm64 --self-contained false -o $(OutputPath)mcp_temp"
-			  ContinueOnError="true"
-			  IgnoreExitCode="true" />
+		<Exec Command="dotnet publish ..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj -c $(Configuration) -r osx-arm64 --self-contained false -o $(OutputPath)mcp_temp" ContinueOnError="true" IgnoreExitCode="true" />
 	</Target>
 
 	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(OutputPath)mcp_temp\wintap_mcp_server')">
-		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server"
-			  DestinationFiles="$(OutputPath)mactap_mcp_server"
-			  SkipUnchangedFiles="true" />
-		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.dll"
-			  DestinationFiles="$(OutputPath)mactap_mcp_server.dll"
-			  SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server" DestinationFiles="$(OutputPath)mactap_mcp_server" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.dll" DestinationFiles="$(OutputPath)mactap_mcp_server.dll" SkipUnchangedFiles="true" />
 		<RemoveDir Directories="$(OutputPath)mcp_temp" />
 		<Message Text="✓ Built and copied mactap_mcp_server" Importance="high" />
 	</Target>
