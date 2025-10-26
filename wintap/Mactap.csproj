@@ -2,17 +2,42 @@
 	<!-- Import common configuration -->
 	<Import Project="Wintap.Common.props" />
 
-	<!-- macOS-specific properties -->
 	<PropertyGroup>
 		<AssemblyName>Mactap</AssemblyName>
 		<RuntimeIdentifiers>osx-x64;osx-arm64</RuntimeIdentifiers>
-		<DefineConstants>$(DefineConstants);OSX</DefineConstants>
+		<BaseIntermediateOutputPath>obj\macOS\</BaseIntermediateOutputPath>
+		<DefineConstants>$(DefineConstants);MACOS</DefineConstants>
+		<UseSharedCompilation>false</UseSharedCompilation>
+		<UseCommonOutputDirectory>false</UseCommonOutputDirectory>
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	</PropertyGroup>
 
-	<!-- Exclude non-macOS platform code - THIS WAS MISSING! -->
+	<!-- Exclude platform code from other platforms -->
 	<ItemGroup>
-		<Compile Remove="Platform.Windows\**\*.cs" />
-		<Compile Remove="Platform.Linux\**\*.cs" />
+		<!-- Exclude Windows platform -->
+		<Compile Remove="..\platform\windows\**\*.cs" />
+		<Compile Remove="platform\windows\**\*.cs" />
+
+		<!-- Exclude Linux platform -->
+		<Compile Remove="..\platform\linux\**\*.cs" />
+		<Compile Remove="platform\linux\**\*.cs" />
+
+		<!-- Exclude Windows-specific resolvers and managers -->
+		<Compile Remove="..\**\WindowsProcessResolver.cs" />
+		<Compile Remove="..\**\LinuxProcessResolver.cs" />
+		<Compile Remove="..\**\WindowsSubscriptionManager.cs" />
+		<Compile Remove="..\**\WindowsStateManager.cs" />
+		<Compile Remove="..\**\LinuxSubscriptionManager.cs" />
+
+		<!-- Mark as content so they don't cause errors -->
+		<None Include="platform\windows\**\*.cs" />
+		<None Include="platform\linux\**\*.cs" />
+	</ItemGroup>
+
+	<!-- macOS-specific packages -->
+	<ItemGroup>
+		<!-- Add macOS-specific packages here if needed -->
 	</ItemGroup>
 
 	<!-- Build and copy MCP server for macOS -->
@@ -47,5 +72,4 @@
 		<Exec Command="codesign --force --deep --sign - $(PublishDir)mactap_mcp_server" ContinueOnError="true" IgnoreExitCode="true" Condition="Exists('$(PublishDir)mactap_mcp_server')" />
 		<Message Text="✓ Applied ad-hoc code signing" Importance="high" />
 	</Target>
-
 </Project>

@@ -5,11 +5,14 @@
  */
 
 using gov.llnl.wintap.core.collect;
-using gov.llnl.wintap.platform.linux.infrastructure;
 
 #if WINDOWS
 using gov.llnl.wintap.platform.windows.collect.shared;
 using gov.llnl.wintap.platform.windows.infrastructure;
+#endif
+
+#if LINUX
+using gov.llnl.wintap.platform.linux.infrastructure;
 #endif
 
 #if MACOS
@@ -32,8 +35,10 @@ namespace gov.llnl.wintap.core.infrastructure
         private WindowsSubscriptionManager winSubMgr;
 #endif
 
+#if LINUX
         private List<BaseSensor> linuxCollectors;
         private LinuxSubscriptionManager linuxSubMgr;
+#endif
 
 #if MACOS
         private MacSubscriptionManager macSubMgr;
@@ -47,8 +52,10 @@ namespace gov.llnl.wintap.core.infrastructure
             winSubMgr = new WindowsSubscriptionManager();
 #endif
 
+#if LINUX
             linuxCollectors = new List<BaseSensor>();
             linuxSubMgr = new LinuxSubscriptionManager();
+#endif
 
 #if MACOS
             macSubMgr = new MacSubscriptionManager();
@@ -67,10 +74,13 @@ namespace gov.llnl.wintap.core.infrastructure
                 winCollectors = winSubMgr.Start();
 #endif
             }
+
+#if LINUX
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 linuxCollectors = linuxSubMgr.Start();
             }
+#endif
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
 #if MACOS
@@ -84,25 +94,34 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             WintapLogger.Log.Append("Serializer shutting down. ", LogLevel.Info);
 
-#if WINDOWS
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                foreach (BaseWindowsSensor collector in winCollectors)
+#if WINDOWS
+        foreach (BaseWindowsSensor collector in winCollectors)
+        {
+            collector.Stop();
+        }
+#endif
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+#if LINUX
+        // Stop linux collectors if needed
+        foreach (BaseSensor collector in linuxCollectors)
+        {
+            collector.Stop();
+        }
+#endif
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+#if MACOS
+                foreach (BaseSensor collector in macCollectors)
                 {
                     collector.Stop();
                 }
+#endif
             }
-#endif
-#if LINUX
-        // todo
-#endif
-#if MACOS
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                macSubMgr.Stop();
-            }
-#endif
-
 
             WintapLogger.Log.Append("Serializer shutdown", LogLevel.Info);
         }

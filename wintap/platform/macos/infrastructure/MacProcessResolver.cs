@@ -14,7 +14,7 @@ namespace gov.llnl.wintap.platform.macos.infrastructure
     /// Maintains cache of active processes for PID-to-PidHash resolution
     /// Similar to LinuxProcessResolver pattern
     /// </summary>
-    public class MacProcessResolver
+    internal class MacProcessResolver : IProcessResolver
     {
         private readonly ConcurrentDictionary<int, ProcessRecord> _activeProcesses;
         private readonly ProcessHash _processHash;
@@ -274,6 +274,17 @@ namespace gov.llnl.wintap.platform.macos.infrastructure
         public int GetProcessCount()
         {
             return _activeProcesses.Count;
+        }
+
+        public bool ProcessExistsForPid(int pid, long eventTime)
+        {
+            // todo
+            return true;
+        }
+
+        public string GetPidHash(int pid, DateTime createTime)
+        {
+            return "todo";
         }
     }
 }
