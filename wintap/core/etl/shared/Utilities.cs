@@ -207,7 +207,7 @@ namespace gov.llnl.wintap.core.etl.shared
 
         internal static string GetFileStorePath(string className)
         {
-            string progData = Strings.ParquetDataPath;
+            string progData = Paths.ParquetDataPath;
             className = className.ToLower();
             string fullPath = Path.Combine(progData, className);
             return fullPath;
