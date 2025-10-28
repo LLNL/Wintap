@@ -7,19 +7,13 @@
 using System.Collections.Generic;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.platform.linux.collect;
 
 namespace gov.llnl.wintap.platform.linux.infrastructure
 {
     /// <summary>
     /// Linux subscription manager - coordinates platform-specific sensors
     /// 
-    /// WORKSHOP TODO: Implement OSQuery-based monitoring
-    /// 
-    /// PLANNED ARCHITECTURE:
-    /// - OSQuery daemon integration for process/network/file events
-    /// - Event subscription via OSQuery pub/sub model
-    /// - Similar architecture to Windows ETW approach
-    /// - Reusable across Linux and macOS (hopefully with significant code sharing)
     /// </summary>
     public class LinuxSubscriptionManager
     {
@@ -27,25 +21,25 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
         {
             WintapLogger.Log.Append("═══════════════════════════════════════════", LogLevel.Info);
             WintapLogger.Log.Append("LinuxSubscriptionManager.Start() called", LogLevel.Info);
-            WintapLogger.Log.Append("TODO: Implement OSQuery sensor integration", LogLevel.Warn);
             WintapLogger.Log.Append("═══════════════════════════════════════════", LogLevel.Info);
 
             List<BaseSensor> baseSensors = new List<BaseSensor>();
 
-            // TODO: Initialize OSQuery connection
-            // TODO: Create and start OSQueryProcessSensor
-            // TODO: Create and start OSQueryNetworkSensor
-            // TODO: Create and start OSQueryFileSensor
+            // todo: integrate linux sensors into the wintap configuration system for optional loading
+            //       for now, just load all of them...
+            ExampleProcessSensor exampleSensor = new ExampleProcessSensor();
+            exampleSensor.Start();
+            baseSensors.Add(exampleSensor);
 
             return baseSensors;
         }
 
         internal void Stop()
         {
-            WintapLogger.Log.Append("LinuxSubscriptionManager.Stop() called", LogLevel.Info);
+            WintapLogger.Log.Append("LinuxSubscriptionManager is shutting down", LogLevel.Info);
+            //  perform any platform-wide sensor shutdown activities (if any...)
 
-            // TODO: Stop all OSQuery sensors
-            // TODO: Shutdown OSQuery connection
+            WintapLogger.Log.Append("LinuxSubscriptionManager is shutdown", LogLevel.Info);
         }
     }
 }
