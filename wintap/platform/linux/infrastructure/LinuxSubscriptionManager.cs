@@ -27,9 +27,9 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
 
             // todo: integrate linux sensors into the wintap configuration system for optional loading
             //       for now, just load all of them...
-            ExampleProcessSensor exampleSensor = new ExampleProcessSensor();
-            exampleSensor.Start();
-            baseSensors.Add(exampleSensor);
+            SysdigFromFileSensor sysdigSensor = new SysdigFromFileSensor();
+            sysdigSensor.Start();
+            baseSensors.Add(sysdigSensor);
 
             return baseSensors;
         }

@@ -31,6 +31,12 @@ From your Windows machine (in the Wintap solution directory):
 dotnet publish -c Debug -r linux-x64 -p:PublishSingleFile=false -f net8.0
 ```
 
+On Mac using arm:
+
+```bash
+dotnet publish Lintap.csproj -c Debug -r linux-arm64 -p:PublishSingleFile=false -f net8.0
+```
+
 ## Step 3: Create Wintap Directory on Linux
 
 On the Ubuntu VM:
