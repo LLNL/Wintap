@@ -14,18 +14,16 @@ namespace gov.llnl.wintap.platform.linux.collect
     internal class ExitSensor : BaseEbpfSensor
     {
         private ProcessHash _pidHashGenerator;
-        private ProcessCache _processCache;
         private LinuxProcessResolver _processResolver;
 
         protected override string BpfObjectFileName => "exit_tracer.bpf.o";
         protected override string BpfProgramName => "trace_process_exit";
 
-        internal ExitSensor(LinuxProcessResolver processResolver, ProcessCache processCache)
+        internal ExitSensor(LinuxProcessResolver processResolver)
         {
             SensorName = "ExitProcess";
             _pidHashGenerator = new ProcessHash();
             _processResolver = processResolver;
-            _processCache = processCache;
         }
 
         protected override LibBpf.RingBufferCallback GetRingBufferCallback() => HandleEvent;
@@ -35,18 +33,40 @@ namespace gov.llnl.wintap.platform.linux.collect
             try
             {
                 var evt = Marshal.PtrToStructure<ExitEvent>(data);
-                
-                // Get cached process info (process is exiting, /proc is gone)
-                var cachedInfo = _processCache?.GetProcessInfo(evt.Pid) 
-                    ?? new ProcessCache.CachedProcessInfo();
 
-                // ✅ Use helper to extract process name from cached command line
-                string processName = evt.GetComm() 
-                                   ?? ProcessSensorHelper.ExtractProcessNameFromCmdline(cachedInfo.CommandLine);
-                
-                // ✅ Use helper to try reading exe path, or extract from cached cmdline
-                string executablePath = ProcessSensorHelper.GetExecutablePath((int)evt.Pid)
-                                      ?? ProcessSensorHelper.ExtractPathFromCmdline(cachedInfo.CommandLine);
+                // Try to get process info from resolver
+                string processName = evt.GetComm() ?? "unknown";
+                string commandLine = "";
+                string userName = "unknown";
+                string processPath = "";
+                int ppid = 0;
+
+                try
+                {
+                    // Get full process info from resolver
+                    var processRecord = _processResolver?.ResolveProcessAtTime(
+                        (int)evt.Pid,
+                        DateTime.UtcNow,
+                        "ProcessExit");
+
+                    if (processRecord != null)
+                    {
+                        processName = processRecord.ProcessName ?? evt.GetComm() ?? "unknown";
+                        commandLine = processRecord.CommandLine ?? "";
+                        userName = processRecord.UserName ?? "unknown";
+                        processPath = processRecord.ProcessPath ?? "";
+                        ppid = processRecord.ParentProcessId;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // Process not in resolver (started before sensor or very short-lived)
+                    // Fall back to eBPF data only
+                    WintapLogger.Log.Append(
+                        $"{SensorName} process {evt.Pid} not in resolver, using minimal data",
+                        LogLevel.Debug);
+                }
+
 
                 var message = new WintapMessage(
                     DateTime.UtcNow,
@@ -56,21 +76,20 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.ActivityType = WintapMessage.ActivityTypeEnum.Stop;
 
-                // ✅ Use helper to create ProcessObject
                 message.Process = ProcessSensorHelper.CreateProcessObject(
                     pid: (int)evt.Pid,
-                    ppid: cachedInfo.PPid,
+                    ppid: ppid,
                     name: processName,
-                    path: executablePath,
-                    commandLine: cachedInfo.CommandLine ?? "",
-                    user: cachedInfo.Username ?? "unknown",
+                    path: processPath,
+                    commandLine: commandLine,
+                    user: userName,
                     exitCode: evt.ExitCode
                 );
 
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
 
-                // Unregister from process resolver (process is terminating)
+                // Unregister from resolver (process is terminating)
                 _processResolver?.UnregisterProcess((int)evt.Pid);
 
                 EventChannel.Send(message);

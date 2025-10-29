@@ -25,23 +25,19 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
 
             List<BaseSensor> baseSensors = new List<BaseSensor>();
 
-            // Create process resolver
             LinuxProcessResolver processResolver = new LinuxProcessResolver();
             EventChannel.Initialize(processResolver);
 
-            // Create sensors
             ExecveSensor execveSensor = new ExecveSensor(processResolver);
             CloneSensor cloneSensor = new CloneSensor(processResolver);
-            ExitSensor exitSensor = new ExitSensor(processResolver, execveSensor.GetProcessCache());
+            ExitSensor exitSensor = new ExitSensor(processResolver);
             OpenatSensor openatSensor = new OpenatSensor();
 
-            // Start sensors
             execveSensor.Start();
             cloneSensor.Start();
             exitSensor.Start();
             openatSensor.Start();
 
-            // Add to list
             baseSensors.Add(execveSensor);
             baseSensors.Add(cloneSensor);
             baseSensors.Add(exitSensor);

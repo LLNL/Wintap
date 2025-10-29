@@ -11,7 +11,6 @@ namespace gov.llnl.wintap.platform.linux.collect
     internal class ExecveSensor : BaseEbpfSensor
     {
         private ProcessHash _pidHashGenerator;
-        private ProcessCache _processCache;
         private LinuxProcessResolver _processResolver;
 
         protected override string BpfObjectFileName => "execve_tracer.bpf.o";
@@ -21,7 +20,6 @@ namespace gov.llnl.wintap.platform.linux.collect
         {
             SensorName = "ExecveProcess";
             _pidHashGenerator = new ProcessHash();
-            _processCache = new ProcessCache();
             _processResolver = processResolver;
         }
 
@@ -88,7 +86,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 );
 
                 _processResolver?.RegisterProcess(processRecord);
-                _processCache?.AddProcess(evt.Pid, rawCmdline, procData.PPid, procData.Username);
 
                 EventChannel.Send(message);
                 return 0;
@@ -100,7 +97,6 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
         }
 
-        internal ProcessCache GetProcessCache() => _processCache;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
