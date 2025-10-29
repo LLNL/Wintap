@@ -35,7 +35,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 // Enrich with /proc data
                 var procData = ProcReader.ReadProcessInfo(evt.Pid);
                 
-                // ✅ ROBUST: Handle empty strings, not just nulls
                 string rawFilename = evt.GetFilename();
                 string rawComm = evt.GetComm();
                 string rawCmdline = procData.CommandLine;
@@ -58,7 +57,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 var message = new WintapMessage(DateTime.UtcNow, (int)evt.Pid, WintapMessage.MessageTypeEnum.Process);
                 message.ActivityType = WintapMessage.ActivityTypeEnum.Start;
 
-                // ✅ Use helper with guaranteed non-empty fields
                 message.Process = ProcessSensorHelper.CreateProcessObject(
                     pid: (int)evt.Pid,
                     ppid: procData.PPid,
@@ -74,7 +72,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
 
-                // ✅ Register with guaranteed non-empty fields
                 var processRecord = ProcessSensorHelper.CreateProcessRecord(
                     pid: (int)evt.Pid,
                     ppid: procData.PPid,

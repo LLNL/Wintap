@@ -39,7 +39,6 @@ namespace gov.llnl.wintap.platform.linux.collect
             {
                 var evt = Marshal.PtrToStructure<OpenatEvent>(data);
                 
-                // ✅ DEBUG: Log RAW event before any processing
                 string rawComm = evt.GetComm() ?? "null";
                 string rawFilename = evt.GetFilename() ?? "null";
                 WintapLogger.Log.Append(
@@ -63,7 +62,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                     return 0;
                 }
                 
-                // ✅ DEBUG: Log before filters
                 WintapLogger.Log.Append(
                     $"OpenatSensor: Processing '{filePath}' from PID {evt.Pid} ({rawComm})", 
                     LogLevel.Debug
@@ -101,7 +99,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = evt.GetComm() ?? "unknown";
 
-                // ✅ DEBUG: Log before sending
                 WintapLogger.Log.Append(
                     $"OpenatSensor: Sending file event: {filePath}", 
                     LogLevel.Debug
@@ -109,7 +106,6 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 EventChannel.Send(message);
                 
-                // ✅ DEBUG: Confirm sent
                 WintapLogger.Log.Append(
                     $"OpenatSensor: Successfully sent event for {filePath}", 
                     LogLevel.Debug
