@@ -1,8 +1,3 @@
-/*
- * Base eBPF Sensor - Common infrastructure for all eBPF sensors
- * Eliminates duplication between ExecveSensor, OpenatSensor, ExitSensor, etc.
- */
-
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
 using System;
