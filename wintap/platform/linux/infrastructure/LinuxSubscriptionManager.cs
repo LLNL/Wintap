@@ -25,11 +25,27 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
 
             List<BaseSensor> baseSensors = new List<BaseSensor>();
 
-            // todo: integrate linux sensors into the wintap configuration system for optional loading
-            //       for now, just load all of them...
-            ExampleProcessSensor exampleSensor = new ExampleProcessSensor();
-            exampleSensor.Start();
-            baseSensors.Add(exampleSensor);
+            // Create process resolver
+            LinuxProcessResolver processResolver = new LinuxProcessResolver();
+            EventChannel.Initialize(processResolver);
+
+            // Create sensors
+            ExecveSensor execveSensor = new ExecveSensor(processResolver);
+            CloneSensor cloneSensor = new CloneSensor(processResolver);
+            ExitSensor exitSensor = new ExitSensor(processResolver, execveSensor.GetProcessCache());
+            OpenatSensor openatSensor = new OpenatSensor();
+
+            // Start sensors
+            execveSensor.Start();
+            cloneSensor.Start();
+            exitSensor.Start();
+            openatSensor.Start();
+
+            // Add to list
+            baseSensors.Add(execveSensor);
+            baseSensors.Add(cloneSensor);
+            baseSensors.Add(exitSensor);
+            baseSensors.Add(openatSensor);
 
             return baseSensors;
         }
