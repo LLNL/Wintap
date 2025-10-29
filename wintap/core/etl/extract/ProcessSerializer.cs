@@ -92,10 +92,6 @@ namespace gov.llnl.wintap.core.etl.extract
             try
             {
                 procName = path.Split(new char[] { '\\' }).Last();
-                if (!procName.EndsWith(".exe"))
-                {
-                    procName = procName + ".exe";
-                }
                 procName = procName.ToLower();
             }
             catch (Exception ex)
