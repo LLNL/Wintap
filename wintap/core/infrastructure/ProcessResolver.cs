@@ -23,6 +23,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private readonly ProcessHash processHash;
         private string MAIN_DB_PATH = Path.Combine($@"{Env.FileDataRoot}", "event_store",  "main.duckdb");
         private DuckDBConnection connection;
+        private readonly object _dbLock = new object();
         private string agentId;
 
         public ProcessResolver()
@@ -43,9 +44,13 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         public ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime)
         {
-            var eventTimeStr = eventTime.ToString("yyyy-MM-dd HH:mm:ss");
+            lock (_dbLock)
+            {
+                try
+                {
+                    var eventTimeStr = eventTime.ToString("yyyy-MM-dd HH:mm:ss");
 
-            var query = $@"
+                    var query = $@"
                SELECT pid_hash, parent_pid_hash, process_id, parent_process_id, 
                process_name, image_path, command_line, create_time, 
                exit_time, exit_code, source, user_name, md5_hash, sha2_hash
@@ -55,41 +60,51 @@ namespace gov.llnl.wintap.core.infrastructure
                ORDER BY create_time DESC
                LIMIT 1";
 
-            using var command = connection.CreateCommand();
-            command.CommandText = query;
+                    using var command = connection.CreateCommand();
+                    command.CommandText = query;
 
-            using var reader = command.ExecuteReader();
+                    using var reader = command.ExecuteReader();
 
-            if (!reader.Read())
-            {
-                WintapLogger.Log.Append(
-                    $"No process found with PID {pid} created before {eventTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Warn);
+                    if (!reader.Read())
+                    {
+                        WintapLogger.Log.Append(
+                            $"No process found with PID {pid} created before {eventTime:yyyy-MM-dd HH:mm:ss}",
+                            LogLevel.Debug);  // Changed to Debug since this is common
+                        return null;  // CRITICAL: Return null instead of continuing
+                    }
 
+                    var owningProcess = new ProcessRecord
+                    {
+                        PidHash = reader.GetString(0),
+                        ParentPidHash = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        ProcessId = reader.GetInt32(2),
+                        ParentProcessId = reader.GetInt32(3),
+                        ProcessName = reader.GetString(4),
+                        ProcessPath = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        CommandLine = reader.IsDBNull(6) ? null : reader.GetString(6),
+                        CreateTime = reader.GetDateTime(7),
+                        ExitTime = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
+                        ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
+                        Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
+                        UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                        MD5Hash = reader.IsDBNull(12) ? null : reader.GetString(12),
+                        SHA2Hash = reader.IsDBNull(13) ? null : reader.GetString(13)
+                    };
+
+                    WintapLogger.Log.Append(
+                        $"Process resolver found process: {owningProcess.ProcessName} with PID: {owningProcess.ProcessId} at {eventTime:yyyy-MM-dd HH:mm:ss}",
+                        LogLevel.Debug);
+
+                    return owningProcess;
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append(
+                        $"DuckDB error resolving PID {pid} at {eventTime:yyyy-MM-dd HH:mm:ss}: {ex.Message}",
+                        LogLevel.Error);
+                    return null;
+                }
             }
-
-            var owningProcess = new ProcessRecord
-            {
-                PidHash = reader.GetString(0),
-                ParentPidHash = reader.IsDBNull(1) ? "" : reader.GetString(1),
-                ProcessId = reader.GetInt32(2),
-                ParentProcessId = reader.GetInt32(3),
-                ProcessName = reader.GetString(4),
-                ProcessPath = reader.IsDBNull(5) ? null : reader.GetString(5),
-                CommandLine = reader.IsDBNull(6) ? null : reader.GetString(6),
-                CreateTime = reader.GetDateTime(7),
-                ExitTime = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
-                ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
-                Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
-                UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
-                MD5Hash = reader.IsDBNull(12) ? null : reader.GetString(12),
-                SHA2Hash = reader.IsDBNull(13) ? null : reader.GetString(13)
-            };
-
-            WintapLogger.Log.Append(
-                $"Process resolver found process: {owningProcess.ProcessName} with PID: {owningProcess.ProcessId} at {eventTime:yyyy-MM-dd HH:mm:ss})",
-                LogLevel.Debug);
-
-            return owningProcess;
         }
 
 
