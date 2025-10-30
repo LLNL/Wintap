@@ -25,22 +25,20 @@
 		<PackageReference Include="Microsoft.Windows.Compatibility" Version="8.0.4" />
 		<PackageReference Include="TaskScheduler" Version="2.11.1" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="core\models\" />
+	  <Folder Include="platform\macos\sensor\" />
+	</ItemGroup>
 
 	<!-- Build and copy MCP server for Windows -->
 	<Target Name="BuildMcpServer" BeforeTargets="Build" Condition="Exists('..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj')">
 		<Message Text="Building MCP server for Windows..." Importance="high" />
-		<Exec Command="dotnet publish ..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj -c $(Configuration) -r win-x64 --self-contained false -o $(OutputPath)mcp_temp"
-			  ContinueOnError="true"
-			  IgnoreExitCode="true" />
+		<Exec Command="dotnet publish ..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj -c $(Configuration) -r win-x64 --self-contained false -o $(OutputPath)mcp_temp" ContinueOnError="true" IgnoreExitCode="true" />
 	</Target>
 
 	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(OutputPath)mcp_temp\wintap_mcp_server.exe')">
-		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.exe"
-			  DestinationFiles="$(OutputPath)wintap_mcp_server.exe"
-			  SkipUnchangedFiles="true" />
-		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.dll"
-			  DestinationFiles="$(OutputPath)wintap_mcp_server.dll"
-			  SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.exe" DestinationFiles="$(OutputPath)wintap_mcp_server.exe" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.dll" DestinationFiles="$(OutputPath)wintap_mcp_server.dll" SkipUnchangedFiles="true" />
 		<RemoveDir Directories="$(OutputPath)mcp_temp" />
 		<Message Text="✓ Built and copied wintap_mcp_server.exe" Importance="high" />
 	</Target>

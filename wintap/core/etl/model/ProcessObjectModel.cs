@@ -17,12 +17,11 @@ internal class ProcessStartData : SensorData
     private readonly long _eventTime;
     private readonly string _processPath;
     private readonly string _userName;
-    private readonly string _userSid;
     private readonly string _fileMd5;
     private readonly string _fileSha2;
-    private readonly string _processArgs;
     private readonly string _uniqueProcessKey;
     private readonly string _agentId;
+    private readonly string _commandLine;
 
     public string ParentPidHash
     {
@@ -79,12 +78,6 @@ internal class ProcessStartData : SensorData
         get { return _userName; }
     }
 
-
-    public string ProcessArgs
-    {
-        get { return _processArgs; }
-    }
-
     public long EventTime
     {
         get { return _eventTime; }
@@ -97,7 +90,7 @@ internal class ProcessStartData : SensorData
     }
 
     public string ActivityType { get; set; }
-    public string CommandLine { get; set; }
+    public string CommandLine { get { return _commandLine; } }
     public string Hostname { get; set; }
 
     public string UniqueProcessKey
@@ -105,7 +98,7 @@ internal class ProcessStartData : SensorData
         get { return _uniqueProcessKey; }
     }
 
-    public ProcessStartData(string parentPidHash, int parentPid, int pid, string pidHash, string processName, long startTime, string processPath, string userName, string userSid, string fileMd5, string fileSha2, string args, string commandLine, string uniqueProcessKey, string agentId)
+    public ProcessStartData(string parentPidHash, int parentPid, int pid, string pidHash, string processName, long startTime, string processPath, string userName, string userSid, string fileMd5, string fileSha2, string commandLine, string agentId)
     {
         _parentPidHash = parentPidHash;
         _parentPid = parentPid;
@@ -115,16 +108,10 @@ internal class ProcessStartData : SensorData
         _startTime = startTime;
         _processPath = processPath;
         _userName = userName;
-        _userSid = userSid;
         _fileMd5 = fileMd5;
         _fileSha2 = fileSha2;
-        _processArgs = args;
         _eventTime = startTime;
-        _uniqueProcessKey = uniqueProcessKey;
-        if (_uniqueProcessKey == null)
-        {
-            _uniqueProcessKey = "";
-        }
+        _commandLine = commandLine;
         _agentId = agentId;
     }
 }

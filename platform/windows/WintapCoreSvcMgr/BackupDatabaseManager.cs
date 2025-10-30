@@ -97,7 +97,7 @@ namespace WintapCoreSvcMgr.Database
                 var sql = $@"
             INSERT OR REPLACE INTO live_processes (
                 pid_hash, parent_pid_hash, process_id, parent_process_id,
-                unique_process_key, process_name, image_path, command_line, 
+                process_name, image_path, command_line, 
                 create_time, is_active, source, depth, has_live_descendants,
                 user_name
             ) VALUES (
@@ -105,7 +105,6 @@ namespace WintapCoreSvcMgr.Database
                 {EscapeString(process.ParentPidHash)},
                 {process.ProcessId},
                 {process.ParentProcessId},
-                {process.UniqueProcessKey},
                 {EscapeString(process.ProcessName)},
                 {EscapeString(process.ProcessPath)},
                 {EscapeString(process.CommandLine)},
@@ -136,8 +135,6 @@ namespace WintapCoreSvcMgr.Database
         {
             try
             {
-                // Boot trace records always use UniqueProcessKey = 0 (they're historical, not real-time)
-                var uniqueKey = 0UL;
 
                 string EscapeString(string value)
                 {
@@ -153,7 +150,7 @@ namespace WintapCoreSvcMgr.Database
                 var sql = $@"
         INSERT INTO live_processes (
             pid_hash, parent_pid_hash, process_id, parent_process_id,
-            unique_process_key, process_name, image_path, command_line, 
+            process_name, image_path, command_line, 
             create_time, is_active, source, depth, has_live_descendants,
             user_name
         ) VALUES (
@@ -161,7 +158,6 @@ namespace WintapCoreSvcMgr.Database
             {EscapeString(process.ParentPidHash)},
             {process.ProcessId},
             {process.ParentProcessId},
-            {uniqueKey},
             {EscapeString(process.ProcessName)},
             {EscapeString(process.ProcessPath)},
             {EscapeString(process.CommandLine)},
@@ -233,7 +229,6 @@ namespace WintapCoreSvcMgr.Database
                 var createIndexes = @"
         CREATE INDEX IF NOT EXISTS idx_parent_pid_hash ON live_processes(parent_pid_hash);
         CREATE INDEX IF NOT EXISTS idx_process_id ON live_processes(process_id);
-        CREATE INDEX IF NOT EXISTS idx_unique_process_key ON live_processes(unique_process_key);
         CREATE INDEX IF NOT EXISTS idx_process_name ON live_processes(process_name);
         CREATE INDEX IF NOT EXISTS idx_is_active ON live_processes(is_active);
         CREATE INDEX IF NOT EXISTS idx_has_live_descendants ON live_processes(has_live_descendants);

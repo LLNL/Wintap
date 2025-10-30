@@ -19,8 +19,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
-using WintapCoreSvcMgr.Database;
-using gov.llnl.wintap.core.models;
+using System.Linq;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -46,177 +45,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public override bool Start()
         {
-            // Call recovery first
-            if (!CallDatabaseRecovery())
-            {
-                WintapLogger.Log.Append("Database recovery failed", LogLevel.Error);
-                return false;
-            }
-
-            // Send process tree to esper (initially, sending full trees every start)
-            BackgroundWorker processTreeWorker = new BackgroundWorker();
-            processTreeWorker.DoWork += ProcessTreeWorker_DoWork;
-            processTreeWorker.RunWorkerAsync();
-
             WintapLogger.Log.Append("Enabling real-time ETW process handling", LogLevel.Info);
 
             startSecurityLogMonitoring();
 
             WintapLogger.Log.Append("Process collection startup complete", LogLevel.Info);
             return true;
-        }
-
-        /// <summary>
-        /// Static method for other sensors to resolve PID at specific time to ProcessRecord
-        /// Thread-safe for use by TCP, File, Registry sensors, etc.
-        /// </summary>
-        /// <param name="pid">Process ID</param>
-        /// <param name="eventTime">Time when the event occurred</param>
-        /// <returns>ProcessRecord if found, null otherwise</returns>
-        internal static ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime, string eventType)
-        {
-            eventTime = eventTime.ToUniversalTime();
-            try
-            {
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
-                {
-                    connection.Open();
-
-                    // Find the process that was active at the given time
-                    // This handles PID reuse by checking time ranges
-                    var sql = $@"
-                SELECT pid_hash, parent_pid_hash, process_id, parent_process_id, 
-                       process_name, image_path, command_line, create_time, 
-                       exit_time, user_name, unique_process_key
-                FROM live_processes 
-                WHERE process_id = {pid}
-                AND create_time <= '{eventTime:yyyy-MM-dd HH:mm:ss.fff}'
-                AND (exit_time IS NULL OR exit_time > '{eventTime:yyyy-MM-dd HH:mm:ss.fff}')
-                ORDER BY create_time DESC
-                LIMIT 1";
-
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    using var reader = cmd.ExecuteReader();
-
-                    if (reader.Read())
-                    {
-                        var process = new ProcessRecord
-                        {
-                            PidHash = reader["pid_hash"]?.ToString(),
-                            ParentPidHash = reader["parent_pid_hash"]?.ToString(),
-                            ProcessId = Convert.ToInt32(reader["process_id"]),
-                            ParentProcessId = Convert.ToInt32(reader["parent_process_id"]),
-                            ProcessName = reader["process_name"]?.ToString(),
-                            ProcessPath = reader["image_path"]?.ToString(),
-                            CommandLine = reader["command_line"]?.ToString(),
-                            CreateTime = Convert.ToDateTime(reader["create_time"]).ToUniversalTime(),
-                            ExitTime = reader["exit_time"] != DBNull.Value ? Convert.ToDateTime(reader["exit_time"]).ToUniversalTime() : null,
-                            UserName = reader["user_name"]?.ToString()
-                        };
-
-                        WintapLogger.Log.Append($"Resolved PID {pid} at {eventTime} to PidHash {process.PidHash}", LogLevel.Debug);
-                        return process;
-                    }
-                }
-
-                WintapLogger.Log.Append($"Could not resolve PID {pid} at {eventTime} for {eventType}, attempting to poll security log for resolution", LogLevel.Debug);
-                // attempt get missing process from security log
-                ProcessRecord processInfo = GetLatestProcessInstanceFromSecurityLog(pid, eventTime);
-                if (processInfo != null)
-                {
-                    ProcessHash processHash = new ProcessHash();
-                    var wintapMessage = new WintapMessage(processInfo.CreateTime.ToUniversalTime(), processInfo.ProcessId, WintapMessage.MessageTypeEnum.Process)
-                    {
-                        EventTime = eventTime.ToFileTimeUtc(),
-                        MessageType = WintapMessage.MessageTypeEnum.Process,
-                        ActivityType = WintapMessage.ActivityTypeEnum.Start,
-                        PID = processInfo.ProcessId,
-                        PidHash = processHash.GenPidHash(processInfo.ProcessId, processInfo.CreateTime.ToFileTimeUtc()),
-                        ProcessName = processInfo.ProcessName,
-                        ProcessPath = processInfo.ProcessPath,
-                        Process = new gov.llnl.wintap.collect.models.WintapMessage.ProcessObject
-                        {
-                            PID = processInfo.ProcessId,
-                            ParentPID = processInfo.ParentProcessId,
-                            Name = processInfo.ProcessName,
-                            Path = processInfo.ProcessPath,
-                            CommandLine = processInfo.CommandLine,
-                            User = processInfo.UserName,
-                        }
-                    };
-                    // send this MIA process event so downstream knows about it, call the underlying esper send method directly to avoid the duckdb process lookup 
-                    EventChannel.EsperRuntime.EventService.SendEventBean(wintapMessage, "WintapMessage");
-                    // insert into duckdb for subsequent lookups.
-                    processInfo.PidHash = wintapMessage.PidHash;
-                    processInfo.ParentPidHash = wintapMessage.Process.ParentPidHash;
-                    InsertProcessStart(processInfo);
-                    WintapLogger.Log.Append($"***SUCCESS on security log resolution for PID {pid} at {eventTime}", LogLevel.Debug);
-                    return processInfo;
-                }
-                WintapLogger.Log.Append($"***FAIL on security log resolution for PID {pid} at {eventTime}", LogLevel.Warn);
-                return null;
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error resolving PID {pid} at {eventTime}: {ex.Message}", LogLevel.Error);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Static method to get PidHash for a PID at specific time (lightweight version)
-        /// Used when only PidHash is needed for attribution
-        /// </summary>
-        /// <param name="pid">Process ID</param>
-        /// <param name="eventTime">Time when the event occurred</param>
-        /// <returns>PidHash if found, null otherwise</returns>
-        public static string ResolvePidHash(int pid, DateTime eventTime)
-        {
-            var processRecord = ResolveProcessAtTime(pid, eventTime.ToUniversalTime(), "resolve_pidhash");
-            return processRecord?.PidHash;
-        }
-
-        // 1. CallDatabaseRecovery() method implementation
-        private bool CallDatabaseRecovery()
-        {
-            try
-            {
-                WintapLogger.Log.Append("Starting database recovery process", LogLevel.Info);
-
-                // Call WintapCoreSvcMgr.exe RECOVER_DATABASE
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WintapCoreSvcMgr.exe"),
-                    Arguments = "RECOVER_DATABASE",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = false,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                using (var process = System.Diagnostics.Process.Start(startInfo))
-                {
-                    process.WaitForExit();
-
-                    var error = process.StandardError.ReadToEnd();
-
-                    if (!string.IsNullOrEmpty(error))
-                    {
-                        WintapLogger.Log.Append($"Database recovery error: {error}", LogLevel.Warn);
-                    }
-
-                    bool success = process.ExitCode == 0;
-                    WintapLogger.Log.Append($"Database recovery completed with exit code: {process.ExitCode}",
-                        success ? LogLevel.Info : LogLevel.Error);
-
-                    return success;
-                }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error calling database recovery: {ex.Message}", LogLevel.Error);
-                return false;
-            }
         }
 
         // 2. Send process tree to Esper implementation
@@ -227,8 +61,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 WintapLogger.Log.Append("Sending existing process tree to Esper", LogLevel.Info);
 
                 // Query all active processes from the database
-                var backupDbManager = new BackupDatabaseManager();
-                var processes = GetAllActiveProcesses(backupDbManager);
+                var processes = EventChannel.GetProcessHistory();
 
                 WintapLogger.Log.Append($"Found {processes.Count} active processes to send to Esper", LogLevel.Info);
 
@@ -253,57 +86,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
 
-        private List<ProcessRecord> GetAllActiveProcesses(BackupDatabaseManager dbManager)
-        {
-            var processes = new List<ProcessRecord>();
-
-            try
-            {
-                int sendCount = 0;
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
-                {
-                    connection.Open();
-
-                    var sql = @"
-                SELECT pid_hash, parent_pid_hash, process_id, parent_process_id, 
-                       process_name, image_path, command_line, create_time, 
-                       user_name, unique_process_key
-                FROM live_processes 
-                ORDER BY create_time ASC";
-
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    using var reader = cmd.ExecuteReader();
-
-                    while (reader.Read())
-                    {
-                        sendCount++;
-                        var process = new ProcessRecord
-                        {
-                            PidHash = reader["pid_hash"]?.ToString(),
-                            ParentPidHash = reader["parent_pid_hash"]?.ToString(),
-                            ProcessId = Convert.ToInt32(reader["process_id"]),
-                            ParentProcessId = Convert.ToInt32(reader["parent_process_id"]),
-                            ProcessName = reader["process_name"]?.ToString(),
-                            ProcessPath = reader["image_path"]?.ToString(),
-                            CommandLine = reader["command_line"]?.ToString(),
-                            CreateTime = Convert.ToDateTime(reader["create_time"]),
-                            UserName = reader["user_name"]?.ToString(),
-                            IsActive = true,
-                            Source = "database_restore"
-                        };
-
-                        processes.Add(process);
-                    }
-                }
-                WintapLogger.Log.Append($"Total process tree events sent: {sendCount}", LogLevel.Info);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error querying active processes: {ex.Message}", LogLevel.Error);
-            }
-
-            return processes;
-        }
 
         private WintapMessage ConvertProcessRecordToWintapMessage(ProcessRecord processRecord)
         {
@@ -325,7 +107,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 ParentPID = processRecord.ParentProcessId,
                 CommandLine = processRecord.CommandLine,
                 Arguments = processRecord.CommandLine,
-                ParentPidHash = processRecord.ParentPidHash
+                ParentPidHash = processRecord.ParentPidHash,
+                User = processRecord.UserName
             };
 
             return msg;
@@ -430,9 +213,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                             DateTime test = ev.TimeCreated.Value.ToUniversalTime();
                             if (ev.TimeCreated == null || ev.TimeCreated.Value.ToUniversalTime() > eventTimeUtc)
                                 continue; // Only consider events before or at target time
-                            ProcessInfo pi = ExtractProcessInfoFromSecurityEvent2(ev);
+                            ProcessRecord pi = ExtractProcessInfoFromSecurityEvent(ev);
                             latestProcess = new ProcessRecord();
-                            latestProcess.ProcessPath = pi.ImagePath;
+                            latestProcess.ProcessPath = pi.ProcessPath;
                             latestProcess.ParentProcessId = pi.ParentProcessId;
                             latestProcess.ProcessId = pi.ProcessId;
                             latestProcess.ProcessName = pi.ProcessName;
@@ -442,7 +225,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         }
                         catch (Exception ex)
                         {
-                            int j = 0;
+
                         }
                         finally
                         {
@@ -458,11 +241,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return latestProcess;
         }
 
-        internal static ProcessInfo ExtractProcessInfoFromSecurityEvent2(EventRecord eventRecord)
+        internal static ProcessRecord ExtractProcessInfoFromSecurityEvent(EventRecord eventRecord)
         {
             try
             {
-                var processInfo = new ProcessInfo();
+                var processInfo = new ProcessRecord();
 
                 // Parse XML data from the event record
                 if (eventRecord.ToXml() != null)
@@ -494,7 +277,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                                     processInfo.ParentProcessId = Convert.ToInt32(value);
                                 break;
                             case "NewProcessName":
-                                processInfo.ImagePath = value;
+                                processInfo.ProcessPath = value;
                                 processInfo.ProcessName = System.IO.Path.GetFileName(value);
                                 break;
                             case "CommandLine":
@@ -562,16 +345,16 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     PID = processInfo.ProcessId,
                     PidHash = processHash.GenPidHash(processInfo.ProcessId, processInfo.CreateTime.ToFileTimeUtc()),
                     ProcessName = processInfo.ProcessName,
-                    ProcessPath = processInfo.ImagePath,
+                    ProcessPath = processInfo.ProcessPath,
                     Process = new gov.llnl.wintap.collect.models.WintapMessage.ProcessObject
                     {
                         PID = processInfo.ProcessId,
                         ParentPID = processInfo.ParentProcessId,
                         Name = processInfo.ProcessName,
-                        Path = processInfo.ImagePath,
+                        Path = processInfo.ProcessPath,
                         CommandLine = processInfo.CommandLine,
                         User = processInfo.UserName,
-                        ExitCode = processInfo.ExitStatus
+                        ExitCode = processInfo.ExitCode
                     }
                 };
 
@@ -582,61 +365,17 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 if (eventId == 4688)
                 {
                     // Process creation - insert into database
-                    PublishProcess(wintapMessage);
+                    EventChannel.Send(wintapMessage);
                 }
                 else if (eventId == 4689)
                 {
                     // Process termination - handle cleanup
-                    HandleProcessTermination(wintapMessage, processInfo);
+                    //HandleProcessTermination(wintapMessage, processInfo);
                 }
             }
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error processing Security log process event: {ex.Message}", LogLevel.Warn);
-            }
-        }
-
-        /// <summary>
-        /// Handle process termination - check for children and cleanup database
-        /// </summary>
-        private void HandleProcessTermination(WintapMessage wintapMessage, ProcessInfo processInfo)
-        {
-            try
-            {
-                // Look up the process in the database to get its PidHash
-                var processRecord = ResolveProcessAtTime(
-                    processInfo.ProcessId,
-                    processInfo.CreateTime,
-                    "termination_lookup");
-
-                if (processRecord == null)
-                {
-                    WintapLogger.Log.Append($"Could not find process record for terminating PID {processInfo.ProcessId}", LogLevel.Warn);
-                    return;
-                }
-
-                // Check if process has any children
-                bool hasChildren = ProcessHasChildren(processRecord.PidHash);
-
-                if (hasChildren)
-                {
-                    // Process has children - update exit time but keep in database
-                    UpdateProcessExitTime(processRecord.PidHash, processInfo.CreateTime);
-                    WintapLogger.Log.Append($"Process {processRecord.PidHash} terminated with children - updating exit time", LogLevel.Debug);
-                }
-                else
-                {
-                    // Process has no children - delete from database
-                    DeleteProcess(processRecord.PidHash);
-                    WintapLogger.Log.Append($"Process {processRecord.PidHash} terminated with no children - removing from database", LogLevel.Debug);
-                }
-
-                // Publish termination event to EventChannel
-                EventChannel.Send(wintapMessage);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error handling process termination: {ex.Message}", LogLevel.Error);
             }
         }
 
@@ -671,157 +410,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         }
 
         /// <summary>
-        /// Update process exit time in database
-        /// </summary>
-        private bool UpdateProcessExitTime(string pidHash, DateTime exitTime)
-        {
-            try
-            {
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
-                {
-                    connection.Open();
-
-                    var sql = $@"
-                        UPDATE live_processes 
-                        SET exit_time = '{exitTime.ToUniversalTime():yyyy-MM-dd HH:mm:ss.fff}'
-                        WHERE pid_hash = '{pidHash.Replace("'", "''")}'";
-
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    cmd.ExecuteNonQuery();
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Failed to update exit time for {pidHash}: {ex.Message}", LogLevel.Error);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Get process by PidHash (primary key)
-        /// </summary>
-        public ProcessRecord GetProcessByPidHash(string pidHash)
-        {
-
-            try
-            {
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
-                {
-                    connection.Open();
-
-                    var sql = "SELECT * FROM live_processes WHERE pid_hash = ?";
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    // Use positional parameter
-                    cmd.Parameters.Add(new DuckDBParameter(pidHash));
-
-                    using var reader = cmd.ExecuteReader();
-                    if (reader.Read())
-                    {
-                        return MapReaderToProcessRecord(reader);
-                    }
-                    return null;
-                }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Failed to get process by PidHash {pidHash}: {ex.Message}", LogLevel.Error);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Get all children of a process by ParentPidHash
-        /// </summary>
-        public List<ProcessRecord> GetChildProcesses(string parentPidHash)
-        {
-            try
-            {
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
-                {
-                    connection.Open();
-
-                    var sql = "SELECT * FROM live_processes WHERE parent_pid_hash = ? ORDER BY create_time";
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    // Use positional parameter
-                    cmd.Parameters.Add(new DuckDBParameter(parentPidHash));
-
-                    var children = new List<ProcessRecord>();
-                    using var reader = cmd.ExecuteReader();
-                    while (reader.Read())
-                    {
-                        children.Add(MapReaderToProcessRecord(reader));
-                    }
-                    return children;
-                }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Failed to get child processes for {parentPidHash}: {ex.Message}", LogLevel.Error);
-                return new List<ProcessRecord>();
-            }
-        }
-
-        private ProcessRecord MapReaderToProcessRecord(DuckDBDataReader reader)
-        {
-            var rec = new ProcessRecord
-            {
-                PidHash = reader.GetString("pid_hash"),
-                ParentPidHash = reader.IsDBNull("parent_pid_hash") ? null : reader.GetString("parent_pid_hash"),
-                ProcessId = reader.GetInt32("process_id"),
-                ParentProcessId = reader.IsDBNull("parent_process_id") ? 0 : reader.GetInt32("parent_process_id"),
-                ProcessName = reader.GetString("process_name"),
-                ProcessPath = reader.IsDBNull("image_path") ? null : reader.GetString("image_path"),
-                CommandLine = reader.IsDBNull("command_line") ? null : reader.GetString("command_line"),
-                CreateTime = reader.GetDateTime("create_time"),
-                ExitTime = reader.IsDBNull("exit_time") ? null : reader.GetDateTime("exit_time"),
-                ExitCode = reader.IsDBNull("exit_code") ? null : reader.GetInt32("exit_code"),
-                IsActive = reader.GetBoolean("is_active"),
-                Source = reader.IsDBNull("source") ? null : reader.GetString("source"),
-                Depth = reader.IsDBNull("depth") ? 0 : reader.GetInt32("depth"),
-                HasLiveDescendants = reader.GetBoolean("has_live_descendants"),
-                UserName = reader.IsDBNull("user_name") ? null : reader.GetString("user_name"),
-                MD5Hash = reader.IsDBNull("md5_hash") ? null : reader.GetString("md5_hash"),
-                SHA2Hash = reader.IsDBNull("sha2_hash") ? null : reader.GetString("sha2_hash")
-            };
-            return rec;
-        }
-
-        /// <summary>
-        /// Delete process record from database
-        /// </summary>
-        private bool DeleteProcess(string pidHash)
-        {
-            try
-            {
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
-                {
-                    connection.Open();
-
-                    var sql = $@"
-                        DELETE FROM live_processes 
-                        WHERE pid_hash = '{pidHash.Replace("'", "''")}'";
-
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    cmd.ExecuteNonQuery();
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Failed to delete process {pidHash}: {ex.Message}", LogLevel.Error);
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Extract process information from Security log Event IDs 4688 or 4689
         /// </summary>
-        private ProcessInfo ExtractProcessInfoFromSecurityEvent(EventRecord eventRecord, int eventId)
+        private ProcessRecord ExtractProcessInfoFromSecurityEvent(EventRecord eventRecord, int eventId)
         {
             try
             {
-                var processInfo = new ProcessInfo();
+                var processInfo = new ProcessRecord();
 
                 // Parse XML data from the event record
                 if (eventRecord.ToXml() != null)
@@ -850,7 +445,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                                     processInfo.ParentProcessId = ParseProcessId(value);
                                     break;
                                 case "NewProcessName":
-                                    processInfo.ImagePath = value;
+                                    processInfo.ProcessPath = value;
                                     processInfo.ProcessName = System.IO.Path.GetFileName(value);
                                     break;
                                 case "CommandLine":
@@ -875,12 +470,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                                     processInfo.ProcessId = ParseProcessId(value);
                                     break;
                                 case "ProcessName":
-                                    processInfo.ImagePath = value;
+                                    processInfo.ProcessPath = value;
                                     processInfo.ProcessName = System.IO.Path.GetFileName(value);
                                     break;
                                 case "Status":
                                     // Exit status code
-                                    processInfo.ExitStatus = ParseProcessId(value);
+                                    processInfo.ExitCode = ParseProcessId(value);
                                     break;
                                 case "SubjectUserName":
                                     processInfo.UserName = value;
@@ -925,229 +520,566 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 return Convert.ToInt32(value);
         }
 
-        /// <summary>
-        /// Helper class for process information extraction
-        /// </summary>
-        public class ProcessInfo
+        internal void Initialize()
         {
-            public int ProcessId { get; set; }
-            public int ParentProcessId { get; set; }
-            public string ProcessName { get; set; }
-            public string ImagePath { get; set; }
-            public string CommandLine { get; set; }
-            public string UserName { get; set; }
-            public DateTime CreateTime { get; set; }
-            public int ExitStatus { get; set; }
-        }
-
-        /// <summary>
-        /// Database statistics
-        /// </summary>
-        public class DatabaseStats
-        {
-            public int TotalProcesses { get; set; }
-            public int ActiveProcesses { get; set; }
-            public int ProcessesWithLiveDescendants { get; set; }
-        }
-
-        private void ProcessTreeWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            SendProcessTreeToEsper();
-        }
-
-        /// <summary>
-        /// Esper listener that publishes process rundown events of the ETL boot trace pattern query 
-        /// </summary>
-        private void etlToEsperPattern_Events(object sender, UpdateEventArgs e)
-        {
-            EventBean[] partials = e.NewEvents;
-
-            foreach (EventBean partial in partials)
+            // initialize process tree database
+            WintapLogger.Log.Append("Process sensor initializing", LogLevel.Info);
+            if (StateManager.MachineBootTime.ToUniversalTime() < GetOldestSecurityLogEntryTime())
             {
-                WintapMessage rundownEvent = (WintapMessage)partial.Underlying;
-                rundownEvent.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
-                PublishProcess(rundownEvent);
+                WintapLogger.Log.Append("Log wrap detected!  Unable to build process tree, computer reboot required.", LogLevel.Error);
+            }
+            else
+            {
+                WintapLogger.Log.Append("Attempting to reconstruct process tree", LogLevel.Info);
+                EventChannel.ClearProcessDB();
+                Dictionary<string, ProcessRecord> systemProcesses = new Dictionary<string, ProcessRecord>();
+                systemProcesses.Add($"4_{StateManager.MachineBootTime.ToUniversalTime()}", CreateSystemProcess(4, "System", Path.Combine(Environment.SystemDirectory, "ntoskrnl.exe"), StateManager.MachineBootTime.ToUniversalTime()));
+                systemProcesses.Add($"0_{StateManager.MachineBootTime.ToUniversalTime()}", CreateSystemProcess(0, "System Idle Process", "idle", StateManager.MachineBootTime.ToUniversalTime()));
+                systemProcesses.Add($"-1_{StateManager.MachineBootTime.ToUniversalTime()}",CreateSystemProcess(-1, "Unknown", "unknown", StateManager.MachineBootTime.ToUniversalTime()));
+                List<ProcessRecord> processRecords = ReconstructProcessTreeFromSecurityLog(systemProcesses);
+                WintapLogger.Log.Append($"Total process records to send: {processRecords.Count}", LogLevel.Info);
+                int sendCounter = 0;
+                foreach (ProcessRecord processRecord in processRecords.OrderBy(p => p.CreateTime))
+                {
+                    WintapMessage processMsg = new WintapMessage(processRecord.CreateTime, processRecord.ProcessId, WintapMessage.MessageTypeEnum.Process);
+                    processMsg.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
+                    processMsg.ProcessName = processRecord.ProcessName.ToLower();
+                    processMsg.PidHash = processHash.GenPidHash(processRecord.ProcessId, processRecord.CreateTime.ToFileTimeUtc());
+                    processMsg.Process = new WintapMessage.ProcessObject();
+                    processMsg.Process.CommandLine = processRecord.CommandLine.ToLower(); ;
+                    processMsg.Process.Name = processRecord.ProcessName.ToLower();
+                    processMsg.Process.Path = processRecord.ProcessPath.ToLower();
+                    processMsg.Process.User = processRecord.UserName.ToLower();
+                    processMsg.Process.ParentPID = processRecord.ParentProcessId;
+                    EventChannel.Send(processMsg);
+                    sendCounter++;
+                }
+                WintapLogger.Log.Append($"Total process records sent to esper: {sendCounter}", LogLevel.Info);
             }
         }
 
-        /// <summary>
-        /// Publish process event to database and event stream
-        /// </summary>
-        internal void PublishProcess(WintapMessage msg)
+        private ProcessRecord CreateSystemProcess(int pid, string name, string path, DateTime createTime)
         {
+            ProcessRecord newSystemProc = new ProcessRecord
+            {
+                ProcessId = pid,
+                ParentProcessId = 4,
+                ProcessName = name,
+                ProcessPath = path,
+                CommandLine = "",
+                CreateTime = createTime,
+                PidHash = processHash.GenPidHash(pid, createTime.ToFileTimeUtc()),
+                ParentPidHash = processHash.GenPidHash(4, createTime.ToFileTimeUtc()),
+                ExitTime = null,
+                ExitCode = 0,
+                UserName = "SYSTEM"
+            };
+
+            return newSystemProc;
+        }
+
+
+        /// <summary>
+        /// Reconstruct process tree from Security log by walking events oldest-to-newest
+        /// Returns only processes that are either still running OR have active descendants
+        /// </summary>
+        /// <returns>List of ProcessRecords representing the complete active process tree</returns>
+        /// <summary>
+        /// Reconstruct process tree from Security log by walking events oldest-to-newest
+        /// Returns only processes that are either still running OR have active descendants
+        /// Filters to only include events since the last system boot
+        /// </summary>
+        /// <returns>List of ProcessRecords representing the complete active process tree</returns>
+        public static List<ProcessRecord> ReconstructProcessTreeFromSecurityLog(Dictionary<string, ProcessRecord> _systemProcessList)
+        {
+            var processHash = new ProcessHash();
+
+            // Dictionary to track all processes by their unique key (PID + CreateTime)
+            var allProcesses = _systemProcessList;
+
+            // Track which processes have terminated
+            var terminatedProcesses = new HashSet<string>();
+
             try
             {
-                // Convert to ProcessRecord and store in database
-                var processRecord = new ProcessRecord
+                // Get the system boot time for filtering
+                DateTime bootTime = StateManager.MachineBootTime.ToUniversalTime();
+                WintapLogger.Log.Append(
+                    $"Filtering Security log events to only those after system boot time: {bootTime:yyyy-MM-dd HH:mm:ss}",
+                    LogLevel.Info);
+
+                WintapLogger.Log.Append("Starting Security log reconstruction - reading process creation events", LogLevel.Info);
+
+                // PHASE 1: Read all 4688 (creation) events from oldest to newest, AFTER boot time
+                string creationQuery = $@"
+            <QueryList>
+              <Query Id='0' Path='Security'>
+                <Select Path='Security'>
+                  *[System[(EventID=4688) and TimeCreated[@SystemTime&gt;='{bootTime:o}']]]
+                </Select>
+              </Query>
+            </QueryList>";
+
+                var query = new EventLogQuery("Security", PathType.LogName, creationQuery)
                 {
-                    PidHash = msg.PidHash,
-                    ParentPidHash = msg.Process?.ParentPidHash,
-                    ProcessId = msg.PID,
-                    ParentProcessId = msg.Process?.ParentPID ?? 0,
-                    ProcessName = msg.Process?.Name,
-                    ProcessPath = msg.Process?.Path,
-                    CommandLine = msg.Process?.CommandLine,
-                    CreateTime = DateTime.FromFileTimeUtc(msg.EventTime),
-                    Source = msg.ActivityType == WintapMessage.ActivityTypeEnum.Refresh ? "boot_trace" : "real_time",
-                    UserName = "Unknown"
+                    ReverseDirection = false // Read OLDEST first
                 };
 
-                // Store in database
-                InsertProcessStart(processRecord);
-
-                // Publish to event stream for compatibility with existing pipeline
-                EventChannel.Send(msg);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Error publishing process event: {ex.Message}", LogLevel.Error);
-            }
-        }
-
-        internal static bool InsertProcessStart(ProcessRecord process)
-        {
-            try
-            {
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
+                using (var reader = new EventLogReader(query))
                 {
-                    connection.Open();
-                    // Helper methods
-                    string EscapeString(string value)
+                    EventRecord ev;
+                    int creationCount = 0;
+                    int skippedBeforeBoot = 0;
+
+                    while ((ev = reader.ReadEvent()) != null)
                     {
-                        if (value == null) return "NULL";
-                        return "'" + value.Replace("'", "''") + "'";
+                        try
+                        {
+                            // Double-check the time filter (belt and suspenders)
+                            if (ev.TimeCreated.HasValue && ev.TimeCreated.Value.ToUniversalTime() < bootTime)
+                            {
+                                skippedBeforeBoot++;
+                                continue;
+                            }
+
+                            var processInfo = ExtractProcessInfoFromSecurityEvent(ev);
+                            if (processInfo == null || processInfo.ProcessId <= 0)
+                                continue;
+
+                            // Create unique key for this process instance (handles PID reuse)
+                            string uniqueKey = $"{processInfo.ProcessId}_{processInfo.CreateTime.ToFileTimeUtc()}";
+
+                            var processRecord = new ProcessRecord
+                            {
+                                ProcessId = processInfo.ProcessId,
+                                ParentProcessId = processInfo.ParentProcessId,
+                                ProcessName = processInfo.ProcessName,
+                                ProcessPath = processInfo.ProcessPath,
+                                CommandLine = processInfo.CommandLine,
+                                UserName = processInfo.UserName,
+                                CreateTime = processInfo.CreateTime,
+                                PidHash = processHash.GenPidHash(processInfo.ProcessId, processInfo.CreateTime.ToFileTimeUtc()),
+                                Source = ProcessRecord.ProcessSourceEnum.refresh
+                            };
+
+                            // Generate parent PidHash if we have a parent PID
+                            if (processInfo.ParentProcessId > 0)
+                            {
+                                // Find the most recent instance of the parent PID that existed at this child's creation time
+                                var parentRecord = FindParentProcess(allProcesses, terminatedProcesses,
+                                    processInfo.ParentProcessId, processInfo.CreateTime);
+
+                                if (parentRecord != null)
+                                {
+                                    processRecord.ParentPidHash = parentRecord.PidHash;
+                                }
+                                else
+                                {
+                                    // Parent not found in our log - generate estimated PidHash
+                                    // This handles processes that started before log retention window
+                                    processRecord.ParentPidHash = processHash.GenPidHash(
+                                        processInfo.ParentProcessId,
+                                        processInfo.CreateTime.ToFileTimeUtc());
+                                }
+                            }
+
+                            allProcesses[uniqueKey] = processRecord;
+                            creationCount++;
+
+                            if (creationCount % 1000 == 0)
+                            {
+                                WintapLogger.Log.Append($"Processed {creationCount} process creation events...", LogLevel.Info);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            WintapLogger.Log.Append($"Error processing creation event: {ex.Message}", LogLevel.Debug);
+                        }
+                        finally
+                        {
+                            ev.Dispose();
+                        }
                     }
 
-                    string EscapeDateTime(DateTime dateTime)
+                    WintapLogger.Log.Append(
+                        $"Phase 1 complete: Processed {creationCount} process creation events (skipped {skippedBeforeBoot} pre-boot events)",
+                        LogLevel.Info);
+                }
+
+                // PHASE 2: Read all 4689 (termination) events from oldest to newest, AFTER boot time
+                WintapLogger.Log.Append("Phase 2: Processing termination events", LogLevel.Info);
+
+                string terminationQuery = $@"
+            <QueryList>
+              <Query Id='0' Path='Security'>
+                <Select Path='Security'>
+                  *[System[(EventID=4689) and TimeCreated[@SystemTime&gt;='{bootTime:o}']]]
+                </Select>
+              </Query>
+            </QueryList>";
+
+                var termQuery = new EventLogQuery("Security", PathType.LogName, terminationQuery)
+                {
+                    ReverseDirection = false // Read OLDEST first
+                };
+
+                using (var reader = new EventLogReader(termQuery))
+                {
+                    EventRecord ev;
+                    int terminationCount = 0;
+                    int matchedCount = 0;
+                    int skippedBeforeBoot = 0;
+
+                    while ((ev = reader.ReadEvent()) != null)
                     {
-                        return "'" + dateTime.ToString("yyyy-MM-dd HH:mm:ss.fff") + "'";
+                        try
+                        {
+                            // Double-check the time filter
+                            if (ev.TimeCreated.HasValue && ev.TimeCreated.Value.ToUniversalTime() < bootTime)
+                            {
+                                skippedBeforeBoot++;
+                                continue;
+                            }
+
+                            // Use the dedicated termination extraction method
+                            var processInfo = ExtractProcessInfoFromTerminationEvent(ev);
+                            if (processInfo == null || processInfo.ProcessId <= 0)
+                            {
+                                continue;
+                            }
+
+                            terminationCount++;
+
+                            // The termination time is in processInfo.CreateTime (reusing the field)
+                            DateTime terminationTime = processInfo.CreateTime;
+
+                            // Find the matching process instance by PID and time
+                            var matchingProcess = FindProcessInstanceForTermination(
+                                allProcesses, processInfo.ProcessId, terminationTime);
+
+                            if (matchingProcess != null)
+                            {
+                                matchingProcess.ExitTime = terminationTime;
+                                matchingProcess.ExitCode = processInfo.ExitCode;
+                                terminatedProcesses.Add(GetProcessKey(matchingProcess));
+                                matchedCount++;
+
+                                if (matchedCount % 1000 == 0)
+                                {
+                                    WintapLogger.Log.Append($"Matched {matchedCount} terminations to processes...", LogLevel.Info);
+                                }
+                            }
+                            else
+                            {
+                                WintapLogger.Log.Append(
+                                    $"Could not find matching process for termination: PID {processInfo.ProcessId} at {terminationTime}",
+                                    LogLevel.Debug);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            WintapLogger.Log.Append($"Error processing termination event: {ex.Message}", LogLevel.Debug);
+                        }
+                        finally
+                        {
+                            ev.Dispose();
+                        }
                     }
 
-                    var sql = $@"
-            INSERT OR REPLACE INTO live_processes (
-                pid_hash, parent_pid_hash, process_id, parent_process_id,
-                process_name, image_path, command_line, 
-                create_time, source, user_name
-            ) VALUES (
-                {EscapeString(process.PidHash)},
-                {EscapeString(process.ParentPidHash)},
-                {process.ProcessId},
-                {process.ParentProcessId},
-                {EscapeString(process.ProcessName)},
-                {EscapeString(process.ProcessPath)},
-                {EscapeString(process.CommandLine)},
-                {EscapeDateTime(process.CreateTime)},
-                {EscapeString(process.Source)},
-                {EscapeString(process.UserName)}
-            )";
+                    WintapLogger.Log.Append(
+                        $"Phase 2 complete: Processed {terminationCount} termination events, matched {matchedCount} to creation events (skipped {skippedBeforeBoot} pre-boot events)",
+                        LogLevel.Info);
+                }
 
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    if(cmd.ExecuteNonQuery() > 0)
+                // PHASE 3: Filter to only processes that are still running OR have active descendants
+                WintapLogger.Log.Append("Phase 3: Building active process tree", LogLevel.Info);
+
+                var activeTree = new List<ProcessRecord>();
+                var processedPidHashes = new HashSet<string>();
+
+                foreach (var kvp in allProcesses)
+                {
+                    var process = kvp.Value;
+
+                    // Skip if already processed
+                    if (processedPidHashes.Contains(process.PidHash))
+                        continue;
+
+                    // Check if this process or any descendant is still running
+                    if (IsProcessOrDescendantActive(process, allProcesses, terminatedProcesses, processedPidHashes))
                     {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
+                        activeTree.Add(process);
+                        processedPidHashes.Add(process.PidHash);
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Failed to insert process start for {process.PidHash}: {ex.Message}", LogLevel.Error);
-                return false;
-            }
-        }
 
-        /// <summary>
-        /// Get process children by parent PidHash
-        /// </summary>
-        public List<ProcessRecord> GetProcessChildren(string parentPidHash)
-        {
-            try
+                WintapLogger.Log.Append(
+                    $"Security log reconstruction complete: {activeTree.Count} processes in active tree " +
+                    $"(out of {allProcesses.Count} total processes since boot at {bootTime:yyyy-MM-dd HH:mm:ss})",
+                    LogLevel.Info);
+
+                return activeTree;
+            }
+            catch (UnauthorizedAccessException ex)
             {
-                return GetChildProcesses(parentPidHash);
+                WintapLogger.Log.Append($"Access denied to Security log: {ex.Message}", LogLevel.Error);
+                return new List<ProcessRecord>();
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error retrieving process children for parent {parentPidHash}: {ex.Message}", LogLevel.Error);
+                WintapLogger.Log.Append($"Error reconstructing process tree from Security log: {ex.Message}", LogLevel.Error);
                 return new List<ProcessRecord>();
             }
         }
 
         /// <summary>
-        /// Get process ancestors by PidHash
+        /// Extract process information from Security log Event ID 4689 (Process Termination)
         /// </summary>
-        public List<ProcessRecord> GetProcessAncestors(string pidHash)
+        private static ProcessRecord ExtractProcessInfoFromTerminationEvent(EventRecord eventRecord)
         {
             try
             {
-                // Build ancestors list by walking up the tree
-                var ancestors = new List<ProcessRecord>();
-                var current = GetProcessByPidHash(pidHash);
+                var processInfo = new ProcessRecord();
 
-                while (current != null && !string.IsNullOrEmpty(current.ParentPidHash))
+                // Parse XML data from the event record
+                if (eventRecord.ToXml() != null)
                 {
-                    var parent = GetProcessByPidHash(current.ParentPidHash);
-                    if (parent != null)
-                    {
-                        ancestors.Add(parent);
-                        current = parent;
+                    var xmlDoc = new System.Xml.XmlDocument();
+                    xmlDoc.LoadXml(eventRecord.ToXml());
+                    var nsmgr = new System.Xml.XmlNamespaceManager(xmlDoc.NameTable);
+                    nsmgr.AddNamespace("ns", "http://schemas.microsoft.com/win/2004/08/events/event");
 
-                        // Prevent infinite loops (kernel case)
-                        if (parent.PidHash == parent.ParentPidHash)
-                            break;
-                    }
-                    else
+                    // Extract key fields from Event Data
+                    var dataNodes = xmlDoc.SelectNodes("//ns:Data", nsmgr);
+                    foreach (System.Xml.XmlNode node in dataNodes)
                     {
-                        break;
+                        var name = node.Attributes?["Name"]?.Value;
+                        var value = node.InnerText;
+
+                        switch (name)
+                        {
+                            case "ProcessId":
+                                // In 4689, ProcessId is the terminated process (in hex format)
+                                if (value.StartsWith("0x"))
+                                    processInfo.ProcessId = Convert.ToInt32(value, 16);
+                                else
+                                    processInfo.ProcessId = Convert.ToInt32(value);
+                                break;
+                            case "ProcessName":
+                                processInfo.ProcessPath = value;
+                                processInfo.ProcessName = System.IO.Path.GetFileName(value);
+                                break;
+                            case "Status":
+                                // Exit status code (in hex format)
+                                if (!string.IsNullOrEmpty(value))
+                                {
+                                    if (value.StartsWith("0x"))
+                                        processInfo.ExitCode = Convert.ToInt32(value, 16);
+                                    else
+                                        processInfo.ExitCode = Convert.ToInt32(value);
+                                }
+                                break;
+                            case "SubjectUserName":
+                                processInfo.UserName = value;
+                                break;
+                            case "SubjectDomainName":
+                                if (!string.IsNullOrEmpty(value) && value != "-")
+                                    processInfo.UserName = $"{value}\\{processInfo.UserName}";
+                                break;
+                        }
                     }
+
+                    // Use event creation time as process termination time
+                    processInfo.CreateTime = eventRecord.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow;
                 }
 
-                return ancestors;
+                // Validate we have minimum required info
+                if (processInfo.ProcessId > 0)
+                {
+                    return processInfo;
+                }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Error retrieving process ancestors for {pidHash}: {ex.Message}", LogLevel.Error);
-                return new List<ProcessRecord>();
+                WintapLogger.Log.Append($"Error extracting process info from termination event: {ex.Message}", LogLevel.Debug);
             }
+
+            return null;
         }
 
-        internal static bool ProcessExistsForPid(int pid, long eventTime)
+        /// <summary>
+        /// Find the parent process instance that was active when the child was created
+        /// </summary>
+        private static ProcessRecord FindParentProcess(
+            Dictionary<string, ProcessRecord> allProcesses,
+            HashSet<string> terminatedProcesses,
+            int parentPid,
+            DateTime childCreateTime)
+        {
+            ProcessRecord bestMatch = null;
+            DateTime? latestCreateTime = null;
+
+            foreach (var kvp in allProcesses)
+            {
+                var process = kvp.Value;
+
+                // Must match parent PID
+                if (process.ProcessId != parentPid)
+                    continue;
+
+                // Parent must have been created before child
+                if (process.CreateTime > childCreateTime)
+                    continue;
+
+                // Parent must still be running at child's creation time (or no exit time recorded)
+                if (process.ExitTime.HasValue && process.ExitTime.Value <= childCreateTime)
+                    continue;
+
+                // Take the most recently created instance that matches criteria
+                if (!latestCreateTime.HasValue || process.CreateTime > latestCreateTime.Value)
+                {
+                    bestMatch = process;
+                    latestCreateTime = process.CreateTime;
+                }
+            }
+
+            return bestMatch;
+        }
+
+        /// <summary>
+        /// Find the process instance that matches a termination event
+        /// </summary>
+        private static ProcessRecord FindProcessInstanceForTermination(Dictionary<string, ProcessRecord> allProcesses,int pid,DateTime terminationTime)
+        {
+            ProcessRecord bestMatch = null;
+            DateTime? latestCreateTime = null;
+
+            foreach (var kvp in allProcesses)
+            {
+                var process = kvp.Value;
+
+                // Must match PID
+                if (process.ProcessId != pid)
+                    continue;
+
+                // Must have been created before termination
+                if (process.CreateTime > terminationTime)
+                    continue;
+
+                // Must not already have an exit time
+                if (process.ExitTime.HasValue)
+                    continue;
+
+                // Take the most recently created instance without an exit time
+                if (!latestCreateTime.HasValue || process.CreateTime > latestCreateTime.Value)
+                {
+                    bestMatch = process;
+                    latestCreateTime = process.CreateTime;
+                }
+            }
+
+            return bestMatch;
+        }
+
+        /// <summary>
+        /// Recursively check if a process or any of its descendants is still active
+        /// </summary>
+        private static bool IsProcessOrDescendantActive(
+            ProcessRecord process,
+            Dictionary<string, ProcessRecord> allProcesses,
+            HashSet<string> terminatedProcesses,
+            HashSet<string> processedPidHashes)
+        {
+            string processKey = GetProcessKey(process);
+
+            // If this process is still running (not terminated), include it
+            if (!terminatedProcesses.Contains(processKey))
+            {
+                return true;
+            }
+
+            // Check if any children are active
+            var children = GetChildrenOfProcess(process, allProcesses);
+            foreach (var child in children)
+            {
+                if (IsProcessOrDescendantActive(child, allProcesses, terminatedProcesses, processedPidHashes))
+                {
+                    return true; // At least one child or descendant is active
+                }
+            }
+
+            return false; // Process terminated and has no active descendants
+        }
+
+        /// <summary>
+        /// Get all child processes of a given process
+        /// </summary>
+        private static List<ProcessRecord> GetChildrenOfProcess(
+            ProcessRecord parent,
+            Dictionary<string, ProcessRecord> allProcesses)
+        {
+            var children = new List<ProcessRecord>();
+
+            foreach (var kvp in allProcesses)
+            {
+                var process = kvp.Value;
+
+                // Check if this process's parent PidHash matches
+                if (process.ParentPidHash == parent.PidHash)
+                {
+                    children.Add(process);
+                }
+            }
+
+            return children;
+        }
+
+        /// <summary>
+        /// Generate unique key for a process instance
+        /// </summary>
+        private static string GetProcessKey(ProcessRecord process)
+        {
+            return $"{process.ProcessId}_{process.CreateTime.ToFileTimeUtc()}";
+        }
+
+
+        private static DateTime? GetOldestSecurityLogEntryTime()
         {
             try
             {
-                using (var connection = new DuckDBConnection($"Data Source={PROCESS_DB_PATH}"))
+                // Query the Security log, ordered by oldest first
+                var query = new EventLogQuery("Security", PathType.LogName)
                 {
-                    connection.Open();
+                    ReverseDirection = false // Get oldest entries first
+                };
 
-                    // Convert FileTime to DateTime BEFORE formatting
-                    var eventDateTime = DateTime.FromFileTimeUtc(eventTime);
+                using (var reader = new EventLogReader(query))
+                {
+                    // Read the first (oldest) event
+                    EventRecord eventRecord = reader.ReadEvent();
 
-                    // Add 2-second tolerance window for out-of-order ETW delivery
-                    var createTimeWindow = eventDateTime.AddSeconds(2);
-
-                    var sql = $@"
-            SELECT 1 FROM live_processes 
-            WHERE process_id = {pid} 
-            AND create_time <= '{createTimeWindow:yyyy-MM-dd HH:mm:ss}' 
-            AND (exit_time IS NULL OR exit_time > '{eventDateTime:yyyy-MM-dd HH:mm:ss}')
-            LIMIT 1";
-
-                    using var cmd = new DuckDBCommand(sql, connection);
-                    var result = cmd.ExecuteScalar();
-                    if (result == null)
+                    if (eventRecord != null)
                     {
-                        int i = 0;
+                        using (eventRecord)
+                        {
+                            // TimeCreated is already in UTC if available
+                            return eventRecord.TimeCreated?.ToUniversalTime();
+                        }
                     }
-                    return result != null;
                 }
 
+                return null; // No events found
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Reading Security log requires elevated privileges
+                throw new UnauthorizedAccessException(
+                    "Access denied. Administrator privileges required to read the Security log.");
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"Database error checking process existence for PID {pid}: {ex.Message}", LogLevel.Error);
-                return false;
+                throw new InvalidOperationException(
+                    $"Failed to read Security log: {ex.Message}", ex);
             }
         }
     }

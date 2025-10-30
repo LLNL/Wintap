@@ -5,6 +5,7 @@
  */
 
 using DuckDB.NET.Data;
+using gov.llnl.wintap.helpers;
 using System.Text;
 
 /// <summary>
@@ -291,6 +292,7 @@ public static class DuckDBManager
 
     public static string ExecuteSQL(string sqlCmd, CancellationToken cancellationToken)
     {
+        Logit.Instance.Append($"AI SQL: {sqlCmd}", LogVerboseLevel.Normal);
         using (var command = _connection.CreateCommand())
         {
             command.CommandText = sqlCmd;
