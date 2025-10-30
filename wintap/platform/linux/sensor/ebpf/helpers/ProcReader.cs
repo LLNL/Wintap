@@ -12,7 +12,6 @@ namespace gov.llnl.wintap.platform.linux.collect
     {
         /// <summary>
         /// Read comprehensive process information from /proc
-        /// Used by ExecveSensor
         /// </summary>
         public static ProcessInfo ReadProcessInfo(uint pid)
         {
@@ -34,7 +33,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                 // Read /proc/<pid>/cwd
                 ReadCwd(procDir, ref info);
 
-                // ✅ NEW: Read /proc/<pid>/exe for executable path
+                // /proc/<pid>/exe for executable path
                 ReadExe(procDir, ref info);
             }
             catch
@@ -243,7 +242,6 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
         }
 
-        // ✅ NEW: Read executable path from /proc/<pid>/exe symlink
         private static void ReadExe(string procDir, ref ProcessInfo info)
         {
             var exePath = $"{procDir}/exe";

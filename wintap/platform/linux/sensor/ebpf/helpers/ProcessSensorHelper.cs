@@ -9,7 +9,6 @@ namespace gov.llnl.wintap.platform.linux.collect
 {
     /// <summary>
     /// Shared helper methods for process sensors
-    /// Eliminates code duplication across ExecveSensor, CloneSensor, ExitSensor
     /// </summary>
     internal static class ProcessSensorHelper
     {
@@ -21,7 +20,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         ///   "bash" → "bash"
         ///   "bash -c ls" → "bash" (extracts first word if looks like cmdline)
         /// 
-        /// ROBUST: Handles empty strings, command lines, and malformed paths
+        /// Handles empty strings, command lines, and malformed paths
         /// </summary>
         public static string ExtractProcessName(string path, string fallback = "unknown")
         {
@@ -43,13 +42,9 @@ namespace gov.llnl.wintap.platform.linux.collect
                 // Get the filename from the path (handles both /usr/bin/bash and bash)
                 string fileName = Path.GetFileName(path);
                 
-                // If GetFileName returned empty (shouldn't happen but be defensive)
+                // If GetFileName returned empty
                 if (string.IsNullOrWhiteSpace(fileName))
                     return NormalizeFallback(fallback);
-                
-                // Remove .exe extension if somehow present (for Windows compatibility)
-                if (fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                    fileName = fileName.Substring(0, fileName.Length - 4);
                 
                 // Final check - return fileName if valid, otherwise fallback
                 return string.IsNullOrWhiteSpace(fileName) ? NormalizeFallback(fallback) : fileName;
