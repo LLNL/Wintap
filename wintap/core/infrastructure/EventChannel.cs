@@ -255,30 +255,48 @@ namespace gov.llnl.wintap.core.infrastructure
                         {
                             if (streamedEvent.Process != null && streamedEvent.Process.ParentPID > 0)
                             {
-                                WintapLogger.Log.Append($"Attempting to retrieve parent process from process resolver pid: {streamedEvent.PID}, parentPid: {streamedEvent.Process.ParentPID}", LogLevel.Debug);
-                                ProcessRecord parentProcess = EventChannel.GetProcessHistory(streamedEvent.Process.ParentPID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
-
-                                if (parentProcess != null)
+                                // Special case: process is its own parent (System process, PID 4)
+                                if (streamedEvent.Process.ParentPID == streamedEvent.PID)
                                 {
-                                    streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
-                                    streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
+                                    WintapLogger.Log.Append(
+                                        $"Process {streamedEvent.PID} is self-parenting, using own PidHash as ParentPidHash",
+                                        LogLevel.Info);
+
+                                    streamedEvent.Process.ParentPidHash = streamedEvent.PidHash;
+                                    streamedEvent.Process.ParentProcessName = streamedEvent.ProcessName;
                                 }
                                 else
                                 {
-                                    WintapLogger.Log.Append(
-                                        $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
-                                        LogLevel.Debug);
+                                    // Normal parent resolution
+                                    WintapLogger.Log.Append($"Attempting to retrieve parent process from process resolver pid: {streamedEvent.PID}, parentPid: {streamedEvent.Process.ParentPID}", LogLevel.Debug);
+                                    ProcessRecord parentProcess = EventChannel.GetProcessHistory(
+                                        streamedEvent.Process.ParentPID,
+                                        DateTime.FromFileTimeUtc(streamedEvent.EventTime));
 
-                                    // Generate basic parent PidHash
-                                    streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(streamedEvent.Process.ParentPID,DateTime.FromFileTimeUtc(streamedEvent.EventTime));
-                                    streamedEvent.Process.ParentProcessName = "Unknown";
+                                    if (parentProcess != null)
+                                    {
+                                        streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
+                                        streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
+                                    }
+                                    else
+                                    {
+                                        WintapLogger.Log.Append(
+                                            $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
+                                            LogLevel.Warn);
+
+                                        // Generate basic parent PidHash
+                                        streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(
+                                            streamedEvent.Process.ParentPID,
+                                            DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                                        streamedEvent.Process.ParentProcessName = "Unknown";
+                                    }
                                 }
                             }
                         }
-                        catch(Exception ex)
+                        catch (Exception ex)
                         {
                             WintapLogger.Log.Append($"Could not resolve parent process for pid {streamedEvent.PID}", LogLevel.Debug);
-                        }              
+                        }
                     }
                 }
                 else
@@ -292,7 +310,10 @@ namespace gov.llnl.wintap.core.infrastructure
                 // Send to Esper
                 EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
                 // Send to backing store
-                _processResolver.RegisterProcess(streamedEvent);
+                if (streamedEvent.MessageType == WintapMessage.MessageTypeEnum.Process)
+                {
+                    _processResolver.RegisterProcess(streamedEvent);
+                }
             }
             catch (Exception ex)
             {
@@ -312,12 +333,12 @@ namespace gov.llnl.wintap.core.infrastructure
 
         public static ProcessRecord GetProcessHistory(int _pid,  DateTime _eventTime)
         {
-            return _processResolver.ResolveProcessAtTime(_pid, _eventTime);
+            return _processResolver.ResolveProcessAtTime(_pid, _eventTime.ToUniversalTime());
         }
 
         public static void ClearProcessDB()
         {
-            _processResolver.
+            _processResolver.ClearDB();
         }
 
         // **************************************************************************

@@ -24,19 +24,16 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
         internal List<BaseWindowsSensor> Start()
         {
-
             List<BaseWindowsSensor> baseSensors = new List<BaseWindowsSensor>();
 
-            // initialize process tree database
-            WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
-
             // start process sensor first for process attribution
-            WintapLogger.Log.Append("Starting Process sensor", LogLevel.Info);
             ProcessSensor pc = new ProcessSensor();
-            if(DateTime.UtcNow.Subtract(StateManager.MachineBootTime.ToUniversalTime()).TotalMinutes < 5)
-            {
-                pc.Initialize();
-            }
+            //if(DateTime.UtcNow.Subtract(StateManager.MachineBootTime.ToUniversalTime()).TotalMinutes < 5)
+            //{
+            //    pc.Initialize();
+            //}
+            pc.Initialize();
+            WintapLogger.Log.Append("Starting Process sensor", LogLevel.Info);
             pc.Start();
             WintapLogger.Log.Append("Process sensor started", LogLevel.Info);
             kernelFlags = KernelTraceEventParser.Keywords.Process;

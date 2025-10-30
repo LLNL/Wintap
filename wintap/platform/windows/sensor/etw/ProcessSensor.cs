@@ -19,6 +19,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
+using System.Linq;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -521,15 +522,60 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         internal void Initialize()
         {
-            if(StateManager.MachineBootTime.ToUniversalTime() < GetOldestSecurityLogEntryTime())
+            // initialize process tree database
+            WintapLogger.Log.Append("Process sensor initializing", LogLevel.Info);
+            if (StateManager.MachineBootTime.ToUniversalTime() < GetOldestSecurityLogEntryTime())
             {
                 WintapLogger.Log.Append("Log wrap detected!  Unable to build process tree, computer reboot required.", LogLevel.Error);
             }
             else
             {
+                WintapLogger.Log.Append("Attempting to reconstruct process tree", LogLevel.Info);
                 EventChannel.ClearProcessDB();
-                List<ProcessRecord> processRecords = ReconstructProcessTreeFromSecurityLog();
+                Dictionary<string, ProcessRecord> systemProcesses = new Dictionary<string, ProcessRecord>();
+                systemProcesses.Add($"4_{StateManager.MachineBootTime.ToUniversalTime()}", CreateSystemProcess(4, "System", Path.Combine(Environment.SystemDirectory, "ntoskrnl.exe"), StateManager.MachineBootTime.ToUniversalTime()));
+                systemProcesses.Add($"0_{StateManager.MachineBootTime.ToUniversalTime()}", CreateSystemProcess(0, "System Idle Process", "idle", StateManager.MachineBootTime.ToUniversalTime()));
+                systemProcesses.Add($"-1_{StateManager.MachineBootTime.ToUniversalTime()}",CreateSystemProcess(-1, "Unknown", "unknown", StateManager.MachineBootTime.ToUniversalTime()));
+                List<ProcessRecord> processRecords = ReconstructProcessTreeFromSecurityLog(systemProcesses);
+                WintapLogger.Log.Append($"Total process records to send: {processRecords.Count}", LogLevel.Info);
+                int sendCounter = 0;
+                foreach (ProcessRecord processRecord in processRecords.OrderBy(p => p.CreateTime))
+                {
+                    WintapMessage processMsg = new WintapMessage(processRecord.CreateTime, processRecord.ProcessId, WintapMessage.MessageTypeEnum.Process);
+                    processMsg.ActivityType = WintapMessage.ActivityTypeEnum.Refresh;
+                    processMsg.ProcessName = processRecord.ProcessName.ToLower();
+                    processMsg.PidHash = processHash.GenPidHash(processRecord.ProcessId, processRecord.CreateTime.ToFileTimeUtc());
+                    processMsg.Process = new WintapMessage.ProcessObject();
+                    processMsg.Process.CommandLine = processRecord.CommandLine.ToLower(); ;
+                    processMsg.Process.Name = processRecord.ProcessName.ToLower();
+                    processMsg.Process.Path = processRecord.ProcessPath.ToLower();
+                    processMsg.Process.User = processRecord.UserName.ToLower();
+                    processMsg.Process.ParentPID = processRecord.ParentProcessId;
+                    EventChannel.Send(processMsg);
+                    sendCounter++;
+                }
+                WintapLogger.Log.Append($"Total process records sent to esper: {sendCounter}", LogLevel.Info);
             }
+        }
+
+        private ProcessRecord CreateSystemProcess(int pid, string name, string path, DateTime createTime)
+        {
+            ProcessRecord newSystemProc = new ProcessRecord
+            {
+                ProcessId = pid,
+                ParentProcessId = 4,
+                ProcessName = name,
+                ProcessPath = path,
+                CommandLine = "",
+                CreateTime = createTime,
+                PidHash = processHash.GenPidHash(pid, createTime.ToFileTimeUtc()),
+                ParentPidHash = processHash.GenPidHash(4, createTime.ToFileTimeUtc()),
+                ExitTime = null,
+                ExitCode = 0,
+                UserName = "SYSTEM"
+            };
+
+            return newSystemProc;
         }
 
 
@@ -538,25 +584,39 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// Returns only processes that are either still running OR have active descendants
         /// </summary>
         /// <returns>List of ProcessRecords representing the complete active process tree</returns>
-        public static List<ProcessRecord> ReconstructProcessTreeFromSecurityLog()
+        /// <summary>
+        /// Reconstruct process tree from Security log by walking events oldest-to-newest
+        /// Returns only processes that are either still running OR have active descendants
+        /// Filters to only include events since the last system boot
+        /// </summary>
+        /// <returns>List of ProcessRecords representing the complete active process tree</returns>
+        public static List<ProcessRecord> ReconstructProcessTreeFromSecurityLog(Dictionary<string, ProcessRecord> _systemProcessList)
         {
             var processHash = new ProcessHash();
 
             // Dictionary to track all processes by their unique key (PID + CreateTime)
-            var allProcesses = new Dictionary<string, ProcessRecord>();
+            var allProcesses = _systemProcessList;
 
             // Track which processes have terminated
             var terminatedProcesses = new HashSet<string>();
 
             try
             {
+                // Get the system boot time for filtering
+                DateTime bootTime = StateManager.MachineBootTime.ToUniversalTime();
+                WintapLogger.Log.Append(
+                    $"Filtering Security log events to only those after system boot time: {bootTime:yyyy-MM-dd HH:mm:ss}",
+                    LogLevel.Info);
+
                 WintapLogger.Log.Append("Starting Security log reconstruction - reading process creation events", LogLevel.Info);
 
-                // PHASE 1: Read all 4688 (creation) events from oldest to newest
-                string creationQuery = @"
+                // PHASE 1: Read all 4688 (creation) events from oldest to newest, AFTER boot time
+                string creationQuery = $@"
             <QueryList>
               <Query Id='0' Path='Security'>
-                <Select Path='Security'>*[System[(EventID=4688)]]</Select>
+                <Select Path='Security'>
+                  *[System[(EventID=4688) and TimeCreated[@SystemTime&gt;='{bootTime:o}']]]
+                </Select>
               </Query>
             </QueryList>";
 
@@ -569,11 +629,19 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 {
                     EventRecord ev;
                     int creationCount = 0;
+                    int skippedBeforeBoot = 0;
 
                     while ((ev = reader.ReadEvent()) != null)
                     {
                         try
                         {
+                            // Double-check the time filter (belt and suspenders)
+                            if (ev.TimeCreated.HasValue && ev.TimeCreated.Value.ToUniversalTime() < bootTime)
+                            {
+                                skippedBeforeBoot++;
+                                continue;
+                            }
+
                             var processInfo = ExtractProcessInfoFromSecurityEvent(ev);
                             if (processInfo == null || processInfo.ProcessId <= 0)
                                 continue;
@@ -590,7 +658,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                                 CommandLine = processInfo.CommandLine,
                                 UserName = processInfo.UserName,
                                 CreateTime = processInfo.CreateTime,
-                                PidHash = processHash.GenPidHash(processInfo.ProcessId, processInfo.CreateTime.ToFileTimeUtc())
+                                PidHash = processHash.GenPidHash(processInfo.ProcessId, processInfo.CreateTime.ToFileTimeUtc()),
+                                Source = ProcessRecord.ProcessSourceEnum.refresh
                             };
 
                             // Generate parent PidHash if we have a parent PID
@@ -632,16 +701,20 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         }
                     }
 
-                    WintapLogger.Log.Append($"Phase 1 complete: Processed {creationCount} process creation events", LogLevel.Info);
+                    WintapLogger.Log.Append(
+                        $"Phase 1 complete: Processed {creationCount} process creation events (skipped {skippedBeforeBoot} pre-boot events)",
+                        LogLevel.Info);
                 }
 
-                // PHASE 2: Read all 4689 (termination) events from oldest to newest
+                // PHASE 2: Read all 4689 (termination) events from oldest to newest, AFTER boot time
                 WintapLogger.Log.Append("Phase 2: Processing termination events", LogLevel.Info);
 
-                string terminationQuery = @"
+                string terminationQuery = $@"
             <QueryList>
               <Query Id='0' Path='Security'>
-                <Select Path='Security'>*[System[(EventID=4689)]]</Select>
+                <Select Path='Security'>
+                  *[System[(EventID=4689) and TimeCreated[@SystemTime&gt;='{bootTime:o}']]]
+                </Select>
               </Query>
             </QueryList>";
 
@@ -654,24 +727,53 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 {
                     EventRecord ev;
                     int terminationCount = 0;
+                    int matchedCount = 0;
+                    int skippedBeforeBoot = 0;
 
                     while ((ev = reader.ReadEvent()) != null)
                     {
                         try
                         {
-                            var processInfo = ExtractProcessInfoFromSecurityEvent(ev);
-                            if (processInfo == null || processInfo.ProcessId <= 0)
+                            // Double-check the time filter
+                            if (ev.TimeCreated.HasValue && ev.TimeCreated.Value.ToUniversalTime() < bootTime)
+                            {
+                                skippedBeforeBoot++;
                                 continue;
+                            }
+
+                            // Use the dedicated termination extraction method
+                            var processInfo = ExtractProcessInfoFromTerminationEvent(ev);
+                            if (processInfo == null || processInfo.ProcessId <= 0)
+                            {
+                                continue;
+                            }
+
+                            terminationCount++;
+
+                            // The termination time is in processInfo.CreateTime (reusing the field)
+                            DateTime terminationTime = processInfo.CreateTime;
 
                             // Find the matching process instance by PID and time
                             var matchingProcess = FindProcessInstanceForTermination(
-                                allProcesses, processInfo.ProcessId, processInfo.CreateTime);
+                                allProcesses, processInfo.ProcessId, terminationTime);
 
                             if (matchingProcess != null)
                             {
-                                matchingProcess.ExitTime = processInfo.CreateTime; // CreateTime of 4689 is the exit time
+                                matchingProcess.ExitTime = terminationTime;
+                                matchingProcess.ExitCode = processInfo.ExitCode;
                                 terminatedProcesses.Add(GetProcessKey(matchingProcess));
-                                terminationCount++;
+                                matchedCount++;
+
+                                if (matchedCount % 1000 == 0)
+                                {
+                                    WintapLogger.Log.Append($"Matched {matchedCount} terminations to processes...", LogLevel.Info);
+                                }
+                            }
+                            else
+                            {
+                                WintapLogger.Log.Append(
+                                    $"Could not find matching process for termination: PID {processInfo.ProcessId} at {terminationTime}",
+                                    LogLevel.Debug);
                             }
                         }
                         catch (Exception ex)
@@ -684,7 +786,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         }
                     }
 
-                    WintapLogger.Log.Append($"Phase 2 complete: Processed {terminationCount} termination events", LogLevel.Info);
+                    WintapLogger.Log.Append(
+                        $"Phase 2 complete: Processed {terminationCount} termination events, matched {matchedCount} to creation events (skipped {skippedBeforeBoot} pre-boot events)",
+                        LogLevel.Info);
                 }
 
                 // PHASE 3: Filter to only processes that are still running OR have active descendants
@@ -711,7 +815,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
                 WintapLogger.Log.Append(
                     $"Security log reconstruction complete: {activeTree.Count} processes in active tree " +
-                    $"(out of {allProcesses.Count} total processes)",
+                    $"(out of {allProcesses.Count} total processes since boot at {bootTime:yyyy-MM-dd HH:mm:ss})",
                     LogLevel.Info);
 
                 return activeTree;
@@ -726,6 +830,81 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 WintapLogger.Log.Append($"Error reconstructing process tree from Security log: {ex.Message}", LogLevel.Error);
                 return new List<ProcessRecord>();
             }
+        }
+
+        /// <summary>
+        /// Extract process information from Security log Event ID 4689 (Process Termination)
+        /// </summary>
+        private static ProcessRecord ExtractProcessInfoFromTerminationEvent(EventRecord eventRecord)
+        {
+            try
+            {
+                var processInfo = new ProcessRecord();
+
+                // Parse XML data from the event record
+                if (eventRecord.ToXml() != null)
+                {
+                    var xmlDoc = new System.Xml.XmlDocument();
+                    xmlDoc.LoadXml(eventRecord.ToXml());
+                    var nsmgr = new System.Xml.XmlNamespaceManager(xmlDoc.NameTable);
+                    nsmgr.AddNamespace("ns", "http://schemas.microsoft.com/win/2004/08/events/event");
+
+                    // Extract key fields from Event Data
+                    var dataNodes = xmlDoc.SelectNodes("//ns:Data", nsmgr);
+                    foreach (System.Xml.XmlNode node in dataNodes)
+                    {
+                        var name = node.Attributes?["Name"]?.Value;
+                        var value = node.InnerText;
+
+                        switch (name)
+                        {
+                            case "ProcessId":
+                                // In 4689, ProcessId is the terminated process (in hex format)
+                                if (value.StartsWith("0x"))
+                                    processInfo.ProcessId = Convert.ToInt32(value, 16);
+                                else
+                                    processInfo.ProcessId = Convert.ToInt32(value);
+                                break;
+                            case "ProcessName":
+                                processInfo.ProcessPath = value;
+                                processInfo.ProcessName = System.IO.Path.GetFileName(value);
+                                break;
+                            case "Status":
+                                // Exit status code (in hex format)
+                                if (!string.IsNullOrEmpty(value))
+                                {
+                                    if (value.StartsWith("0x"))
+                                        processInfo.ExitCode = Convert.ToInt32(value, 16);
+                                    else
+                                        processInfo.ExitCode = Convert.ToInt32(value);
+                                }
+                                break;
+                            case "SubjectUserName":
+                                processInfo.UserName = value;
+                                break;
+                            case "SubjectDomainName":
+                                if (!string.IsNullOrEmpty(value) && value != "-")
+                                    processInfo.UserName = $"{value}\\{processInfo.UserName}";
+                                break;
+                        }
+                    }
+
+                    // Use event creation time as process termination time
+                    processInfo.CreateTime = eventRecord.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow;
+                }
+
+                // Validate we have minimum required info
+                if (processInfo.ProcessId > 0)
+                {
+                    return processInfo;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error extracting process info from termination event: {ex.Message}", LogLevel.Debug);
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -770,10 +949,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// <summary>
         /// Find the process instance that matches a termination event
         /// </summary>
-        private static ProcessRecord FindProcessInstanceForTermination(
-            Dictionary<string, ProcessRecord> allProcesses,
-            int pid,
-            DateTime terminationTime)
+        private static ProcessRecord FindProcessInstanceForTermination(Dictionary<string, ProcessRecord> allProcesses,int pid,DateTime terminationTime)
         {
             ProcessRecord bestMatch = null;
             DateTime? latestCreateTime = null;
