@@ -31,17 +31,20 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
             ExecveSensor execveSensor = new ExecveSensor(processResolver);
             CloneSensor cloneSensor = new CloneSensor(processResolver);
             ExitSensor exitSensor = new ExitSensor(processResolver);
-            OpenatSensor openatSensor = new OpenatSensor();
+            NetworkSensor networkSensor = new NetworkSensor();
+            FileOpsSensor fileOpsSensor = new FileOpsSensor();
 
             execveSensor.Start();
             cloneSensor.Start();
             exitSensor.Start();
-            openatSensor.Start();
+            networkSensor.Start();
+            fileOpsSensor.Start();
 
             baseSensors.Add(execveSensor);
             baseSensors.Add(cloneSensor);
             baseSensors.Add(exitSensor);
-            baseSensors.Add(openatSensor);
+            baseSensors.Add(networkSensor);
+            baseSensors.Add(fileOpsSensor);
 
             return baseSensors;
         }

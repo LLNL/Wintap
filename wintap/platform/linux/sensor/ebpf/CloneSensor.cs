@@ -47,7 +47,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                                       ?? evt.GetParentComm()
                                       ?? "unknown";
 
-                // ✅ Use helper to extract process name
                 string processName = ProcessSensorHelper.ExtractProcessName(executablePath, evt.GetParentComm());
 
                 var message = new WintapMessage(
@@ -58,7 +57,6 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.ActivityType = WintapMessage.ActivityTypeEnum.Start;
 
-                // ✅ Use helper to create ProcessObject
                 message.Process = ProcessSensorHelper.CreateProcessObject(
                     pid: (int)evt.ChildPid,
                     ppid: (int)evt.ParentPid,
@@ -73,7 +71,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
 
-                // ✅ Use helper to create ProcessRecord
                 var processRecord = ProcessSensorHelper.CreateProcessRecord(
                     pid: (int)evt.ChildPid,
                     ppid: (int)evt.ParentPid,
