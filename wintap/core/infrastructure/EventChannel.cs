@@ -11,7 +11,6 @@ using com.espertech.esper.compiler.client;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure.helpers;
-using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.core.shared;
 using Newtonsoft.Json;
 using System;
@@ -25,12 +24,13 @@ using System.Linq;
 namespace gov.llnl.wintap.core.infrastructure
 {
     /// <summary>
-    /// Central event routing and processing hub for Wintap telemetry data using the Esper Complex Event Processing (CEP) engine.
+    /// Central event routing and processing hub for Wintap telemetry data.
     /// Manages event enrichment, statistics tracking, and interactive query workbench functionality for real-time telemetry analysis.
     /// </summary>
     /// <remarks>
     /// Core Responsibilities (todo: map these to seperate classes):
     /// - Event Processing: Routes telemetry events to Esper CEP engine with process lineage enrichment
+    /// - Event History:  Provides process attribution through historical process lookup
     /// - Performance Monitoring: Tracks throughput metrics including events/second, peak rates, and total event counts
     /// - Query Management: Compiles, deploys, and manages user-defined EPL (Event Processing Language) queries
     /// - Workbench State: Persists and restores interactive analysis queries across sessions
@@ -121,23 +121,7 @@ namespace gov.llnl.wintap.core.infrastructure
             WintapLogger.Log.Append("EventChannel initialized with process resolver", LogLevel.Info);
         }
 
-        private static void StatsWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            while (true)
-            {
-                System.Threading.Thread.Sleep(1000);
-
-                // Calculate events per second
-                eventsPerSecond = totalEvents - lastTotalEvents;
-                lastTotalEvents = totalEvents;
-
-                if (eventsPerSecond > maxEventsPerSecond)
-                {
-                    maxEventsPerSecond = eventsPerSecond;
-                    maxEventTime = DateTime.Now;
-                }
-            }
-        }
+       
 
 
         // **************************************************************************
@@ -212,9 +196,6 @@ namespace gov.llnl.wintap.core.infrastructure
         /// - Maintains running counts of total events processed
         /// - Calculates events per second and tracks peak throughput
         /// 
-        /// Error Handling:
-        /// - Exceptions during process resolution or event transmission are logged but do not throw, preventing data collection interruption
-        /// - On Linux (no database), gracefully handles null process resolution results
         /// </remarks>
         public static void Send(WintapMessage streamedEvent)
         {
@@ -250,10 +231,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
                     {
                         // For non-Process events: resolve the owning process
-                        ProcessRecord ownerProcess = _processResolver.ResolveProcessAtTime(
-                            streamedEvent.PID,
-                            DateTime.FromFileTimeUtc(streamedEvent.EventTime),
-                            streamedEvent.MessageType.ToString());
+                        ProcessRecord ownerProcess = _processResolver.ResolveProcessAtTime(streamedEvent.PID,DateTime.FromFileTimeUtc(streamedEvent.EventTime));
 
                         if (ownerProcess != null)
                         {
@@ -263,15 +241,10 @@ namespace gov.llnl.wintap.core.infrastructure
                         else
                         {
                             // On Linux or if process not found, generate PidHash without full resolution
-                            WintapLogger.Log.Append(
-                                $"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})",
-                                LogLevel.Debug);
+                            WintapLogger.Log.Append($"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})",LogLevel.Warn);
 
                             // Generate a basic PidHash so events still have an identifier
-                            streamedEvent.PidHash = _processResolver.GetPidHash(
-                                streamedEvent.PID,
-                                DateTime.FromFileTimeUtc(streamedEvent.EventTime));
-                            streamedEvent.ProcessName = "Unknown";
+                            streamedEvent.PidHash = _processResolver.GetPidHash(streamedEvent.PID,DateTime.FromFileTimeUtc(streamedEvent.EventTime));streamedEvent.ProcessName = "Unknown";
                         }
                     }
                     else
@@ -283,7 +256,7 @@ namespace gov.llnl.wintap.core.infrastructure
                             if (streamedEvent.Process != null && streamedEvent.Process.ParentPID > 0)
                             {
                                 WintapLogger.Log.Append($"Attempting to retrieve parent process from process resolver pid: {streamedEvent.PID}, parentPid: {streamedEvent.Process.ParentPID}", LogLevel.Debug);
-                                ProcessRecord parentProcess = _processResolver.ResolveProcessAtTime(streamedEvent.Process.ParentPID, DateTime.FromFileTimeUtc(streamedEvent.EventTime), "ParentProcessFinder");
+                                ProcessRecord parentProcess = EventChannel.GetProcessHistory(streamedEvent.Process.ParentPID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
 
                                 if (parentProcess != null)
                                 {
@@ -297,9 +270,7 @@ namespace gov.llnl.wintap.core.infrastructure
                                         LogLevel.Debug);
 
                                     // Generate basic parent PidHash
-                                    streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(
-                                        streamedEvent.Process.ParentPID,
-                                        DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                                    streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(streamedEvent.Process.ParentPID,DateTime.FromFileTimeUtc(streamedEvent.EventTime));
                                     streamedEvent.Process.ParentProcessName = "Unknown";
                                 }
                             }
@@ -320,6 +291,8 @@ namespace gov.llnl.wintap.core.infrastructure
 
                 // Send to Esper
                 EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
+                // Send to backing store
+                _processResolver.RegisterProcess(streamedEvent);
             }
             catch (Exception ex)
             {
@@ -329,6 +302,23 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
+        // **************************************************************************
+        // ***  HISTORICAL EVENT ACCESS
+        // **************************************************************************
+        public static List<ProcessRecord> GetProcessHistory()
+        {
+            return _processResolver.GetAllProcesses();
+        }
+
+        public static ProcessRecord GetProcessHistory(int _pid,  DateTime _eventTime)
+        {
+            return _processResolver.ResolveProcessAtTime(_pid, _eventTime);
+        }
+
+        public static void ClearProcessDB()
+        {
+            _processResolver.
+        }
 
         // **************************************************************************
         // ***  QUERY COMPILATION & DEPLOYMENT
@@ -384,25 +374,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 throw;
             }
         }
-
-        /// <summary>
-        /// Format query for compilation - handles enum conversion if needed
-        /// </summary>
-        private static string FormatQueryForCompile(string epl)
-        {
-            try
-            {
-                // Try to use EnumFormatter if available
-                return EnumFormatter.FormatQueryForCompile(epl);
-            }
-            catch (Exception ex)
-            {
-                // If EnumFormatter is not available, log and return original
-                WintapLogger.Log.Append($"EnumFormatter not available, using original EPL: {ex.Message}", LogLevel.Debug);
-                return epl;
-            }
-        }
-
 
         // **************************************************************************
         // ***  WORKBENCH STATE MANAGEMENT
@@ -600,6 +571,43 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
             return queries;
+        }
+
+
+        /// <summary>
+        /// Format query for compilation - handles enum conversion if needed
+        /// </summary>
+        private static string FormatQueryForCompile(string epl)
+        {
+            try
+            {
+                // Try to use EnumFormatter if available
+                return EnumFormatter.FormatQueryForCompile(epl);
+            }
+            catch (Exception ex)
+            {
+                // If EnumFormatter is not available, log and return original
+                WintapLogger.Log.Append($"EnumFormatter not available, using original EPL: {ex.Message}", LogLevel.Debug);
+                return epl;
+            }
+        }
+
+        private static void StatsWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            while (true)
+            {
+                System.Threading.Thread.Sleep(1000);
+
+                // Calculate events per second
+                eventsPerSecond = totalEvents - lastTotalEvents;
+                lastTotalEvents = totalEvents;
+
+                if (eventsPerSecond > maxEventsPerSecond)
+                {
+                    maxEventsPerSecond = eventsPerSecond;
+                    maxEventTime = DateTime.Now;
+                }
+            }
         }
     }
 

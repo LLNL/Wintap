@@ -30,18 +30,13 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             // initialize process tree database
             WintapLogger.Log.Append("Recovering process tree", LogLevel.Info);
 
-            // Clean up existing database files before recovery
-            FileInfo mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb"));
-            mainDBInfo.Delete();
-            mainDBInfo = new FileInfo(Path.Combine(Env.FileDataRoot, "ProcessTree", "main.duckdb.wal"));
-            mainDBInfo.Delete();
-
-            // Execute database recovery process
-            CallDatabaseRecovery();
-
             // start process sensor first for process attribution
             WintapLogger.Log.Append("Starting Process sensor", LogLevel.Info);
             ProcessSensor pc = new ProcessSensor();
+            if(DateTime.UtcNow.Subtract(StateManager.MachineBootTime.ToUniversalTime()).TotalMinutes < 5)
+            {
+                pc.Initialize();
+            }
             pc.Start();
             WintapLogger.Log.Append("Process sensor started", LogLevel.Info);
             kernelFlags = KernelTraceEventParser.Keywords.Process;

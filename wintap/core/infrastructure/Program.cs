@@ -220,38 +220,11 @@ builder.Services.AddSingleton<IInfer>(sp =>
 // ─── Process Resolver Registration (Platform-Specific) ────────────────────
 WintapLogger.Log.Append("Registering platform-specific process resolver", LogLevel.Info);
 
-// ─── Process Resolver Registration (Platform-Specific) ────────────────────
-WintapLogger.Log.Append("Registering platform-specific process resolver", LogLevel.Info);
+// ─── Process Resolver Registration (cross-platform) ────────────────────
+WintapLogger.Log.Append("Registering cross-platform process resolver", LogLevel.Info);
+IProcessResolver processResolver = new ProcessResolver();
+builder.Services.AddSingleton<IProcessResolver>(processResolver);
 
-#if WINDOWS
-if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-{
-    builder.Services.AddSingleton<IProcessResolver, WindowsProcessResolver>();
-    WintapLogger.Log.Append("Registered WindowsProcessResolver", LogLevel.Info);
-}
-#endif
-
-#if LINUX
-if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-{
-    builder.Services.AddSingleton<IProcessResolver, LinuxProcessResolver>();
-    WintapLogger.Log.Append("Registered LinuxProcessResolver", LogLevel.Info);
-}
-#endif
-
-#if MACOS
-if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-{
-    builder.Services.AddSingleton<IProcessResolver, MacProcessResolver>();
-    WintapLogger.Log.Append("Registered MacProcessResolver", LogLevel.Info);
-}
-#endif
-
-#if !WINDOWS && !LINUX && !MACOS
-// Fallback for unsupported platforms
-builder.Services.AddSingleton<IProcessResolver>(sp => null);
-WintapLogger.Log.Append("No process resolver registered (unsupported platform)", LogLevel.Warn);
-#endif
 
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
 #if WINDOWS

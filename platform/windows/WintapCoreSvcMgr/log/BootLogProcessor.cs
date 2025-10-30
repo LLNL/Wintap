@@ -98,9 +98,15 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                 LogInfo($"Extracted {processRecords.Count} process records from Security Log");
 
+                System.Diagnostics.Debugger.Launch();
+
                 // Insert into database 
                 foreach (var processRecord in processRecords)
                 {
+                    if(String.IsNullOrEmpty(processRecord.ParentPidHash))
+                    {
+                        processRecord.ParentPidHash = "";
+                    }
                     _database.InsertBootTraceRecord(processRecord);
                 }
 
@@ -245,6 +251,8 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 // Extract command line if available
                 var commandLine = eventData.GetValueOrDefault("CommandLine", "");
 
+                var userName = eventData.GetValueOrDefault("SubjectUserName");
+
                 var ParentProcessName = eventData.GetValueOrDefault("ParentProcessName", "");
 
                 ProcessRecord parentProcess = activeProcesses.Where(p => p.ProcessId == -1).First();
@@ -272,9 +280,10 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     UniqueProcessKey = 0, // Not available in Security Log
                     ExitTime = null,
                     ExitCode = null,
+                    UserName = userName
                 };
 
-                LogInfo($"Parsed process creation: PID={processId}, Name={processRecord.ProcessName}, Parent={parentProcessId}");
+                LogInfo($"Parsed process creation: PID={processId}, Name={processRecord.ProcessName}, Parent={parentProcessId}, User={userName}");
                 return processRecord;
             }
             catch (Exception ex)
@@ -389,7 +398,8 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 ParentPidHash = _processHash.GenPidHash(4, createTime.ToFileTimeUtc()),
                 UniqueProcessKey = 0,
                 ExitTime = null,
-                ExitCode = null
+                ExitCode = null,
+                UserName = ""
             };
 
             return newSystemProc;

@@ -301,6 +301,9 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 string parentProcessName = "";
                 eventData.TryGetValue("ParentProcessName", out parentProcessName);
 
+                string subjectUserName = "";
+                eventData.TryGetValue("SubjectUserName", out subjectUserName);
+
                 // Create time from event timestamp
                 var createTime = eventRecord.TimeCreated.Value.ToUniversalTime();
 
@@ -335,6 +338,7 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     UniqueProcessKey = 0, // Not available in Security Log
                     ExitTime = null,
                     ExitCode = null,
+                    UserName = subjectUserName
                 };
 
                 LogInfo($"Parsed process creation: PID={processId}, Name={processRecord.ProcessName}, Parent={parentProcessId}");
@@ -382,12 +386,18 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 var pidHash = _processHash.GenPidHash(processId, createTime.ToFileTimeUtc());
 
                 // Look up parent PidHash from database
-                string parentPidHash = null;
-                if (parentProcessId > 0)
+                string parentPidHash = "";
+                try
                 {
-                    // TODO:  create support for this in the database mananager
-                    // parentPidHash = await LookupParentPidHashFromDatabase(parentProcessId, createTime);
+                    parentPidHash = _processHash.GenPidHash(parentProcessId, createTime.ToFileTimeUtc());
                 }
+                catch (Exception ex)
+                {
+
+                }
+
+                string subjectUserName = "";
+                eventData.TryGetValue("SubjectUserName", out subjectUserName);
 
                 // Create ProcessRecord
                 var processRecord = new ProcessRecord
@@ -402,7 +412,8 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     ParentPidHash = parentPidHash,
                     UniqueProcessKey = 0, // Not available in Security Log
                     ExitTime = null,
-                    ExitCode = null
+                    ExitCode = null,
+                    UserName = subjectUserName
                 };
 
                 LogInfo($"Created ProcessRecord: PID={processId}, Name={processRecord.ProcessName}, Parent={parentProcessId}");
@@ -447,26 +458,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
             return eventData;
         }
-
-        /// <summary>
-        /// Look up parent PidHash from database
-        /// More accurate than ETL approach since we have full process history
-        /// </summary>
-        //private async Task<string> LookupParentPidHashFromDatabase(int parentProcessId, DateTime childCreateTime)
-        //{
-        //    try
-        //    {
-        //        // Query database for parent process that was active at child creation time
-        //        // This is more accurate than ETL approach which lacks parent timing info
-        //        var parentProcess = await _database.GetParentPidHash(parentProcessId, childCreateTime);
-        //        return parentProcess?.PidHash;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        LogError($"Error looking up parent PidHash for PID {parentProcessId}: {ex.Message}");
-        //        return null;
-        //    }
-        //}
 
         #endregion
 

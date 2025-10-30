@@ -194,12 +194,10 @@ namespace gov.llnl.wintap
                 }
 
                 // ─── Agent Identification ──────────────────────────────────────
-                WintapLogger.Log.Append($"{Env.AppName} Agent ID: {StateManager.AgentId}",
-                    LogLevel.Info);
+                WintapLogger.Log.Append($"{Env.AppName} Agent ID: {StateManager.AgentId}",LogLevel.Info);
 
                 // ─── Initialize EventChannel with Process Resolver ─────────────
-                WintapLogger.Log.Append("Initializing EventChannel with process resolver",
-                    LogLevel.Info);
+                WintapLogger.Log.Append("Initializing EventChannel with process resolver",LogLevel.Info);
                 var processResolver = ServiceProviderAccessor.Services.GetService(typeof(IProcessResolver)) as IProcessResolver;
                 EventChannel.Initialize(processResolver);
 

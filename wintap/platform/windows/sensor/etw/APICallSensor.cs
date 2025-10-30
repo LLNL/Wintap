@@ -1,6 +1,5 @@
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using System;
@@ -81,7 +80,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
                     
                     string desiredAccessString = translateDesiredAccessToEnum(Convert.ToUInt32(obj.PayloadByName("DesiredAccess")));
-                    ProcessRecord pr = ProcessSensor.ResolveProcessAtTime(Convert.ToInt32(obj.PayloadByName("TargetProcessId")), obj.TimeStamp, msg.MessageType.ToString());
+                    ProcessRecord pr = EventChannel.GetProcessHistory(Convert.ToInt32(obj.PayloadByName("TargetProcessId")), obj.TimeStamp);
                     string target = pr.ProcessName;
                     msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, 0, obj.ThreadID, target, desiredAccessString);
                 }
@@ -89,7 +88,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 {
                     msg.ActivityType = WintapMessage.ActivityTypeEnum.OpenThread;
                     msg.ReceiveTime = DateTime.Now.ToFileTimeUtc();
-                    ProcessRecord pr = ProcessSensor.ResolveProcessAtTime(Convert.ToInt32(obj.PayloadByName("TargetProcessId")), obj.TimeStamp, msg.MessageType.ToString());
+                    ProcessRecord pr = EventChannel.GetProcessHistory(Convert.ToInt32(obj.PayloadByName("TargetProcessId")), obj.TimeStamp);
                     string target = pr.ProcessName;
                     string desiredAccessStr = translateDesiredAccessToEnum(Convert.ToUInt32(obj.PayloadByName("DesiredAccess")));
                     msg.ApiCall = new WintapMessage.ApiCallData(obj.ProviderName, Convert.ToInt32(obj.PayloadByName("TargetProcessId")), Convert.ToUInt32(obj.PayloadByName("DesiredAccess")), Convert.ToUInt32(obj.PayloadByName("ReturnCode")), "", "", 0, Convert.ToUInt32(obj.PayloadByName("TargetThreatId")), obj.ThreadID, target, desiredAccessStr);

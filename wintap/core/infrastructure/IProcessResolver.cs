@@ -4,8 +4,9 @@
  * All rights reserved.
  */
 
-using gov.llnl.wintap.core.models;
+using gov.llnl.wintap.collect.models;
 using System;
+using System.Collections.Generic;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -18,7 +19,9 @@ namespace gov.llnl.wintap.core.infrastructure
         /// <summary>
         /// Resolve process information at a specific point in time (handles PID reuse)
         /// </summary>
-        ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime, string eventType);
+        ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime);
+
+        void RegisterProcess(WintapMessage processEvent);
 
         /// <summary>
         /// Check if a process exists for the given PID at the specified time
@@ -29,5 +32,9 @@ namespace gov.llnl.wintap.core.infrastructure
         /// Generate a PID hash for the given process ID and creation time
         /// </summary>
         string GetPidHash(int pid, DateTime createTime);
+
+        List<ProcessRecord> GetAllProcesses();
+
+        void ClearDB();
     }
 }

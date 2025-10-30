@@ -1,14 +1,9 @@
-using com.espertech.esper.compat;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
-using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.core.shared;
-using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
-using gov.llnl.wintap.platform.windows.infrastructure;
 using Microsoft.Diagnostics.Tracing;
-using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -16,9 +11,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 using static gov.llnl.wintap.collect.models.WintapMessage;
-using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -193,7 +186,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 try
                 {
-                    ProcessRecord owningProcess = gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor.ResolveProcessAtTime(currentInfo.ProcessId, DateTime.UtcNow, "detect_changes");
+                    ProcessRecord owningProcess = EventChannel.GetProcessHistory(currentInfo.ProcessId, DateTime.Now);
                     if (owningProcess.ProcessName != "unknown")
                     {
                         string pidHash = owningProcess.PidHash;
