@@ -71,12 +71,12 @@ ls -lh *.bpf.o
 
 From your development machine (in the Lintap solution directory):
 ```bash
-# Build for Linux x64
-dotnet publish wintap/Lintap.csproj \
-    -c Release \
+# Build
+dotnet publish \
+    -c Debug \
     -p:PublishSingleFile=false \
-    -f net8.0 \
-    --self-contained false
+    -f net8.0 
+    Lintap.csproj
 
 # Output will be in: wintap/bin/Release/net8.0/linux-x64/publish/
 ```
@@ -102,18 +102,18 @@ sudo chown -R $USER:$USER /var/log/lintap
 
 ### Option A: Using multipass (from Windows/Mac)
 ```bash
-multipass transfer -r ./wintap/bin/Release/net8.0/linux-x64/publish/* <vm-name>:/opt/lintap/
+multipass transfer -r ./wintap/bin/Debug/net8.0/publish/* <vm-name>:/opt/lintap/
 ```
 
 ### Option B: Using scp
 ```bash
-scp -r ./wintap/bin/Release/net8.0/linux-x64/publish/* user@linux-host:/opt/lintap/
+scp -r ./wintap/bin/Debug/net8.0/publish/* user@linux-host:/opt/lintap/
 ```
 
 ### Option C: Local build
 ```bash
 # If building on the target Linux system
-cp -r ./wintap/bin/Release/net8.0/linux-x64/publish/* /opt/lintap/
+cp -r ./wintap/bin/Debug/net8.0/publish/* /opt/lintap/
 ```
 
 ## Step 6: Verify eBPF Tracers
@@ -159,20 +159,10 @@ Group=root
 
 Environment="DOTNET_ENVIRONMENT=Production"
 Environment="ASPNETCORE_URLS=http://0.0.0.0:8099"
-Environment="LINTAP_DATA_DIR=/var/lib/lintap"
-Environment="LINTAP_LOG_DIR=/var/log/lintap"
 
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=lintap
-
-# Security hardening (while maintaining eBPF capabilities)
-NoNewPrivileges=false
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/lintap /var/log/lintap
-AmbientCapabilities=CAP_BPF CAP_PERFMON CAP_NET_ADMIN CAP_SYS_ADMIN
 
 [Install]
 WantedBy=multi-user.target
