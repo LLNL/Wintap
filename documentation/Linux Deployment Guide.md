@@ -1,12 +1,14 @@
-﻿# Deploying Wintap to Linux - Step-by-Step Guide
+﻿# Deploying Lintap to Linux - Step-by-Step Guide
 
 ## Prerequisites
-- Windows machine with Wintap source code
-- Ubuntu Linux VM (tested with Multipass)
-- .NET 8 SDK installed on both machines
+- Development machine with Lintap source code
+- Ubuntu Linux system (24.04+ recommended, tested with Multipass)
+- .NET 8 SDK installed on development machine
+- Root/sudo access on target Linux system
 
-## Step 1: Install .NET 8 Runtime on Ubuntu
+## Step 1: Install Dependencies on Ubuntu
 
+### .NET 8 Runtime
 ```bash
 # Add Microsoft package repository
 wget https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
@@ -18,63 +20,132 @@ sudo apt update
 sudo apt install -y dotnet-sdk-8.0 aspnetcore-runtime-8.0
 ```
 
-Verify installation:
+### eBPF Development Tools
 ```bash
+# Install eBPF toolchain and dependencies
+sudo apt install -y \
+    libbpf-dev \
+    libbpf1 \
+    linux-headers-$(uname -r) \
+    clang \
+    llvm \
+    libelf-dev \
+    bpftool \
+    build-essential
+
+# Verify installations
+clang --version
+bpftool version
 dotnet --version
 ```
 
-## Step 2: Build and Publish Wintap for Linux
-
-From your Windows machine (in the Wintap solution directory):
-
+### Verify eBPF Support
 ```bash
-dotnet publish -c Debug -r linux-x64 -p:PublishSingleFile=false -f net8.0
+# Check if BPF is enabled in kernel
+cat /boot/config-$(uname -r) | grep BPF
+
+# Should see CONFIG_BPF=y and CONFIG_BPF_SYSCALL=y
 ```
 
-## Step 3: Create Wintap Directory on Linux
+## Step 2: Build eBPF Programs
 
-On the Ubuntu VM:
-
+On the Linux development system (or target if building locally):
 ```bash
-mkdir -p ~/wintap/publish
+cd ~/gitlab/Lintap/wintap/platform/linux/sensor/ebpf/tracers
+
+# Build all eBPF tracer programs
+make all
+
+# Or build individually:
+# make clone
+# make execve
+# make exit
+# make network
+# make fileops
+
+# Verify .bpf.o files were created
+ls -lh *.bpf.o
 ```
 
-## Step 4: Transfer Files to Linux
+## Step 3: Build and Publish Lintap for Linux
 
-From Windows (adjust paths as needed):
-
+From your development machine (in the Lintap solution directory):
 ```bash
-# Using multipass
-"c:\Program Files\Multipass\bin\multipass.exe" transfer -r .\bin\Debug\net8.0\linux-x64\publish enabled-cattle:/home/ubuntu/wintap/
+# Build for Linux x64
+dotnet publish wintap/Lintap.csproj \
+    -c Release \
+    -p:PublishSingleFile=false \
+    -f net8.0 \
+    --self-contained false
+
+# Output will be in: wintap/bin/Release/net8.0/linux-x64/publish/
 ```
 
-## Step 5: Create Required Directories
+## Step 4: Create Lintap Directory on Linux
 
-On Ubuntu:
-
+On the Ubuntu system:
 ```bash
-sudo mkdir -p /usr/share/Wintap
-sudo chown -R ubuntu:ubuntu /usr/share/Wintap
-sudo chmod -R 755 /usr/share/Wintap
+# Create application directory
+sudo mkdir -p /opt/lintap
+sudo chown -R $USER:$USER /opt/lintap
+
+# Create data directory
+sudo mkdir -p /var/lib/lintap
+sudo chown -R $USER:$USER /var/lib/lintap
+
+# Create log directory
+sudo mkdir -p /var/log/lintap
+sudo chown -R $USER:$USER /var/log/lintap
 ```
 
-## Step 6: Create systemd Service
+## Step 5: Transfer Files to Linux
 
+### Option A: Using multipass (from Windows/Mac)
 ```bash
-sudo nano /etc/systemd/system/wintap.service
+multipass transfer -r ./wintap/bin/Release/net8.0/linux-x64/publish/* <vm-name>:/opt/lintap/
+```
+
+### Option B: Using scp
+```bash
+scp -r ./wintap/bin/Release/net8.0/linux-x64/publish/* user@linux-host:/opt/lintap/
+```
+
+### Option C: Local build
+```bash
+# If building on the target Linux system
+cp -r ./wintap/bin/Release/net8.0/linux-x64/publish/* /opt/lintap/
+```
+
+## Step 6: Verify eBPF Tracers
+
+Ensure eBPF object files are in the correct location:
+```bash
+# Check that tracers directory exists
+ls -lh /opt/lintap/tracers/
+
+# Should contain:
+# - clone_tracer.bpf.o
+# - execve_tracer.bpf.o
+# - exit_tracer.bpf.o
+# - network_ops_tracer.bpf.o
+# - file_ops_tracer.bpf.o
+```
+
+## Step 7: Create systemd Service
+```bash
+sudo nano /etc/systemd/system/lintap.service
 ```
 
 Paste this content:
-
 ```ini
 [Unit]
-Description=Wintap Security Monitoring Service
+Description=Lintap Security Monitoring Service
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ubuntu/wintap/publish
-ExecStart=/home/ubuntu/wintap/publish/Wintap
+WorkingDirectory=/opt/lintap
+ExecStart=/opt/lintap/Lintap
 Restart=on-failure
 RestartSec=10
 KillMode=mixed
@@ -82,72 +153,113 @@ KillSignal=SIGTERM
 TimeoutStartSec=300
 TimeoutStopSec=90
 
-User=ubuntu
-Group=ubuntu
+# IMPORTANT: Lintap requires root for eBPF operations
+User=root
+Group=root
 
 Environment="DOTNET_ENVIRONMENT=Production"
 Environment="ASPNETCORE_URLS=http://0.0.0.0:8099"
+Environment="LINTAP_DATA_DIR=/var/lib/lintap"
+Environment="LINTAP_LOG_DIR=/var/log/lintap"
 
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=wintap
+SyslogIdentifier=lintap
+
+# Security hardening (while maintaining eBPF capabilities)
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/lintap /var/log/lintap
+AmbientCapabilities=CAP_BPF CAP_PERFMON CAP_NET_ADMIN CAP_SYS_ADMIN
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+**Note:** Lintap requires root privileges to load eBPF programs. The service runs as root but includes security hardening directives.
+
 Save (Ctrl+O, Enter, Ctrl+X)
 
-## Step 7: Enable and Start Service
-
+## Step 8: Enable and Start Service
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable wintap
-sudo systemctl start wintap
-sudo systemctl status wintap
+sudo systemctl enable lintap
+sudo systemctl start lintap
+sudo systemctl status lintap
 ```
 
-## Step 8: Verify Deployment
+## Step 9: Verify Deployment
 
 Check service status:
 ```bash
-sudo systemctl status wintap
+sudo systemctl status lintap
 ```
 
 View logs:
 ```bash
-sudo journalctl -u wintap -f
+sudo journalctl -u lintap -f
 ```
 
-Check Wintap log file:
+Check Lintap log file:
 ```bash
-tail -f /usr/share/Wintap/Logs/Wintap.log
+tail -f /var/log/lintap/Lintap.log
 ```
 
-Access web workbench from Windows:
-```
-http://<vm-ip>:8099
+Verify eBPF programs are loaded:
+```bash
+sudo bpftool prog list | grep -i lintap
 ```
 
-(Get VM IP: `ip addr show` or from Windows: `multipass info enabled-cattle`)
+Access web workbench:
+```
+http://<linux-host-ip>:8099
+```
+
+(Get IP: `ip addr show` or `hostname -I`)
+
+## Step 10: Test eBPF Sensors
+
+Generate some activity to test sensors:
+```bash
+# Test process creation (execve sensor)
+ls -la
+
+# Test process forking (clone sensor)
+bash -c "echo test"
+
+# Test network activity (network sensor)
+curl https://example.com
+
+# Test file operations (fileops sensor)
+touch /tmp/test.txt && rm /tmp/test.txt
+```
+
+Check that events appear in logs:
+```bash
+# TBD
+```
 
 ## Service Management Commands
-
 ```bash
 # Stop service
-sudo systemctl stop wintap
+sudo systemctl stop lintap
 
 # Start service
-sudo systemctl start wintap
+sudo systemctl start lintap
 
 # Restart service
-sudo systemctl restart wintap
+sudo systemctl restart lintap
 
 # View logs (follow mode)
-sudo journalctl -u wintap -f
+sudo journalctl -u lintap -f
 
 # View recent logs
-sudo journalctl -u wintap -n 100
+sudo journalctl -u lintap -n 100
+
+# View eBPF-specific logs
+sudo journalctl -u lintap | grep -i ebpf
 ```
 
 ## Expected Behavior on Linux
@@ -157,33 +269,129 @@ sudo journalctl -u wintap -n 100
 - Web workbench accessible on port 8099
 - Plugin architecture loads
 - MCP server functionality
-- Linux process collector (basic)
+- eBPF-based process monitoring (execve, clone, exit)
+- eBPF-based network monitoring
+- eBPF-based file operations monitoring
 - Event pipeline flows to Esper
+- Real-time system telemetry collection
 
-⚠️ **Limited/Not Supported:**
-- Process tree database persistence (Windows-only for now)
+⚠️ **Known Limitations:**
+- Requires root privileges for eBPF operations
+- Some Windows-specific features not available (ETW, COM+, etc.)
 
 ## Troubleshooting
 
-**Service won't start:**
+### Service won't start
 ```bash
 # Check detailed logs
-sudo journalctl -u wintap -n 50 --no-pager
+sudo journalctl -u lintap -n 50 --no-pager
+
+# Check if process is running
+ps aux | grep Lintap
 ```
 
-**Permission errors:**
+### eBPF programs fail to load
 ```bash
-# Fix Wintap data directory permissions
-sudo chown -R ubuntu:ubuntu /usr/share/Wintap
+# Check kernel BPF support
+cat /proc/sys/kernel/unprivileged_bpf_disabled
+
+# Verify libbpf is installed
+ldconfig -p | grep libbpf
+
+# Check BPF filesystem is mounted
+mount | grep bpf
+
+# Manually test loading a BPF program
+sudo bpftool prog load /opt/lintap/tracers/clone_tracer.bpf.o /sys/fs/bpf/test_clone
 ```
 
-**Can't access web workbench:**
+### Permission errors
+```bash
+# Ensure service runs as root (required for eBPF)
+sudo systemctl cat lintap | grep User
+
+# Fix data directory permissions if needed
+sudo chown -R root:root /opt/lintap
+sudo chmod -R 755 /opt/lintap
+sudo chown -R root:root /var/lib/lintap
+sudo chmod -R 755 /var/lib/lintap
+```
+
+### Can't access web workbench
 - Verify service is listening: `curl http://localhost:8099`
-- Check firewall if accessing from external machine
+- Check firewall: `sudo ufw status`
+- If using firewall, allow port: `sudo ufw allow 8099/tcp`
 - Ensure `ASPNETCORE_URLS=http://0.0.0.0:8099` in service file
 
-**After updating code:**
+### eBPF tracers not found
 ```bash
-# Rebuild on Windows, transfer files, then:
-sudo systemctl restart wintap
+# Verify tracers exist
+ls -lh /opt/lintap/tracers/
+
+# If missing, rebuild and copy
+cd ~/gitlab/Lintap/wintap/platform/linux/sensor/ebpf/tracers
+make clean && make all
+sudo cp *.bpf.o /opt/lintap/tracers/
+sudo systemctl restart lintap
+```
+
+### After updating code
+```bash
+# Rebuild eBPF programs
+cd wintap/platform/linux/sensor/ebpf/tracers
+make clean && make all
+
+# Rebuild Lintap
+dotnet publish -c Release -r linux-x64
+
+# Stop service
+sudo systemctl stop lintap
+
+# Update files
+sudo cp -r bin/Release/net8.0/linux-x64/publish/* /opt/lintap/
+
+# Restart service
+sudo systemctl start lintap
+```
+
+## Development Notes
+
+### Rebuilding eBPF Programs Only
+```bash
+cd wintap/platform/linux/sensor/ebpf/tracers
+make clean
+make all
+sudo cp *.bpf.o /opt/lintap/tracers/
+sudo systemctl restart lintap
+```
+
+### Viewing eBPF Debug Info
+```bash
+# List loaded BPF programs
+sudo bpftool prog list
+
+# Show program details
+sudo bpftool prog show id <id>
+
+# Dump program bytecode
+sudo bpftool prog dump xlated id <id>
+```
+
+## Security Considerations
+
+- Lintap requires root privileges to load eBPF programs into the kernel
+- The systemd service includes security hardening directives where possible
+- eBPF programs are verified by the kernel before loading
+- Consider running behind a firewall and restricting web workbench access
+- Review logs regularly for any suspicious activity
+
+## Minimum Kernel Requirements
+
+- Linux Kernel: 5.8+ (for CO-RE eBPF support)
+- Ubuntu: 20.04+ (24.04+ recommended)
+- BTF (BPF Type Format) enabled in kernel
+
+Check your kernel version:
+```bash
+uname -r
 ```
