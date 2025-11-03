@@ -350,3 +350,6 @@ MigrationBackup/
 .ionide/
 /.sonarqube
 /WintapAPI/WintapAPI.nuspec
+
+# eBPF compiled objects
+*.o

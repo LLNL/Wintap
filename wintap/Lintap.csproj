@@ -41,6 +41,13 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="8.0.0" />
 	</ItemGroup>
 
+	<!-- Linux-specific packages -->
+	<ItemGroup>
+		<None Include="platform/linux/sensor/ebpf/tracers/*.bpf.o" 
+			CopyToOutputDirectory="PreserveNewest"
+			Link="tracers/%(Filename)%(Extension)" />
+	</ItemGroup>
+
 	<!-- Build and copy MCP server for Linux -->
 	<Target Name="BuildMcpServer" BeforeTargets="Build" Condition="Exists('..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj')">
 		<Message Text="Building MCP server for Linux..." Importance="high" />
