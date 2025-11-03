@@ -286,7 +286,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
                                         // Generate basic parent PidHash
                                         streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(
-                                            streamedEvent.Process.ParentPID,
+                                            -1,  // the 'unknown' process
                                             DateTime.FromFileTimeUtc(streamedEvent.EventTime));
                                         streamedEvent.Process.ParentProcessName = "Unknown";
                                     }
@@ -295,7 +295,7 @@ namespace gov.llnl.wintap.core.infrastructure
                         }
                         catch (Exception ex)
                         {
-                            WintapLogger.Log.Append($"Could not resolve parent process for pid {streamedEvent.PID}", LogLevel.Debug);
+                            WintapLogger.Log.Append($"Could not resolve parent process for pid {streamedEvent.PID}", LogLevel.Warn);
                         }
                     }
                 }
