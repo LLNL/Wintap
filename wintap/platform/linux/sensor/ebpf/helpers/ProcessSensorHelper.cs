@@ -1,5 +1,4 @@
 using gov.llnl.wintap.collect.models;
-using gov.llnl.wintap.core.models;
 using gov.llnl.wintap.core.shared.helpers;
 using gov.llnl.wintap.platform.linux.infrastructure;
 using System;
@@ -61,31 +60,6 @@ namespace gov.llnl.wintap.platform.linux.collect
         private static string NormalizeFallback(string fallback)
         {
             return string.IsNullOrWhiteSpace(fallback) ? "unknown" : fallback.Trim();
-        }
-
-        /// <summary>
-        /// Create a ProcessRecord for registration with LinuxProcessResolver
-        /// </summary>
-        public static ProcessRecord CreateProcessRecord(
-            int pid,
-            int ppid,
-            string processName,
-            string processPath,
-            string commandLine,
-            string userName,
-            string pidHash)
-        {
-            return new ProcessRecord
-            {
-                ProcessId = pid,
-                ParentProcessId = ppid,
-                ProcessName = NormalizeFallback(processName),
-                ProcessPath = string.IsNullOrWhiteSpace(processPath) ? "unknown" : processPath,
-                CommandLine = commandLine ?? "",
-                UserName = NormalizeFallback(userName),
-                CreateTime = DateTime.UtcNow,
-                PidHash = pidHash ?? ""
-            };
         }
 
         /// <summary>

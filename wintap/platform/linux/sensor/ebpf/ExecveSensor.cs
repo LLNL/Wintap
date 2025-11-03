@@ -11,16 +11,14 @@ namespace gov.llnl.wintap.platform.linux.collect
     internal class ExecveSensor : BaseEbpfSensor
     {
         private ProcessHash _pidHashGenerator;
-        private LinuxProcessResolver _processResolver;
 
         protected override string BpfObjectFileName => "execve_tracer.bpf.o";
         protected override string BpfProgramName => "trace_execve_entry";
 
-        internal ExecveSensor(LinuxProcessResolver processResolver)
+        internal ExecveSensor()
         {
             SensorName = "ExecveProcess";
             _pidHashGenerator = new ProcessHash();
-            _processResolver = processResolver;
         }
 
         protected override LibBpf.RingBufferCallback GetRingBufferCallback() => HandleEvent;
@@ -71,18 +69,6 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
-
-                var processRecord = ProcessSensorHelper.CreateProcessRecord(
-                    pid: (int)evt.Pid,
-                    ppid: procData.PPid,
-                    processName: processName,
-                    processPath: executablePath,
-                    commandLine: rawCmdline ?? "",
-                    userName: procData.Username ?? "unknown",
-                    pidHash: message.PidHash
-                );
-
-                _processResolver?.RegisterProcess(processRecord);
 
                 EventChannel.Send(message);
                 return 0;

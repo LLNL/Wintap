@@ -14,16 +14,13 @@ namespace gov.llnl.wintap.platform.linux.collect
     internal class ExitSensor : BaseEbpfSensor
     {
         private ProcessHash _pidHashGenerator;
-        private LinuxProcessResolver _processResolver;
-
         protected override string BpfObjectFileName => "exit_tracer.bpf.o";
         protected override string BpfProgramName => "trace_process_exit";
 
-        internal ExitSensor(LinuxProcessResolver processResolver)
+        internal ExitSensor()
         {
             SensorName = "ExitProcess";
             _pidHashGenerator = new ProcessHash();
-            _processResolver = processResolver;
         }
 
         protected override LibBpf.RingBufferCallback GetRingBufferCallback() => HandleEvent;
@@ -40,33 +37,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 string userName = "unknown";
                 string processPath = "";
                 int ppid = 0;
-
-                try
-                {
-                    // Get full process info from resolver
-                    var processRecord = _processResolver?.ResolveProcessAtTime(
-                        (int)evt.Pid,
-                        DateTime.UtcNow,
-                        "ProcessExit");
-
-                    if (processRecord != null)
-                    {
-                        processName = processRecord.ProcessName ?? evt.GetComm() ?? "unknown";
-                        commandLine = processRecord.CommandLine ?? "";
-                        userName = processRecord.UserName ?? "unknown";
-                        processPath = processRecord.ProcessPath ?? "";
-                        ppid = processRecord.ParentProcessId;
-                    }
-                }
-                catch (InvalidOperationException)
-                {
-                    // Process not in resolver (started before sensor or very short-lived)
-                    // Fall back to eBPF data only
-                    WintapLogger.Log.Append(
-                        $"{SensorName} process {evt.Pid} not in resolver, using minimal data",
-                        LogLevel.Debug);
-                }
-
 
                 var message = new WintapMessage(
                     DateTime.UtcNow,
@@ -90,7 +60,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                 message.ProcessName = processName;
 
                 // Unregister from resolver (process is terminating)
-                _processResolver?.UnregisterProcess((int)evt.Pid);
+//                _processResolver?.UnregisterProcess((int)evt.Pid);
 
                 EventChannel.Send(message);
                 return 0;

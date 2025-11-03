@@ -15,16 +15,13 @@ namespace gov.llnl.wintap.platform.linux.collect
     internal class CloneSensor : BaseEbpfSensor
     {
         private ProcessHash _pidHashGenerator;
-        private LinuxProcessResolver _processResolver;
-
         protected override string BpfObjectFileName => "clone_tracer.bpf.o";
         protected override string BpfProgramName => "trace_process_fork";
 
-        internal CloneSensor(LinuxProcessResolver processResolver)
+        internal CloneSensor()
         {
             SensorName = "CloneProcess";
             _pidHashGenerator = new ProcessHash();
-            _processResolver = processResolver;
         }
 
         protected override LibBpf.RingBufferCallback GetRingBufferCallback() => HandleEvent;
@@ -70,18 +67,6 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
-
-                var processRecord = ProcessSensorHelper.CreateProcessRecord(
-                    pid: (int)evt.ChildPid,
-                    ppid: (int)evt.ParentPid,
-                    processName: processName,
-                    processPath: executablePath,
-                    commandLine: childProcData.CommandLine ?? parentProcData.CommandLine ?? "",
-                    userName: parentProcData.Username ?? "",
-                    pidHash: message.PidHash
-                );
-                
-                _processResolver?.RegisterProcess(processRecord);
 
                 EventChannel.Send(message);
                 return 0;

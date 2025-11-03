@@ -30,13 +30,20 @@ sudo apt install -y \
     clang \
     llvm \
     libelf-dev \
-    bpftool \
+    linux-tools-common \
     build-essential
 
 # Verify installations
 clang --version
 bpftool version
 dotnet --version
+```
+
+_On OSX ARM, you will get an error about a missing include (asm/types.h). Fix with:_
+
+```bash
+# The headers should already be there, just create the symlink
+sudo ln -s /usr/include/aarch64-linux-gnu/asm /usr/include/asm
 ```
 
 ### Verify eBPF Support
