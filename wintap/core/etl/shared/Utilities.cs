@@ -118,8 +118,8 @@ namespace gov.llnl.wintap.core.etl.shared
                     {
                         IPInterfaceProperties ipInfo = adapter.GetIPProperties();
                         NIC newNic = new NIC();
-                        foreach (UnicastIPAddressInformation unicast in ipInfo.UnicastAddresses.Where(i => i.IsDnsEligible == true))
-                        {
+                        // Note: Linux doesn't support the "i.IsDnsEligible" method. Just restrict to NOT loopback
+                        foreach (UnicastIPAddressInformation unicast in ipInfo.UnicastAddresses.Where(i => i.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork))                        {
                             try
                             {
                                 newNic.MAC = adapter.GetPhysicalAddress().ToString();
@@ -128,7 +128,10 @@ namespace gov.llnl.wintap.core.etl.shared
                                 newNic.IPAddrAsLong = Converters.ConvertIpToLong(newNic.IPAddess);
                                 nicList.Add(newNic);
                             }
-                            catch (Exception ex) { }
+                            catch (Exception ex)             {
+                                WintapLogger.Log.Append("Windows specific DLL? Could not enumerate network interfaces using .net api: " + ex.Message, LogLevel.Debug);
+                            }
+
                         }
                     }
                 }
