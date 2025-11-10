@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist</Message><BucketName>uswds-assets</BucketName><RequestId>9QYN420M7R0KS84P</RequestId><HostId>B5i5uOvGHqeLU7m/wSseld3RXH1si7Vorp6c86kq4r5yB5kVZwi0gmkNm2LNtnmNptq3N4NfW8F2odVqBnY+dVaWXPgKgkG2</HostId></Error>
