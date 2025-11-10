@@ -114,7 +114,7 @@ def publish_table_tex(con, table, f):
     f.write('\\endfirsthead\n\n')
     
     # Continuation header
-    f.write('\\multicolumn{2}{c}%\n')
+    f.write('\\multicolumn{3}{c}%\n')
     f.write(f'{{\\tablename\\ \\thetable\\ -- Continued from previous page}} \\\\\n')
     f.write('\\hline\n')
     f.write('\\textbf{Column} & \\textbf{Data Type} & \\textbf{Description} \\\\\n')
@@ -123,7 +123,7 @@ def publish_table_tex(con, table, f):
     
     # Continuation footer
     f.write('\\hline\n')
-    f.write('\\multicolumn{2}{r}{Continued on next page} \\\\\n')
+    f.write('\\multicolumn{3}{r}{Continued on next page} \\\\\n')
     f.write('\\endfoot\n\n')
     
     # Final footer
