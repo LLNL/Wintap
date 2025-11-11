@@ -350,3 +350,11 @@ MigrationBackup/
 .ionide/
 /.sonarqube
 /WintapAPI/WintapAPI.nuspec
+.vscode/settings.json
+data-dictionary/data_dictionary.aux
+data-dictionary/data_dictionary.fdb_latexmk
+data-dictionary/data_dictionary.fls
+data-dictionary/data_dictionary.synctex.gz
+data-dictionary/data_dictionary.toc
+data-dictionary/FileSummary.aux
+data-dictionary/FileSummary.synctex.gz
