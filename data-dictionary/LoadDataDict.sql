@@ -1,8 +1,8 @@
-create table md_comments as from '/Users/johnson30/git/wintap-notebooks/experimental/datadict/md_desc.parquet'
+create OR replace table md_comments as from '~/git/LLNL/Wintap/data-dictionary/md_desc.parquet'
 ;
 
 -- Use this to export the in-memory data to parquet. Note that it intentionally doesn't overwite the original source file.
-copy md_comments to '/Users/johnson30/git/wintap-notebooks/experimental/datadict/md_desc-wip.parquet'
+copy md_comments to '~/git/LLNL/Wintap/data-dictionary/md_desc-test.parquet'
 ;
 
 -- Create all the objects we'll be commenting. Put them in their own schema, just to help organize a little.
