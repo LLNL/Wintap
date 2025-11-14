@@ -21,7 +21,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         /// 
         /// Handles empty strings, command lines, and malformed paths
         /// </summary>
-        public static string ExtractProcessName(string path, string fallback = "unknown")
+        public static string ExtractProcessName(string path, string fallback = "unknown-4")
         {
             // Handle null or empty (whitespace counts as empty too)
             if (string.IsNullOrWhiteSpace(path))
@@ -59,7 +59,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         /// </summary>
         private static string NormalizeFallback(string fallback)
         {
-            return string.IsNullOrWhiteSpace(fallback) ? "unknown" : fallback.Trim();
+            return string.IsNullOrWhiteSpace(fallback) ? "unknown-fallback" : fallback.Trim();
         }
 
         /// <summary>
@@ -81,9 +81,10 @@ namespace gov.llnl.wintap.platform.linux.collect
                 PID = pid,
                 ParentPID = ppid,
                 Name = NormalizeFallback(name),
-                Path = string.IsNullOrWhiteSpace(path) ? "unknown" : path,
+                Path = string.IsNullOrWhiteSpace(path) ? "unknown-5" : path,
                 CommandLine = commandLine ?? "",
-                User = NormalizeFallback(user)
+                User = NormalizeFallback(user),
+                UniqueProcessKey = "unknown-key"
             };
 
             if (exitCode.HasValue)
@@ -100,7 +101,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         /// Example: "bash -c ls" → "bash"
         /// Example: "/usr/bin/bash -c ls" → "bash"
         /// </summary>
-        public static string ExtractProcessNameFromCmdline(string cmdline, string fallback = "unknown")
+        public static string ExtractProcessNameFromCmdline(string cmdline, string fallback = "unknown-6")
         {
             if (string.IsNullOrWhiteSpace(cmdline))
                 return NormalizeFallback(fallback);
@@ -124,7 +125,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         /// Example: "/usr/bin/bash -c ls" → "/usr/bin/bash"
         /// Example: "bash -c ls" → "bash"
         /// </summary>
-        public static string ExtractPathFromCmdline(string cmdline, string fallback = "unknown")
+        public static string ExtractPathFromCmdline(string cmdline, string fallback = "unknown-7")
         {
             if (string.IsNullOrWhiteSpace(cmdline))
                 return NormalizeFallback(fallback);
