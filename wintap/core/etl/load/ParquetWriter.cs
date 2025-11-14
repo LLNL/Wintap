@@ -149,12 +149,24 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 try
                 {
-                    Type type = kvp.Value?.GetType();
-                    DataField field = new DataField(kvp.Key, type);
+                    DataField field = null;
+                    if ((kvp.Key == "ParentPidHash" || kvp.Key == "FileSha2" || kvp.Key == "FileMd5") && kvp.Value == null)
+                    {
+                        // HACK: Just set type to "string". Not sure how to get the base type correctly, but Key is the type we want.
+                        // Next HACK, set a default on the ProcessRecord
+                        Type type = kvp.Key?.GetType();
+                        field = new DataField(kvp.Key, type);                        
+                    } else
+                    {
+                        Type type = kvp.Value?.GetType();
+                        field = new DataField(kvp.Key, type);                        
+                    }
                     fields.Add(field);
                 }
                 catch (Exception ex)
-                { }
+                {
+                        WintapLogger.Log.Append($"Error on determining parquet schema: {ex.ToString}", LogLevel.Error);
+                }
             }
             ParquetSchema schema = new ParquetSchema(fields.ToArray());
             return schema;

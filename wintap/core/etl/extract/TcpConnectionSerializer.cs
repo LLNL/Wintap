@@ -41,7 +41,8 @@ namespace gov.llnl.wintap.core.etl.extract
                 base.HandleSensorEvent(sensorEvent);
                 networkEventTimer.Stop();
                 networkEventTimer.Start();
-                ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, sensorEvent["PidHash"].ToString(), activeNics);
+                string tmpPidHash = sensorEvent["PidHash"]?.ToString() ??  "fixmepid";
+                ProcessConnIncrData pci = transform.Transformer.CreateProcessConn(sensorEvent, tmpPidHash, activeNics);
                 pci.Hostname = HostSerializer.Instance.HostId.Hostname;
                 pci.MessageType = "PROCESS_CONN_INCR";
                 long maxPktSize = 0;
@@ -59,6 +60,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
                 flatMsg.ActivityType = pci.IpEvent;
                 //flatMsg.AgentId = sensorEvent["AgentId"].ToString();
+                flatMsg.AgentId = "grantj";
 
                 // adding for convenience
                 flatMsg.SourceIpAddressString = sensorEvent["srcIp"].ToString();
@@ -70,7 +72,7 @@ namespace gov.llnl.wintap.core.etl.extract
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error creating TcpConnection object on pid: " + sensorEvent["PID"] + ",  exception: " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append("Error creating TcpConnection object on pid: " + sensorEvent["PID"] + ",  exception: " + ex.ToString(), LogLevel.Info);
             }
         }
     }
