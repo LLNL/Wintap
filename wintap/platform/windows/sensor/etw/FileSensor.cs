@@ -15,6 +15,7 @@ using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -24,10 +25,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     /// </summary>
     internal class FileSensor : EtwProviderCollector
     {
-        private enum FileOperationEnum { READ, WRITE, CLOSE, DELETE };
-        private ConcurrentDictionary<ulong, string> fileKeyToPath;
-        private ETWTraceEventSource rundownSource;
+        private const string RundownEtlSubPath = "etl\\kernelrundown.etl";
+        private const string EtlFileExtension = ".etl";
 
+        private ConcurrentDictionary<ulong, string> fileKeyToPath;
 
         public FileSensor() : base()
         {
@@ -35,9 +36,12 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             EtwProviderId = "SystemTraceControlGuid";
             KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIOInit;
             fileKeyToPath = new ConcurrentDictionary<ulong, string>();
-
         }
 
+        /// <summary>
+        /// Starts the file sensor and processes the ETW rundown trace.
+        /// </summary>
+        /// <returns>True if the sensor started successfully.</returns>
         public bool Start()
         {
             base.Start();
@@ -52,17 +56,29 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
             }
 
+            ProcessRundownTrace();
+            ExecuteEtwRundown();
+
+            return true;
+        }
+
+        /// <summary>
+        /// Processes the kernel rundown ETL file to populate the file key to path mapping.
+        /// </summary>
+        private void ProcessRundownTrace()
+        {
             WintapLogger.Log.Append("Processing rundown trace", LogLevel.Info);
-            // TODO: make relative to assembly path
-            string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap7\\etl\\kernelrundown.etl";
+
+            string etlFilePath = Path.Combine(Env.FileRootPath, RundownEtlSubPath);
             FileInfo rundownInfo = new FileInfo(etlFilePath);
+
             if (rundownInfo.Exists)
             {
-                WintapLogger.Log.Append("processing rundown trace", LogLevel.Info);
+                WintapLogger.Log.Append($"Processing rundown trace from {etlFilePath}", LogLevel.Info);
                 int counter = 0;
+
                 using (var source = new ETWTraceEventSource(etlFilePath))
                 {
-                    // Set up callbacks
                     source.Kernel.FileIOFileRundown += delegate (FileIONameTraceData data)
                     {
                         if (data.EventName.ToLower().Contains("rundown"))
@@ -71,214 +87,258 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                             counter++;
                         }
                     };
-                    source.Process(); // Invoke callbacks, will break at eof
-                    WintapLogger.Log.Append("Rundown file event trace complete. total rundowns processed: " + counter, LogLevel.Info);
+                    source.Process();
+                    WintapLogger.Log.Append($"Rundown file event trace complete. Total rundowns processed: {counter}", LogLevel.Info);
                 }
             }
             else
             {
-                WintapLogger.Log.Append("No file rundown ETL found.  File events may not always contaihn a path for this session.", LogLevel.Warn);
+                WintapLogger.Log.Append("No file rundown ETL found. File events may not always contain a path for this session.", LogLevel.Warn);
             }
-
-            WintapLogger.Log.Append("Doing ETW event rundown", LogLevel.Always);
-            ProcessStartInfo rundownPsi = new ProcessStartInfo();
-            rundownPsi.FileName = Env.FileRootPath + "\\WintapCoreSvcMgr.exe";
-            rundownPsi.Arguments = "RUNDOWN";
-            System.Diagnostics.Process rundown = new Process();
-            rundown.StartInfo = rundownPsi;
-            rundown.Start();
-            rundown.WaitForExit();
-            WintapLogger.Log.Append("ETW Rundown complete", LogLevel.Always);
-
-            return true;
         }
 
+        /// <summary>
+        /// Executes the ETW rundown process via WintapCoreSvcMgr.
+        /// </summary>
+        private void ExecuteEtwRundown()
+        {
+            WintapLogger.Log.Append("Executing ETW event rundown", LogLevel.Always);
+
+            ProcessStartInfo rundownPsi = new ProcessStartInfo
+            {
+                FileName = Path.Combine(Env.FileRootPath, "WintapCoreSvcMgr.exe"),
+                Arguments = "RUNDOWN"
+            };
+
+            using (Process rundown = new Process { StartInfo = rundownPsi })
+            {
+                rundown.Start();
+                rundown.WaitForExit();
+            }
+
+            WintapLogger.Log.Append("ETW Rundown complete", LogLevel.Always);
+        }
+
+        /// <summary>
+        /// Handles file close events from ETW.
+        /// </summary>
         private void EtwParser_FileIOClose(FileIOSimpleOpTraceData obj)
         {
-            // todo:
-            //UpdateStatistics(obj.Source.EventsLost);
             try
             {
-                string path = "";
-                fileKeyToPath.TryGetValue(obj.FileKey, out path);
-                if (path != null)
+                string path;
+                if (!fileKeyToPath.TryGetValue(obj.FileKey, out path) || string.IsNullOrEmpty(path))
                 {
-                    if (string.IsNullOrEmpty(path))
-                    {
-                        fileKeyToPath.TryGetValue(obj.FileObject, out path);
-                    }
-                    string activityId = null;
-                    string correlationId = null;
-                    try
-                    {
-                        activityId = obj.ActivityID.ToString();
-                        correlationId = obj.PayloadStringByName("CorrelationId");
-                    }
-                    catch (Exception ex) { }
+                    fileKeyToPath.TryGetValue(obj.FileObject, out path);
+                }
+
+                if (!string.IsNullOrEmpty(path))
+                {
+                    string activityId = TryGetActivityId(obj);
+                    string correlationId = TryGetCorrelationId(obj);
                     sendFileEvent(path, obj.ProcessID, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Close, 0, activityId, correlationId);
                 }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("CLOSE handler error: " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append($"CLOSE handler error: {ex.Message}", LogLevel.Info);
             }
         }
 
-        void Kernel_FileIoCreate(FileIOCreateTraceData obj)
+        /// <summary>
+        /// Handles file create events from ETW and maps FileObject to file name.
+        /// FileObject is per-openfile not per-filename (fileKey).
+        /// </summary>
+        private void Kernel_FileIoCreate(FileIOCreateTraceData obj)
         {
-            // todo:
-            //UpdateStatistics(obj.Source.EventsLost);
             try
             {
-                fileKeyToPath.TryAdd(obj.FileObject, obj.FileName);  // FileObject is per-openfile not per-filename (fileKey). 
+                fileKeyToPath.TryAdd(obj.FileObject, obj.FileName);
             }
             catch (Exception ex)
-            { }
+            {
+                WintapLogger.Log.Append($"CREATE handler error: {ex.Message}", LogLevel.Debug);
+            }
         }
 
+        /// <summary>
+        /// Handles file name events from ETW and maps FileKey to file name.
+        /// </summary>
         private void EtwParser_FileIOName(FileIONameTraceData obj)
         {
-            // todo:
-            //UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 fileKeyToPath.TryAdd(obj.FileKey, obj.FileName);
             }
             catch (Exception ex)
-            { }
+            {
+                WintapLogger.Log.Append($"FILE NAME handler error: {ex.Message}", LogLevel.Debug);
+            }
         }
 
+        /// <summary>
+        /// Handles file read events from ETW.
+        /// </summary>
         private void Kernel_FileIoRead(FileIOReadWriteTraceData obj)
         {
-            // todo:
-            //UpdateStatistics(obj.Source.EventsLost);
             try
             {
                 string filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
-                string activityId = null;
-                string correlationId = null;
-                try
+                if (!string.IsNullOrEmpty(filePath))
                 {
-                    activityId = obj.ActivityID.ToString();
-                    correlationId = obj.PayloadStringByName("CorrelationId");
+                    string activityId = TryGetActivityId(obj);
+                    string correlationId = TryGetCorrelationId(obj);
+                    sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Read, obj.IoSize, activityId, correlationId);
                 }
-                catch (Exception ex) { }
-                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Read, obj.IoSize, activityId, correlationId);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error handing Kernel_FileIoRead event: " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append($"Error handling Kernel_FileIoRead event: {ex.Message}", LogLevel.Info);
             }
         }
 
+        /// <summary>
+        /// Handles file write events from ETW.
+        /// </summary>
         private void Kernel_FileIoWrite(FileIOReadWriteTraceData obj)
         {
-            // todo:
-            //UpdateStatistics(obj.Source.EventsLost);
-            if (obj.ProcessID == StateManager.WintapPID) { return; }
+            if (obj.ProcessID == StateManager.WintapPID)
+            {
+                return; // Prevent feedback loop
+            }
+
             try
             {
-                string filePath = obj.FileName;
-                if (string.IsNullOrEmpty(obj.FileName))
+                string filePath = string.IsNullOrEmpty(obj.FileName)
+                    ? resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey)
+                    : obj.FileName;
+
+                if (!string.IsNullOrEmpty(filePath))
                 {
-                    filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
+                    string activityId = TryGetActivityId(obj);
+                    string correlationId = TryGetCorrelationId(obj);
+                    sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Write, obj.IoSize, activityId, correlationId);
                 }
-                string activityId = null;
-                string correlationId = null;
-                try
-                {
-                    activityId = obj.ActivityID.ToString();
-                    correlationId = obj.PayloadStringByName("CorrelationId");
-                }
-                catch (Exception ex) { }
-                if (!String.IsNullOrEmpty(filePath))
-                {
-                    int i = 0;
-                }
-                sendFileEvent(filePath, obj.ProcessID, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Write, obj.IoSize, activityId, correlationId);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error handing Kernel_FileIoWrite event: " + ex.Message + " " + obj.ToString(), LogLevel.Info);
+                WintapLogger.Log.Append($"Error handling Kernel_FileIoWrite event: {ex.Message} - {obj}", LogLevel.Info);
             }
         }
 
+        /// <summary>
+        /// Resolves the file path from either the existing path or file object/key lookups.
+        /// </summary>
         private string resolveIoFilePath(string existingPath, ulong fileObj, ulong fileKey)
         {
-            string filePath = existingPath;
-            if (string.IsNullOrEmpty(filePath))
+            if (!string.IsNullOrEmpty(existingPath))
             {
-                fileKeyToPath.TryGetValue(fileObj, out filePath);
-                if (filePath == null)
-                {
-                    fileKeyToPath.TryGetValue(fileKey, out filePath);
-                }
-                else if (!string.IsNullOrEmpty(filePath))
-                {
-                    WintapLogger.Log.Append("resolved path from fileTable lookup: " + filePath, LogLevel.Debug);
-                }
+                return existingPath;
             }
+
+            string filePath;
+            if (fileKeyToPath.TryGetValue(fileObj, out filePath) && !string.IsNullOrEmpty(filePath))
+            {
+                WintapLogger.Log.Append($"Resolved path from fileTable lookup: {filePath}", LogLevel.Debug);
+                return filePath;
+            }
+
+            fileKeyToPath.TryGetValue(fileKey, out filePath);
             return filePath;
         }
 
+        /// <summary>
+        /// Sends a file event to the event channel.
+        /// </summary>
         private void sendFileEvent(string filePath, int pid, DateTime eventTime, WintapMessage.ActivityTypeEnum opName, int bytesRequested, string activityId, string correlationId)
         {
             if (string.IsNullOrEmpty(filePath))
             {
                 return;
             }
-            if (filePath.EndsWith(".etl")) // possible feedback scenario with ETW internals, skip etw log activity
+
+            if (filePath.EndsWith(EtlFileExtension, StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return; // Prevent feedback scenario with ETW internals
             }
-            WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, WintapMessage.MessageTypeEnum.File);
-            wintapBuilder.File = new WintapMessage.FileActivityObject();
-            wintapBuilder.ActivityType = opName;
-            wintapBuilder.File.Path = filePath.ToLower();
-            wintapBuilder.File.BytesRequested = bytesRequested;
-            wintapBuilder.ActivityId = activityId;
-            wintapBuilder.CorrelationId = correlationId;
+
+            WintapMessage wintapBuilder = new WintapMessage(eventTime, pid, WintapMessage.MessageTypeEnum.File)
+            {
+                File = new WintapMessage.FileActivityObject
+                {
+                    Path = filePath.ToLower(),
+                    BytesRequested = bytesRequested
+                },
+                ActivityType = opName,
+                ActivityId = activityId,
+                CorrelationId = correlationId
+            };
+
             EventChannel.Send(wintapBuilder);
         }
 
-        void Kernel_FileIoDelete(FileIOInfoTraceData obj)
+        /// <summary>
+        /// Safely attempts to get the activity ID from the trace data.
+        /// </summary>
+        private string TryGetActivityId(TraceEvent obj)
         {
-            base.Process_Event(obj);
             try
             {
-                int pid = obj.ProcessID;
-                string filePath = "";
-                if (pid == StateManager.WintapPID)
-                {
-                    return;  // prevent feedback loop
-                }
-                if (!string.IsNullOrEmpty(obj.FileName))
-                {
-                    filePath = obj.FileName;
-                }
-                else
-                {
-                    fileKeyToPath.TryGetValue(obj.FileKey, out filePath);
-                }
-
-                if (!string.IsNullOrEmpty(filePath))
-                {
-                    string activityId = null;
-                    string correlationId = null;
-                    try
-                    {
-                        activityId = obj.ActivityID.ToString();
-                        correlationId = obj.PayloadStringByName("CorrelationId");
-                    }
-                    catch (Exception ex) { }
-                    sendFileEvent(filePath.ToLower(), pid, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Delete, 0, activityId, correlationId);
-                }
-
-                fileKeyToPath.TryRemove(obj.FileKey, out filePath);
+                return obj.ActivityID.ToString();
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("problem in Kernel_FileIoDelete event:  " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append($"Failed to get ActivityID: {ex.Message}", LogLevel.Debug);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Safely attempts to get the correlation ID from the trace data payload.
+        /// </summary>
+        private string TryGetCorrelationId(TraceEvent obj)
+        {
+            try
+            {
+                return obj.PayloadStringByName("CorrelationId");
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to get CorrelationId: {ex.Message}", LogLevel.Debug);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Handles file delete events from ETW.
+        /// </summary>
+        private void Kernel_FileIoDelete(FileIOInfoTraceData obj)
+        {
+            base.Process_Event(obj);
+
+            if (obj.ProcessID == StateManager.WintapPID)
+            {
+                return; // Prevent feedback loop
+            }
+
+            try
+            {
+                string filePath = !string.IsNullOrEmpty(obj.FileName)
+                    ? obj.FileName
+                    : (fileKeyToPath.TryGetValue(obj.FileKey, out var path) ? path : null);
+
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    string activityId = TryGetActivityId(obj);
+                    string correlationId = TryGetCorrelationId(obj);
+                    sendFileEvent(filePath.ToLower(), obj.ProcessID, obj.TimeStamp, WintapMessage.ActivityTypeEnum.Delete, 0, activityId, correlationId);
+                }
+
+                fileKeyToPath.TryRemove(obj.FileKey, out _);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error in Kernel_FileIoDelete event: {ex.Message}", LogLevel.Info);
             }
         }
     }
