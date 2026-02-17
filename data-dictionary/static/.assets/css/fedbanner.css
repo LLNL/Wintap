@@ -1,0 +1,65 @@
+/* NOTE: THIS IS JUST A STAND-IN, ON GDO WE CREATE A SYMLINK TO THE PROVIDED .assets/ DIRECTORY */
+.usa-banner {
+  background-color: #f1f1f1;
+  border: 1px solid #d6d7d9;
+  /* light gray border */
+  border-bottom: 1px solid #d6d7d9;
+  font-family: sans-serif;
+  font-size: 14px;
+  padding: 0.5rem 1rem;
+}
+
+.usa-banner__flag {
+  width: 25px;
+  height: auto;
+}
+
+.usa-banner__button {
+  background: none;
+  border: none;
+  color: #005ea2;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.usa-banner__button:focus {
+  outline: 2px solid #005ea2;
+  outline-offset: 2px;
+}
+
+.usa-banner__content {
+  margin-top: 0.75rem;
+  background-color: #f1f1f1;
+  padding: 0.75rem;
+}
+
+.usa-banner__details p {
+  margin: 0 0 0.5rem;
+  background-color: #f1f1f1;
+}
+
+.usa-banner__header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  /* Align everything to the left */
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  /* Allows wrapping on smaller screens */
+  background-color: #f1f1f1;
+  margin-bottom: 0.50rem;
+}
+
+.usa-banner__text-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #f1f1f1;
+  flex-wrap: wrap;
+}
+
+.usa-banner__text {
+  background-color: #f1f1f1;
+  margin: 0;
+}

@@ -1,0 +1,62 @@
+\documentclass[conference,compsoc]{IEEEtran}
+\usepackage{longtable}
+\usepackage{booktabs}
+
+\begin{document}
+
+\onecolumn
+
+\section*{ACME4 Dataset Files}
+
+\begin{longtable}{|l|r|r|}
+\caption{ACME4 Dataset File Statistics} \label{tab:dataset-files} \\
+\hline
+\textbf{Filename} & \textbf{Rows} & \textbf{Size} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Filename} & \textbf{Rows} & \textbf{Size} \\
+\hline
+\endhead
+
+\midrule
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+all\_files.parquet                     & 2{,}655{,}395   & 88.4 MB   \\
+files.parquet                          & 2{,}921{,}710   & 241.1 MB  \\
+host.parquet                           & 23              & 5.7 kB    \\
+host\_ip.parquet                       & 25              & 3.3 kB    \\
+labels\_graph\_net\_conn.parquet       & 8               & 5.1 kB    \\
+labels\_graph\_nodes.parquet           & 267             & 9.5 kB    \\
+labels\_graph\_process\_summary.parquet & 162            & 11.8 kB   \\
+labels\_networkx.parquet               & 4               & 77.7 kB   \\
+lolbas.parquet                         & 405             & 109.9 kB  \\
+mitre\_labels.parquet                  & 2{,}218{,}973   & 74.2 MB   \\
+process.parquet                        & 1{,}773{,}405   & 249.2 MB  \\
+process\_conn\_incr.parquet            & 4{,}206{,}423   & 448.7 MB  \\
+process\_exe\_file\_summary.parquet    & 4{,}705         & 358.9 kB  \\
+process\_file.parquet                  & 9{,}343{,}199   & 952.8 MB  \\
+process\_file\_summary.parquet         & 531{,}286       & 32.2 MB   \\
+process\_image\_load.parquet           & 52{,}056{,}815  & 3.5 GB    \\
+process\_image\_load\_summary.parquet  & 1{,}678{,}449   & 241.9 MB  \\
+process\_lolbas\_summary.parquet       & 1{,}540{,}620   & 55.0 MB   \\
+process\_mitre\_summary.parquet        & 1{,}761{,}094   & 62.1 MB   \\
+process\_net\_conn.parquet             & 2{,}097{,}906   & 194.2 MB  \\
+process\_net\_summary.parquet          & 10{,}536        & 1.3 MB    \\
+process\_path.parquet                  & 1{,}772{,}947   & 266.9 MB  \\
+process\_registry.parquet              & 209{,}510{,}164 & 14.0 GB   \\
+process\_registry\_summary.parquet     & 1{,}471{,}835   & 81.1 MB   \\
+process\_summary.parquet               & 1{,}772{,}966   & 461.4 MB  \\
+process\_uber\_summary.parquet         & 1{,}772{,}966   & 464.8 MB  \\
+sigma\_labels.parquet                  & 26{,}058{,}993  & 523.9 MB  \\
+sigma\_labels\_summary.parquet         & 1{,}760{,}341   & 61.5 MB   \\
+
+\end{longtable}
+
+\end{document}

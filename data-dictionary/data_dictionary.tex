@@ -1,0 +1,1461 @@
+\documentclass[conference,compsoc]{IEEEtran}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{textcomp}
+\usepackage{needspace}
+
+\begin{document}
+\onecolumn
+
+\section{Table Definitions}
+
+% Suppress warnings about missing aux file on first compile
+\IfFileExists{\jobname.aux}{\tableofcontents\clearpage}{}
+
+\needspace{4\baselineskip}
+\subsection{all\_files}
+\label{sec:all_files}
+
+Master list of filenames seen in the collect. Derived from process executions, dll loads and file usage activity.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+dll\_num\_rows & DOUBLE & Number of times used as a DLL \\
+file\_num\_rows & DOUBLE & Number of times referenced in file read/write activity \\
+filename & STRING & Fully qualified filename \\
+num\_hosts & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+process\_num\_rows & DOUBLE & Number of rows file was executed as a process \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{files}
+\label{sec:files}
+
+Files by hostname with summary information for executions, dlls and file usage.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+dll\_first\_seen & TIMESTAMP & Earliest time seen \\
+dll\_last\_seen & TIMESTAMP & Latest time seen \\
+dll\_num\_rows & DOUBLE & Number of times used as a DLL \\
+file\_first\_seen & TIMESTAMP & Earliest time seen \\
+file\_id & STRING & Unique ID for a file. Hash of hostname+fully qualified filename \\
+file\_last\_seen & TIMESTAMP & Latest time seen \\
+file\_num\_rows & DOUBLE & Number of times referenced in file read/write activity \\
+filename & STRING & Fully qualified filename \\
+hostname & STRING & Hostname data collected from \\
+max\_process\_term & TIMESTAMP & Maximum value in the interval \\
+min\_process\_started & TIMESTAMP & Minimum value in the interval \\
+process\_num\_rows & DOUBLE & Number of rows file was executed as a process \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{host}
+\label{sec:host}
+
+Unique entry for every instrumented host.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Hostname & STRING & Hostname data collected from \\
+ad\_domain & STRING & Active directory host is joined to \\
+agent\_ids & STRING[] & List of agent ids. A long running host may have several dur to update, reinstalls, etc. \\
+arch & STRING & Chip architecture \\
+domain\_role & STRING & Host role within the domain. Ex: domain controller, member, etc. \\
+etl\_version & STRING & Wintap data collection plugin version \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+has\_battery & BOOLEAN & Does this host have a battery? Indicates laptop if true \\
+last\_boot & INT64 & Time of last boot, in epoch seconds \\
+last\_seen & TIMESTAMP & Latest time seen \\
+num\_ad\_domain & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_arch & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_domain\_role & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_etl\_version & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_has\_battery & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_last\_boot & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_os & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_os\_version & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_processor\_count & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_processor\_speed & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_rows & INT64 & Number of row behind this summary \\
+num\_wintap\_version & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+os & STRING & Host operating system \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+os\_version & STRING & Operating System Version \\
+processor\_count & INTEGER & Number of processors cores \\
+processor\_speed & INT64 & Speed of processors \\
+wintap\_version & STRING & Version Wintap core. Each plugin has its own version. \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{host\_ip}
+\label{sec:host_ip}
+
+Network interface information for hosts.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Hostname & STRING & Hostname data collected from \\
+MTU & INTEGER & Should be max transmition unit, but its currently not collected. \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+interface & STRING & Should be the interface device name, but its currently not collected. \\
+ip\_addr & INT64 & An IP address on the host. Stored as an integer \\
+ip\_addr\_no & STRING & An IP address on the host. In dotted quad notation. \\
+last\_seen & TIMESTAMP & Latest time seen \\
+mac & STRING & Mac address as string (colon delimited) \\
+num\_rows & INT64 & Number of row behind this summary \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+private\_gateway & STRING & IP of the gateway used by this interface \\
+\hline
+\end{longtable}
+
+\needspace{9\baselineskip}
+\subsection{labels\_graph\_net\_conn}
+\label{sec:labels_graph_net_conn}
+
+Summarizes network-related labels by conn\_id
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+conn\_id & STRING & Hash of "normalized" 5 tuple (ip1, port1, ip2, port2, L4 protocol). To represent A to B the same as B to A, the lower IP (as int) along with its port comes first in the hash preimage ordering. When ip1 == ip2, then the pair order is decided by lowest port instead. \\
+label\_num\_hits & INT64 & Number of unique labels hit \\
+label\_num\_sources & INT64 & Number of unique sources of labels \\
+label\_num\_uniq\_annotations & INT64 & Number of unqiue annotations \\
+label\_source & STRING & For now, only a single source: "networkx" \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{labels\_graph\_nodes}
+\label{sec:labels_graph_nodes}
+
+Parse JSON in NetworkX files into a flat structure representing the nodes
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+annotation & STRING & Annotations are manually added to specific nodes by the person creating the networkx graph of activity. Used to further highlight the activity. \\
+filename & STRING & Fully qualified filename \\
+id & STRING & Unique ID for the node in the graph. Often a PID\_HASH, CONN\_ID or similar. \\
+label & STRING & Graph node label. Often a PROCESS\_NAME or similar. \\
+node\_type & STRING & Type of node: PROCESS, NETWORK, FILE, etc. \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{labels\_graph\_process\_summary}
+\label{sec:labels_graph_process_summary}
+
+Summarizes process-related labels by pid\_hash
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+label\_num\_hits & INT64 & Number of unique labels hit \\
+label\_num\_sources & INT64 & Number of unique sources of labels \\
+label\_num\_uniq\_annotations & INT64 & Number of unqiue annotations \\
+label\_source & STRING & For now, only a single source: "networkx" \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{labels\_networkx}
+\label{sec:labels_networkx}
+
+Import of networkx graph data. Used primarily as base to build summary tables. Data in this table is JSON, tricky to work with directly.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+directed & BOOLEAN & Directed graph or not. \\
+filename & STRING & Fully qualified filename \\
+is\_multigraph & BOOLEAN & Multigraph or not \\
+links & STRUCT & List of links \\
+nodes & STRUCT & List of nodes \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{lolbas}
+\label{sec:lolbas}
+
+Joins process data with LOLBAS (Living Off the Land Binaries and Scripts) data. Summarizes LOLBAS-related activity by pid\_hash.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+acknowledgements & STRING & Person who submitted the entry. May be more than 1. \\
+author & STRING & Person or group who submitted the entry. \\
+command & STRING & The command with arguments \\
+command\_category & STRING & Intent. Ex: EXECUTE, UAC BYPASS, CONCEAL, etc. \\
+command\_description & STRING & Description of the command \\
+command\_privileges & STRING & Required priviledges to execute \\
+command\_usecase & STRING & Description of use case for attacker \\
+date & DATE & Date created \\
+description & STRING & Normal purpose of the command \\
+detections & STRING & How to detect exploit: Many are URLs pointing to SIGMA rule, Defender, etc. \\
+filename & STRING & Filename of executable. No path. \\
+mitre\_attck\_technique & STRING & Specific MITRE attck code. Ex: T1003 \\
+operating\_system & STRING & OSes binary is found on. Some very specific, some general. \\
+paths & STRING & Paths where binary is found. More than one are comma separated. \\
+resources & STRING & URL to more info \\
+url & STRING & URL to LolBAS project about the exploit \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{mitre\_labels}
+\label{sec:mitre_labels}
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+analytic\_id & STRING & Mitre analytic ID. Ex: CAR-2021-05-012 \\
+entity & STRING & Wintap entity ID (hash). The type of entity (PID\_HASH, CONN\_ID, etc) is defined in the ENTITY\_TYPE column. Note: Currently, only PID\_HASHes are identified. \\
+entity\_type & STRING & Wintap entity type. Determines what kind of hash is in the ENTITY column. Ex: PID\_HASH, CONN\_ID, FILE\_ID \\
+time & TIMESTAMP & Timestamp of activity \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process}
+\label{sec:process}
+
+Each row is a process execution. Processes are the central object of this entire data model.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+args & STRING & Command line arguments \\
+commit\_charge & INT64 & Commit charge is the total amount of virtual memory guaranteed for all processes to fit in physical memory and the page file. \\
+commit\_peak & INT64 & Total memory commited \\
+cpu\_cycle\_count & INT64 & Always zero (note: more than zero cycles were generally used in a process) \\
+cpu\_utilization & INTEGER & Ignore: unable to collect. This *should* be a value indicating the percentage of cpu utilized by the process over its life, but turns out be harder to collect than expected. \\
+exit\_code & INT64 & Process exit code \\
+file\_id & STRING & Unique ID for a file. Hash of hostname+fully qualified filename \\
+file\_md5 & STRING & MD5 hash of the binary process/dll \\
+file\_sha2 & STRING & SHA2 hash of the file contents \\
+filename & STRING & Fully qualified filename \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+hard\_fault\_count & INTEGER & Count of hard page faults \\
+hostname & STRING & Hostname data collected from \\
+last\_seen & TIMESTAMP & Latest time seen \\
+num\_agent\_id & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_args & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_file\_md5 & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_file\_sha2 & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_parent\_os\_pid & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_parent\_pid\_hash & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_name & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_path & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_start & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_stop & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_user\_name & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+os\_pid & INTEGER & Operating system process id \\
+parent\_os\_pid & INTEGER & OS Process ID of parent process \\
+parent\_pid\_hash & STRING & PID\_HASH of parent process \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+process\_path & STRING & Fully qualified path of the process executable \\
+process\_started & TIMESTAMP & Process start timestamp \\
+process\_started\_seconds & DOUBLE & Process start time in unix epoch seconds \\
+process\_stop\_seconds & DOUBLE & Process stop in unix epoch seconds \\
+process\_term & TIMESTAMP & Process termination timestamp \\
+read\_operation\_count & INT64 & Count of number of read operations \\
+read\_transfer\_kilobytes & INT64 & Number of K bytes read \\
+token\_elevation\_type & INTEGER & Indicates UAC privilege status: 1 (Default) = no linked token, UAC disabled or non-admin account; 2 (Full) = elevated administrator with full rights after UAC approval; 3 (Limited) = filtered admin token before elevation with available full token; 4 = undocumented value, treat as unknown/reserved. \\
+user\_name & STRING & Username. Note that on windows there are many usernames that represent system or other background activity \\
+write\_operation\_count & INT64 & Count of number of write operations \\
+write\_transfer\_kilobytes & INT64 & Number of K bytes written \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_conn\_incr}
+\label{sec:process_conn_incr}
+
+Network connection increments for each process. (KEY: PID\_HASH + CONN\_ID + INCR\_START\_SECS)
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Hostname & STRING & Hostname data collected from \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+conn\_id & STRING & Hash of "normalized" 5 tuple (ip1, port1, ip2, port2, L4 protocol). To represent A to B the same as B to A, the lower IP (as int) along with its port comes first in the hash preimage ordering. When ip1 == ip2, then the pair order is decided by lowest port instead. \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+incr\_start & TIMESTAMP & Start time of a 1 minute increment used to aggregate the high-volume events \\
+last\_seen & TIMESTAMP & Latest time seen \\
+local\_ip\_addr & STRING & IP address on the host collecting data. This address is local to the host sensor. In dotted quad notation. \\
+local\_ip\_int & INT64 & IP of the host collecting this data as 32-bit int \\
+local\_port & INTEGER & Port of the process on the collecting host \\
+max\_10sec\_eventcount & INTEGER & Maximum value in the interval \\
+max\_size & INT64 & Maximum value in the interval \\
+max\_tcp\_recv\_count & INTEGER & Maximum value in the interval \\
+max\_tcp\_recv\_size & INT64 & Maximum value in the interval \\
+max\_tcp\_send\_count & INTEGER & Maximum value in the interval \\
+max\_tcp\_send\_size & INT64 & Maximum value in the interval \\
+max\_udp\_recv\_count & INTEGER & Maximum value in the interval \\
+max\_udp\_recv\_size & INT64 & Maximum value in the interval \\
+max\_udp\_send\_count & INTEGER & Maximum value in the interval \\
+max\_udp\_send\_size & INT64 & Maximum value in the interval \\
+min\_10sec\_eventcount & INTEGER & Minimum value in the interval \\
+min\_size & INT64 & Minimum value in the interval \\
+min\_tcp\_recv\_size & INT64 & Minimum value in the interval \\
+min\_tcp\_send\_size & INT64 & Minimum value in the interval \\
+min\_udp\_recv\_size & INT64 & Minimum value in the interval \\
+min\_udp\_send\_size & INT64 & Minimum value in the interval \\
+num\_raw\_rows & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+protocol & STRING & Layer 4 protocol (TCP, UDP) \\
+remote\_ip\_addr & STRING & IP address the host collecting data is talking to. This address is remote to the host sensor. In dotted quad notation. \\
+remote\_ip\_int & INT64 & IP of the remote host for this connection increment as 32-bit int \\
+remote\_port & INTEGER & Port of the remote host for this connection increment \\
+sq\_size & DOUBLE & Squared size of bytes in network packet. Ask Chris B! \\
+sq\_tcp\_recv\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+sq\_tcp\_send\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+sq\_udp\_recv\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+sq\_udp\_send\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+tcp\_accept\_count & DOUBLE & Number of TCP ACCEPT events on this connection for the time window \\
+tcp\_connect\_count & DOUBLE & Number of TCP CONNECT events on this connection for the time window \\
+tcp\_disconnect\_count & DOUBLE & Number of TCP DISCONNECT events on this connection for the time window \\
+tcp\_reconnect\_count & DOUBLE & Number of TCP RECONNECT events on this connection for the time window \\
+tcp\_recv\_count & DOUBLE & Number of TCP RECV events on this connection for the time window \\
+tcp\_recv\_size & DOUBLE & Number of TCP RECV bytes received on this connection for the time window \\
+tcp\_retransmit\_count & DOUBLE & Number of TCP RETRANSMIT events on this connection for the time window \\
+tcp\_send\_count & DOUBLE & Number of TCP SEND events on this connection for the time window \\
+tcp\_send\_size & DOUBLE & Number of TCP bytes sent for the time window \\
+tcp\_tcpcopy\_count & DOUBLE & Number of TCP TCPCOPY events on this connection for the time window \\
+tcp\_tcpcopy\_size & DOUBLE & Number of TCP TCPCOPY bytes on this connection for the time window \\
+total\_events & DOUBLE & Sum of events counts for this connection increment \\
+total\_size & DOUBLE & Number of bytes observed for this connection increment \\
+udp\_recv\_count & DOUBLE & Number of UDP RECV events on this connection for the time window \\
+udp\_recv\_size & DOUBLE & Number of UDP bytes received for the time window \\
+udp\_send\_count & DOUBLE & Number of UDP SEND events on this connection for the time window \\
+udp\_send\_size & DOUBLE & Number of UDP bytes sent for the time window \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_exe\_file\_summary}
+\label{sec:process_exe_file_summary}
+
+Summary of files used in process executions. Derived from all process executions resulting in a single row per file per host.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+file\_id & STRING & Unique ID for a file. Hash of hostname+fully qualified filename \\
+filename & STRING & Fully qualified filename \\
+hostname & STRING & Hostname data collected from \\
+max\_process\_term & TIMESTAMP & Maximum value in the interval \\
+min\_process\_started & TIMESTAMP & Minimum value in the interval \\
+process\_num\_rows & INT64 & Number of rows file was executed as a process \\
+source & STRING & Source of file: currently only PROCESS \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_file}
+\label{sec:process_file}
+
+File activity of processes. Activity is summarized to the PROCESS + FILE level. See RAW\_PROCESS\_FILE for activity detailed activity.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Hostname & STRING & Hostname data collected from \\
+activity\_type & STRING & File activity type. Ex: READ, WRITE \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+bytes\_requested & DOUBLE & Total bytes requested \\
+event\_count & DOUBLE & Total ETW events \\
+file\_hash & STRING & MD5 hash of the file \\
+file\_id & STRING & Unique ID for a file. Hash of hostname+fully qualified filename \\
+filename & STRING & Name of the file \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+last\_seen & TIMESTAMP & Latest time seen \\
+max\_event & TIMESTAMP & Maximum value in the interval \\
+min\_event & TIMESTAMP & Minimum value in the interval \\
+num\_raw\_rows & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_file\_summary}
+\label{sec:process_file_summary}
+
+File activity summarize to the process level.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Close\_Events & DOUBLE & Number of file close events \\
+Create\_Events & DOUBLE & Number of file create events \\
+Delete\_Events & DOUBLE & Number of file delete events \\
+Hostname & STRING & Hostname data collected from \\
+Read\_Bytes & DOUBLE & File bytes read \\
+Read\_Events & DOUBLE & Number of file read events \\
+Rename\_Events & DOUBLE & Number of file rename events \\
+SetInfo\_Events & DOUBLE &  \\
+Write\_Bytes & DOUBLE & File bytes written \\
+Write\_Events & DOUBLE & Number of file write events \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+last\_seen & TIMESTAMP & Latest time seen \\
+num\_null\_filename & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_raw\_rows & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_uniq\_file\_hash & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_image\_load}
+\label{sec:process_image_load}
+
+DLLs loaded and unloaded by process.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+build\_time & INT64 & Build time of DLL \\
+checksum & INTEGER & A checksum on the file contents of the DLL \\
+default\_base & STRING & Default base memory address \\
+file\_id & STRING & Unique ID for a file. Hash of hostname+fully qualified filename \\
+file\_md5 & STRING & MD5 hash of the binary process/dll \\
+filename & STRING & Filename of the loaded code \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+hostname & STRING & Hostname data collected from \\
+image\_base & STRING & Actual base memory address(?) \\
+last\_seen & TIMESTAMP & Latest time seen \\
+max\_image\_size & INTEGER & Maximum value in the interval \\
+min\_image\_size & INTEGER & Minimum value in the interval \\
+num\_load & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_unload & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_image\_load\_summary}
+\label{sec:process_image_load_summary}
+
+Summarizes DLL and image load activity by process (pid\_hash).
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+dlls & STRING[] & List of DDL names as an array \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+hostname & STRING & Hostname data collected from \\
+last\_seen & TIMESTAMP & Latest time seen \\
+num\_uniq\_files & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_lolbas\_summary}
+\label{sec:process_lolbas_summary}
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+lolbas\_cats & STRING[] & List categories from hits \\
+lolbas\_mitre & STRING[] & List of Mitre codes from hits \\
+lolbas\_num\_rows & INT64 & Number of hits \\
+lolbas\_privs & STRING[] & List of priviledges from hist \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_mitre\_summary}
+\label{sec:process_mitre_summary}
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+mitre\_analytic\_ids & STRING[] & List of analytic IDs from hits \\
+mitre\_analytic\_types & STRING[][] & List of ananlytic types from hits \\
+mitre\_information\_domains & STRING[] & List domains from hits. Ex: Analytic, Host, Network \\
+mitre\_num\_rows & INT64 & Number of hits \\
+mitre\_subtypes & STRING[][] & List of subtypes from hits. Ex: Map building, Anomaly, Hostflow.  Process. \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_net\_conn}
+\label{sec:process_net_conn}
+
+Network connections for each process. These are summarize to the PROCESS and Network 5-tuple (KEY: PID\_HASH + CONN\_ID)
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Hostname & STRING & Hostname data collected from \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+conn\_id & STRING & Hash of "normalized" 5 tuple (ip1, port1, ip2, port2, L4 protocol). To represent A to B the same as B to A, the lower IP (as int) along with its port comes first in the hash preimage ordering. When ip1 == ip2, then the pair order is decided by lowest port instead. \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+last\_seen & TIMESTAMP & Latest time seen \\
+local\_ip\_addr & STRING & IP address on the host collecting data. This address is local to the host sensor. In dotted quad notation. \\
+local\_port & INTEGER & Port of the process on the collecting host \\
+num\_raw\_rows & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+protocol & STRING & Layer 4 Protocol (TCP, UDP) \\
+remote\_ip\_addr & STRING & IP address the host collecting data is talking to. This address is remote to the host sensor. In dotted quad notation. \\
+remote\_port & INTEGER & Port of the remote host for this connection increment \\
+sq\_size & DOUBLE & Squared size of bytes in network packet. Ask Chris B! \\
+sq\_tcp\_recv\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+sq\_tcp\_send\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+sq\_udp\_recv\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+sq\_udp\_send\_size & DOUBLE & Square of the values in the interval. (Ask Chris B) \\
+tcp\_accept\_count & DOUBLE & Number of TCP ACCEPT events on this connection \\
+tcp\_connect\_count & DOUBLE & Number of TCP CONNECT events on this connection \\
+tcp\_disconnect\_count & DOUBLE & Number of TCP DISCONNECT events on this connection \\
+tcp\_reconnect\_count & DOUBLE & Number of TCP RECONNECT events on this connection \\
+tcp\_recv\_count & DOUBLE & Number of TCP RECV events on this connection \\
+tcp\_recv\_size & DOUBLE & Number of TCP RECV bytes received on this connection \\
+tcp\_retransmit\_count & DOUBLE & Number of TCP RETRANSMIT events on this connection \\
+tcp\_send\_count & DOUBLE & Number of TCP SEND events on this connection \\
+tcp\_send\_size & DOUBLE & Number of TCP bytes sent \\
+tcp\_tcpcopy\_count & DOUBLE & Number of TCP TCPCOPY events on this connection \\
+tcp\_tcpcopy\_size & DOUBLE & Number of TCP TCPCOPY bytes on this connection \\
+total\_events & DOUBLE & Sum of events counts for this connection \\
+total\_size & DOUBLE & Number of bytes observed for this connection \\
+udp\_recv\_count & DOUBLE & Number of UDP RECV events on this connection \\
+udp\_recv\_size & DOUBLE & Number of UDP bytes received \\
+udp\_send\_count & DOUBLE & Number of UDP SEND events on this connection \\
+udp\_send\_size & DOUBLE & Number of UDP bytes sent on this connection \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_net\_summary}
+\label{sec:process_net_summary}
+
+Summarizes all network connections for a given process to the process level.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Hostname & STRING & Hostname data collected from \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+avg\_bytes & DOUBLE & Average bytes in an event \\
+avg\_packets & DOUBLE & Average packets per session done by the process \\
+conn\_id\_count & INT64 & Number of unique network connection IDs (5-tuples) \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+last\_seen & TIMESTAMP & Latest time seen \\
+max\_bytes & DOUBLE & Maximum bytes in an event \\
+max\_packets & DOUBLE & Max packets per session done by the process \\
+min\_bytes & DOUBLE & Minimum bytes in an event \\
+min\_packets & DOUBLE & Min packets per session done by the process \\
+net\_recv\_size & DOUBLE & Total bytes received by the process \\
+net\_rs\_total & DOUBLE & Total bytes sent/received by the process \\
+net\_send\_size & DOUBLE & Total bytes sent by the process \\
+net\_send\_vs\_recv & DOUBLE & Ratio of bytes sent vs received by the process \\
+net\_total\_events & DOUBLE & Total events accross UDP/TCP \\
+net\_total\_size & DOUBLE & Total bytes accross all events \\
+num\_raw\_rows & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+sq\_size & DOUBLE & Squared size of bytes in network packet. Ask Chris B! \\
+tcp\_accept\_count & DOUBLE & Number of TCP Accept for this process \\
+tcp\_connect\_count & DOUBLE & Number of TCP Connects for this process \\
+tcp\_disconnect\_count & DOUBLE & Number of TCP Disconnects for this process \\
+tcp\_reconnect\_count & DOUBLE & Number of TCP Reconnects for this process \\
+tcp\_recv\_count & DOUBLE & Number of TCP packets recevied by the process \\
+tcp\_recv\_size & DOUBLE & Number of TCP bytes received by the process \\
+tcp\_retransmit\_count & DOUBLE & Number of TCP retransmits by the process \\
+tcp\_rs\_total & DOUBLE & Total TCP bytes sent/received by the process \\
+tcp\_send\_count & DOUBLE & Number of TCP packets sent by the process \\
+tcp\_send\_size & DOUBLE & Number of TCP bytes sent by the process \\
+tcp\_send\_vs\_recv & DOUBLE & Ratio of TCP bytes sent vs received by the process \\
+tcp\_tcpcopy\_count & DOUBLE & Number of TCP copy events during the process \\
+tcp\_tcpcopy\_size & DOUBLE & TCP copy bytes \\
+udp\_recv\_count & DOUBLE & Number of UDP packets received by the process \\
+udp\_recv\_size & DOUBLE & Number of UDP bytes received by the process \\
+udp\_rs\_total & DOUBLE & Total UDP bytes received by the process \\
+udp\_send\_count & DOUBLE & Number of UDP packets sent by the process \\
+udp\_send\_size & DOUBLE & Number of UDP bytes sent by the process \\
+udp\_send\_vs\_recv & DOUBLE & Ratio of UDP bytes sent vs received by the process \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_path}
+\label{sec:process_path}
+
+For each process, has the path to its root (parent process).
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+hostname & STRING & Hostname data collected from \\
+level & INTEGER & Distance from the kernel process \\
+max\_level & INTEGER & Ignore: The same value level. Artifact of the processing to generate the paths. \\
+os\_pid & INTEGER & Operating system process id \\
+parent\_os\_pid & INTEGER & OS Process ID of parent process \\
+parent\_pid\_hash & STRING & PID\_HASH of parent process \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+process\_path & STRING & Fully qualified path of the process executable \\
+ptree & STRING & Path to kernel using only PROCESS\_NAMEs. Order and format is: =process->parent process->...  Ex: =winlogon.exe->smss.exe->smss.exe->ntoskrnl.exe \\
+ptree\_list & STRING[] & Path to kernel using PID\_HASHes. Stored as an list. List is order from process to kernel process \\
+ptree\_list\_tuples & STRUCT & Path to kernel using named tuples of PID\_HASH and PROCESS\_NAME (list of maps). List is order from process to kernel process \\
+seq & INTEGER & Ignore: Artifact left over from process. Level+1. \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_registry}
+\label{sec:process_registry}
+
+Registry activity events. These are aggregated to PROCESS + Registry Key/Value
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+activity\_type & STRING & Type of registry activity. Ex: CREATEKEY, READ, WRITE, DELETEVALUE, DELETEKEY \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+event\_count & DOUBLE & Total ETW events \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+hostname & STRING & Hostname data collected from \\
+last\_seen & TIMESTAMP & Latest time seen \\
+max\_event & TIMESTAMP & Maximum value in the interval \\
+min\_event & TIMESTAMP & Minimum value in the interval \\
+num\_raw\_rows & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+reg\_data & STRING & Registry data, which is the most detailed part of the registry key. Strangely, it isn't data \\
+reg\_path & STRING & Registry path \\
+reg\_value & STRING & Registry value read or written \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_registry\_summary}
+\label{sec:process_registry_summary}
+
+All registry activity events summarized to the PROCESS.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+createkeys & DOUBLE & Number of createkeys by process \\
+deletekeys & DOUBLE & Number of deletekeys by process \\
+deletevalues & DOUBLE & Number of deletevalues by process \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+hostname & STRING & Hostname data collected from \\
+last\_seen & TIMESTAMP & Latest time seen \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+reads & DOUBLE & Number of reads by process \\
+total\_activity\_types & DOUBLE & Total number of ETW events for all registry activity for a process \\
+writes & DOUBLE & Number of writes by process \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_summary}
+\label{sec:process_summary}
+
+Provides a unified summary of all process-related activities that are directly collected by Wintap. This includes:n  Process metadata (e.g., process\_name, hostname, pid\_hash).n  Registry activity (e.g., reads, writes, key creation/deletion).n  File activity (e.g., file reads, writes, and other events).n  Network activity (e.g., connections, data sent/received).n  Image loads (e.g., DLLs loaded by the process).n  Host-level metadata (e.g., OS, architecture).
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Close\_Events & DOUBLE & Number of file close events \\
+Create\_Events & DOUBLE & Number of file create events \\
+Delete\_Events & DOUBLE & Number of file delete events \\
+Read\_Bytes & DOUBLE & File bytes read \\
+Read\_Events & DOUBLE & Number of file read events \\
+Rename\_Events & DOUBLE & Number of file rename events \\
+SetInfo\_Events & DOUBLE &  \\
+Write\_Bytes & DOUBLE & File bytes written \\
+Write\_Events & DOUBLE & Number of file write events \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+arch & STRING & Host architecture \\
+args & STRING & Process arguments. Note: as a simple string, no parsing done \\
+avg\_bytes & DOUBLE & Average bytes over the interval \\
+avg\_packets & DOUBLE & Average packets over the interval \\
+commit\_charge & INT64 & Commit charge is the total amount of virtual memory guaranteed for all processes to fit in physical memory and the page file. \\
+commit\_peak & INT64 & Total memory commited \\
+conn\_id\_count & INT64 & Number of unique network connection IDs (5-tuples) \\
+cpu\_cycle\_count & INT64 & Always zero (note: more than zero cycles were generally used in a process) \\
+cpu\_utilization & INTEGER & Ignore: unable to collect. This *should* be a value indicating the percentage of cpu utilized by the process over its life, but turns out be harder to collect than expected. \\
+dll\_first\_seen & TIMESTAMP & Earliest time seen \\
+dll\_last\_seen & TIMESTAMP & Latest time seen \\
+dll\_num\_uniq\_files & INT64 & Number of unique DDLs by name \\
+dlls & STRING[] & List of DDL names as an array \\
+duration\_seconds & DOUBLE & Elapsed process execution in seconds \\
+exit\_code & INT64 & Process exit code \\
+file\_first\_seen & TIMESTAMP & Earliest time seen \\
+file\_id & STRING & Unique ID for a file. Hash of hostname+fully qualified filename \\
+file\_last\_seen & TIMESTAMP & Latest time seen \\
+file\_md5 & STRING & MD5 hash of the binary process/dll \\
+file\_num\_raw\_rows & DOUBLE & Number of rows of file activity from the raw data. \\
+file\_sha2 & STRING & SHA2 hash of the file contents \\
+filename & STRING & Fully qualified filename \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+hard\_fault\_count & INTEGER & Count of hard page faults \\
+hostname & STRING & Hostname data collected from \\
+last\_seen & TIMESTAMP & Latest time seen \\
+max\_bytes & DOUBLE & Max bytes in the interval \\
+max\_packets & DOUBLE & Max packets in the interval \\
+min\_bytes & DOUBLE & Min bytes in the interval \\
+min\_packets & DOUBLE & Max packets in the interval \\
+net\_first\_seen & TIMESTAMP & Earliest time seen \\
+net\_last\_seen & TIMESTAMP & Latest time seen \\
+net\_num\_raw\_rows & DOUBLE & Number of rows in the raw data \\
+net\_recv\_size & DOUBLE & Total bytes received in the interval \\
+net\_rs\_total & DOUBLE & Total bytes sent/received in the interval \\
+net\_send\_size & DOUBLE & Total bytes sent in the interval \\
+net\_send\_vs\_recv & DOUBLE & Ratio of bytes sent/received in the interval \\
+net\_total\_events & DOUBLE & Total network events in the interval \\
+net\_total\_size & DOUBLE & Total bytes (send/receive) in the interval \\
+num\_agent\_id & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_args & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_file\_md5 & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_file\_sha2 & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_null\_filename & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_parent\_os\_pid & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_parent\_pid\_hash & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_name & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_path & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_start & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_stop & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_uniq\_file\_hash & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_user\_name & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+os & STRING & Operating System \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+os\_pid & INTEGER & Operating system process id \\
+os\_version & STRING & Operating System Version \\
+parent\_os\_pid & INTEGER & OS Process ID of parent process \\
+parent\_pid\_hash & STRING & PID\_HASH of parent process \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+process\_path & STRING & Fully qualified path of the process executable \\
+process\_started & TIMESTAMP & Process start timestamp \\
+process\_started\_seconds & DOUBLE & Process start time in unix epoch seconds \\
+process\_stop\_seconds & DOUBLE & Process stop in unix epoch seconds \\
+process\_term & TIMESTAMP & Process termination timestamp \\
+read\_operation\_count & INT64 & Count of number of read operations \\
+read\_transfer\_kilobytes & INT64 & Number of K bytes read \\
+reg\_createkeys & DOUBLE & Registry keys created \\
+reg\_deletekeys & DOUBLE & Registry keys deleted \\
+reg\_deletevalues & DOUBLE & Registry values deleted \\
+reg\_first\_seen & TIMESTAMP & Earliest time seen \\
+reg\_last\_seen & TIMESTAMP & Latest time seen \\
+reg\_reads & DOUBLE & Registry read events \\
+reg\_totals & DOUBLE & Total registry events \\
+reg\_writes & DOUBLE & Registry write events \\
+sq\_size & DOUBLE & Squared size of bytes in network packet. Ask Chris B! \\
+tcp\_accept\_count & DOUBLE & TCP Accepts \\
+tcp\_connect\_count & DOUBLE & TCP connects \\
+tcp\_disconnect\_count & DOUBLE & TCP disconnects \\
+tcp\_reconnect\_count & DOUBLE & TCP reconnects \\
+tcp\_recv\_count & DOUBLE & TCP packets received \\
+tcp\_recv\_size & DOUBLE & TCP bytes received \\
+tcp\_retransmit\_count & DOUBLE & TCP packets retransmitted \\
+tcp\_rs\_total & DOUBLE & TCP bytes total (send/received) \\
+tcp\_send\_count & DOUBLE & TCP bytes sent \\
+tcp\_send\_size & DOUBLE & TCP packets sent \\
+tcp\_send\_vs\_recv & DOUBLE & Ratio of TCP bytes sent/received \\
+tcp\_tcpcopy\_count & DOUBLE & TCP copy events. We think this is an event that is internal to the network stack on the host. \\
+tcp\_tcpcopy\_size & DOUBLE & TCP copy bytes \\
+token\_elevation\_type & INTEGER & Indicates UAC privilege status: 1 (Default) = no linked token, UAC disabled or non-admin account; 2 (Full) = elevated administrator with full rights after UAC approval; 3 (Limited) = filtered admin token before elevation with available full token; 4 = undocumented value, treat as unknown/reserved. \\
+udp\_recv\_count & DOUBLE & UDP bytes received \\
+udp\_recv\_size & DOUBLE & UDP events received \\
+udp\_rs\_total & DOUBLE & Total UDP bytes sent/received \\
+udp\_send\_count & DOUBLE & UDP packets sent \\
+udp\_send\_size & DOUBLE & UDP bytes sent \\
+udp\_send\_vs\_recv & DOUBLE & Ratio of UDP bytes sent/recieved \\
+user\_name & STRING & Username. Note that on windows there are many usernames that represent system or other background activity \\
+write\_operation\_count & INT64 & Count of number of write operations \\
+write\_transfer\_kilobytes & INT64 & Number of K bytes written \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{process\_uber\_summary}
+\label{sec:process_uber_summary}
+
+The process\_uber\_summary view is an enhanced version of the process\_summary view, incorporating additional threat intelligence and labeling data. It combines process activity summaries with external threat indicators such as SIGMA rules, MITRE ATT\&CK techniques, LOLBAS (Living Off the Land Binaries and Scripts), and NetworkX graph labels. This comprehensive view provides a detailed and enriched dataset for advanced threat analysis and detection.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Close\_Events & DOUBLE & Number of file close events \\
+Create\_Events & DOUBLE & Number of file create events \\
+Delete\_Events & DOUBLE & Number of file delete events \\
+Read\_Bytes & DOUBLE & File bytes read \\
+Read\_Events & DOUBLE & Number of file read events \\
+Rename\_Events & DOUBLE & Number of file rename events \\
+SetInfo\_Events & DOUBLE &  \\
+Write\_Bytes & DOUBLE & File bytes written \\
+Write\_Events & DOUBLE & Number of file write events \\
+agent\_id & STRING & Agent ID is a unique id for a Wintap install on a host. It is created on initial startup after install. \\
+arch & STRING & Host architecture \\
+args & STRING & Process arguments. Note: as a simple string, no parsing done \\
+avg\_bytes & DOUBLE & Average bytes over the interval \\
+avg\_packets & DOUBLE & Average packets over the interval \\
+commit\_charge & INT64 & Commit charge is the total amount of virtual memory guaranteed for all processes to fit in physical memory and the page file. \\
+commit\_peak & INT64 & Total memory commited \\
+conn\_id\_count & INT64 & Number of unique network connection IDs (5-tuples) \\
+cpu\_cycle\_count & INT64 & Always zero (note: more than zero cycles were generally used in a process) \\
+cpu\_utilization & INTEGER & Ignore: unable to collect. This *should* be a value indicating the percentage of cpu utilized by the process over its life, but turns out be harder to collect than expected. \\
+critical\_num\_sigma\_hits & DOUBLE & Number of unique Sigma rules hit \\
+dll\_first\_seen & TIMESTAMP & Earliest time seen \\
+dll\_last\_seen & TIMESTAMP & Latest time seen \\
+dll\_num\_uniq\_files & INT64 & Number of unique DDLs by name \\
+dlls & STRING[] & List of DDL names as an array \\
+duration\_seconds & DOUBLE & Elapsed process execution in seconds \\
+exit\_code & INT64 & Process exit code \\
+file\_first\_seen & TIMESTAMP & Earliest time seen \\
+file\_id & STRING & Unique ID for a file. Hash of hostname+fully qualified filename \\
+file\_last\_seen & TIMESTAMP & Latest time seen \\
+file\_md5 & STRING & MD5 hash of the binary process/dll \\
+file\_num\_raw\_rows & DOUBLE & Number of rows of file activity from the raw data. \\
+file\_sha2 & STRING & SHA2 hash of the file contents \\
+filename & STRING & Fully qualified filename \\
+first\_seen & TIMESTAMP & Earliest time seen \\
+hard\_fault\_count & INTEGER & Count of hard page faults \\
+high\_num\_sigma\_hits & INT64 & Number of unique Sigma rules hit \\
+high\_num\_sigma\_rows & INT64 & Number of times Sigma rules hit for this entity \\
+hostname & STRING & Hostname data collected from \\
+label\_num\_hits & INT64 & Number of unique labels hit \\
+label\_num\_sources & INT64 & Number of unique sources of labels \\
+label\_num\_uniq\_annotations & INT64 & Number of unqiue annotations \\
+label\_source & STRING & For now, only a single source: "networkx" \\
+last\_seen & TIMESTAMP & Latest time seen \\
+lolbas\_cats & STRING[] & List categories from hits \\
+lolbas\_mitre & STRING[] & List of Mitre codes from hits \\
+lolbas\_num\_rows & INT64 & Number of hits \\
+lolbas\_privs & STRING[] & List of priviledges from hist \\
+low\_num\_sigma\_hits & INT64 & Number of unique Sigma rules hit \\
+low\_num\_sigma\_rows & INT64 & Number of times Sigma rules hit for this entity \\
+max\_bytes & DOUBLE & Max bytes in the interval \\
+max\_packets & DOUBLE & Max packets in the interval \\
+medium\_num\_sigma\_hits & INT64 & Number of unique Sigma rules hit \\
+medium\_num\_sigma\_rows & INT64 & Number of times Sigma rules hit for this entity \\
+min\_bytes & DOUBLE & Min bytes in the interval \\
+min\_packets & DOUBLE & Max packets in the interval \\
+mitre\_analytic\_ids & STRING[] & List of analytic IDs from hits \\
+mitre\_analytic\_types & STRING[][] & List of ananlytic types from hits \\
+mitre\_information\_domains & STRING[] & List domains from hits. Ex: Analytic, Host, Network \\
+mitre\_num\_rows & INT64 & Number of hits \\
+mitre\_subtypes & STRING[][] & List of subtypes from hits. Ex: Map building, Anomaly, Hostflow.  Process. \\
+net\_first\_seen & TIMESTAMP & Earliest time seen \\
+net\_last\_seen & TIMESTAMP & Latest time seen \\
+net\_num\_raw\_rows & DOUBLE & Number of rows in the raw data \\
+net\_recv\_size & DOUBLE & Total bytes received in the interval \\
+net\_rs\_total & DOUBLE & Total bytes sent/received in the interval \\
+net\_send\_size & DOUBLE & Total bytes sent in the interval \\
+net\_send\_vs\_recv & DOUBLE & Ratio of bytes sent/received in the interval \\
+net\_total\_events & DOUBLE & Total network events in the interval \\
+net\_total\_size & DOUBLE & Total bytes (send/receive) in the interval \\
+num\_agent\_id & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_args & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_file\_md5 & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_file\_sha2 & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_null\_filename & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_parent\_os\_pid & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_parent\_pid\_hash & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_name & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_path & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_start & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_process\_stop & DOUBLE & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_uniq\_file\_hash & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+num\_user\_name & INT64 & Number of unique values in the related column. Typically, the related column should only have 1 value. \\
+os & STRING & Operating System \\
+os\_family & STRING & OS Family: windows, linux, osx \\
+os\_pid & INTEGER & Operating system process id \\
+os\_version & STRING & Operating System Version \\
+parent\_os\_pid & INTEGER & OS Process ID of parent process \\
+parent\_pid\_hash & STRING & PID\_HASH of parent process \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+process\_name & STRING & Filename of executable \\
+process\_path & STRING & Fully qualified path of the process executable \\
+process\_started & TIMESTAMP & Process start timestamp \\
+process\_started\_seconds & DOUBLE & Process start time in unix epoch seconds \\
+process\_stop\_seconds & DOUBLE & Process stop in unix epoch seconds \\
+process\_term & TIMESTAMP & Process termination timestamp \\
+read\_operation\_count & INT64 & Count of number of read operations \\
+read\_transfer\_kilobytes & INT64 & Number of K bytes read \\
+reg\_createkeys & DOUBLE & Registry keys created \\
+reg\_deletekeys & DOUBLE & Registry keys deleted \\
+reg\_deletevalues & DOUBLE & Registry values deleted \\
+reg\_first\_seen & TIMESTAMP & Earliest time seen \\
+reg\_last\_seen & TIMESTAMP & Latest time seen \\
+reg\_reads & DOUBLE & Registry read events \\
+reg\_totals & DOUBLE & Total registry events \\
+reg\_writes & DOUBLE & Registry write events \\
+sq\_size & DOUBLE & Squared size of bytes in network packet. Ask Chris B! \\
+tcp\_accept\_count & DOUBLE & TCP Accepts \\
+tcp\_connect\_count & DOUBLE & TCP connects \\
+tcp\_disconnect\_count & DOUBLE & TCP disconnects \\
+tcp\_reconnect\_count & DOUBLE & TCP reconnects \\
+tcp\_recv\_count & DOUBLE & TCP packets received \\
+tcp\_recv\_size & DOUBLE & TCP bytes received \\
+tcp\_retransmit\_count & DOUBLE & TCP packets retransmitted \\
+tcp\_rs\_total & DOUBLE & TCP bytes total (send/received) \\
+tcp\_send\_count & DOUBLE & TCP bytes sent \\
+tcp\_send\_size & DOUBLE & TCP packets sent \\
+tcp\_send\_vs\_recv & DOUBLE & Ratio of TCP bytes sent/received \\
+tcp\_tcpcopy\_count & DOUBLE & TCP copy events. We think this is an event that is internal to the network stack on the host. \\
+tcp\_tcpcopy\_size & DOUBLE & TCP copy bytes \\
+token\_elevation\_type & INTEGER & Indicates UAC privilege status: 1 (Default) = no linked token, UAC disabled or non-admin account; 2 (Full) = elevated administrator with full rights after UAC approval; 3 (Limited) = filtered admin token before elevation with available full token; 4 = undocumented value, treat as unknown/reserved. \\
+total\_sigma\_hits & DOUBLE & Total Sigma hits over all crticality levels \\
+udp\_recv\_count & DOUBLE & UDP bytes received \\
+udp\_recv\_size & DOUBLE & UDP events received \\
+udp\_rs\_total & DOUBLE & Total UDP bytes sent/received \\
+udp\_send\_count & DOUBLE & UDP packets sent \\
+udp\_send\_size & DOUBLE & UDP bytes sent \\
+udp\_send\_vs\_recv & DOUBLE & Ratio of UDP bytes sent/recieved \\
+user\_name & STRING & Username. Note that on windows there are many usernames that represent system or other background activity \\
+write\_operation\_count & INT64 & Count of number of write operations \\
+write\_transfer\_kilobytes & INT64 & Number of K bytes written \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{sigma\_labels}
+\label{sec:sigma_labels}
+
+The sigma\_labels table is a key component in the threat detection pipeline, as it links process or entity activity to specific SIGMA rules. SIGMA is a standardized rule format for describing log-based detection patterns, often used for identifying suspicious or malicious behavior in systems. The sigma\_labels table provides a mapping between entities (like processes) and the SIGMA rules that matched their activity, along with metadata about the severity and type of the detection.
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+analytic\_id & STRING & Specific SIGMA rule hit. Value is a GUID \\
+entity & STRING & Wintap entity ID (hash). The type of entity (PID\_HASH, CONN\_ID, etc) is defined in the ENTITY\_TYPE column. Note: Currently, only PID\_HASHes are identified. \\
+entity\_type & STRING & Wintap entity type. Determines what kind of hash is in the ENTITY column. Ex: PID\_HASH, CONN\_ID, FILE\_ID \\
+time & TIMESTAMP & Timestamp of activity \\
+\hline
+\end{longtable}
+
+\needspace{4\baselineskip}
+\subsection{sigma\_labels\_summary}
+\label{sec:sigma_labels_summary}
+
+Aggregates data from sigma\_labels by PID\_HASH and pivots the severity levels into separate columns (e.g., critical\_num\_sigma\_hits, high\_num\_sigma\_hits).
+
+\begin{longtable}{|p{5cm}|p{2cm}|p{9cm}|}
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\tablename\ \thetable\ -- Continued from previous page} \\
+\hline
+\textbf{Column} & \textbf{Data Type} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{Continued on next page} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+critical\_num\_sigma\_hits & DOUBLE & Number of unique Sigma rules hit \\
+high\_num\_sigma\_hits & INT64 & Number of unique Sigma rules hit \\
+high\_num\_sigma\_rows & INT64 & Number of times Sigma rules hit for this entity \\
+low\_num\_sigma\_hits & INT64 & Number of unique Sigma rules hit \\
+low\_num\_sigma\_rows & INT64 & Number of times Sigma rules hit for this entity \\
+medium\_num\_sigma\_hits & INT64 & Number of unique Sigma rules hit \\
+medium\_num\_sigma\_rows & INT64 & Number of times Sigma rules hit for this entity \\
+pid\_hash & STRING & Globally unique process hash (hash from hostname, os pid, and start\_time) \\
+\hline
+\end{longtable}
+
+\twocolumn\end{document}
