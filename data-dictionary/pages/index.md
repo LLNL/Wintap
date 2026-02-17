@@ -8,13 +8,13 @@ title: Welcome to Wintap Data!
 
 [Data Dictionary](datadict)
 
-[**Wintap**](https://github.com/LLNL/Wintap) is an open-source host-based telemetry collection tool developed by **Lawrence Livermore National Laboratory (LLNL)**. It is designed to address the challenges of collecting, processing and analyzing host-based data in large-scale Windows environments, specifically to support cyberseurity research.
+[**Wintap**](https://github.com/LLNL/Wintap) is an open-source host-based telemetry collection tool developed by **Lawrence Livermore National Laboratory (LLNL)**. It is designed to address the challenges of collecting, processing and analyzing host-based data in large-scale Windows environments, specifically to support cybersecurity research.
 
 The [**ACME datasets**](https://gdo168.llnl.gov) are realistic, high-quality cybersecurity datasets generated using **Wintap** in simulated Windows business network environments. These datasets are designed to support hands-on learning, innovative research, and practical experience in cybersecurity. These datasets are released under the Creative Commons 4.0 license.
 
 **Wintap** ([GitHub](https://github.com/LLNL/Wintap)) and the [**ACME datasets**](https://gdo168.llnl.gov) are powerful tools for advancing cybersecurity research and operations. Wintap's granular data collection and flexible processing pipeline make it a valuable tool for studying cyber-attacks and developing detection tools. While ACME datasets provide realistic, labeled data for studying cyber-attacks and defenses. Together, they form a comprehensive framework for improving cybersecurity practices and fostering innovation in the field.
 
-In addtion to the ACME datasets, we also have the [**Dynamic Malware Behavior Dataset**](DMBD). This dataset is derived from 65,416 software samples with comprehensive execution logs. It can be used for training and evaluating machine learning models to distinguish between malicious and benign software based on their runtime behavior, with baseline accuracy of 95% that researchers are challenged to surpass.
+In addition to the ACME datasets, we also have the [**Dynamic Malware Behavior Dataset**](DMBD). This dataset is derived from 65,416 software samples with comprehensive execution logs. It can be used for training and evaluating machine learning models to distinguish between malicious and benign software based on their runtime behavior, with baseline accuracy of 95% that researchers are challenged to surpass.
 
 ---
 
