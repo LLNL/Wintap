@@ -94,7 +94,7 @@ namespace gov.llnl.wintap.core.shared
                 }
                 else // Linux and other Unix
                 {
-                    return "/var/lib/Lintap";
+                    return "/var/log/lintap";
                 }
             }
         }

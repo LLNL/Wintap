@@ -25,7 +25,6 @@
 
 		<!-- Exclude Windows-specific resolvers and managers -->
 		<Compile Remove="..\**\WindowsProcessResolver.cs" />
-		<Compile Remove="..\**\LinuxProcessResolver.cs" />
 		<Compile Remove="..\**\WindowsSubscriptionManager.cs" />
 		<Compile Remove="..\**\WindowsStateManager.cs" />
 		<Compile Remove="..\**\LinuxSubscriptionManager.cs" />

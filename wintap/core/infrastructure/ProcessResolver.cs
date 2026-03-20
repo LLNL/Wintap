@@ -46,19 +46,20 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             lock (_dbLock)
             {
+                string query = null;
                 try
                 {
                     var eventTimeStr = eventTime.ToString("yyyy-MM-dd HH:mm:ss");
 
-                    var query = $@"
-               SELECT pid_hash, parent_pid_hash, process_id, parent_process_id, 
-               process_name, image_path, command_line, create_time, 
-               exit_time, exit_code, source, user_name, md5_hash, sha2_hash
-               FROM process
-               WHERE process_id = {pid}
-               AND create_time <= '{eventTimeStr}'
-               ORDER BY create_time DESC
-               LIMIT 1";
+                    query = $@"
+                        SELECT pid_hash, parent_pid_hash, process_id, parent_process_id, 
+                        process_name, image_path, command_line, create_time, 
+                        exit_time, exit_code, source, user_name, md5_hash, sha2_hash
+                        FROM process
+                        WHERE process_id = {pid}
+                        AND create_time <= '{eventTimeStr}'
+                        ORDER BY create_time DESC
+                        LIMIT 1";
 
                     using var command = connection.CreateCommand();
                     command.CommandText = query;
@@ -76,7 +77,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     var owningProcess = new ProcessRecord
                     {
                         PidHash = reader.GetString(0),
-                        ParentPidHash = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        ParentPidHash = reader.IsDBNull(1) ? "fixparentpidhash" : reader.GetString(1),
                         ProcessId = reader.GetInt32(2),
                         ParentProcessId = reader.GetInt32(3),
                         ProcessName = reader.GetString(4),
@@ -87,8 +88,8 @@ namespace gov.llnl.wintap.core.infrastructure
                         ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
                         Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
                         UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
-                        MD5Hash = reader.IsDBNull(12) ? null : reader.GetString(12),
-                        SHA2Hash = reader.IsDBNull(13) ? null : reader.GetString(13)
+                        MD5Hash = reader.IsDBNull(12) ? "fixmd5" : reader.GetString(12),
+                        SHA2Hash = reader.IsDBNull(13) ? "fixsha2" : reader.GetString(13)
                     };
 
                     WintapLogger.Log.Append(
@@ -99,12 +100,35 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append(
-                        $"DuckDB error resolving PID {pid} at {eventTime:yyyy-MM-dd HH:mm:ss}: {ex.Message}",
-                        LogLevel.Error);
-                    return null;
+                    // Dig deep into the exception
+                    Console.WriteLine($"=== EXCEPTION DETAILS ===");
+                    Console.WriteLine($"Type: {ex.GetType().FullName}");
+                    Console.WriteLine($"Message: {ex.Message}");
+                    Console.WriteLine($"Source: {ex.Source}");
+                    Console.WriteLine($"Stack Trace:\n{ex.StackTrace}");
+
+                    // Check for inner exceptions (often where DuckDB errors hide)
+                    var innerEx = ex.InnerException;
+                    int level = 1;
+                    while (innerEx != null)
+                    {
+                        Console.WriteLine($"\n=== INNER EXCEPTION {level} ===");
+                        Console.WriteLine($"Type: {innerEx.GetType().FullName}");
+                        Console.WriteLine($"Message: {innerEx.Message}");
+                        Console.WriteLine($"Stack Trace:\n{innerEx.StackTrace}");
+                        innerEx = innerEx.InnerException;
+                        level++;
+                    }
+
+                    // Also log what we were trying to do
+                    Console.WriteLine($"\n=== CONTEXT ===");
+                    Console.WriteLine($"PID: {pid}");
+                    Console.WriteLine($"EventTime: {eventTime}");
+                    Console.WriteLine($"Query: {query}");
+
+                    throw;
                 }
-            }
+            }          
         }
 
 
@@ -167,11 +191,21 @@ namespace gov.llnl.wintap.core.infrastructure
 
             using var command = connection.CreateCommand();
             command.CommandText = query;
-            command.ExecuteNonQuery();
+            try
+            {
+                command.ExecuteNonQuery();
 
-            WintapLogger.Log.Append(
-                $"Registered process PID {message.PID}: {proc.Name} with process resolver",
-                LogLevel.Info);
+                WintapLogger.Log.Append(
+                    $"Registered process PID {message.PID}: {proc.Name} with process resolver",
+                    LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append(
+                    $"DuckDB registering PID {message.PID} {proc.Name}: {ex.Message}",
+                    LogLevel.Error);
+            }
+
         }
 
         /// <summary>
@@ -247,15 +281,26 @@ namespace gov.llnl.wintap.core.infrastructure
             using var command = connection.CreateCommand();
             command.CommandText = query;
 
-            var result = command.ExecuteScalar();
-
-            if (result == null)
+            try
             {
-                WintapLogger.Log.Append($"No PidHash found for PID {pid} at or before {createTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Warn);
+                var result = command.ExecuteScalar();
+
+                if (result == null)
+                {
+                    WintapLogger.Log.Append($"No PidHash found for PID {pid} at or before {createTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Warn);
+                    return null;
+                }
+
+                return result.ToString();
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append(
+                    $"No pidhash found for PID {pid} at or before {createTime:yyyy-MM-dd HH:mm:ss}: {ex.Message}",
+                    LogLevel.Error);
                 return null;
             }
 
-            return result.ToString();
         }
 
         /// <summary>

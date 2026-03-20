@@ -535,7 +535,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 Dictionary<string, ProcessRecord> systemProcesses = new Dictionary<string, ProcessRecord>();
                 systemProcesses.Add($"4_{StateManager.MachineBootTime.ToUniversalTime()}", CreateSystemProcess(4, "System", Path.Combine(Environment.SystemDirectory, "ntoskrnl.exe"), StateManager.MachineBootTime.ToUniversalTime()));
                 systemProcesses.Add($"0_{StateManager.MachineBootTime.ToUniversalTime()}", CreateSystemProcess(0, "System Idle Process", "idle", StateManager.MachineBootTime.ToUniversalTime()));
-                systemProcesses.Add($"-1_{StateManager.MachineBootTime.ToUniversalTime()}",CreateSystemProcess(-1, "Unknown", "unknown", StateManager.MachineBootTime.ToUniversalTime()));
+                systemProcesses.Add($"-1_{StateManager.MachineBootTime.ToUniversalTime()}",CreateSystemProcess(-1, "Unknown", "unknown-sys", StateManager.MachineBootTime.ToUniversalTime()));
                 List<ProcessRecord> processRecords = ReconstructProcessTreeFromSecurityLog(systemProcesses);
                 WintapLogger.Log.Append($"Total process records to send: {processRecords.Count}", LogLevel.Info);
                 int sendCounter = 0;

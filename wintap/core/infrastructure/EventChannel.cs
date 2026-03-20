@@ -318,7 +318,7 @@ namespace gov.llnl.wintap.core.infrastructure
             catch (Exception ex)
             {
                 WintapLogger.Log.Append(
-                    $"Error sending event for {streamedEvent.MessageType}: {ex.Message}",
+                    $"Error sending event for {streamedEvent.MessageType}: {ex.ToString()}",
                     LogLevel.Error);
             }
         }
