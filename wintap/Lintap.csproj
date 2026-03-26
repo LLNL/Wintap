@@ -10,6 +10,8 @@
 		<DefineConstants>$(DefineConstants);LINUX</DefineConstants>
 		<UseSharedCompilation>false</UseSharedCompilation>
 		<UseCommonOutputDirectory>false</UseCommonOutputDirectory>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
 
 		<!-- Prevent duplicate assembly attributes -->
 		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
@@ -46,25 +48,51 @@
 		<None Include="platform/linux/sensor/ebpf/tracers/*.bpf.o" 
 			CopyToOutputDirectory="PreserveNewest"
 			Link="tracers/%(Filename)%(Extension)" />
+		<Content Include="core/shared/systemprompt.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>systemprompt.txt</Link>
+		</Content>
 	</ItemGroup>
 
 	<!-- Build and copy MCP server for Linux -->
-	<Target Name="BuildMcpServer" BeforeTargets="Build" Condition="Exists('..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj')">
+	<PropertyGroup>
+		<McpServerProject>$(MSBuildProjectDirectory)\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj</McpServerProject>
+		<McpTempDir>$(OutputPath)mcp_temp\</McpTempDir>
+		<McpOutputDir>$(OutputPath)mcp\</McpOutputDir>
+	</PropertyGroup>
+
+	<Target Name="BuildMcpServer" BeforeTargets="Build;Publish" Condition="Exists('$(McpServerProject)')">
 		<Message Text="Building MCP server for Linux..." Importance="high" />
-		<Exec Command="dotnet publish ..\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj -c $(Configuration) -r linux-x64 --self-contained false -o $(OutputPath)mcp_temp" ContinueOnError="true" IgnoreExitCode="true" />
+		<MakeDir Directories="$(McpTempDir)" />
+		<Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained false -o &quot;$(McpTempDir)&quot;" ContinueOnError="false" IgnoreExitCode="false" />
 	</Target>
 
-	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(OutputPath)mcp_temp\wintap_mcp_server')">
-		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server" DestinationFiles="$(OutputPath)lintap_mcp_server" SkipUnchangedFiles="true" />
-		<Copy SourceFiles="$(OutputPath)mcp_temp\wintap_mcp_server.dll" DestinationFiles="$(OutputPath)lintap_mcp_server.dll" SkipUnchangedFiles="true" />
-		<RemoveDir Directories="$(OutputPath)mcp_temp" />
-		<Message Text="✓ Built and copied lintap_mcp_server" Importance="high" />
+	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(McpTempDir)wintap_mcp_server')">
+		<MakeDir Directories="$(McpOutputDir)" />
+		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server" DestinationFiles="$(McpOutputDir)wintap_mcp_server" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server.dll" DestinationFiles="$(McpOutputDir)wintap_mcp_server.dll" SkipUnchangedFiles="true" Condition="Exists('$(McpTempDir)wintap_mcp_server.dll')" />
+		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server.deps.json" DestinationFiles="$(McpOutputDir)wintap_mcp_server.deps.json" SkipUnchangedFiles="true" Condition="Exists('$(McpTempDir)wintap_mcp_server.deps.json')" />
+		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server.runtimeconfig.json" DestinationFiles="$(McpOutputDir)wintap_mcp_server.runtimeconfig.json" SkipUnchangedFiles="true" Condition="Exists('$(McpTempDir)wintap_mcp_server.runtimeconfig.json')" />
+		<ItemGroup>
+			<McpSupportFiles Include="$(McpTempDir)*.so" />
+		</ItemGroup>
+		<Copy SourceFiles="@(McpSupportFiles)" DestinationFolder="$(McpOutputDir)" SkipUnchangedFiles="true" Condition="'@(McpSupportFiles)' != ''" />
+		<RemoveDir Directories="$(McpTempDir)" />
+		<Message Text="Built and copied wintap_mcp_server to mcp" Importance="high" />
+	</Target>
+
+	<Target Name="CopyMcpServerToPublish" AfterTargets="Publish" Condition="Exists('$(McpOutputDir)wintap_mcp_server')">
+		<MakeDir Directories="$(PublishDir)mcp" />
+		<ItemGroup>
+			<McpPublishFiles Include="$(McpOutputDir)**\*" />
+		</ItemGroup>
+		<Copy SourceFiles="@(McpPublishFiles)" DestinationFiles="@(McpPublishFiles->'$(PublishDir)mcp\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
 	</Target>
 
 	<!-- Set executable permissions on Linux binaries -->
 	<Target Name="SetExecutablePermissions" AfterTargets="Publish" Condition="'$(OS)' == 'Unix'">
 		<Exec Command="chmod +x $(PublishDir)Lintap" ContinueOnError="true" />
-		<Exec Command="chmod +x $(PublishDir)lintap_mcp_server" ContinueOnError="true" Condition="Exists('$(PublishDir)lintap_mcp_server')" />
+		<Exec Command="chmod +x $(PublishDir)mcp/wintap_mcp_server" ContinueOnError="true" Condition="Exists('$(PublishDir)mcp/wintap_mcp_server')" />
 		<Message Text="✓ Set executable permissions on Lintap binaries" Importance="high" />
 	</Target>
 </Project>

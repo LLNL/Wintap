@@ -106,6 +106,8 @@ namespace gov.llnl.wintap.core.api
                     TokensUsed = 0
                 };
 
+                WintapLogger.Log.Append($"Inference response: {response.Text}", LogLevel.Info);
+
                 string jsonString = JsonConvert.SerializeObject(inf);
                 await this.hubContext.Clients.All.SendAsync("ReceiveMessage", inf, "OK");
 
@@ -117,6 +119,37 @@ namespace gov.llnl.wintap.core.api
             }
 
             WintapLogger.Log.Append($"Inference complete", LogLevel.Info);
+        }
+
+        [HttpGet("tools")]
+        public async Task<IActionResult> GetTools()
+        {
+            try
+            {
+                IList<McpClientTool> tools = await mcpClient.ListToolsAsync();
+
+                return Ok(new
+                {
+                    mcpInitialized = true,
+                    toolCount = tools.Count,
+                    tools = tools.Select(tool => new
+                    {
+                        name = tool.Name,
+                        description = tool.Description
+                    })
+                });
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error listing MCP tools: {ex.Message}", LogLevel.Error);
+
+                return StatusCode(500, new
+                {
+                    mcpInitialized = false,
+                    error = ex.Message,
+                    tools = Array.Empty<object>()
+                });
+            }
         }
 
 

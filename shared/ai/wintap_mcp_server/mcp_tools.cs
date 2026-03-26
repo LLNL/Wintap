@@ -5,7 +5,9 @@
  */
 
 using ModelContextProtocol.Server;
+using gov.llnl.wintap.helpers;
 using System.ComponentModel;
+using System.Net;
 
 namespace gov.llnl.wintap.ai.mcp
 {
@@ -118,16 +120,48 @@ namespace gov.llnl.wintap.ai.mcp
 
         }
 
-        [McpServerTool(Name = "TellTime"), Description("Tells the current local date and time")]
-        public static string TellTime(CancellationToken cancellationToken)
+        [McpServerTool(Name = "get_current_datetime"), Description("Returns the current system date and time from the Linux host.")]
+        public static string GetCurrentDateTime(CancellationToken cancellationToken)
         {
-            return DateTime.Now.ToString();
+            try
+            {
+                DateTimeOffset utcNow = DateTimeOffset.UtcNow;
+                DateTimeOffset localNow = DateTimeOffset.Now;
+
+                string response = "{" +
+                    $"\"utc\":\"{EscapeJson(utcNow.ToString("O"))}\"," +
+                    $"\"local\":\"{EscapeJson(localNow.ToString("O"))}\"," +
+                    $"\"timezone\":\"{EscapeJson(TimeZoneInfo.Local.Id)}\"," +
+                    $"\"unix_epoch\":{utcNow.ToUnixTimeSeconds()}," +
+                    $"\"hostname\":\"{EscapeJson(Dns.GetHostName())}\"" +
+                    "}";
+
+                Logit.Instance.Append($"get_current_datetime returning: {response}", LogVerboseLevel.Normal);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                Logit.Instance.Append($"get_current_datetime failed: {ex}", LogVerboseLevel.Normal);
+                throw;
+            }
         }
 
         [McpServerTool(Name = "RunSQL"), Description("Allows you to run arbitrary sql commands on the Wintap telemetry database")]
         public static string RunSQL(string sqlCmd, CancellationToken cancellationToken)
         {
             return DuckDBManager.ExecuteSQL(sqlCmd, cancellationToken);
+        }
+
+        private static string EscapeJson(string value)
+        {
+            return value
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\b", "\\b")
+                .Replace("\f", "\\f")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
         }
     }
 

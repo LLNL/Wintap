@@ -110,6 +110,13 @@ try
 
     WintapLogger.Log.Append("MCP client initialized successfully", LogLevel.Info);
 
+    IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();
+    WintapLogger.Log.Append($"MCP tool count: {mcpTools.Count}", LogLevel.Info);
+    foreach (McpClientTool tool in mcpTools)
+    {
+        WintapLogger.Log.Append($"MCP tool: {tool.Name}", LogLevel.Info);
+    }
+
     // ─── Chat Client Configuration (Provider-Specific) ────────────────────
     if (aiProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
     {
