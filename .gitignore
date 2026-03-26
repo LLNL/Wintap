@@ -353,3 +353,6 @@ MigrationBackup/
 
 # eBPF compiled objects
 wintap/platform/linux/sensor/ebpf/tracers/*.bpf.o
+/documentation/instructions/workbench-on-linux.md
+/wintap/mcp/libduckdb.so
+/wintap/mcp/wintap_mcp_server
