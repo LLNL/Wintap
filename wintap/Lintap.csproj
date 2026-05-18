@@ -64,7 +64,16 @@
 	<Target Name="BuildMcpServer" BeforeTargets="Build;Publish" Condition="Exists('$(McpServerProject)')">
 		<Message Text="Building MCP server for Linux..." Importance="high" />
 		<MakeDir Directories="$(McpTempDir)" />
-		<Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained false -o &quot;$(McpTempDir)&quot;" ContinueOnError="false" IgnoreExitCode="false" />
+		
+		<!-- We create a variable that includes '-r ID' only if ID is present -->
+		<PropertyGroup>
+			<RuntimeArg Condition="'$(RuntimeIdentifier)' != ''"> -r $(RuntimeIdentifier)</RuntimeArg>
+			<RuntimeArg Condition="'$(RuntimeIdentifier)' == ''"></RuntimeArg>
+		</PropertyGroup>
+
+		<Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration)$(RuntimeArg) --self-contained false -o &quot;$(McpTempDir)&quot;" 
+			ContinueOnError="false" 
+			IgnoreExitCode="false" />
 	</Target>
 
 	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(McpTempDir)wintap_mcp_server')">
