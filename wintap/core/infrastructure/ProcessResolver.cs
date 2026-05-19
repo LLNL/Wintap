@@ -138,17 +138,20 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         public bool ProcessExistsForPid(int pid, long eventTime)
         {
-            var query = $@"
-                SELECT COUNT(*) 
-                FROM process 
-                WHERE process_id = {pid}";
+            lock (_dbLock)
+            {
+                var query = $@"
+                    SELECT COUNT(*) 
+                    FROM process 
+                    WHERE process_id = {pid}";
 
-            using var command = connection.CreateCommand();
-            command.CommandText = query;
+                using var command = connection.CreateCommand();
+                command.CommandText = query;
 
-            var count = (long)command.ExecuteScalar();
+                var count = (long)command.ExecuteScalar();
 
-            return count > 0;
+                return count > 0;
+            }
         }
 
         /// <summary>
@@ -167,45 +170,47 @@ namespace gov.llnl.wintap.core.infrastructure
             // Convert EventTime (FileTime format) to DateTime
             var createTime = DateTime.FromFileTimeUtc(message.EventTime).ToUniversalTime();
 
-            var query = $@"
-                INSERT OR REPLACE INTO process (
-                        pid_hash, parent_pid_hash, process_id, parent_process_id,
-                        process_name, image_path, command_line, create_time,
-                        exit_time, exit_code, source, user_name, md5_hash, sha2_hash
-                    ) VALUES (
-                        '{EscapeSql(message.PidHash)}',
-                        {(string.IsNullOrEmpty(proc.ParentPidHash) ? "NULL" : $"'{EscapeSql(proc.ParentPidHash)}'")},
-                        {message.PID},
-                        {proc.ParentPID},
-                        '{EscapeSql(proc.Name)}',
-                        '{EscapeSql(proc.Path)}',
-                        '{EscapeSql(proc.CommandLine)}',
-                        TIMESTAMP '{createTime:yyyy-MM-dd HH:mm:ss}',
-                        NULL,
-                        NULL,
-                        'real_time',
-                        '{EscapeSql(proc.User)}',
-                        {(string.IsNullOrEmpty(proc.MD5) ? "NULL" : $"'{EscapeSql(proc.MD5)}'")},
-                        {(string.IsNullOrEmpty(proc.SHA2) ? "NULL" : $"'{EscapeSql(proc.SHA2)}'")}
-                    )";
-
-            using var command = connection.CreateCommand();
-            command.CommandText = query;
-            try
+            lock (_dbLock)
             {
-                command.ExecuteNonQuery();
+                var query = $@"
+                    INSERT OR REPLACE INTO process (
+                            pid_hash, parent_pid_hash, process_id, parent_process_id,
+                            process_name, image_path, command_line, create_time,
+                            exit_time, exit_code, source, user_name, md5_hash, sha2_hash
+                        ) VALUES (
+                            '{EscapeSql(message.PidHash)}',
+                            {(string.IsNullOrEmpty(proc.ParentPidHash) ? "NULL" : $"'{EscapeSql(proc.ParentPidHash)}'")},
+                            {message.PID},
+                            {proc.ParentPID},
+                            '{EscapeSql(proc.Name)}',
+                            '{EscapeSql(proc.Path)}',
+                            '{EscapeSql(proc.CommandLine)}',
+                            TIMESTAMP '{createTime:yyyy-MM-dd HH:mm:ss}',
+                            NULL,
+                            NULL,
+                            'real_time',
+                            '{EscapeSql(proc.User)}',
+                            {(string.IsNullOrEmpty(proc.MD5) ? "NULL" : $"'{EscapeSql(proc.MD5)}'")},
+                            {(string.IsNullOrEmpty(proc.SHA2) ? "NULL" : $"'{EscapeSql(proc.SHA2)}'")}
+                        )";
 
-                WintapLogger.Log.Append(
-                    $"Registered process PID {message.PID}: {proc.Name} with process resolver",
-                    LogLevel.Info);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append(
-                    $"DuckDB registering PID {message.PID} {proc.Name}: {ex.Message}",
-                    LogLevel.Error);
-            }
+                using var command = connection.CreateCommand();
+                command.CommandText = query;
+                try
+                {
+                    command.ExecuteNonQuery();
 
+                    WintapLogger.Log.Append(
+                        $"Registered process PID {message.PID}: {proc.Name} with process resolver",
+                        LogLevel.Info);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append(
+                        $"DuckDB registering PID {message.PID} {proc.Name}: {ex.Message}",
+                        LogLevel.Error);
+                }
+            }
         }
 
         /// <summary>
@@ -283,15 +288,18 @@ namespace gov.llnl.wintap.core.infrastructure
 
             try
             {
-                var result = command.ExecuteScalar();
-
-                if (result == null)
+                lock (_dbLock)
                 {
-                    WintapLogger.Log.Append($"No PidHash found for PID {pid} at or before {createTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Warn);
-                    return null;
-                }
+                    var result = command.ExecuteScalar();
 
-                return result.ToString();
+                    if (result == null)
+                    {
+                        WintapLogger.Log.Append($"No PidHash found for PID {pid} at or before {createTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Warn);
+                        return null;
+                    }
+
+                    return result.ToString();
+                }
             }
             catch (Exception ex)
             {
@@ -318,32 +326,35 @@ namespace gov.llnl.wintap.core.infrastructure
 
             var processes = new List<ProcessRecord>();
 
-            using var command = connection.CreateCommand();
-            command.CommandText = query;
-
-            using var reader = command.ExecuteReader();
-
-            while (reader.Read())
+            lock (_dbLock)
             {
-                var process = new ProcessRecord
-                {
-                    PidHash = reader.GetString(0),
-                    ParentPidHash = reader.IsDBNull(1) ? "" : reader.GetString(1),
-                    ProcessId = reader.GetInt32(2),
-                    ParentProcessId = reader.GetInt32(3),
-                    ProcessName = reader.GetString(4),
-                    ProcessPath = reader.IsDBNull(5) ? null : reader.GetString(5),
-                    CommandLine = reader.IsDBNull(6) ? null : reader.GetString(6),
-                    CreateTime = reader.GetDateTime(7),
-                    ExitTime = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
-                    ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
-                    Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
-                    UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
-                    MD5Hash = reader.IsDBNull(12) ? null : reader.GetString(12),
-                    SHA2Hash = reader.IsDBNull(13) ? null : reader.GetString(13)
-                };
+                using var command = connection.CreateCommand();
+                command.CommandText = query;
 
-                processes.Add(process);
+                using var reader = command.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    var process = new ProcessRecord
+                    {
+                        PidHash = reader.GetString(0),
+                        ParentPidHash = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        ProcessId = reader.GetInt32(2),
+                        ParentProcessId = reader.GetInt32(3),
+                        ProcessName = reader.GetString(4),
+                        ProcessPath = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        CommandLine = reader.IsDBNull(6) ? null : reader.GetString(6),
+                        CreateTime = reader.GetDateTime(7),
+                        ExitTime = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
+                        ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
+                        Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
+                        UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                        MD5Hash = reader.IsDBNull(12) ? null : reader.GetString(12),
+                        SHA2Hash = reader.IsDBNull(13) ? null : reader.GetString(13)
+                    };
+
+                    processes.Add(process);
+                }
             }
 
             WintapLogger.Log.Append(
@@ -360,19 +371,22 @@ namespace gov.llnl.wintap.core.infrastructure
         public void ClearDB()
         {
             WintapLogger.Log.Append("Starting ClearDB...", LogLevel.Info);
-            var countQuery = "SELECT COUNT(*) FROM process";
+            lock (_dbLock)
+            {
+                var countQuery = "SELECT COUNT(*) FROM process";
 
-            using var countCommand = connection.CreateCommand();
-            countCommand.CommandText = countQuery;
-            var recordCount = (long)countCommand.ExecuteScalar();
+                using var countCommand = connection.CreateCommand();
+                countCommand.CommandText = countQuery;
+                var recordCount = (long)countCommand.ExecuteScalar();
 
-            var deleteQuery = "DELETE FROM process";
+                var deleteQuery = "DELETE FROM process";
 
-            using var deleteCommand = connection.CreateCommand();
-            deleteCommand.CommandText = deleteQuery;
-            deleteCommand.ExecuteNonQuery();
+                using var deleteCommand = connection.CreateCommand();
+                deleteCommand.CommandText = deleteQuery;
+                deleteCommand.ExecuteNonQuery();
 
-            WintapLogger.Log.Append($"Cleared {recordCount} process records from event store",LogLevel.Info);
+                WintapLogger.Log.Append($"Cleared {recordCount} process records from event store", LogLevel.Info);
+            }
         }
     }
 
