@@ -81,6 +81,17 @@ namespace gov.llnl.wintap.core.shared
         {
             get
             {
+                if (!string.IsNullOrEmpty(_overriddenDataRoot))
+                {
+                    return _overriddenDataRoot;
+                }
+
+                string envOverride = Environment.GetEnvironmentVariable("WINTAP_DATA_ROOT");
+                if (!string.IsNullOrEmpty(envOverride))
+                {
+                    return envOverride;
+                }
+
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     return Path.Combine(
@@ -94,9 +105,16 @@ namespace gov.llnl.wintap.core.shared
                 }
                 else // Linux and other Unix
                 {
-                    return "/var/log/lintap";
+                    return "/var/lib/lintap";
                 }
             }
+        }
+
+        private static string _overriddenDataRoot = null;
+
+        internal static void SetDataRoot(string path)
+        {
+            _overriddenDataRoot = path;
         }
 
         static internal string AppName

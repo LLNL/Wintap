@@ -15,6 +15,7 @@ namespace gov.llnl.wintap.core.etl.model
         public int UploadIntervalSec { get; set; }
         public bool WriteToParquet { get; set; }
         public bool WriteToCsv { get; set; }
+        public string DataRootPath { get; set; }
         public List<Adapter> Adapters = new List<Adapter>();
         public class Adapter
         {

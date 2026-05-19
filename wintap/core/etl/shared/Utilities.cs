@@ -97,7 +97,14 @@ namespace gov.llnl.wintap.core.etl.shared
             {
                 string assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 string etlConfig = Path.Combine(assemblyDirectory, "ETLConfig.json");
-                return JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(etlConfig));
+                if (File.Exists(etlConfig))
+                {
+                    config = JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(etlConfig));
+                    if (config != null && !string.IsNullOrEmpty(config.DataRootPath))
+                    {
+                        Env.SetDataRoot(config.DataRootPath);
+                    }
+                }
             }
             catch (Exception ex)
             {
