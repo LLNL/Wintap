@@ -66,7 +66,7 @@ namespace gov.llnl.wintap.core.etl.extract
         private HostSerializer()
         {
             hostId = new HostId();
-            etlRoot = gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("host_sensor");
+            etlRoot = gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("host");
             hostId.Hostname = Environment.MachineName;
             hostContainer = getHost();
         }
@@ -133,7 +133,7 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 var macIps = gov.llnl.wintap.core.etl.shared.Utilities.GetMacIps();
                 string macIpFile = "macip-" + DateTime.UtcNow.ToFileTimeUtc() + ".parquet";
-                DirectoryInfo macIpDir = new DirectoryInfo(gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("macip_sensor"));
+                DirectoryInfo macIpDir = new DirectoryInfo(gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("macip"));
                 if (!macIpDir.Exists)
                 {
                     macIpDir.Create();

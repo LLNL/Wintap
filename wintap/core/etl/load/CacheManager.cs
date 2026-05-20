@@ -218,8 +218,8 @@ namespace gov.llnl.wintap.core.etl.load
         {
             bool genHost = true;
             bool genMacIp = true;
-            DirectoryInfo hostDirInfo = new DirectoryInfo(gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("host_sensor"));
-            DirectoryInfo macipDirInfo = new DirectoryInfo(gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("macip_sensor"));
+            DirectoryInfo hostDirInfo = new DirectoryInfo(gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("host"));
+            DirectoryInfo macipDirInfo = new DirectoryInfo(gov.llnl.wintap.core.etl.shared.Utilities.GetFileStorePath("macip"));
 
             if (!hostDirInfo.Exists)
             {

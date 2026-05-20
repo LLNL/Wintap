@@ -116,6 +116,8 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 case "raw_host_sensor":
                     return "raw_host";
+                case "raw_macip_sensor":
+                    return "raw_macip";
                 case "raw_file":
                     return "raw_process_file";
                 case "raw_processstop":

@@ -11,6 +11,7 @@ using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
+using EtlPaths = gov.llnl.wintap.core.etl.shared.Paths;
 using gov.llnl.wintap.Properties;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -303,6 +304,16 @@ app.UseEndpoints(endpoints =>
 // ═══════════════════════════════════════════════════════════════════════════
 // APPLICATION STARTUP
 // ═══════════════════════════════════════════════════════════════════════════
+
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    string parquetPath = EtlPaths.ParquetDataPath;
+    string rawSensorPath = Path.Combine(parquetPath, "raw_sensor");
+    Console.WriteLine($"Wintap parquet data path: {parquetPath}");
+    Console.WriteLine($"Wintap raw_sensor data path: {rawSensorPath}");
+    WintapLogger.Log.Append($"Wintap parquet data path: {parquetPath}", LogLevel.Info);
+    WintapLogger.Log.Append($"Wintap raw_sensor data path: {rawSensorPath}", LogLevel.Info);
+});
 
 WintapLogger.Log.Append("Running app", LogLevel.Info);
 app.Run();
