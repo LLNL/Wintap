@@ -7,10 +7,9 @@ using System.IO;
 namespace gov.llnl.wintap.core.etl.load
 {
     /// <summary>
-    /// Materializes serializer parquet files directly into the raw_sensor partition
-    /// layout used by downstream processing. This mirrors mergedtoraw.py's naming
-    /// and partitioning behavior, but skips the intermediate merged directory and
-    /// uses DuckDB as the parquet writer.
+    /// Materializes serializer parquet files directly into the canonical raw_sensor
+    /// partition layout used by downstream DBT processing. This skips the legacy
+    /// intermediate merged directory and uses DuckDB as the parquet writer.
     /// </summary>
     internal static class RawSensorWriter
     {
@@ -42,7 +41,7 @@ namespace gov.llnl.wintap.core.etl.load
 
             if (!string.IsNullOrWhiteSpace(protocol))
             {
-                outputDirectory = Path.Combine(outputDirectory, $"proto={protocol}");
+                outputDirectory = Path.Combine(outputDirectory, $"protoPK={protocol}");
             }
 
             Directory.CreateDirectory(outputDirectory);
