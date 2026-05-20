@@ -54,26 +54,9 @@ namespace gov.llnl.wintap.core.etl.load
                             try
                             {
                                 sensorName = defaultMergeType;
-                                using (var duckDBConnection = new DuckDBConnection("Data Source=:memory:"))
-                                {
-                                    // duckdb doesn't like the '+' character in table names, so name the table as  sensorName and then rename the file on disk to our expected format
-                                    duckDBConnection.Open();
-                                    var command = duckDBConnection.CreateCommand();
-                                    string parquetDir = Path.Combine(Paths.ParquetDataPath, "merged");
-                                    string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
-                                    string tempFileName = sensorName;
-                                    command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/" + defaultMergeType + "*.parquet';";
-                                    WintapLogger.Log.Append("Duck db command: " + command.CommandText, LogLevel.Info);
-                                    var executeNonQuery = command.ExecuteNonQuery();
-                                    command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
-                                    executeNonQuery = command.ExecuteNonQuery();
-                                    FileInfo tempFile = new FileInfo(Path.Combine(parquetDir, tempFileName + ".parquet"));
-                                    FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir, mergeFileName + ".parquet"));
-                                    tempFile.MoveTo(mergeFile.FullName);
-                                    command.CommandText = $"DROP TABLE IF EXISTS {tempFileName}";
-                                    command.ExecuteNonQuery();
-                                    WintapLogger.Log.Append("Table dropped: " + tempFileName, LogLevel.Info);
-                                }
+                                string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString() + ".parquet";
+                                string sourceParquetGlob = parquetSearchRoot.Replace("\\", "/") + "/" + defaultMergeType + "*.parquet";
+                                RawSensorWriter.MaterializeFromParquetGlob(sourceParquetGlob, mergeFileName);
                             }
                             catch(Exception ex)
                             {
@@ -88,26 +71,9 @@ namespace gov.llnl.wintap.core.etl.load
                 {
                     WintapLogger.Log.Append("Attempting to query parquets at root: " + parquetSearchRoot, LogLevel.Info);
                     sensorName = renameSensor(sensorName);  // e.g. tcp/udp
-                    using (var duckDBConnection = new DuckDBConnection("Data Source=:memory:"))
-                    {
-                        // duckdb doesn't like the '+' character in table names, so name the table as  sensorName and then rename the file on disk to our expected format
-                        duckDBConnection.Open();
-                        var command = duckDBConnection.CreateCommand();
-                        string parquetDir = Path.Combine(Paths.ParquetDataPath, "merged");
-                        string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString();
-                        string tempFileName = sensorName;
-                        command.CommandText = "CREATE TABLE '" + tempFileName + "' as SELECT * FROM '" + parquetSearchRoot.Replace("\\", "/") + "/*.parquet';";
-                        WintapLogger.Log.Append("Duck db command: " + command.CommandText, LogLevel.Info);
-                        var executeNonQuery = command.ExecuteNonQuery();
-                        command.CommandText = "EXPORT DATABASE '" + parquetDir + "' (FORMAT PARQUET);";
-                        executeNonQuery = command.ExecuteNonQuery();
-                        FileInfo tempFile = new FileInfo(Path.Combine(parquetDir, tempFileName + ".parquet"));
-                        FileInfo mergeFile = new FileInfo(Path.Combine(parquetDir, mergeFileName + ".parquet"));
-                        tempFile.MoveTo(mergeFile.FullName);
-                        command.CommandText = $"DROP TABLE IF EXISTS {tempFileName}";
-                        command.ExecuteNonQuery();
-                        WintapLogger.Log.Append("Table dropped: " + tempFileName, LogLevel.Info);
-                    }
+                    string mergeFileName = Environment.MachineName.ToLower() + "+raw_" + sensorName.Replace("serializer", "") + "+" + mergeTime.ToFileTimeUtc().ToString() + ".parquet";
+                    string sourceParquetGlob = parquetSearchRoot.Replace("\\", "/") + "/*.parquet";
+                    RawSensorWriter.MaterializeFromParquetGlob(sourceParquetGlob, mergeFileName);
                 }
             }
             catch (Exception ex)

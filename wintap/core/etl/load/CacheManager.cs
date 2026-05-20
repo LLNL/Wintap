@@ -26,7 +26,6 @@ namespace gov.llnl.wintap.core.etl.load
         private BackgroundWorker uploaderThread;
         private bool svcRunning;
         private DirectoryInfo cacheDir;
-        private DirectoryInfo mergeDir;
         private long bytesOnDisk;
         private int mergeHelperPid;
         private List<IUpload> uploaders;
@@ -49,7 +48,6 @@ namespace gov.llnl.wintap.core.etl.load
                 parquetDir.Create();
             }
             cacheDir = new DirectoryInfo(Paths.ParquetDataPath);
-            mergeDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "merged"));
             bytesOnDisk = getCurrentCacheDirSize();
 
             WintapLogger.Log.Append("Loading data uploaders...", LogLevel.Info);
@@ -74,7 +72,7 @@ namespace gov.llnl.wintap.core.etl.load
             }
             createMetaRecords();
             WintapLogger.Log.Append("Total uploaders: " + uploaders.Count, LogLevel.Info);
-            clearMerge();
+            clearRawSensor();
             workerThread = new BackgroundWorker();
             workerThread.DoWork += WorkerThread_DoWork;
         }
@@ -113,10 +111,6 @@ namespace gov.llnl.wintap.core.etl.load
         private void WorkerThread_DoWork(object sender, DoWorkEventArgs e)
         {
             WintapLogger.Log.Append("uploader thread is running", LogLevel.Info);
-            if (!mergeDir.Exists)
-            {
-                mergeDir.Create();
-            }
             Stopwatch uploadTimer = new Stopwatch();
             uploadTimer.Restart();
             while (svcRunning)
@@ -124,7 +118,8 @@ namespace gov.llnl.wintap.core.etl.load
                 if (uploadTimer.Elapsed.TotalSeconds > etlConfig.UploadIntervalSec)
                 {
                     doMerge();
-                    if (mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories).Count() > 0)
+                    DirectoryInfo rawSensorDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "raw_sensor"));
+                    if (rawSensorDir.Exists && rawSensorDir.GetFiles("*.parquet", SearchOption.AllDirectories).Count() > 0)
                     {
                         WintapLogger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Info);
                         try
@@ -165,9 +160,15 @@ namespace gov.llnl.wintap.core.etl.load
 
         private void upload()
         {
-            WintapLogger.Log.Append("CacheManager upload method is starting. merge directory: " + mergeDir.FullName, LogLevel.Info);
+            DirectoryInfo rawSensorDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "raw_sensor"));
+            WintapLogger.Log.Append("CacheManager upload method is starting. raw_sensor directory: " + rawSensorDir.FullName, LogLevel.Info);
 
-            foreach (FileInfo dataFile in mergeDir.GetFiles("*.parquet", SearchOption.AllDirectories))
+            if (!rawSensorDir.Exists)
+            {
+                return;
+            }
+
+            foreach (FileInfo dataFile in rawSensorDir.GetFiles("*.parquet", SearchOption.AllDirectories))
             {
                 if (dataFile.Length > 0)
                 {
@@ -358,15 +359,16 @@ namespace gov.llnl.wintap.core.etl.load
             }
         }
 
-        private void clearMerge()
+        private void clearRawSensor()
         {
-            if (!mergeDir.Exists)
+            DirectoryInfo rawSensorDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "raw_sensor"));
+            if (!rawSensorDir.Exists)
             {
-                mergeDir.Create();
+                rawSensorDir.Create();
             }
             if (uploaders.Count > 0)
             {
-                foreach (FileInfo fi in mergeDir.GetFiles())
+                foreach (FileInfo fi in rawSensorDir.GetFiles("*.parquet", SearchOption.AllDirectories))
                 {
                     deleteFile(fi);
                 }
@@ -395,7 +397,10 @@ namespace gov.llnl.wintap.core.etl.load
                 long currentSizeBytes = bytesOnDisk;
 
                 // Get the list of files in cache, ordered by creation time ascending (oldest first).
-                IOrderedEnumerable<FileInfo> cacheFiles = mergeDir.GetFiles().OrderBy(f => f.CreationTime);
+                DirectoryInfo rawSensorDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "raw_sensor"));
+                IOrderedEnumerable<FileInfo> cacheFiles = rawSensorDir.Exists
+                    ? rawSensorDir.GetFiles("*.parquet", SearchOption.AllDirectories).OrderBy(f => f.CreationTime)
+                    : Enumerable.Empty<FileInfo>().OrderBy(f => f.CreationTime);
 
                 // Iterate parquet files and delete them until the cache is below the maximum size.
                 foreach (FileInfo fi in cacheFiles.Where(f => f.Extension.ToLower().Contains("parquet")))
@@ -406,12 +411,12 @@ namespace gov.llnl.wintap.core.etl.load
                         currentSizeBytes -= fi.Length;
                         if (currentSizeBytes <= maxCacheSizeBytes)
                         {
-                            // Stop once we’re within the size limit.
+                            // Stop once weï¿½re within the size limit.
                             break;
                         }
 
                         fi.Delete();
-                        WintapLogger.Log.Append($"Deleted file: " + fi.FullName + " (" + fi.Length + $" bytes).  new size of merged: {currentSizeBytes}", LogLevel.Info);
+                        WintapLogger.Log.Append($"Deleted file: " + fi.FullName + " (" + fi.Length + $" bytes).  new size of raw_sensor: {currentSizeBytes}", LogLevel.Info);
                     }
                     catch(Exception ex)
                     {
