@@ -1,7 +1,9 @@
+using gov.llnl.wintap.core.etl.shared;
 using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -40,35 +42,70 @@ namespace gov.llnl.wintap.core.etl.load.adapters.baseclass
         }
 
         /// <summary>
-        /// converts parquet file name to s3 object name
+        /// Converts a local parquet path to an S3 object key while preserving the canonical
+        /// raw_sensor directory layout. For example:
+        ///   {parquetRoot}/raw_sensor/raw_process/dayPK=20260529/hourPK=13/file.parquet
+        /// becomes:
+        ///   raw_sensor/raw_process/dayPK=20260529/hourPK=13/file.parquet
+        /// Optional config properties KeyPrefix, Path, or ObjectPrefix are prepended when set.
         /// </summary>
-        /// <param name="dataFile"></param>
-        /// <returns></returns>
-        protected string getS3ObjectNameForFile(string dataFile)
+        protected string getS3ObjectNameForFile(string localFile, Dictionary<string, string> parameters)
         {
-            // S3 folder hierarchy setup
-            //   unless tcp/udp, then add one additional layer for efficient filtering
-            string objectPrefix = "v3";
-            string uploadDPK = DateTime.UtcNow.Year + DateTime.UtcNow.ToString("MM") + DateTime.UtcNow.ToString("dd");
-            string uploadHPK = DateTime.UtcNow.ToString("HH");
-            string timeSegment = dataFile.Split('+')[2].Split(new char[] { '.' })[0];
-            string dataFileEventType = dataFile.Split('+')[1];
-            string[] disgardedSuffix = new string[1];
-            disgardedSuffix[0] = "_sensor";
-            dataFileEventType = dataFileEventType.Split(disgardedSuffix, StringSplitOptions.None)[0];
-            long dataFileMergeTime = Int64.Parse(timeSegment);
-            DateTime mergeTimeUtc = DateTime.FromFileTimeUtc(dataFileMergeTime);
-            long collectTimeAsUnix = ((System.DateTimeOffset)mergeTimeUtc).ToUnixTimeSeconds();
-            string objectKey = objectPrefix + "/raw_sensor/" + dataFileEventType + "/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/" + Environment.MachineName.ToLower() + "+" + dataFileEventType + "+" + collectTimeAsUnix + ".parquet";
-            if (dataFileEventType == "raw_tcp_process_conn_incr")
+            string relativePath = getParquetRelativePathForFile(localFile).Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+            string objectPrefix = getConfiguredPathPrefix(parameters).Replace('\\', '/').Trim('/');
+
+            if (string.IsNullOrWhiteSpace(objectPrefix))
             {
-                objectKey = objectPrefix + "/raw_sensor/raw_process_conn_incr/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/protoPK=TCP/" + Environment.MachineName.ToLower() + "+" + dataFileEventType + "+" + collectTimeAsUnix + ".parquet";
+                return relativePath;
             }
-            else if (dataFileEventType == "raw_udp_process_conn_incr")
+
+            return objectPrefix + "/" + relativePath.TrimStart('/');
+        }
+
+        protected string getParameter(Dictionary<string, string> parameters, string key, string defaultValue = "")
+        {
+            if (parameters != null && parameters.TryGetValue(key, out string value) && value != null)
             {
-                objectKey = objectPrefix + "/raw_sensor/raw_process_conn_incr/uploadedDPK=" + uploadDPK + "/uploadedHPK=" + uploadHPK + "/protoPK=UDP/" + Environment.MachineName.ToLower() + "+" + dataFileEventType + "+" + collectTimeAsUnix + ".parquet";
+                return value;
             }
-            return objectKey;
+
+            return defaultValue;
+        }
+
+        private string getParquetRelativePathForFile(string localFile)
+        {
+            string fullPath = Path.GetFullPath(localFile);
+            string parquetRoot = Path.GetFullPath(Paths.ParquetDataPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+            if (fullPath.StartsWith(parquetRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return fullPath.Substring(parquetRoot.Length);
+            }
+
+            string rawSensorMarker = Path.DirectorySeparatorChar + "raw_sensor" + Path.DirectorySeparatorChar;
+            int rawSensorIndex = fullPath.IndexOf(rawSensorMarker, StringComparison.OrdinalIgnoreCase);
+            if (rawSensorIndex >= 0)
+            {
+                return fullPath.Substring(rawSensorIndex + 1);
+            }
+
+            WintapLogger.Log.Append($"Could not resolve parquet-relative path for {localFile}; using file name only", LogLevel.Warn);
+            return Path.GetFileName(localFile);
+        }
+
+        private string getConfiguredPathPrefix(Dictionary<string, string> parameters)
+        {
+            string prefix = getParameter(parameters, "KeyPrefix");
+            if (string.IsNullOrWhiteSpace(prefix))
+            {
+                prefix = getParameter(parameters, "Path");
+            }
+            if (string.IsNullOrWhiteSpace(prefix))
+            {
+                prefix = getParameter(parameters, "ObjectPrefix");
+            }
+
+            return prefix ?? string.Empty;
         }
     }
 }

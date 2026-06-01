@@ -140,7 +140,10 @@
 		<EmbeddedResource Include="core\etl\esper\registry.epl" />
 		<EmbeddedResource Include="core\etl\esper\tcp.epl" />
 		<EmbeddedResource Include="core\etl\esper\udp.epl" />
-		<None Include="core\etl\ETLConfig.json" />
+		<None Include="core\etl\ETLConfig.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>ETLConfig.json</Link>
+		</None>
 	</ItemGroup>
 
 	<!-- Cross-platform package references -->

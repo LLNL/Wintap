@@ -20,9 +20,16 @@
     {
       "Properties": {
         "Bucket": "",
-        "RegionEndpoint":  ""
+        "RegionEndpoint": "",
+        "ServiceURL": "",
+        "Endpoint": "",
+        "AccessKey": "",
+        "SecretKey": "",
+        "SessionToken": "",
+        "KeyPrefix": "",
+        "ForcePathStyle": "false"
       },
-      "Name": "InstanceProfileAdapter",
+      "Name": "S3Adapter",
       "Enabled": false
     }
   ],
@@ -30,6 +37,6 @@
   "SensorProfile": "Quality",
   "SerializationIntervalSec": 60,
   "UploadIntervalSec": 300,
-  "WriteToParquet": true,
+  "WriteToParquet": true
 }
 
