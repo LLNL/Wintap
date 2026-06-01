@@ -1,5 +1,5 @@
 # Output files
-OBJS = file_ops_tracer.bpf.o execve_tracer.bpf.o exit_tracer.bpf.o clone_tracer.bpf.o network_ops_tracer.bpf.o
+OBJS = file_ops_tracer.bpf.o execve_tracer.bpf.o exit_tracer.bpf.o clone_tracer.bpf.o network_ops_tracer.bpf.o openat_tracer.bpf.o
 VMLINUX = vmlinux.h
 
 # Auto-detect architecture
