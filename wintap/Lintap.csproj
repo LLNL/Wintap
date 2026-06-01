@@ -71,7 +71,7 @@
 			<RuntimeArg Condition="'$(RuntimeIdentifier)' == ''"></RuntimeArg>
 		</PropertyGroup>
 
-		<Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration)$(RuntimeArg) --self-contained false -o &quot;$(McpTempDir)&quot;" 
+		<Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration)$(RuntimeArg) --self-contained $(SelfContained) -o &quot;$(McpTempDir)&quot;" 
 			ContinueOnError="false" 
 			IgnoreExitCode="false" />
 	</Target>
