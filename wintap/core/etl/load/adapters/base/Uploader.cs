@@ -62,6 +62,24 @@ namespace gov.llnl.wintap.core.etl.load.adapters.baseclass
             return objectPrefix + "/" + relativePath.TrimStart('/');
         }
 
+        /// <summary>
+        /// Converts a local parquet path to a relative destination path for file-share uploaders,
+        /// preserving raw_sensor as the top-level folder and applying optional KeyPrefix/Path/ObjectPrefix.
+        /// </summary>
+        protected string getFileShareRelativePathForFile(string localFile, Dictionary<string, string> parameters)
+        {
+            string relativePath = getParquetRelativePathForFile(localFile);
+            string configuredPrefix = getConfiguredPathPrefix(parameters);
+
+            if (string.IsNullOrWhiteSpace(configuredPrefix))
+            {
+                return relativePath;
+            }
+
+            configuredPrefix = configuredPrefix.Trim(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, '/', '\\');
+            return Path.Combine(configuredPrefix, relativePath);
+        }
+
         protected string getParameter(Dictionary<string, string> parameters, string key, string defaultValue = "")
         {
             if (parameters != null && parameters.TryGetValue(key, out string value) && value != null)
