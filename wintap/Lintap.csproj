@@ -6,7 +6,6 @@
 	<PropertyGroup>
 		<AssemblyName>Lintap</AssemblyName>
 		<RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
-		<BaseIntermediateOutputPath>obj\Linux\</BaseIntermediateOutputPath>
 		<DefineConstants>$(DefineConstants);LINUX</DefineConstants>
 		<UseSharedCompilation>false</UseSharedCompilation>
 		<UseCommonOutputDirectory>false</UseCommonOutputDirectory>

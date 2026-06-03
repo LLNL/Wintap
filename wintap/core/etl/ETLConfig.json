@@ -27,7 +27,12 @@
         "SecretKey": "",
         "SessionToken": "",
         "KeyPrefix": "",
-        "ForcePathStyle": "false"
+        "ForcePathStyle": "false",
+        "CloudflareAccessClientId": "",
+        "CloudflareAccessClientSecret": "",
+        "RateLimitMaxRetries": "5",
+        "RateLimitInitialDelayMs": "1000",
+        "RateLimitMaxDelayMs": "60000"
       },
       "Name": "S3Adapter",
       "Enabled": false

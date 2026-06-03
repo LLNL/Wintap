@@ -7,6 +7,9 @@ using gov.llnl.wintap.core.infrastructure;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace gov.llnl.wintap.core.etl.load.adapters
@@ -33,6 +36,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
 
             awsCredentials = createCredentials(parameters);
             AmazonS3Config s3Config = createS3Config(parameters);
+            configureCloudflareAccess(parameters, s3Config);
             client = new AmazonS3Client(awsCredentials, s3Config);
 
             this.startSessionStats();
@@ -77,7 +81,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
 
                 try
                 {
-                    PutObjectResponse resp = await client.PutObjectAsync(req);
+                    PutObjectResponse resp = await putObjectWithRateLimitRetry(req, parameters);
                     fileSent = true;
                     updateSessionStats();
                     WintapLogger.Log.Append("Upload HTTP status code: " + resp.HttpStatusCode, LogLevel.Info);
@@ -113,6 +117,92 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             return new InstanceProfileAWSCredentials();
         }
 
+        private async Task<PutObjectResponse> putObjectWithRateLimitRetry(PutObjectRequest request, Dictionary<string, string> parameters)
+        {
+            int maxRetries = getIntParameter(parameters, "RateLimitMaxRetries", 5);
+            int initialDelayMs = getIntParameter(parameters, "RateLimitInitialDelayMs", 1000);
+            int maxDelayMs = getIntParameter(parameters, "RateLimitMaxDelayMs", 60000);
+            int attempt = 0;
+
+            while (true)
+            {
+                try
+                {
+                    return await client.PutObjectAsync(request);
+                }
+                catch (AmazonServiceException ex) when (IsRateLimitResponse(ex) && attempt < maxRetries)
+                {
+                    attempt++;
+                    int delayMs = CalculateBackoffDelayMs(attempt, initialDelayMs, maxDelayMs);
+                    WintapLogger.Log.Append($"S3 upload was rate limited with HTTP 429. Retry {attempt}/{maxRetries} in {delayMs} ms. Message: {ex.Message}", LogLevel.Warn);
+                    await Task.Delay(delayMs);
+                }
+            }
+        }
+
+        private bool IsRateLimitResponse(AmazonServiceException ex)
+        {
+            return ex.StatusCode == (HttpStatusCode)429 || ex.StatusCode == HttpStatusCode.TooManyRequests;
+        }
+
+        private int CalculateBackoffDelayMs(int attempt, int initialDelayMs, int maxDelayMs)
+        {
+            int boundedInitialDelay = Math.Max(initialDelayMs, 100);
+            int boundedMaxDelay = Math.Max(maxDelayMs, boundedInitialDelay);
+            double exponentialDelay = boundedInitialDelay * Math.Pow(2, attempt - 1);
+            int delay = (int)Math.Min(exponentialDelay, boundedMaxDelay);
+            int jitter = Random.Shared.Next(0, Math.Max(1, delay / 4));
+            return Math.Min(delay + jitter, boundedMaxDelay);
+        }
+
+        private int getIntParameter(Dictionary<string, string> parameters, string key, int defaultValue)
+        {
+            string value = getParameter(parameters, key);
+            if (int.TryParse(value, out int parsed) && parsed >= 0)
+            {
+                return parsed;
+            }
+
+            return defaultValue;
+        }
+
+        private void configureCloudflareAccess(Dictionary<string, string> parameters, AmazonS3Config s3Config)
+        {
+            string clientId = getParameter(parameters, "CloudflareAccessClientId");
+            if (string.IsNullOrWhiteSpace(clientId))
+            {
+                clientId = getParameter(parameters, "CFAccessClientId");
+            }
+            if (string.IsNullOrWhiteSpace(clientId))
+            {
+                clientId = Environment.GetEnvironmentVariable("CF_ACCESS_CLIENT_ID");
+            }
+
+            string clientSecret = getParameter(parameters, "CloudflareAccessClientSecret");
+            if (string.IsNullOrWhiteSpace(clientSecret))
+            {
+                clientSecret = getParameter(parameters, "CFAccessClientSecret");
+            }
+            if (string.IsNullOrWhiteSpace(clientSecret))
+            {
+                clientSecret = Environment.GetEnvironmentVariable("CF_ACCESS_CLIENT_SECRET");
+            }
+
+            if (string.IsNullOrWhiteSpace(clientId) && string.IsNullOrWhiteSpace(clientSecret))
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+            {
+                WintapLogger.Log.Append("Cloudflare Access service token configuration is incomplete. Both client id and client secret are required.", LogLevel.Warn);
+                return;
+            }
+
+            s3Config.HttpClientFactory = new CloudflareAccessHttpClientFactory(clientId, clientSecret);
+            WintapLogger.Log.Append("Cloudflare Access service token headers are enabled for S3 uploads", LogLevel.Info);
+        }
+
         private AmazonS3Config createS3Config(Dictionary<string, string> parameters)
         {
             string regionEndpoint = getParameter(parameters, "RegionEndpoint");
@@ -146,6 +236,51 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
 
             return config;
+        }
+
+        private class CloudflareAccessHttpClientFactory : Amazon.Runtime.HttpClientFactory
+        {
+            private readonly string clientId;
+            private readonly string clientSecret;
+
+            internal CloudflareAccessHttpClientFactory(string clientId, string clientSecret)
+            {
+                this.clientId = clientId;
+                this.clientSecret = clientSecret;
+            }
+
+            public override HttpClient CreateHttpClient(Amazon.Runtime.IClientConfig clientConfig)
+            {
+                HttpMessageHandler innerHandler = new HttpClientHandler();
+                HttpMessageHandler cloudflareAccessHandler = new CloudflareAccessHeaderHandler(clientId, clientSecret)
+                {
+                    InnerHandler = innerHandler
+                };
+
+                return new HttpClient(cloudflareAccessHandler);
+            }
+        }
+
+        private class CloudflareAccessHeaderHandler : DelegatingHandler
+        {
+            private readonly string clientId;
+            private readonly string clientSecret;
+
+            internal CloudflareAccessHeaderHandler(string clientId, string clientSecret)
+            {
+                this.clientId = clientId;
+                this.clientSecret = clientSecret;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                request.Headers.Remove("CF-Access-Client-Id");
+                request.Headers.Remove("CF-Access-Client-Secret");
+                request.Headers.TryAddWithoutValidation("CF-Access-Client-Id", clientId);
+                request.Headers.TryAddWithoutValidation("CF-Access-Client-Secret", clientSecret);
+
+                return base.SendAsync(request, cancellationToken);
+            }
         }
     }
 }

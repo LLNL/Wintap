@@ -39,7 +39,7 @@ namespace gov.llnl.wintap.core.etl.load
             uploaders = new List<IUpload>();
             WintapLogger.Log.Append("Cache Manager is starting up", LogLevel.Info);
             etlConfig = _config;
-            WintapLogger.Log.Append("Upload interval (sec): " + etlConfig.UploadIntervalSec, LogLevel.Info);
+            LogStartupConfiguration();
             svcRunning = true;
             SendQueue = new ConcurrentQueue<dynamic>();
             DirectoryInfo parquetDir = new DirectoryInfo(Paths.ParquetDataPath);
@@ -55,7 +55,13 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 try
                 {
-                    Type type = Type.GetType("gov.llnl.wintap.core.etl.load.adapters." + u.Name);
+                    Type type = ResolveAdapterType(u.Name);
+                    if (type == null)
+                    {
+                        WintapLogger.Log.Append("ERROR: No assembly matching the name " + u.Name + " was found. This uploader will not run. Check the spelling or remove this config entry.", LogLevel.Error);
+                        continue;
+                    }
+
                     IUpload uploader = (IUpload)Activator.CreateInstance(type, null);
                     uploader.Name = u.Name;
                     if (u.Enabled)
@@ -67,7 +73,7 @@ namespace gov.llnl.wintap.core.etl.load
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("ERROR:  No assembly matching the name " + u.Name + " was found.  This uploader will not run.  Check the spelling or remove this config entry.", LogLevel.Info);
+                    WintapLogger.Log.Append("ERROR: Could not initialize uploader " + u.Name + ": " + ex.Message, LogLevel.Error);
                 }
             }
             createMetaRecords();
@@ -75,6 +81,178 @@ namespace gov.llnl.wintap.core.etl.load
             clearRawSensor();
             workerThread = new BackgroundWorker();
             workerThread.DoWork += WorkerThread_DoWork;
+        }
+
+        private void LogStartupConfiguration()
+        {
+            Utilities.LogStartupConfigurationMessage("ETL startup configuration summary", LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("ETLConfig path: " + Utilities.GetETLConfigPath(), LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("ETLConfig exists: " + File.Exists(Utilities.GetETLConfigPath()), LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Data root: " + gov.llnl.wintap.core.shared.Env.FileDataRoot, LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Parquet data path: " + Paths.ParquetDataPath, LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Serialization interval (sec): " + etlConfig.SerializationIntervalSec, LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Upload interval (sec): " + etlConfig.UploadIntervalSec, LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Write to parquet: " + etlConfig.WriteToParquet, LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Write to csv: " + etlConfig.WriteToCsv, LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Configured adapters: " + etlConfig.Adapters.Count, LogLevel.Info);
+            Utilities.LogStartupConfigurationMessage("Enabled adapters: " + etlConfig.Adapters.Count(adapter => adapter != null && adapter.Enabled), LogLevel.Info);
+
+            foreach (ETLConfig.Adapter adapter in etlConfig.Adapters)
+            {
+                LogAdapterConfiguration(adapter);
+            }
+        }
+
+        private void LogAdapterConfiguration(ETLConfig.Adapter adapter)
+        {
+            if (adapter == null)
+            {
+                Utilities.LogStartupConfigurationMessage("Adapter config entry is null", LogLevel.Warn);
+                return;
+            }
+
+            string adapterName = string.IsNullOrWhiteSpace(adapter.Name) ? "<missing>" : adapter.Name;
+            Type adapterType = ResolveAdapterType(adapter.Name);
+            Utilities.LogStartupConfigurationMessage($"Adapter config: name={adapterName}, enabled={adapter.Enabled}, typeResolved={adapterType != null}", LogLevel.Info);
+
+            if (adapterType == null)
+            {
+                Utilities.LogStartupConfigurationMessage($"Adapter config warning: {adapterName} does not resolve to a known uploader type", LogLevel.Warn);
+            }
+
+            if (!adapter.Enabled)
+            {
+                return;
+            }
+
+            if (adapter.Properties == null || adapter.Properties.Count == 0)
+            {
+                Utilities.LogStartupConfigurationMessage($"Enabled adapter properties for {adapterName}: none", LogLevel.Info);
+                return;
+            }
+
+            foreach (KeyValuePair<string, string> property in adapter.Properties.OrderBy(p => p.Key))
+            {
+                Utilities.LogStartupConfigurationMessage($"Enabled adapter property: {adapterName}.{property.Key}={SanitizeAdapterProperty(property.Key, property.Value)}", LogLevel.Info);
+            }
+
+            LogAdapterSpecificValidation(adapterName, adapter.Properties);
+        }
+
+        private void LogAdapterSpecificValidation(string adapterName, Dictionary<string, string> properties)
+        {
+            if (adapterName.Equals("S3Adapter", StringComparison.OrdinalIgnoreCase))
+            {
+                string bucket = GetAdapterProperty(properties, "Bucket");
+                string regionEndpoint = GetAdapterProperty(properties, "RegionEndpoint");
+                string serviceUrl = GetAdapterProperty(properties, "ServiceURL");
+                string endpoint = GetAdapterProperty(properties, "Endpoint");
+                string accessKey = GetAdapterProperty(properties, "AccessKey");
+                string secretKey = GetAdapterProperty(properties, "SecretKey");
+                string sessionToken = GetAdapterProperty(properties, "SessionToken");
+                string forcePathStyle = GetAdapterProperty(properties, "ForcePathStyle");
+                string keyPrefix = GetAdapterProperty(properties, "KeyPrefix");
+
+                Utilities.LogStartupConfigurationMessage($"S3Adapter config summary: bucket={(string.IsNullOrWhiteSpace(bucket) ? "<missing>" : bucket)}, endpoint={(string.IsNullOrWhiteSpace(serviceUrl) ? endpoint : serviceUrl)}, region={regionEndpoint}, keyPrefix={keyPrefix}, forcePathStyle={forcePathStyle}, credentialSource={GetS3CredentialSource(accessKey, secretKey, sessionToken)}", LogLevel.Info);
+
+                if (string.IsNullOrWhiteSpace(bucket))
+                {
+                    Utilities.LogStartupConfigurationMessage("S3Adapter config warning: Bucket is not set; uploads will fail with NO_BUCKET_SPECIFIED", LogLevel.Warn);
+                }
+
+                if (string.IsNullOrWhiteSpace(regionEndpoint) && string.IsNullOrWhiteSpace(serviceUrl) && string.IsNullOrWhiteSpace(endpoint))
+                {
+                    Utilities.LogStartupConfigurationMessage("S3Adapter config warning: RegionEndpoint, ServiceURL, and Endpoint are all empty; AWS SDK defaults will be used", LogLevel.Warn);
+                }
+
+                if (!string.IsNullOrWhiteSpace(accessKey) != !string.IsNullOrWhiteSpace(secretKey))
+                {
+                    Utilities.LogStartupConfigurationMessage("S3Adapter config warning: AccessKey and SecretKey must be configured together; instance profile credentials will be used if either is missing", LogLevel.Warn);
+                }
+
+                if (!string.IsNullOrWhiteSpace(forcePathStyle) && !bool.TryParse(forcePathStyle, out _))
+                {
+                    Utilities.LogStartupConfigurationMessage("S3Adapter config warning: ForcePathStyle is not a valid boolean: " + forcePathStyle, LogLevel.Warn);
+                }
+            }
+            else if (adapterName.Equals("SMBFileShareAdapter", StringComparison.OrdinalIgnoreCase))
+            {
+                string uncPath = GetAdapterProperty(properties, "UNCPath");
+                Utilities.LogStartupConfigurationMessage("SMBFileShareAdapter config summary: UNCPath=" + (string.IsNullOrWhiteSpace(uncPath) ? "<missing>" : uncPath), LogLevel.Info);
+                if (string.IsNullOrWhiteSpace(uncPath))
+                {
+                    Utilities.LogStartupConfigurationMessage("SMBFileShareAdapter config warning: UNCPath is not set", LogLevel.Warn);
+                }
+            }
+        }
+
+        private Type ResolveAdapterType(string adapterName)
+        {
+            if (string.IsNullOrWhiteSpace(adapterName))
+            {
+                return null;
+            }
+
+            return Type.GetType("gov.llnl.wintap.core.etl.load.adapters." + adapterName);
+        }
+
+        private string GetAdapterProperty(Dictionary<string, string> properties, string key)
+        {
+            if (properties != null && properties.TryGetValue(key, out string value) && value != null)
+            {
+                return value;
+            }
+
+            return string.Empty;
+        }
+
+        private string SanitizeAdapterProperty(string key, string value)
+        {
+            if (value == null)
+            {
+                return "<null>";
+            }
+
+            if (IsSensitiveAdapterProperty(key))
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    return "<empty>";
+                }
+
+                return "<set; length=" + value.Length + ">";
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "<empty>";
+            }
+
+            return value;
+        }
+
+        private bool IsSensitiveAdapterProperty(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return false;
+            }
+
+            return key.IndexOf("secret", StringComparison.OrdinalIgnoreCase) >= 0
+                || key.IndexOf("token", StringComparison.OrdinalIgnoreCase) >= 0
+                || key.IndexOf("password", StringComparison.OrdinalIgnoreCase) >= 0
+                || key.IndexOf("accesskey", StringComparison.OrdinalIgnoreCase) >= 0
+                || key.IndexOf("certificate", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private string GetS3CredentialSource(string accessKey, string secretKey, string sessionToken)
+        {
+            if (!string.IsNullOrWhiteSpace(accessKey) && !string.IsNullOrWhiteSpace(secretKey))
+            {
+                return string.IsNullOrWhiteSpace(sessionToken) ? "ETLConfig AccessKey/SecretKey" : "ETLConfig session credentials";
+            }
+
+            return "instance profile/default AWS credentials";
         }
 
         private void Uploader_UploadCompleted(object sender, string e)

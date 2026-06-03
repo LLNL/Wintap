@@ -1,6 +1,22 @@
 <Project>
   <!-- This file is automatically imported by all .csproj files in this directory -->
   
+  <!-- Platform-specific intermediate output paths must be set before Microsoft.Common.props uses them. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Wintap'">
+    <BaseIntermediateOutputPath>obj\Windows\</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Lintap'">
+    <BaseIntermediateOutputPath>obj\Linux\</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Mactap'">
+    <BaseIntermediateOutputPath>obj\macOS\</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+
   <!-- Exclude Windows platform code from non-Windows builds -->
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'Wintap'">
     <Compile Remove="platform\windows\**\*.cs" />
