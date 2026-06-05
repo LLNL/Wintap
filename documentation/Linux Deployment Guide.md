@@ -233,9 +233,27 @@ curl https://example.com
 touch /tmp/test.txt && rm /tmp/test.txt
 ```
 
-Check that events appear in logs:
+Run the network capture smoke test to verify that generated HTTP/HTTPS traffic appears in collected parquet data:
+
 ```bash
-# TBD
+# Example using a temporary data root for a foreground/manual test run
+sudo rm -rf /tmp/lintap-smoke
+mkdir -p /tmp/lintap-smoke
+cd /opt/lintap
+sudo env WINTAP_DATA_ROOT=/tmp/lintap-smoke ./Lintap
+
+# In another shell on the same host/VM
+python3 /path/to/wintap/devtools/network_capture_smoke_test.py \
+    --data-root /tmp/lintap-smoke \
+    --timeout 240 \
+    --poll-interval 10
+```
+
+A passing run should show recent outbound TCP records for ports 80/443 and the local host/VM IP address with ephemeral local ports, for example:
+
+```text
+local=192.168.252.9:37804 -> remote=104.20.23.154:80 proto=TCP rows=2
+PASS: captured recent outbound network records for the generated traffic.
 ```
 
 ## Service Management Commands

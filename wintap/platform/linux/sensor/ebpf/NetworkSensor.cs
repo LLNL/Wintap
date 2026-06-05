@@ -18,7 +18,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         private List<IntPtr> _additionalLinks;
 
         protected override string BpfObjectFileName => "network_ops_tracer.bpf.o";
-        protected override string BpfProgramName => "trace_connect";
+        protected override string BpfProgramName => "trace_inet_sock_set_state";
 
         internal NetworkSensor()
         {
@@ -36,7 +36,6 @@ namespace gov.llnl.wintap.platform.linux.collect
             {
                 var programNames = new[]
                 {
-                    "trace_accept",
                     "trace_sendto",
                     "trace_recvfrom"
                 };
@@ -160,16 +159,11 @@ namespace gov.llnl.wintap.platform.linux.collect
             if (ipNetworkOrder == 0)
                 return "0.0.0.0";
 
-            // Convert from network byte order to host byte order
-            uint ipHostOrder = (uint)IPAddress.NetworkToHostOrder((int)ipNetworkOrder);
-            
-            // Extract octets
-            byte b1 = (byte)(ipHostOrder & 0xFF);
-            byte b2 = (byte)((ipHostOrder >> 8) & 0xFF);
-            byte b3 = (byte)((ipHostOrder >> 16) & 0xFF);
-            byte b4 = (byte)((ipHostOrder >> 24) & 0xFF);
-            
-            return $"{b1}.{b2}.{b3}.{b4}";
+            // eBPF sends the IPv4 address as the raw 4 bytes used by the
+            // kernel/network stack. Marshal reads those bytes into a native
+            // endian uint, so converting back to bytes preserves the address
+            // order for IPAddress.
+            return new IPAddress(BitConverter.GetBytes(ipNetworkOrder)).ToString();
         }
 
         protected override void OnStopping()

@@ -1,6 +1,73 @@
-# Log Message Semantic Clustering
+# Developer Tools
 
-A Python tool that uses NLP (sentence transformers) to cluster log messages by semantic similarity rather than exact string matching. Perfect for analyzing large log files and identifying recurring issues across TeleTap components (Wintap, Mactap, Lintap).
+This directory contains small utilities for validating and troubleshooting Wintap, Mactap, and Lintap deployments.
+
+## Network Capture Smoke Test
+
+`network_capture_smoke_test.py` is an integration smoke test for the Lintap/Wintap network capture pipeline. It generates a small amount of outbound HTTP/HTTPS traffic, waits for ETL parquet output, and queries the captured parquet files with DuckDB to confirm that recent outbound TCP records were collected.
+
+The test validates the end-to-end path:
+
+```text
+generated internet traffic -> eBPF/network sensor -> ETL/parquet writer -> DuckDB query -> expected remote ports/IPs
+```
+
+### Requirements
+
+- Lintap/Wintap is already running on the host where the test is executed.
+- `WriteToParquet=true` in `ETLConfig.json`.
+- `SerializationIntervalSec` is short enough for the selected timeout.
+- Either the Python `duckdb` package is installed or the `duckdb` CLI is available on `PATH`.
+
+### Usage
+
+Run the test on the same host/VM where Lintap is collecting network data:
+
+```bash
+python3 devtools/network_capture_smoke_test.py \
+  --data-root /tmp/lintap-smoke \
+  --timeout 240 \
+  --poll-interval 10
+```
+
+If `WINTAP_DATA_ROOT` points at the active data root, `--data-root` can be omitted:
+
+```bash
+WINTAP_DATA_ROOT=/tmp/lintap-smoke \
+python3 devtools/network_capture_smoke_test.py --timeout 240
+```
+
+Optional stricter validation requires one of the resolved endpoint IPv4 addresses to appear in captured rows:
+
+```bash
+python3 devtools/network_capture_smoke_test.py \
+  --data-root /tmp/lintap-smoke \
+  --require-target-ip-match
+```
+
+Exact IP matching is disabled by default because CDN-backed endpoints may resolve or connect differently across attempts. The default validation confirms recent outbound TCP rows on remote ports `80` and/or `443`.
+
+### Example Passing Output
+
+```text
+collected network rows for remote ports 80/443:
+  remote=104.20.23.154:80 protocol=TCP rows=4
+  remote=104.20.23.154:443 protocol=TCP rows=4
+  remote=104.16.124.96:443 protocol=TCP rows=3
+
+PASS: captured recent outbound network records for the generated traffic.
+Matched resolved target IPs: 104.16.124.96, 104.20.23.154
+```
+
+The captured local endpoint should show the host/VM's routable local address with ephemeral ports, for example:
+
+```text
+local=192.168.252.9:37804 -> remote=104.20.23.154:80 proto=TCP rows=2
+```
+
+## Log Message Semantic Clustering
+
+`log_cluster.py` uses NLP (sentence transformers) to cluster log messages by semantic similarity rather than exact string matching. Perfect for analyzing large log files and identifying recurring issues across TeleTap components (Wintap, Mactap, Lintap).
 
 ## Features
 

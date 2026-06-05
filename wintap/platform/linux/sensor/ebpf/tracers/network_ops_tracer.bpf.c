@@ -7,6 +7,15 @@
 
 #define TASK_COMM_LEN 16
 
+// TCP state values from include/net/tcp_states.h
+#define TCP_ESTABLISHED 1
+#define TCP_SYN_SENT 2
+#define TCP_SYN_RECV 3
+#define TCP_CLOSE 7
+#define TCP_LISTEN 10
+
+#define AF_INET 2
+
 // Network operation types
 enum net_op_type {
     NET_OP_TCP_CONNECT = 1,
@@ -87,6 +96,62 @@ struct sockaddr_in {
     __u32 sin_addr;
 };
 
+// sock:inet_sock_set_state tracepoint context. This tracepoint fires after
+// the kernel has assigned socket addresses, so it includes the local address
+// that is not available at sys_enter_connect time.
+struct inet_sock_set_state_args {
+    unsigned long long unused;
+    const void *skaddr;
+    int oldstate;
+    int newstate;
+    __u16 sport;
+    __u16 dport;
+    __u16 family;
+    __u16 protocol;
+    __u8 saddr[4];
+    __u8 daddr[4];
+    __u8 saddr_v6[16];
+    __u8 daddr_v6[16];
+};
+
+SEC("tracepoint/sock/inet_sock_set_state")
+int trace_inet_sock_set_state(struct inet_sock_set_state_args *ctx)
+{
+    if (ctx->family != AF_INET || ctx->protocol != PROTO_TCP)
+        return 0;
+
+    __u8 op_type = 0;
+
+    if (ctx->newstate == TCP_ESTABLISHED)
+    {
+        if (ctx->oldstate == TCP_SYN_SENT)
+            op_type = NET_OP_TCP_CONNECT;
+        else if (ctx->oldstate == TCP_SYN_RECV || ctx->oldstate == TCP_LISTEN)
+            op_type = NET_OP_TCP_ACCEPT;
+    }
+    else if (ctx->newstate == TCP_CLOSE)
+    {
+        op_type = NET_OP_TCP_CLOSE;
+    }
+
+    if (op_type == 0)
+        return 0;
+
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+
+    __u32 saddr = 0;
+    __u32 daddr = 0;
+    __builtin_memcpy(&saddr, ctx->saddr, sizeof(saddr));
+    __builtin_memcpy(&daddr, ctx->daddr, sizeof(daddr));
+
+    // The tracepoint exposes sport/dport in host byte order.
+    emit_network_event(pid, saddr, daddr, ctx->sport, ctx->dport,
+                       PROTO_TCP, op_type, 0);
+
+    return 0;
+}
+
 // TCP connect - Outbound connection
 struct connect_args {
     unsigned long long unused;
@@ -105,14 +170,10 @@ int trace_connect(struct connect_args *ctx)
     struct sockaddr_in addr;
     bpf_probe_read_user(&addr, sizeof(addr), ctx->addr);
     
-    // Only handle IPv4 (family = 2)
-    if (addr.sin_family == 2)
-    {
-        emit_network_event(pid, 0, addr.sin_addr, 0, 
-                          bpf_ntohs(addr.sin_port), PROTO_TCP,
-                          NET_OP_TCP_CONNECT, 0);
-    }
-    
+    // Local address is not available at sys_enter_connect time. TCP
+    // connection events are emitted from trace_inet_sock_set_state instead.
+    (void)pid;
+    (void)addr;
     return 0;
 }
 
@@ -128,22 +189,9 @@ struct accept_args {
 SEC("tracepoint/syscalls/sys_enter_accept")
 int trace_accept(struct accept_args *ctx)
 {
-    __u64 pid_tgid = bpf_get_current_pid_tgid();
-    __u32 pid = pid_tgid >> 32;
-    
-    if (ctx->addr)
-    {
-        struct sockaddr_in addr;
-        bpf_probe_read_user(&addr, sizeof(addr), ctx->addr);
-        
-        if (addr.sin_family == 2)
-        {
-            emit_network_event(pid, addr.sin_addr, 0, 
-                              bpf_ntohs(addr.sin_port), 0, PROTO_TCP,
-                              NET_OP_TCP_ACCEPT, 0);
-        }
-    }
-    
+    // Peer/local addresses are not available at sys_enter_accept time. TCP
+    // accept events are emitted from trace_inet_sock_set_state instead.
+    (void)ctx;
     return 0;
 }
 
@@ -177,12 +225,9 @@ int trace_sendto(struct sendto_args *ctx)
                               NET_OP_UDP_SEND, (__u32)ctx->len);
         }
     }
-    else
-    {
-        // TCP send (connected socket, no dest_addr)
-        emit_network_event(pid, 0, 0, 0, 0, PROTO_TCP,
-                          NET_OP_TCP_SEND, (__u32)ctx->len);
-    }
+    // For connected TCP sockets, sys_enter_sendto does not include the local
+    // or remote socket addresses. Avoid emitting placeholder 0.0.0.0 TCP
+    // events here; TCP connection addresses come from inet_sock_set_state.
     
     return 0;
 }
@@ -217,12 +262,9 @@ int trace_recvfrom(struct recvfrom_args *ctx)
                               NET_OP_UDP_RECV, 0);
         }
     }
-    else
-    {
-        // TCP receive
-        emit_network_event(pid, 0, 0, 0, 0, PROTO_TCP,
-                          NET_OP_TCP_RECV, 0);
-    }
+    // For connected TCP sockets, sys_enter_recvfrom does not include the local
+    // or remote socket addresses. Avoid emitting placeholder 0.0.0.0 TCP
+    // events here; TCP connection addresses come from inet_sock_set_state.
     
     return 0;
 }
