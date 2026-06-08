@@ -70,7 +70,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     {
                         WintapLogger.Log.Append(
                             $"No process found with PID {pid} created before {eventTime:yyyy-MM-dd HH:mm:ss}",
-                            LogLevel.Debug);  // Changed to Debug since this is common
+                            LogLevel.Debug);
                         return null;  // CRITICAL: Return null instead of continuing
                     }
 
@@ -202,7 +202,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
                     WintapLogger.Log.Append(
                         $"Registered process PID {message.PID}: {proc.Name} with process resolver",
-                        LogLevel.Info);
+                        LogLevel.Debug);
                 }
                 catch (Exception ex)
                 {

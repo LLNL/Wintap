@@ -32,6 +32,7 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
             ExitSensor exitSensor = new ExitSensor();
             NetworkSensor networkSensor = new NetworkSensor();
             FileOpsSensor fileOpsSensor = new FileOpsSensor();
+            ProcessRundownSensor processRundownSensor = new ProcessRundownSensor();
 
             execveSensor.Start();
             cloneSensor.Start();
@@ -39,11 +40,17 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
             networkSensor.Start();
             fileOpsSensor.Start();
 
+            // After live process sensors are attached, emit Refresh events for
+            // processes that existed before startup so later file/network events
+            // can resolve owner and parent process context.
+            processRundownSensor.Start();
+
             baseSensors.Add(execveSensor);
             baseSensors.Add(cloneSensor);
             baseSensors.Add(exitSensor);
             baseSensors.Add(networkSensor);
             baseSensors.Add(fileOpsSensor);
+            baseSensors.Add(processRundownSensor);
 
             return baseSensors;
         }
