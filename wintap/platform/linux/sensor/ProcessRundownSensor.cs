@@ -116,6 +116,8 @@ namespace gov.llnl.wintap.platform.linux.collect
                 arguments: BuildArguments(processInfo)
             );
 
+            ProcessSensorHelper.EnrichParentProcess(message, pidHashGenerator);
+
             return message;
         }
 

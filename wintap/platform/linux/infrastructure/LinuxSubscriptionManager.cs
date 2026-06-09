@@ -5,6 +5,7 @@
  */
 
 using System.Collections.Generic;
+using System;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.platform.linux.collect;
@@ -25,32 +26,75 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
 
             List<BaseSensor> baseSensors = new List<BaseSensor>();
 
-            // todo: integrate linux sensors into the wintap configuration system for optional loading
-            //       for now, just load all of them...
-            ExecveSensor execveSensor = new ExecveSensor();
-            CloneSensor cloneSensor = new CloneSensor();
-            ExitSensor exitSensor = new ExitSensor();
-            NetworkSensor networkSensor = new NetworkSensor();
-            FileOpsSensor fileOpsSensor = new FileOpsSensor();
-            ProcessRundownSensor processRundownSensor = new ProcessRundownSensor();
+            bool IsEnabled(string envVar) =>
+                string.Equals(Environment.GetEnvironmentVariable(envVar), "true", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Environment.GetEnvironmentVariable(envVar), "1", StringComparison.OrdinalIgnoreCase);
 
-            execveSensor.Start();
-            cloneSensor.Start();
-            exitSensor.Start();
-            networkSensor.Start();
-            fileOpsSensor.Start();
+            if (IsEnabled("WINTAP_ENABLE_EXECVE_SENSOR"))
+            {
+                ExecveSensor execveSensor = new ExecveSensor();
+                execveSensor.Start();
+                baseSensors.Add(execveSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("ExecveSensor disabled by WINTAP_ENABLE_EXECVE_SENSOR", LogLevel.Warn);
+            }
 
-            // After live process sensors are attached, emit Refresh events for
-            // processes that existed before startup so later file/network events
-            // can resolve owner and parent process context.
-            processRundownSensor.Start();
+            if (IsEnabled("WINTAP_ENABLE_CLONE_SENSOR"))
+            {
+                CloneSensor cloneSensor = new CloneSensor();
+                cloneSensor.Start();
+                baseSensors.Add(cloneSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("CloneSensor disabled by WINTAP_ENABLE_CLONE_SENSOR", LogLevel.Warn);
+            }
 
-            baseSensors.Add(execveSensor);
-            baseSensors.Add(cloneSensor);
-            baseSensors.Add(exitSensor);
-            baseSensors.Add(networkSensor);
-            baseSensors.Add(fileOpsSensor);
-            baseSensors.Add(processRundownSensor);
+            if (IsEnabled("WINTAP_ENABLE_EXIT_SENSOR"))
+            {
+                ExitSensor exitSensor = new ExitSensor();
+                exitSensor.Start();
+                baseSensors.Add(exitSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("ExitSensor disabled by WINTAP_ENABLE_EXIT_SENSOR", LogLevel.Warn);
+            }
+
+            if (IsEnabled("WINTAP_ENABLE_NETWORK_SENSOR"))
+            {
+                NetworkSensor networkSensor = new NetworkSensor();
+                networkSensor.Start();
+                baseSensors.Add(networkSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("NetworkSensor disabled by WINTAP_ENABLE_NETWORK_SENSOR", LogLevel.Warn);
+            }
+
+            if (IsEnabled("WINTAP_ENABLE_FILEOPS_SENSOR"))
+            {
+                FileOpsSensor fileOpsSensor = new FileOpsSensor();
+                fileOpsSensor.Start();
+                baseSensors.Add(fileOpsSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("FileOpsSensor disabled by WINTAP_ENABLE_FILEOPS_SENSOR", LogLevel.Warn);
+            }
+
+            if (IsEnabled("WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR"))
+            {
+                ProcessRundownSensor processRundownSensor = new ProcessRundownSensor();
+                processRundownSensor.Start();
+                baseSensors.Add(processRundownSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("ProcessRundownSensor disabled by WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR", LogLevel.Warn);
+            }
 
             return baseSensors;
         }

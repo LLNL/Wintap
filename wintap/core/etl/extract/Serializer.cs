@@ -303,17 +303,11 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private void regContext()
         {
-            var assembly = Assembly.GetExecutingAssembly();
             try
             {
                 var esper1 = esperNameSpacePrefix + "esper-context.epl";
-
-                using (Stream stream = assembly.GetManifestResourceStream(esper1))
-                using (StreamReader reader = new StreamReader(stream))
-                {
-                    string esperQuery = reader.ReadToEnd();
-                    gov.llnl.wintap.core.infrastructure.EventChannel.CompileDeploy(esperQuery, "esper_context");
-                }
+                string esperQuery = readQueryFromFile(esper1);
+                gov.llnl.wintap.core.infrastructure.EventChannel.CompileDeploy(esperQuery, "esper_context");
             }
             catch (Exception ex)
             {
@@ -340,14 +334,33 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private string readQueryFromFile(string fileName)
         {
-            string query = "NONE";
+            string eplFileName = fileName;
+            int eplSuffix = fileName.LastIndexOf(".epl", StringComparison.OrdinalIgnoreCase);
+            if (eplSuffix >= 0)
+            {
+                int nameStart = fileName.LastIndexOf('.', eplSuffix - 1) + 1;
+                eplFileName = fileName.Substring(nameStart, eplSuffix - nameStart + 4);
+            }
+
+            string outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "esper", eplFileName);
+            if (File.Exists(outputPath))
+            {
+                return File.ReadAllText(outputPath);
+            }
+
             var assembly = Assembly.GetExecutingAssembly();
             using (Stream stream = assembly.GetManifestResourceStream(fileName))
-            using (StreamReader reader = new StreamReader(stream))
             {
-                query = reader.ReadToEnd();
+                if (stream == null)
+                {
+                    throw new FileNotFoundException($"Could not find EPL query as file or embedded resource: {fileName}", outputPath);
+                }
+
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    return reader.ReadToEnd();
+                }
             }
-            return query;
         }
 
 

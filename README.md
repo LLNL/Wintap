@@ -107,3 +107,22 @@ Developer Guide - see documents folder in repo
 
 ### LLNL-CODE-837816
 https://github.com/LLNL/wintap
+
+## Building on Host-Shared Filesystems (Important for macOS/VM mounts)
+
+When the repository is located on a host-shared mount (for example: macOS host -> Linux VM using 9p/virtiofs/osxfs, VirtualBox shared folders vboxsf, CIFS/SMB mounts, or other FUSE-backed mounts), .NET's build step that creates a native "apphost" binary can fail with memory-mapped file errors (IOException: Invalid argument). This is caused by limitations in the shared filesystem's support for memory-mapped file operations.
+
+What we do in this repo
+- The Makefile auto-detects common shared/host-mounted filesystem types (9p, virtiofs, vboxsf, fuse, smbfs, cifs, osxfs) and automatically sets the dotnet build flag `-p:UseAppHost=false` to avoid the apphost creation step when building from these mounts. A clear message is printed during `make` when this happens.
+
+How this affects you
+- Disabling the apphost prevents the native stub from being generated; the produced app will still run with `dotnet <dll>` but will not be a standalone native binary. CI or native builds on real Linux filesystems are unaffected.
+
+Workarounds and overrides
+- To force the apphost behavior (if you are building on a native filesystem or prefer to control the flag), set `DOTNET_BUILD_FLAGS` when invoking make, for example:
+
+  make all DOTNET_BUILD_FLAGS='-p:UseAppHost=true'
+
+- To permanently disable apphost for all builds on your machine, add a `UseAppHost` property to the project or Directory.Build.props. See the Makefile for more details.
+
+If you run into build errors related to memory-mapped files and you're not on a native VM filesystem, try copying the repository onto the VM's local filesystem (e.g. `/home/${USER}/src`) and building there for full fidelity.

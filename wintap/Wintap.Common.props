@@ -127,6 +127,10 @@
 		<EmbeddedResource Include="core\etl\esper\registry.epl" />
 		<EmbeddedResource Include="core\etl\esper\tcp.epl" />
 		<EmbeddedResource Include="core\etl\esper\udp.epl" />
+		<Content Include="core\etl\esper\*.epl">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>esper\%(Filename)%(Extension)</Link>
+		</Content>
 		<None Include="core\etl\ETLConfig.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>ETLConfig.json</Link>

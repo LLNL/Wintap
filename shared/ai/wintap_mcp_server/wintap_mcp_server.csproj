@@ -12,6 +12,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The Lintap build may redirect BaseIntermediateOutputPath/BaseOutputPath to a
+      VM-local temp directory when publishing this project from a host-shared mount.
+      When that happens, the SDK's default obj/bin excludes no longer cover stale
+      in-repo obj/bin directories, so explicitly exclude them from source globs.
+    -->
+    <Compile Remove="obj\**\*.cs" />
+    <None Remove="obj\**" />
+    <EmbeddedResource Remove="obj\**" />
+    <Content Remove="obj\**" />
+    <Compile Remove="bin\**\*.cs" />
+    <None Remove="bin\**" />
+    <EmbeddedResource Remove="bin\**" />
+    <Content Remove="bin\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="DuckDB.NET.Data.Full" Version="1.3.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-rc.1.25451.107" />
     <PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.3" />

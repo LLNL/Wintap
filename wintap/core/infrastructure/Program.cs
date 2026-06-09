@@ -73,10 +73,17 @@ if (configuredUrl.Contains("localhost"))
     aiProvider = "Ollama";
 }
 
-IMcpClient mcpClient;
-IChatClient chatClient;
+IMcpClient mcpClient = null;
+IChatClient chatClient = null;
+PluginMcpManager pluginMcpManager = null;
+bool mcpDisabled = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_MCP"), "true", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_MCP"), "1", StringComparison.OrdinalIgnoreCase);
 
-try
+if (mcpDisabled)
+{
+    WintapLogger.Log.Append("MCP/AI initialization disabled by WINTAP_DISABLE_MCP", LogLevel.Warn);
+}
+else try
 {
     // ─── MCP Server Configuration ──────────────────────────────────────────
     string fileRootPath = Env.FileRootPath;
@@ -181,13 +188,25 @@ try
 
     // ─── Create Plugin MCP Manager ─────────────────────────────────────────
     WintapLogger.Log.Append("Creating Plugin MCP Manager", LogLevel.Info);
-    var pluginMcpManager = new PluginMcpManager(mcpClient, WintapLogger.Log);
+    pluginMcpManager = new PluginMcpManager(mcpClient, WintapLogger.Log);
 
     // ─── AI Service Registration ──────────────────────────────────────────
     builder.Services.AddSingleton(chatHistory);
-    builder.Services.AddSingleton<IMcpClient>(mcpClient);
-    builder.Services.AddSingleton<IChatClient>(chatClient);
-    builder.Services.AddSingleton<PluginMcpManager>(pluginMcpManager);
+
+    if (mcpClient != null)
+    {
+        builder.Services.AddSingleton<IMcpClient>(mcpClient);
+    }
+
+    if (chatClient != null)
+    {
+        builder.Services.AddSingleton<IChatClient>(chatClient);
+    }
+
+    if (pluginMcpManager != null)
+    {
+        builder.Services.AddSingleton<PluginMcpManager>(pluginMcpManager);
+    }
 
     WintapLogger.Log.Append("AI services registered in DI container", LogLevel.Info);
 
@@ -204,6 +223,37 @@ catch (Exception ex)
 
 WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
 
+if (string.Equals(Environment.GetEnvironmentVariable("WINTAP_ESPER_REPRO"), "true", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(Environment.GetEnvironmentVariable("WINTAP_ESPER_REPRO"), "1", StringComparison.OrdinalIgnoreCase))
+{
+    string[] reproQueries =
+    {
+        "SELECT * FROM WintapMessage",
+        "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = 'Process'",
+        "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) <> 'ProcessPartial'",
+        "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = 'SessionChange'",
+        "@Name(\"Every10Seconds Context DDL\")\ncreate context Every10Seconds initiated @now and pattern [every timer:interval(10 seconds)] terminated after 10 seconds\n"
+    };
+
+    Console.WriteLine("WINTAP_ESPER_REPRO_BEGIN");
+    for (int i = 0; i < reproQueries.Length; i++)
+    {
+        string name = "esper_repro_" + i;
+        try
+        {
+            EventChannel.CompileDeploy(reproQueries[i], name);
+            Console.WriteLine($"WINTAP_ESPER_REPRO_RESULT|{i}|OK|{reproQueries[i].Replace('\n', ' ')}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"WINTAP_ESPER_REPRO_RESULT|{i}|FAIL|{ex.GetType().FullName}|{ex.Message.Replace('\n', ' ')}|{reproQueries[i].Replace('\n', ' ')}");
+        }
+    }
+    Console.WriteLine("WINTAP_ESPER_REPRO_END");
+    WintapLogger.Log.Close();
+    return;
+}
+
 // ─── Logger Registration ───────────────────────────────────────────────────
 // Register WintapLogger as IWintapLogger for plugin dependency injection
 builder.Services.AddSingleton<IWintapLogger>(sp => WintapLogger.Log);
@@ -213,12 +263,12 @@ builder.Services.AddSingleton<IWintapLogger>(sp => WintapLogger.Log);
 builder.Services.AddSingleton<IInfer>(sp =>
 {
     var chatClient = sp.GetService<IChatClient>();
-    var mcpManager = sp.GetRequiredService<PluginMcpManager>();
+    var mcpManager = sp.GetService<PluginMcpManager>();
     var logger = sp.GetService<IWintapLogger>();
 
-    if (chatClient == null)
+    if (chatClient == null || mcpManager == null)
     {
-        WintapLogger.Log.Append("Warning: IChatClient not available. IInfer will not be available to plugins.", LogLevel.Warn);
+        WintapLogger.Log.Append("Warning: AI/MCP services not available. IInfer will not be available to plugins.", LogLevel.Warn);
         return null;
     }
 

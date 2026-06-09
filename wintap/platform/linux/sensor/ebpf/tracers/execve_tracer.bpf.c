@@ -1,6 +1,7 @@
-#include <linux/bpf.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+#include <bpf/bpf_core_read.h>
 
 // Maximum sizes for our data
 #define TASK_COMM_LEN 16
@@ -81,7 +82,9 @@ int trace_execve_entry(struct trace_event_raw_sys_enter_execve *ctx)
     event->timestamp_ns = bpf_ktime_get_ns();
     
     // Fields filled in userspace
-    event->ppid = 0;
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task_btf();
+    struct task_struct *parent = BPF_CORE_READ(task, real_parent);
+    event->ppid = parent ? BPF_CORE_READ(parent, tgid) : 0;
     event->sid = 0;
     event->exit_code = 0;
     event->flags = 0;

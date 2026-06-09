@@ -86,6 +86,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                 
                 // Extract process name with comm as fallback
                 string processName = ProcessSensorHelper.ExtractProcessName(executablePath, rawComm);
+                int parentPid = procData.PPid > 0 ? procData.PPid : (int)evt.PPid;
                 
                 // Final safety: if process name is STILL empty, try cmdline
                 if (string.IsNullOrWhiteSpace(processName) || processName == "unknown-1")
@@ -98,7 +99,7 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.Process = ProcessSensorHelper.CreateProcessObject(
                     pid: (int)evt.Pid,
-                    ppid: procData.PPid,
+                    ppid: parentPid,
                     name: processName,
                     path: executablePath,
                     commandLine: rawCmdline ?? "",
@@ -110,6 +111,7 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
+                ProcessSensorHelper.EnrichParentProcess(message, _pidHashGenerator);
 
                 EventChannel.Send(message);
                 return 0;

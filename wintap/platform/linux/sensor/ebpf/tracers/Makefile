@@ -14,7 +14,7 @@ endif
 
 .PHONY: all clean test
 
-all: $(OBJS) $(VMLINUX)
+all: $(VMLINUX) $(OBJS)
 
 # Pattern rule: This handles ALL .c to .o conversions
 # $< is the source file (.c), $@ is the target file (.o)

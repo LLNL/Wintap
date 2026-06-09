@@ -63,15 +63,33 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private void LogPluginException(Exception ex, string type)
         {
+            if (ex == null)
+            {
+                WintapLogger.Log.Append($"Plugin Exception ({type}): non-Exception object", LogLevel.Info);
+                return;
+            }
+
             var pluginName = GetPluginNameFromStack(ex);
-            var logMessage = $"Plugin Exception ({type}) in {pluginName}: {ex.Message}\nStack Trace: {ex.StackTrace}";
+            var logMessage = $"Plugin Exception ({type}) in {pluginName}: {ex.Message}\nStack Trace: {GetSafeStackTrace(ex)}";
 
             if (ex.InnerException != null)
             {
-                logMessage += $"\nInner Exception: {ex.InnerException.Message}\nInner Stack Trace: {ex.InnerException.StackTrace}";
+                logMessage += $"\nInner Exception: {ex.InnerException.Message}\nInner Stack Trace: {GetSafeStackTrace(ex.InnerException)}";
             }
 
             WintapLogger.Log.Append(logMessage, LogLevel.Info);
+        }
+
+        private string GetSafeStackTrace(Exception ex)
+        {
+            try
+            {
+                return ex?.StackTrace ?? "(no stack trace)";
+            }
+            catch (Exception stackEx)
+            {
+                return $"(stack trace unavailable: {stackEx.Message})";
+            }
         }
 
         private string GetPluginNameFromStack(Exception ex)
@@ -79,7 +97,7 @@ namespace gov.llnl.wintap.core.infrastructure
             // Try to determine plugin name from stack trace
             try
             {
-                var stack = ex.StackTrace;
+                var stack = GetSafeStackTrace(ex);
                 if (string.IsNullOrEmpty(stack))
                     return "Unknown Plugin";
 
@@ -115,7 +133,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 msg.WintapAlert = new WintapMessage.WintapAlertData
                 {
                     AlertName = WintapMessage.WintapAlertData.AlertNameEnum.OTHER,
-                    AlertDescription = $"Plugin Exception in {pluginName}: {ex.Message}"
+                    AlertDescription = $"Plugin Exception in {pluginName}: {ex?.Message ?? "non-Exception object"}"
                 };
                 EventChannel.Send(msg);
             }

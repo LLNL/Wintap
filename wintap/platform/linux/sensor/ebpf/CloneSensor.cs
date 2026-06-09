@@ -104,6 +104,7 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
+                ProcessSensorHelper.EnrichParentProcess(message, _pidHashGenerator);
 
                 EventChannel.Send(message);
                 return 0;
