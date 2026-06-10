@@ -106,7 +106,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 ParquetSchema schema = DetermineSchemaFromExpando(host.ToDynamic());
 
                 ParquetSerializerOptions options = new ParquetSerializerOptions();
-                options.CompressionMethod = CompressionMethod.Snappy;
+                options.CompressionMethod = gov.llnl.wintap.core.etl.load.ParquetWriter.GetCompressionMethod();
                 List<ExpandoObject> data = new List<ExpandoObject>();
                 data.Add(host.ToDynamic());
 
@@ -144,7 +144,7 @@ namespace gov.llnl.wintap.core.etl.extract
                     ParquetSchema schema = DetermineSchemaFromExpando(macIp.ToDynamic());
 
                     ParquetSerializerOptions options = new ParquetSerializerOptions();
-                    options.CompressionMethod = CompressionMethod.Snappy;
+                    options.CompressionMethod = gov.llnl.wintap.core.etl.load.ParquetWriter.GetCompressionMethod();
                     List<ExpandoObject> data = new List<ExpandoObject>();
                     foreach (MacIpV4Record macIpV4Record in macIps)
                     {

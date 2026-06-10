@@ -77,6 +77,23 @@ namespace gov.llnl.wintap.core.etl.load
             batches.Enqueue(batch);
         }
 
+        internal static CompressionMethod GetCompressionMethod()
+        {
+            string configured = Environment.GetEnvironmentVariable("WINTAP_PARQUET_COMPRESSION");
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                return CompressionMethod.Snappy;
+            }
+
+            if (Enum.TryParse(configured, ignoreCase: true, out CompressionMethod method))
+            {
+                return method;
+            }
+
+            WintapLogger.Log.Append($"Unknown WINTAP_PARQUET_COMPRESSION '{configured}', using Snappy", LogLevel.Warn);
+            return CompressionMethod.Snappy;
+        }
+
         internal async Task<string> Write(Batch.SensorData dataSet)
         {
             // prevent file name collisions on shared event types
@@ -108,7 +125,7 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
                 ParquetSerializerOptions options = new ParquetSerializerOptions();
-                options.CompressionMethod = CompressionMethod.Snappy;
+                options.CompressionMethod = GetCompressionMethod();
                 using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
                 {
                     await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
@@ -127,7 +144,7 @@ namespace gov.llnl.wintap.core.etl.load
                     {
                         ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
                         ParquetSerializerOptions options = new ParquetSerializerOptions();
-                        options.CompressionMethod = CompressionMethod.Snappy;
+                        options.CompressionMethod = GetCompressionMethod();
                         using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
                         {
                             await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
