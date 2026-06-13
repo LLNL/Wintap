@@ -24,6 +24,9 @@ namespace gov.llnl.wintap.platform.linux.collect
         // Threading
         protected Thread? PollingThread;
         protected volatile bool IsRunning = false;
+        // Diagnostics thread that polls BPF maps (e.g., diag_counters)
+        protected Thread? DiagThread;
+        protected CancellationTokenSource? DiagCancel;
 
         // Abstract properties - subclasses define these
         protected abstract string BpfObjectFileName { get; }
@@ -149,6 +152,12 @@ namespace gov.llnl.wintap.platform.linux.collect
                 return false;
             }
 
+            // Start diagnostics monitor in background. It will look for a map named
+            // "diag_counters" and periodically log STORE/HIT/MISS counts. This is
+            // intentionally lightweight and uses bpftool to read map contents so we
+            // do not add extensive libbpf P/Invoke surface.
+            StartDiagMonitor();
+
             return true;
         }
 
@@ -184,6 +193,14 @@ namespace gov.llnl.wintap.platform.linux.collect
             WintapLogger.Log.Append($"Stopping {SensorName} sensor...", LogLevel.Info);
 
             IsRunning = false;
+
+            // Stop diagnostic monitor if running
+            try
+            {
+                DiagCancel?.Cancel();
+                DiagThread?.Join(TimeSpan.FromSeconds(2));
+            }
+            catch { }
 
             // Wait for polling thread
             PollingThread?.Join(TimeSpan.FromSeconds(2));
@@ -253,6 +270,143 @@ namespace gov.llnl.wintap.platform.linux.collect
         /// Hook for subclass cleanup (optional)
         /// </summary>
         protected virtual void OnStopping() { }
+
+        private void StartDiagMonitor()
+        {
+            try
+            {
+                DiagCancel = new CancellationTokenSource();
+                var ct = DiagCancel.Token;
+                DiagThread = new Thread(() =>
+                {
+                    while (!ct.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            // Find diag_counters map via bpftool
+                            var psi = new System.Diagnostics.ProcessStartInfo("bpftool", "map list -j")
+                            {
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true,
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            };
+
+                            using var p = System.Diagnostics.Process.Start(psi);
+                            if (p == null)
+                                throw new Exception("bpftool start failed");
+                            string outJson = p.StandardOutput.ReadToEnd();
+                            p.WaitForExit(2000);
+
+                            int mapId = -1;
+                            if (!string.IsNullOrWhiteSpace(outJson))
+                            {
+                                try
+                                {
+                                    using var doc = System.Text.Json.JsonDocument.Parse(outJson);
+                                    foreach (var el in doc.RootElement.EnumerateArray())
+                                    {
+                                        if (el.TryGetProperty("name", out var nameEl) && nameEl.GetString() == "diag_counters")
+                                        {
+                                            if (el.TryGetProperty("id", out var idEl))
+                                                mapId = idEl.GetInt32();
+                                            break;
+                                        }
+                                    }
+                                }
+                                catch { /* ignore JSON parse errors */ }
+                            }
+
+                            if (mapId != -1)
+                            {
+                                // Dump map entries human-readable and parse keys/values
+                                var psi2 = new System.Diagnostics.ProcessStartInfo("bpftool", $"map dump id {mapId} -p")
+                                {
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError = true,
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true
+                                };
+
+                                using var p2 = System.Diagnostics.Process.Start(psi2);
+                                if (p2 != null)
+                                {
+                                    string dump = p2.StandardOutput.ReadToEnd();
+                                    p2.WaitForExit(2000);
+                                    long store = 0, hit = 0, miss = 0;
+                                    foreach (var line in dump.Split('\n'))
+                                    {
+                                        var s = line.Trim();
+                                        if (s.Length == 0) continue;
+
+                                        // Lines may be one of:
+                                        //   key: 0 value: 123
+                                        // or for per-cpu arrays:
+                                        //   key: 0 value: 12, 0, 7
+                                        try
+                                        {
+                                            int key = -1;
+                                            int idx = s.IndexOf("key:", StringComparison.Ordinal);
+                                            if (idx >= 0)
+                                            {
+                                                var after = s.Substring(idx + 4).Trim();
+                                                var parts = after.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                                if (parts.Length > 0)
+                                                {
+                                                    int.TryParse(parts[0].TrimEnd(':'), out key);
+                                                }
+                                            }
+
+                                            long valueSum = 0;
+                                            idx = s.IndexOf("value:", StringComparison.Ordinal);
+                                            if (idx >= 0)
+                                            {
+                                                var valPart = s.Substring(idx + 6).Trim();
+                                                // Remove any trailing characters
+                                                valPart = valPart.Trim();
+                                                // If per-cpu, values are comma-separated
+                                                var tokens = valPart.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                                foreach (var t in tokens)
+                                                {
+                                                    if (long.TryParse(t.Trim(), out var parsed))
+                                                        valueSum += parsed;
+                                                }
+                                            }
+
+                                            if (key == 0) store = valueSum;
+                                            else if (key == 1) hit = valueSum;
+                                            else if (key == 2) miss = valueSum;
+                                        }
+                                        catch { }
+                                    }
+
+                                    WintapLogger.Log.Append($"BPF diag counters (STORE/HIT/MISS) = {store}/{hit}/{miss}", LogLevel.Info);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            WintapLogger.Log.Append($"DiagMonitor error: {ex.Message}", LogLevel.Debug);
+                        }
+
+                        try {
+                            int waitMs = 5000;
+                            for (int i = 0; i < waitMs / 200; i++)
+                            {
+                                if (ct.IsCancellationRequested) break;
+                                Thread.Sleep(200);
+                            }
+                        } catch { }
+                    }
+                }) { IsBackground = true };
+
+                DiagThread.Start();
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to start diag monitor: {ex.Message}", LogLevel.Debug);
+            }
+        }
 
         [DllImport("libc")]
         private static extern uint getuid();

@@ -26,9 +26,20 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
 
             List<BaseSensor> baseSensors = new List<BaseSensor>();
 
-            bool IsEnabled(string envVar) =>
-                string.Equals(Environment.GetEnvironmentVariable(envVar), "true", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(Environment.GetEnvironmentVariable(envVar), "1", StringComparison.OrdinalIgnoreCase);
+            // Default to enabled unless the environment variable explicitly
+            // disables the sensor by being set to "false" or "0". This reverses
+            // the previous opt-in behavior so sensors are on by default and
+            // can be disabled via configuration.
+            bool IsEnabled(string envVar)
+            {
+                var v = Environment.GetEnvironmentVariable(envVar);
+                if (string.IsNullOrEmpty(v))
+                    return true; // default ON
+                if (string.Equals(v, "false", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(v, "0", StringComparison.OrdinalIgnoreCase))
+                    return false;
+                return true;
+            }
 
             if (IsEnabled("WINTAP_ENABLE_EXECVE_SENSOR"))
             {

@@ -14,6 +14,12 @@ namespace gov.llnl.wintap.platform.linux.collect
     /// </summary>
     internal class NetworkSensor : BaseEbpfSensor
     {
+        // Local aggregated diagnostic counters (incremented from ringbuffer diag events)
+        private long _diagStore = 0;
+        private long _diagHit = 0;
+        private long _diagMiss = 0;
+        private System.Threading.Thread? _diagReporterThread;
+        private System.Threading.CancellationTokenSource? _diagReporterCancel;
         private ProcessHash _pidHashGenerator;
         private List<IntPtr> _additionalLinks;
 
@@ -32,6 +38,33 @@ namespace gov.llnl.wintap.platform.linux.collect
             if (!base.Start())
                 return false;
 
+            // Start a small diag reporter that logs aggregated ringbuffer diag events
+            try
+            {
+                _diagReporterCancel = new System.Threading.CancellationTokenSource();
+                var ct = _diagReporterCancel.Token;
+                _diagReporterThread = new System.Threading.Thread(() =>
+                {
+                    while (!ct.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            System.Threading.Thread.Sleep(10000);
+                            var s = System.Threading.Interlocked.Read(ref _diagStore);
+                            var h = System.Threading.Interlocked.Read(ref _diagHit);
+                            var m = System.Threading.Interlocked.Read(ref _diagMiss);
+                            WintapLogger.Log.Append($"NetworkSensor aggregated BPF diag (STORE/HIT/MISS) = {s}/{h}/{m}", LogLevel.Info);
+                        }
+                        catch { }
+                    }
+                }) { IsBackground = true };
+                _diagReporterThread.Start();
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to start NetworkSensor diag reporter: {ex.Message}", LogLevel.Debug);
+            }
+
             try
             {
                 var programNames = new[]
@@ -46,6 +79,37 @@ namespace gov.llnl.wintap.platform.linux.collect
                     if (prog == IntPtr.Zero)
                     {
                         WintapLogger.Log.Append($"{SensorName} program '{progName}' not found", LogLevel.Warn);
+                        continue;
+                    }
+
+                    IntPtr link = LibBpf.bpf_program__attach(prog);
+                    if (link == IntPtr.Zero)
+                    {
+                        WintapLogger.Log.Append($"{SensorName} failed to attach '{progName}'", LogLevel.Warn);
+                        continue;
+                    }
+
+                    _additionalLinks.Add(link);
+                    WintapLogger.Log.Append($"{SensorName} attached '{progName}'", LogLevel.Info);
+                }
+
+                // Also attempt to attach kprobe/kretprobe programs that populate
+                // the sock_pid_map. These are not always auto-attached by libbpf
+                // in all environments, so attach them explicitly when present.
+                var kprobeNames = new[]
+                {
+                    "kprobe__tcp_v4_connect",
+                    "kprobe__tcp_v6_connect",
+                    "kprobe__tcp_connect",
+                    "kretprobe__inet_csk_accept"
+                };
+
+                foreach (var progName in kprobeNames)
+                {
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, progName);
+                    if (prog == IntPtr.Zero)
+                    {
+                        WintapLogger.Log.Append($"{SensorName} program '{progName}' not found", LogLevel.Debug);
                         continue;
                     }
 
@@ -80,6 +144,24 @@ namespace gov.llnl.wintap.platform.linux.collect
                 
                 if (evt.Comm == null)
                     return 0;
+
+                // Handle in-band diagnostic events emitted by the tracer
+                if (evt.Protocol == 0xFF)
+                {
+                    // opType is the diag code: 0=STORE,1=HIT,2=MISS
+                    int diag = evt.OpType;
+                    int pid_diag = (int)evt.Pid;
+                    uint sk_lo = evt.Bytes; // low 32 bits of socket ptr
+                    WintapLogger.Log.Append($"BPF diag event code={diag} pid={pid_diag} sk_lo=0x{sk_lo:x8}", LogLevel.Info);
+                    // Maintain local aggregates for quick visibility
+                    switch (diag)
+                    {
+                        case 0: System.Threading.Interlocked.Increment(ref _diagStore); break;
+                        case 1: System.Threading.Interlocked.Increment(ref _diagHit); break;
+                        case 2: System.Threading.Interlocked.Increment(ref _diagMiss); break;
+                    }
+                    return 0;
+                }
 
                 int pid = (int)evt.Pid;
                 bool isTcp = evt.Protocol == 6;
@@ -168,6 +250,13 @@ namespace gov.llnl.wintap.platform.linux.collect
 
         protected override void OnStopping()
         {
+            try
+            {
+                _diagReporterCancel?.Cancel();
+                _diagReporterThread?.Join(TimeSpan.FromSeconds(2));
+            }
+            catch { }
+
             foreach (var link in _additionalLinks)
             {
                 if (link != IntPtr.Zero)
