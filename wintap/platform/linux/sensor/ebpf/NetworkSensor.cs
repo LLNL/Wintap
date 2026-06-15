@@ -38,6 +38,36 @@ namespace gov.llnl.wintap.platform.linux.collect
             if (!base.Start())
                 return false;
 
+            // Optional: reduce event volume by filtering the tracer to a single PID.
+            // This is primarily for validation/benchmark runs.
+            try
+            {
+                var pidStr = Environment.GetEnvironmentVariable("WINTAP_NETWORK_CAPTURE_PID");
+                if (!string.IsNullOrWhiteSpace(pidStr) && uint.TryParse(pidStr, out var capturePid) && capturePid > 0)
+                {
+                    IntPtr map = LibBpf.bpf_object__find_map_by_name(BpfObject, "capture_pid");
+                    if (map != IntPtr.Zero)
+                    {
+                        int fd = LibBpf.bpf_map__fd(map);
+                        if (fd >= 0)
+                        {
+                            uint key = 0;
+                            uint value = capturePid;
+                            // flags=0 => BPF_ANY
+                            int rc = LibBpf.bpf_map_update_elem(fd, ref key, ref value, 0);
+                            if (rc == 0)
+                                WintapLogger.Log.Append($"{SensorName} tracer PID filter enabled: {capturePid}", LogLevel.Info);
+                            else
+                                WintapLogger.Log.Append($"{SensorName} failed to set tracer PID filter: rc={rc}", LogLevel.Warn);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"{SensorName} failed to configure PID filter: {ex.Message}", LogLevel.Debug);
+            }
+
             // Start a small diag reporter that logs aggregated ringbuffer diag events
             try
             {
@@ -146,7 +176,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                      // TCP send/recv coverage
                      "kprobe__tcp_sendmsg",
-                     "kprobe__tcp_recvmsg"
+                     "kprobe__tcp_recvmsg",
+
+                     // UDP send/recv for connected UDP sockets (sendmsg/recvmsg)
+                     "kprobe__udp_sendmsg",
+                     "kprobe__udp_recvmsg"
                  };
 
                 foreach (var progName in kprobeNames)

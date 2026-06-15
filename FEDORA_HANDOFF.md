@@ -292,6 +292,14 @@ WINTAP_DISABLE_DUCKDB_UI=false make run
   - Copies EPL files to output under `esper/`.
 - `wintap/wintap/core/etl/extract/Serializer.cs`
   - Reads EPL from output files first.
+  - Supports optional in-memory backlog limits to prevent OOM on long runs:
+    - `WINTAP_ETL_MAX_QUEUE_EVENTS` / `WINTAP_ETL_MAX_QUEUE_EVENTS_<SERIALIZERNAME>`
+    - `WINTAP_ETL_QUEUE_DROP_POLICY=newest|oldest` / per-serializer override
+
+- `wintap/wintap/core/etl/load/ParquetWriter.cs`
+  - Supports optional parquet batch backlog limits:
+    - `WINTAP_PARQUET_MAX_BATCH_BACKLOG`
+    - `WINTAP_PARQUET_BACKLOG_DROP_POLICY=newest|oldest`
 
 ## Current Known Runtime Behavior
 

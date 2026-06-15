@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 //using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.core.infrastructure
@@ -71,6 +72,16 @@ namespace gov.llnl.wintap.core.infrastructure
         public static long TotalEvents => totalEvents;
         public static string Runtime => stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss");
         public static int DroppedEventCount => droppedEventCount;
+
+        internal static void AddDroppedEvents(int count)
+        {
+            if (count <= 0)
+            {
+                return;
+            }
+
+            Interlocked.Add(ref droppedEventCount, count);
+        }
 
         /// <summary>
         /// Esper configuration accessor

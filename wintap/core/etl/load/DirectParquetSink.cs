@@ -15,8 +15,45 @@ namespace gov.llnl.wintap.core.etl.load
         private static readonly ParquetWriter parquetWriter = new();
         private static readonly Timer flushTimer;
 
+        // Bound memory usage in direct-parquet mode as well.
+        // 0 means unlimited.
+        private static readonly int maxQueueEvents;
+        private static readonly DropPolicy backlogDropPolicy;
+        private static long droppedEvents;
+        private static DateTime lastDropLogUtc = DateTime.MinValue;
+
+        private enum DropPolicy
+        {
+            DropNewest,
+            DropOldest
+        }
+
+        private static DropPolicy ParseDropPolicy(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return DropPolicy.DropNewest;
+            }
+
+            if (string.Equals(value, "oldest", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "drop_oldest", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "dropoldest", StringComparison.OrdinalIgnoreCase))
+            {
+                return DropPolicy.DropOldest;
+            }
+
+            return DropPolicy.DropNewest;
+        }
+
         static DirectParquetSink()
         {
+            if (!int.TryParse(Environment.GetEnvironmentVariable("WINTAP_DIRECT_PARQUET_MAX_QUEUE_EVENTS"), out maxQueueEvents) || maxQueueEvents < 0)
+            {
+                maxQueueEvents = 0;
+            }
+
+            backlogDropPolicy = ParseDropPolicy(Environment.GetEnvironmentVariable("WINTAP_DIRECT_PARQUET_QUEUE_DROP_POLICY"));
+
             int flushSeconds = 15;
             if (int.TryParse(Environment.GetEnvironmentVariable("WINTAP_DIRECT_PARQUET_FLUSH_SECONDS"), out int configuredSeconds) && configuredSeconds > 0)
             {
@@ -42,6 +79,52 @@ namespace gov.llnl.wintap.core.etl.load
 
             string messageType = message.MessageType.ToString();
             ConcurrentQueue<ExpandoObject> queue = queues.GetOrAdd(messageType, _ => new ConcurrentQueue<ExpandoObject>());
+
+            if (maxQueueEvents > 0 && queue.Count >= maxQueueEvents)
+            {
+                if (backlogDropPolicy == DropPolicy.DropOldest)
+                {
+                    // Evict one oldest event to make room.
+                    if (queue.TryDequeue(out _))
+                    {
+                        droppedEvents++;
+                        gov.llnl.wintap.core.infrastructure.EventChannel.AddDroppedEvents(1);
+                    }
+                    else
+                    {
+                        // Nothing to evict; drop newest.
+                        droppedEvents++;
+                        gov.llnl.wintap.core.infrastructure.EventChannel.AddDroppedEvents(1);
+                        var now2 = DateTime.UtcNow;
+                        if ((now2 - lastDropLogUtc).TotalSeconds >= 5)
+                        {
+                            lastDropLogUtc = now2;
+                            WintapLogger.Log.Append($"DirectParquetSink backlog limit reached (type={messageType}, max={maxQueueEvents}, policy={backlogDropPolicy}). Dropping events. dropped={droppedEvents}", LogLevel.Warn);
+                        }
+                        return;
+                    }
+                }
+                else
+                {
+                    droppedEvents++;
+                    gov.llnl.wintap.core.infrastructure.EventChannel.AddDroppedEvents(1);
+                    var now = DateTime.UtcNow;
+                    if ((now - lastDropLogUtc).TotalSeconds >= 5)
+                    {
+                        lastDropLogUtc = now;
+                        WintapLogger.Log.Append($"DirectParquetSink backlog limit reached (type={messageType}, max={maxQueueEvents}, policy={backlogDropPolicy}). Dropping events. dropped={droppedEvents}", LogLevel.Warn);
+                    }
+                    return;
+                }
+
+                var nowLog = DateTime.UtcNow;
+                if ((nowLog - lastDropLogUtc).TotalSeconds >= 5)
+                {
+                    lastDropLogUtc = nowLog;
+                    WintapLogger.Log.Append($"DirectParquetSink backlog limit reached (type={messageType}, max={maxQueueEvents}, policy={backlogDropPolicy}). Dropping events. dropped={droppedEvents}", LogLevel.Warn);
+                }
+            }
+
             queue.Enqueue(ToExpando(message));
         }
 

@@ -338,6 +338,33 @@ sudo chmod -R 755 /var/lib/lintap
 - If using firewall, allow port: `sudo ufw allow 8099/tcp`
 - Ensure `ASPNETCORE_URLS=http://0.0.0.0:8099` in service file
 
+### OOM / Memory Growth (Backlog)
+
+On a busy host, memory growth is usually caused by backlog: upstream event volume temporarily (or persistently) exceeds downstream Esper aggregation + serialization throughput. To prevent unbounded growth, Lintap supports optional queue limits with configurable overflow policy.
+
+ETL serializer queue (Esper output before parquet write):
+
+- `WINTAP_ETL_MAX_QUEUE_EVENTS=<N>`
+- `WINTAP_ETL_MAX_QUEUE_EVENTS_<SERIALIZERNAME>=<N>`
+- `WINTAP_ETL_QUEUE_DROP_POLICY=newest|oldest` (default: `newest`)
+- `WINTAP_ETL_QUEUE_DROP_POLICY_<SERIALIZERNAME>=newest|oldest`
+
+Parquet writer backlog:
+
+- `WINTAP_PARQUET_MAX_BATCH_BACKLOG=<N>`
+- `WINTAP_PARQUET_BACKLOG_DROP_POLICY=newest|oldest` (default: `newest`)
+
+Related ETL tuning overrides (without editing `ETLConfig.json`):
+
+- `WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=<seconds>`
+- `WINTAP_ETL_UPLOAD_INTERVAL_SEC=<seconds>`
+
+Notes:
+
+- `newest` drops incoming work when full.
+- `oldest` evicts queued work to keep newer data.
+- Drops increment `EventChannel.DroppedEventCount` and emit throttled warnings.
+
 ### eBPF tracers not found
 ```bash
 # Verify tracers exist

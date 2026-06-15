@@ -90,6 +90,8 @@ This milestone started as a PID attribution hardening pass for the Linux eBPF ne
   - Current eBPF UDP events emitted from `trace_sendto`/`trace_recvfrom_exit` do not populate the local address/port (source for send, destination for recv). This shows up as `0.0.0.0:0` in parquet.
   - The DNS testcase confirms send/recv events exist, but the local tuple capture needs improvement.
 
+  - Detailed note: `diagnostics/udp_local_tuple_0_0_0_0_notes.md`
+
 - DNS tooling differences matter:
   - Many DNS tools use connected UDP sockets and `sendmsg/recvmsg`, which are not yet traced for UDP in this sensor.
   - The `sendto/recvfrom` path now works reliably (post-fix).

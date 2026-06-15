@@ -115,6 +115,21 @@ namespace gov.llnl.wintap.core.etl.shared
             {
                 LogStartupConfigurationMessage("Could not read ETLConfig from disk, using default values: " + ex.Message, LogLevel.Warn);
             }
+
+            // Allow runtime overrides without modifying ETLConfig.json.
+            // These are particularly useful for tuning memory usage on long-running deployments.
+            if (int.TryParse(Environment.GetEnvironmentVariable("WINTAP_ETL_SERIALIZATION_INTERVAL_SEC"), out int serSec) && serSec > 0)
+            {
+                config.SerializationIntervalSec = serSec;
+                LogStartupConfigurationMessage($"ETLConfig override: SerializationIntervalSec={serSec} (WINTAP_ETL_SERIALIZATION_INTERVAL_SEC)", LogLevel.Info);
+            }
+
+            if (int.TryParse(Environment.GetEnvironmentVariable("WINTAP_ETL_UPLOAD_INTERVAL_SEC"), out int upSec) && upSec > 0)
+            {
+                config.UploadIntervalSec = upSec;
+                LogStartupConfigurationMessage($"ETLConfig override: UploadIntervalSec={upSec} (WINTAP_ETL_UPLOAD_INTERVAL_SEC)", LogLevel.Info);
+            }
+
             return config;
         }
 

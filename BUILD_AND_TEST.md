@@ -70,6 +70,36 @@ Quick build
    - `WINTAP_SKIP_PROCESS_REGISTER`
    - `WINTAP_SKIP_ESPER_SEND`
 
+## Backlog / OOM Protection (ETL + Parquet)
+
+The Esper/ETL path can still OOM if upstream event volume exceeds downstream aggregation/serialization throughput for long enough. The pipeline uses in-memory queues, so a sustained mismatch will grow memory unless bounded.
+
+Lintap supports optional queue limits and configurable overflow policy:
+
+- Per-serializer in-memory backlog (Esper output before parquet write)
+  - `WINTAP_ETL_MAX_QUEUE_EVENTS=<N>`
+  - `WINTAP_ETL_MAX_QUEUE_EVENTS_<SERIALIZERNAME>=<N>` (overrides global)
+  - `WINTAP_ETL_QUEUE_DROP_POLICY=newest|oldest` (default: `newest`)
+  - `WINTAP_ETL_QUEUE_DROP_POLICY_<SERIALIZERNAME>=newest|oldest`
+  - Semantics:
+    - `newest`: drop incoming events when the queue is full.
+    - `oldest`: evict queued events to make room for new ones.
+
+- Parquet writer batch backlog (protects the writer if IO falls behind)
+  - `WINTAP_PARQUET_MAX_BATCH_BACKLOG=<N>`
+  - `WINTAP_PARQUET_BACKLOG_DROP_POLICY=newest|oldest` (default: `newest`)
+
+- Direct Parquet bring-up path (not the main ETL path, but can also be bounded)
+  - `WINTAP_DIRECT_PARQUET_MAX_QUEUE_EVENTS=<N>`
+  - `WINTAP_DIRECT_PARQUET_QUEUE_DROP_POLICY=newest|oldest` (default: `newest`)
+
+When drops occur, Lintap increments `EventChannel.DroppedEventCount` and emits throttled warnings indicating the queue and the configured policy.
+
+Related ETL tuning overrides (without editing `ETLConfig.json`):
+
+- `WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=<seconds>`
+- `WINTAP_ETL_UPLOAD_INTERVAL_SEC=<seconds>`
+
 4. Run the MCP server directly for startup diagnostics:
 
    make run-mcp
