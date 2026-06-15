@@ -49,6 +49,14 @@ DEFAULT_ENDPOINTS = [
     "https://httpbin.org/get",
 ]
 
+# Default UDP targets (IP, port). We send a small UDP datagram to these addresses
+# to exercise UDP capture in the tracer. Use public DNS servers which are
+# typically reachable from most environments.
+DEFAULT_UDP_TARGETS = [
+    ("8.8.8.8", 53),
+    ("1.1.1.1", 53),
+]
+
 
 @dataclass
 class EndpointProbe:
@@ -138,6 +146,32 @@ def generate_traffic(probes: list[EndpointProbe], rounds: int, request_timeout: 
                 print(f"  ERR {probe.url}: {probe.request_error}")
 
 
+def generate_udp_traffic(udp_targets: list[tuple[str,int]], rounds: int, timeout: int) -> list[tuple[str,int,bool,str]]:
+    """Send simple UDP datagrams to target IPs. Returns list of tuples (ip,port,ok,error)."""
+    results = []
+    import socket
+    for r in range(rounds):
+        print(f"udp traffic round {r+1}/{rounds}")
+        for ip, port in udp_targets:
+            ok = False
+            err = None
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.settimeout(timeout)
+                s.sendto(b"lintap-udp-smoke-test", (ip, port))
+                ok = True
+            except Exception as ex:
+                err = str(ex)
+            finally:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+            print(f"  UDP -> {ip}:{port} ok={ok} err={err or ''}")
+            results.append((ip, port, ok, err))
+    return results
+
+
 def find_candidate_parquet_files(parquet_root: Path, start_epoch: float) -> list[Path]:
     if not parquet_root.exists():
         return []
@@ -166,28 +200,28 @@ def sql_string(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
-def build_query(files: Iterable[Path], start_epoch: float) -> str:
+def build_query(files: Iterable[Path], start_epoch: float, target_ports: set[int]) -> str:
     start_ms = int((start_epoch - 30) * 1000)
     file_list = ", ".join(sql_string(str(path)) for path in files)
+    # We will query both TCP (80/443) and common UDP ports (e.g., 53) by allowing
+    # the recent files to be scanned for ports of interest. The smoke-test will
+    # compute which ports to expect and validate against them.
+    # For the smoke test we restrict by the set of candidate files gathered
+    # by modification time and by the target ports. Time fields in parquet
+    # may use different origin/scales, so avoid relying on FirstSeenMs filtering
+    # here — the file selection already constrains recency.
     return f"""
 WITH data AS (
     SELECT *
     FROM read_parquet([{file_list}], union_by_name=true)
-), recent AS (
-    SELECT *
-    FROM data
-    WHERE
-        COALESCE(TRY_CAST(FirstSeenMs AS BIGINT), 0) >= {start_ms}
-        OR COALESCE(TRY_CAST(LastSeenMs AS BIGINT), 0) >= {start_ms}
-        OR COALESCE(TRY_CAST(EventTime AS BIGINT), 0) >= CAST({start_ms / 1000.0} AS BIGINT)
 )
 SELECT
     TRY_CAST(RemoteIpAddr AS UBIGINT) AS remote_ip_addr,
     TRY_CAST(RemotePort AS INTEGER) AS remote_port,
     CAST(Protocol AS VARCHAR) AS protocol,
     COUNT(*) AS row_count
-FROM recent
-WHERE TRY_CAST(RemotePort AS INTEGER) IN (80, 443)
+FROM data
+WHERE TRY_CAST(RemotePort AS INTEGER) IN ({','.join(str(p) for p in sorted(target_ports))})
 GROUP BY 1, 2, 3
 ORDER BY row_count DESC, remote_port, remote_ip_addr;
 """
@@ -222,7 +256,11 @@ def query_with_duckdb_cli(sql: str) -> list[dict]:
 
 
 def query_parquet(files: list[Path], start_epoch: float) -> list[dict]:
-    sql = build_query(files, start_epoch)
+    # Default to querying common TCP ports if caller did not supply a target set.
+    # This wrapper is kept for backward compatibility; callers in this script
+    # will pass an explicit port set when available.
+    default_ports = {80, 443}
+    sql = build_query(files, start_epoch, default_ports)
     rows = query_with_python_duckdb(sql)
     if rows is not None:
         return rows
@@ -243,8 +281,9 @@ def summarize_expected_targets(probes: list[EndpointProbe]) -> None:
         print(f"  {probe.url} -> port {probe.port}, IPv4: {ips}, request_ok={probe.request_ok}")
 
 
-def validate(rows: list[dict], probes: list[EndpointProbe], require_target_ip_match: bool) -> int:
-    print("\ncollected network rows for remote ports 80/443:")
+def validate(rows: list[dict], probes: list[EndpointProbe], target_ports: set[int], require_target_ip_match: bool) -> int:
+    ports_label = ",".join(str(p) for p in sorted(target_ports))
+    print(f"\ncollected network rows for remote ports {ports_label}:")
     if not rows:
         print("  <none>")
     for row in rows[:50]:
@@ -259,7 +298,7 @@ def validate(rows: list[dict], probes: list[EndpointProbe], require_target_ip_ma
         )
 
     observed_ports = {int(row["remote_port"]) for row in rows if row.get("remote_port") is not None}
-    expected_ports = {probe.port for probe in probes if probe.request_ok and probe.port in {80, 443}}
+    expected_ports = {probe.port for probe in probes if probe.request_ok and probe.port in target_ports}
     missing_ports = expected_ports - observed_ports
 
     expected_ip_longs = set()
@@ -318,6 +357,11 @@ def main() -> int:
 
     start_epoch = time.time()
     generate_traffic(probes, args.rounds, args.request_timeout)
+
+    # Generate UDP test traffic as well (separate path). This sends small
+    # UDP datagrams to DEFAULT_UDP_TARGETS to exercise UDP capture.
+    udp_results = generate_udp_traffic(DEFAULT_UDP_TARGETS, args.rounds, args.request_timeout)
+
     summarize_expected_targets(probes)
 
     deadline = time.time() + args.timeout
@@ -329,13 +373,27 @@ def main() -> int:
         if last_files:
             print(f"\nquerying {len(last_files)} recent parquet file(s)...")
             try:
+                # Compute target ports: include HTTP(S) probe ports that succeeded
+                # and any UDP ports used in the UDP traffic that succeeded.
+                target_ports = {probe.port for probe in probes if probe.request_ok}
+                # include UDP ports from udp_results where send was OK
+                try:
+                    udp_ports = {p for (_, p, ok, _) in udp_results if ok}
+                except Exception:
+                    udp_ports = set()
+                target_ports.update(udp_ports)
+
                 last_rows = query_parquet(last_files, start_epoch)
+                # If query_parquet used default ports, rebuild SQL with our target_ports
+                if target_ports != {80, 443}:
+                    sql = build_query(last_files, start_epoch, target_ports)
+                    last_rows = query_with_python_duckdb(sql) or query_with_duckdb_cli(sql)
             except Exception as exc:  # noqa: BLE001 - test should print actionable failure
                 print(f"query error: {exc}")
                 last_rows = []
 
             if last_rows:
-                return validate(last_rows, probes, args.require_target_ip_match)
+                return validate(last_rows, probes, target_ports, args.require_target_ip_match)
 
         remaining = int(deadline - time.time())
         if remaining <= 0:

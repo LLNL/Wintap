@@ -101,6 +101,42 @@ struct {
     __uint(max_entries, 10240);
 } sock_pid_map SEC(".maps");
 
+// Connection info stored keyed by socket pointer so we can attribute
+// send/recv events with addresses without reading kernel struct layout.
+struct conn_info {
+    __u32 saddr;
+    __u32 daddr;
+    __u16 sport;
+    __u16 dport;
+    __u64 start_ns;
+
+    // Rate-limit tcp_sendmsg/tcp_recvmsg emission per socket to avoid flooding
+    // userland (and OOMing the host) on high-volume systems.
+    __u64 last_send_ns;
+    __u64 last_recv_ns;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u64);
+    __type(value, struct conn_info);
+    __uint(max_entries, 16384);
+} conn_map SEC(".maps");
+
+// recvfrom context captured at sys_enter so we can read user-provided src_addr
+// after the syscall returns (sys_exit), when the kernel has populated it.
+struct recvfrom_ctx {
+    void *src_addr;
+    int *addrlen;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u64);
+    __type(value, struct recvfrom_ctx);
+    __uint(max_entries, 8192);
+} recvfrom_ctx_map SEC(".maps");
+
 // Helper to emit network event
 static __always_inline void emit_network_event(__u32 pid, __u32 saddr, __u32 daddr,
                                                 __u16 sport, __u16 dport, __u8 protocol,
@@ -202,12 +238,23 @@ int trace_inet_sock_set_state(struct inet_sock_set_state_args *ctx)
     __u64 sk_key = (__u64)sk;
     struct sock_info *si = bpf_map_lookup_elem(&sock_pid_map, &sk_key);
     if (si) {
-        pid = si->pid;
-        // once consumed, delete to avoid leaks
-        bpf_map_delete_elem(&sock_pid_map, &sk_key);
-        // Emit in-band diagnostic: HIT (code 1)
-        emit_diag_event(1, pid, sk);
-        diag_inc(1);
+        // If the stored entry is too old, consider it stale and delete it.
+        __u64 now = bpf_ktime_get_ns();
+        const __u64 max_age_ns = 5ULL * 1000000000ULL; // 5 seconds
+        if (now - si->start_ns > max_age_ns) {
+            // stale entry
+            bpf_map_delete_elem(&sock_pid_map, &sk_key);
+            emit_diag_event(2, 0, sk); // report as MISS/stale
+            diag_inc(2);
+            pid = 0;
+        } else {
+            pid = si->pid;
+            // once consumed, delete to avoid leaks
+            bpf_map_delete_elem(&sock_pid_map, &sk_key);
+            // Emit in-band diagnostic: HIT (code 1)
+            emit_diag_event(1, pid, sk);
+            diag_inc(1);
+        }
     } else {
         __u64 pid_tgid = bpf_get_current_pid_tgid();
         pid = pid_tgid >> 32;
@@ -221,7 +268,20 @@ int trace_inet_sock_set_state(struct inet_sock_set_state_args *ctx)
     __builtin_memcpy(&saddr, ctx->saddr, sizeof(saddr));
     __builtin_memcpy(&daddr, ctx->daddr, sizeof(daddr));
 
-    // The tracepoint exposes sport/dport in host byte order.
+    // Store a copy of the connection tuple keyed by socket pointer so other
+    // kprobe-based handlers can later lookup addresses without reading
+    // kernel struct fields.
+    struct conn_info cinfo = {};
+    cinfo.saddr = saddr;
+    cinfo.daddr = daddr;
+    cinfo.sport = ctx->sport;
+    cinfo.dport = ctx->dport;
+    cinfo.start_ns = bpf_ktime_get_ns();
+    __u64 sk_key_for_store = (__u64)sk;
+    bpf_map_update_elem(&conn_map, &sk_key_for_store, &cinfo, BPF_ANY);
+
+    // The tracepoint exposes sport/dport in host byte order. Emit the event
+    // as usual (addresses available here).
     emit_network_event(pid, saddr, daddr, ctx->sport, ctx->dport,
                        PROTO_TCP, op_type, 0);
 
@@ -310,6 +370,65 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     return 0;
 }
 
+// Capture TCP send message to emit send events with addresses when possible.
+// tcp_sendmsg signature: int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len);
+SEC("kprobe/tcp_sendmsg")
+int kprobe__tcp_sendmsg(struct pt_regs *ctx)
+{
+    void *sk = (void *)PT_REGS_PARM1(ctx);
+    if (!sk)
+        return 0;
+
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    __u64 len = (__u64)PT_REGS_PARM3(ctx);
+
+    // Prefer connection tuple from conn_map (populated by
+    // trace_inet_sock_set_state). Avoid direct reads from kernel struct
+    // layouts (struct sock may be incomplete depending on build headers).
+    __u64 sk_key = (__u64)sk;
+    struct conn_info *ci = bpf_map_lookup_elem(&conn_map, &sk_key);
+    if (!ci)
+        return 0;
+
+    __u64 now = bpf_ktime_get_ns();
+    const __u64 min_interval_ns = 1ULL * 1000000000ULL; // 1 second
+    if (ci->last_send_ns && (now - ci->last_send_ns) < min_interval_ns)
+        return 0;
+    ci->last_send_ns = now;
+
+    emit_network_event(pid, ci->saddr, ci->daddr, ci->sport, ci->dport, PROTO_TCP, NET_OP_TCP_SEND, (__u32)len);
+    return 0;
+}
+
+// Capture TCP receive message to emit recv events with addresses when possible.
+// tcp_recvmsg signature: ssize_t tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int flags, int noblock);
+SEC("kprobe/tcp_recvmsg")
+int kprobe__tcp_recvmsg(struct pt_regs *ctx)
+{
+    void *sk = (void *)PT_REGS_PARM1(ctx);
+    if (!sk)
+        return 0;
+
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    __u64 len = (__u64)PT_REGS_PARM3(ctx);
+
+    __u64 sk_key = (__u64)sk;
+    struct conn_info *ci = bpf_map_lookup_elem(&conn_map, &sk_key);
+    if (!ci)
+        return 0;
+
+    __u64 now = bpf_ktime_get_ns();
+    const __u64 min_interval_ns = 1ULL * 1000000000ULL; // 1 second
+    if (ci->last_recv_ns && (now - ci->last_recv_ns) < min_interval_ns)
+        return 0;
+    ci->last_recv_ns = now;
+
+    emit_network_event(pid, ci->saddr, ci->daddr, ci->sport, ci->dport, PROTO_TCP, NET_OP_TCP_RECV, (__u32)len);
+    return 0;
+}
+
 // TCP connect - Outbound connection
 struct connect_args {
     unsigned long long unused;
@@ -330,8 +449,34 @@ int trace_connect(struct connect_args *ctx)
     
     // Local address is not available at sys_enter_connect time. TCP
     // connection events are emitted from trace_inet_sock_set_state instead.
-    (void)pid;
+    // As an additional store path, attempt to lookup the struct sock * for
+    // the supplied file descriptor using the bpf helper (if available).
+    // This increases the chance we capture the socket pointer in process
+    // context and later correlate it in inet_sock_set_state.
     (void)addr;
+
+    int fd = ctx->fd;
+    if (fd >= 0)
+    {
+        // Try to use the sockfd lookup helper. Helper availability varies by
+        // kernel version; if the helper is not available this will compile
+        // only if provided by the kernel headers used by clang. We wrap the
+        // result handling defensively.
+#ifdef __BPF_HAVE_SOCKFD_LOOKUP
+        void *sk = bpf_sockfd_lookup(fd, AF_INET, 0);
+        if (sk) {
+            struct sock_info info = {};
+            info.pid = pid;
+            info.start_ns = bpf_ktime_get_ns();
+            __u64 sk_key = (__u64)sk;
+            bpf_map_update_elem(&sock_pid_map, &sk_key, &info, BPF_ANY);
+            emit_diag_event(0, info.pid, sk);
+            diag_inc(0);
+        }
+#endif
+
+    }
+
     return 0;
 }
 
@@ -405,25 +550,52 @@ struct recvfrom_args {
 SEC("tracepoint/syscalls/sys_enter_recvfrom")
 int trace_recvfrom(struct recvfrom_args *ctx)
 {
-    __u64 pid_tgid = bpf_get_current_pid_tgid();
-    __u32 pid = pid_tgid >> 32;
-    
+    // src_addr is written by the kernel on syscall return, so stash the user
+    // pointers here and read them in sys_exit_recvfrom.
     if (ctx->src_addr)
     {
-        struct sockaddr_in addr;
-        bpf_probe_read_user(&addr, sizeof(addr), ctx->src_addr);
-        
-        if (addr.sin_family == 2)
-        {
-            emit_network_event(pid, addr.sin_addr, 0,
-                              bpf_ntohs(addr.sin_port), 0, PROTO_UDP,
-                              NET_OP_UDP_RECV, 0);
-        }
+        __u64 pid_tgid = bpf_get_current_pid_tgid();
+        struct recvfrom_ctx rctx = {};
+        rctx.src_addr = (void *)ctx->src_addr;
+        rctx.addrlen = ctx->addrlen;
+        bpf_map_update_elem(&recvfrom_ctx_map, &pid_tgid, &rctx, BPF_ANY);
     }
-    // For connected TCP sockets, sys_enter_recvfrom does not include the local
-    // or remote socket addresses. Avoid emitting placeholder 0.0.0.0 TCP
-    // events here; TCP connection addresses come from inet_sock_set_state.
-    
+    return 0;
+}
+
+struct sys_exit_args {
+    unsigned long long unused;
+    long syscall_nr;
+    long ret;
+};
+
+SEC("tracepoint/syscalls/sys_exit_recvfrom")
+int trace_recvfrom_exit(struct sys_exit_args *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    struct recvfrom_ctx *rctx = bpf_map_lookup_elem(&recvfrom_ctx_map, &pid_tgid);
+    if (!rctx)
+        return 0;
+
+    // Always delete to avoid leaks.
+    bpf_map_delete_elem(&recvfrom_ctx_map, &pid_tgid);
+
+    // ret is the number of bytes received (or <0 on error)
+    if (ctx->ret <= 0)
+        return 0;
+
+    struct sockaddr_in addr;
+    bpf_probe_read_user(&addr, sizeof(addr), rctx->src_addr);
+    if (addr.sin_family != AF_INET)
+        return 0;
+
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    emit_network_event(pid,
+                       addr.sin_addr, 0,
+                       bpf_ntohs(addr.sin_port), 0,
+                       PROTO_UDP,
+                       NET_OP_UDP_RECV,
+                       (__u32)ctx->ret);
     return 0;
 }
 

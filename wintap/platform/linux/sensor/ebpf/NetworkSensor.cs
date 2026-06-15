@@ -54,6 +54,46 @@ namespace gov.llnl.wintap.platform.linux.collect
                             var h = System.Threading.Interlocked.Read(ref _diagHit);
                             var m = System.Threading.Interlocked.Read(ref _diagMiss);
                             WintapLogger.Log.Append($"NetworkSensor aggregated BPF diag (STORE/HIT/MISS) = {s}/{h}/{m}", LogLevel.Info);
+
+                            // Persist a generic message so ETL will serialize these counters
+                            try
+                            {
+                                var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                                var msg = new gov.llnl.wintap.collect.models.WintapMessage(DateTime.UtcNow, pid, gov.llnl.wintap.collect.models.WintapMessage.MessageTypeEnum.GenericMessage);
+                                msg.ActivityType = gov.llnl.wintap.collect.models.WintapMessage.ActivityTypeEnum.Other;
+                                msg.GenericMessage = new gov.llnl.wintap.collect.models.WintapMessage.GenericMessageObject
+                                {
+                                    ProviderId = "BPFDiag",
+                                    ProviderName = "BPFDiag",
+                                    EventName = "DiagCounters",
+                                    PID = pid,
+                                    EventTime = DateTime.UtcNow,
+                                    Payload = $"STORE={s};HIT={h};MISS={m}"
+                                };
+                                gov.llnl.wintap.core.infrastructure.EventChannel.Send(msg);
+                            }
+                            catch (Exception ex)
+                            {
+                                WintapLogger.Log.Append($"Failed to persist BPF diag counters: {ex.Message}", LogLevel.Debug);
+                            }
+                            // Also append a local CSV for immediate DuckDB queries and persistence
+                            try
+                            {
+                                var diagDir = System.IO.Path.Combine("/var/lib/lintap", "diag");
+                                System.IO.Directory.CreateDirectory(diagDir);
+                                var csvPath = System.IO.Path.Combine(diagDir, "diag_counters.csv");
+                                bool writeHeader = !System.IO.File.Exists(csvPath);
+                                using (var sw = new System.IO.StreamWriter(csvPath, true))
+                                {
+                                    if (writeHeader)
+                                        sw.WriteLine("TimestampUtc,Store,Hit,Miss");
+                                    sw.WriteLine($"{DateTime.UtcNow:o},{s},{h},{m}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                WintapLogger.Log.Append($"Failed to write local diag CSV: {ex.Message}", LogLevel.Debug);
+                            }
                         }
                         catch { }
                     }
@@ -70,7 +110,8 @@ namespace gov.llnl.wintap.platform.linux.collect
                 var programNames = new[]
                 {
                     "trace_sendto",
-                    "trace_recvfrom"
+                    "trace_recvfrom",
+                    "trace_recvfrom_exit"
                 };
 
                 foreach (var progName in programNames)
@@ -96,13 +137,17 @@ namespace gov.llnl.wintap.platform.linux.collect
                 // Also attempt to attach kprobe/kretprobe programs that populate
                 // the sock_pid_map. These are not always auto-attached by libbpf
                 // in all environments, so attach them explicitly when present.
-                var kprobeNames = new[]
-                {
-                    "kprobe__tcp_v4_connect",
-                    "kprobe__tcp_v6_connect",
-                    "kprobe__tcp_connect",
-                    "kretprobe__inet_csk_accept"
-                };
+                 var kprobeNames = new[]
+                 {
+                     "kprobe__tcp_v4_connect",
+                     "kprobe__tcp_v6_connect",
+                     "kprobe__tcp_connect",
+                     "kretprobe__inet_csk_accept",
+
+                     // TCP send/recv coverage
+                     "kprobe__tcp_sendmsg",
+                     "kprobe__tcp_recvmsg"
+                 };
 
                 foreach (var progName in kprobeNames)
                 {
