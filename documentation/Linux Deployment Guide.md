@@ -201,7 +201,7 @@ sudo journalctl -u lintap -f
 
 Check Lintap log file:
 ```bash
-tail -f /var/log/lintap/Lintap.log
+tail -f /var/log/lintap/Logs/Lintap.log
 ```
 
 Verify eBPF programs are loaded:
@@ -240,7 +240,7 @@ Run the network capture smoke test to verify that generated HTTP/HTTPS traffic a
 sudo rm -rf /tmp/lintap-smoke
 mkdir -p /tmp/lintap-smoke
 cd /opt/lintap
-sudo env WINTAP_DATA_ROOT=/tmp/lintap-smoke ./Lintap
+sudo env WINTAP_DATA_ROOT=/tmp/lintap-smoke WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=10 ./Lintap
 
 # In another shell on the same host/VM
 python3 /path/to/wintap/devtools/network_capture_smoke_test.py \
@@ -254,6 +254,15 @@ A passing run should show recent outbound TCP records for ports 80/443 and the l
 ```text
 local=192.168.252.9:37804 -> remote=104.20.23.154:80 proto=TCP rows=2
 PASS: captured recent outbound network records for the generated traffic.
+```
+
+Run the process capture smoke test to verify parent PID/hash linkage in process parquet:
+
+```bash
+python3 /path/to/wintap/devtools/process_capture_smoke_test.py \
+    --data-root /tmp/lintap-smoke \
+    --timeout 240 \
+    --poll-interval 10
 ```
 
 ## Service Management Commands

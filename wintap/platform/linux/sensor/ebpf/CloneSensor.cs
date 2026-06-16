@@ -83,8 +83,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 string processName = ProcessSensorHelper.ExtractProcessName(executablePath, evt.GetParentComm());
 
+                // Use child process start time for stable PidHash.
+                DateTime startUtc = childProcData.StartTimeUtc != default ? childProcData.StartTimeUtc.ToUniversalTime() : DateTime.UtcNow;
+
                 var message = new WintapMessage(
-                    DateTime.UtcNow,
+                    startUtc,
                     (int)evt.ChildPid,
                     WintapMessage.MessageTypeEnum.Process
                 );

@@ -309,7 +309,14 @@ Build/run from `/home/grantj/git/LLNL/wintap/wintap` with source on the shared m
 
 ```bash
 make build_ebpf
-WINTAP_DATA_ROOT=/tmp/lintap-data-etl-execve-native WINTAP_DISABLE_ETL=false WINTAP_DISABLE_SENSORS=false WINTAP_ENABLE_EXECVE_SENSOR=true make run
+
+# Note: the Makefile exports per-sensor env vars and defaults them to false,
+# so using `make run` is opt-in unless you override the variables.
+WINTAP_DATA_ROOT=/tmp/lintap-data-etl-execve-native \
+  WINTAP_DISABLE_ETL=false \
+  WINTAP_DISABLE_SENSORS=false \
+  WINTAP_ENABLE_EXECVE_SENSOR=true \
+  make run
 ```
 
 Observed after native-output fix:

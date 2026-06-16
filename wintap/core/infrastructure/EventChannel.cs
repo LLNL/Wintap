@@ -13,6 +13,7 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.load;
 using gov.llnl.wintap.core.infrastructure.helpers;
 using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.core.shared.helpers;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -56,6 +57,8 @@ namespace gov.llnl.wintap.core.infrastructure
         private static long lastTotalEvents;
         private static int droppedEventCount;
         private static IProcessResolver _processResolver;
+
+        private static readonly Lazy<string> UnknownPidHash = new Lazy<string>(() => new ProcessHash().GenPidHash(-1, 0));
 
 
         private static Stopwatch stopWatch;
@@ -268,8 +271,11 @@ namespace gov.llnl.wintap.core.infrastructure
                             // On Linux or if process not found, generate PidHash without full resolution
                             WintapLogger.Log.Append($"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})",LogLevel.Warn);
 
-                            // Generate a basic PidHash so events still have an identifier
-                            streamedEvent.PidHash = _processResolver.GetPidHash(streamedEvent.PID,DateTime.FromFileTimeUtc(streamedEvent.EventTime));streamedEvent.ProcessName = "Unknown";
+                            // Generate a best-effort PidHash so events still have an identifier.
+                            // Prefer resolver lookup; fall back to a local hash when resolver has no record.
+                            var fallbackPidHash = _processResolver.GetPidHash(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                            streamedEvent.PidHash = fallbackPidHash ?? new ProcessHash().GenPidHash(streamedEvent.PID, streamedEvent.EventTime);
+                            streamedEvent.ProcessName = "Unknown";
                         }
                     }
                     else if (!skipParentProcessResolve)
@@ -312,10 +318,8 @@ namespace gov.llnl.wintap.core.infrastructure
                                             $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
                                             LogLevel.Warn);
 
-                                        // Generate basic parent PidHash
-                                        streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(
-                                            -1,  // the 'unknown' process
-                                            DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                                        // Stable sentinel for unknown parent attribution.
+                                        streamedEvent.Process.ParentPidHash = UnknownPidHash.Value;
                                         streamedEvent.Process.ParentProcessName = "Unknown";
                                     }
                                 }

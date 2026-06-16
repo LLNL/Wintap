@@ -1,6 +1,8 @@
+#include "vmlinux.h"
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+#include <bpf/bpf_core_read.h>
 
 #define TASK_COMM_LEN 16
 
@@ -8,7 +10,7 @@
 struct exit_event {
     // Process identification
     __u32 pid;
-    __u32 ppid;        // Will be 0, filled in userspace
+    __u32 ppid;
     __u32 uid;
     __u32 gid;
     
@@ -19,7 +21,7 @@ struct exit_event {
     __u64 timestamp_ns;
     
     // Exit information
-    __s32 exit_code;   // Exit status (if available)
+    __s32 exit_code;
 };
 
 // Ring buffer map
@@ -62,9 +64,14 @@ int trace_process_exit(struct sched_exit_args *ctx)
     // Get timestamp
     event->timestamp_ns = bpf_ktime_get_ns();
     
-    // Fields filled in userspace
-    event->ppid = 0;
-    event->exit_code = 0;  // Exit code is tricky to get reliably
+    // Best-effort parent pid + exit code from task_struct.
+    // This runs in the context of the exiting task.
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task_btf();
+    struct task_struct *parent = BPF_CORE_READ(task, real_parent);
+    event->ppid = parent ? BPF_CORE_READ(parent, tgid) : 0;
+
+    // Kernel stores wait status in task->exit_code.
+    event->exit_code = BPF_CORE_READ(task, exit_code);
     
     // Submit
     bpf_ringbuf_submit(event, 0);

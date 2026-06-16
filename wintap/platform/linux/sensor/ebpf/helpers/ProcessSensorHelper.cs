@@ -106,6 +106,9 @@ namespace gov.llnl.wintap.platform.linux.collect
             ProcReader.ProcessInfo parentInfo = ProcReader.ReadProcessInfo((uint)message.Process.ParentPID);
             if (!parentInfo.Exists)
             {
+                // Leave ParentPidHash unset so EventChannel can still attempt resolver-based parent resolution.
+                message.Process.ParentPidHash = "";
+                message.Process.ParentProcessName = "Unknown";
                 return;
             }
 

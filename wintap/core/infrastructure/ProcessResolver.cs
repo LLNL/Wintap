@@ -51,15 +51,16 @@ namespace gov.llnl.wintap.core.infrastructure
                 {
                     var eventTimeStr = eventTime.ToString("yyyy-MM-dd HH:mm:ss");
 
-                    query = $@"
-                        SELECT pid_hash, parent_pid_hash, process_id, parent_process_id, 
-                        process_name, image_path, command_line, create_time, 
-                        exit_time, exit_code, source, user_name, md5_hash, sha2_hash
-                        FROM process
-                        WHERE process_id = {pid}
-                        AND create_time <= '{eventTimeStr}'
-                        ORDER BY create_time DESC
-                        LIMIT 1";
+                     query = $@"
+                         SELECT pid_hash, parent_pid_hash, process_id, parent_process_id,
+                         process_name, image_path, command_line, create_time,
+                         exit_time, exit_code, source, user_name, md5_hash, sha2_hash
+                         FROM process
+                         WHERE process_id = {pid}
+                         AND create_time <= '{eventTimeStr}'
+                         AND (exit_time IS NULL OR exit_time >= '{eventTimeStr}')
+                         ORDER BY create_time DESC
+                         LIMIT 1";
 
                     using var command = connection.CreateCommand();
                     command.CommandText = query;
@@ -77,7 +78,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     var owningProcess = new ProcessRecord
                     {
                         PidHash = reader.GetString(0),
-                        ParentPidHash = reader.IsDBNull(1) ? "fixparentpidhash" : reader.GetString(1),
+                        ParentPidHash = reader.IsDBNull(1) ? "" : reader.GetString(1),
                         ProcessId = reader.GetInt32(2),
                         ParentProcessId = reader.GetInt32(3),
                         ProcessName = reader.GetString(4),
@@ -88,8 +89,8 @@ namespace gov.llnl.wintap.core.infrastructure
                         ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
                         Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
                         UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
-                        MD5Hash = reader.IsDBNull(12) ? "fixmd5" : reader.GetString(12),
-                        SHA2Hash = reader.IsDBNull(13) ? "fixsha2" : reader.GetString(13)
+                        MD5Hash = reader.IsDBNull(12) ? "" : reader.GetString(12),
+                        SHA2Hash = reader.IsDBNull(13) ? "" : reader.GetString(13)
                     };
 
                     WintapLogger.Log.Append(
@@ -172,13 +173,76 @@ namespace gov.llnl.wintap.core.infrastructure
 
             lock (_dbLock)
             {
+                string pidHash = EscapeSql(message.PidHash);
+
+                // Stop events should update exit_time/exit_code without clobbering create_time.
+                if (message.ActivityType == WintapMessage.ActivityTypeEnum.Stop)
+                {
+                    var exitTime = createTime;
+                    var exitCode = proc.ExitCode;
+
+                    var update = $@"
+                        UPDATE process
+                        SET exit_time = TIMESTAMP '{exitTime:yyyy-MM-dd HH:mm:ss}',
+                            exit_code = {exitCode},
+                            parent_pid_hash = {(string.IsNullOrEmpty(proc.ParentPidHash) ? "parent_pid_hash" : $"'{EscapeSql(proc.ParentPidHash)}'")},
+                            parent_process_id = {proc.ParentPID}
+                        WHERE pid_hash = '{pidHash}'";
+
+                    using var updateCmd = connection.CreateCommand();
+                    updateCmd.CommandText = update;
+                    try
+                    {
+                        var rows = updateCmd.ExecuteNonQuery();
+                        if (rows == 0)
+                        {
+                            // No matching start record; insert a minimal record so the stop isn't lost.
+                            var insert = $@"
+                                INSERT INTO process (
+                                    pid_hash, parent_pid_hash, process_id, parent_process_id,
+                                    process_name, image_path, command_line, create_time,
+                                    exit_time, exit_code, source, user_name, md5_hash, sha2_hash
+                                ) VALUES (
+                                    '{pidHash}',
+                                    {(string.IsNullOrEmpty(proc.ParentPidHash) ? "NULL" : $"'{EscapeSql(proc.ParentPidHash)}'")},
+                                    {message.PID},
+                                    {proc.ParentPID},
+                                    '{EscapeSql(proc.Name)}',
+                                    '{EscapeSql(proc.Path)}',
+                                    '{EscapeSql(proc.CommandLine)}',
+                                    TIMESTAMP '{exitTime:yyyy-MM-dd HH:mm:ss}',
+                                    TIMESTAMP '{exitTime:yyyy-MM-dd HH:mm:ss}',
+                                    {exitCode},
+                                    'real_time',
+                                    '{EscapeSql(proc.User)}',
+                                    {(string.IsNullOrEmpty(proc.MD5) ? "NULL" : $"'{EscapeSql(proc.MD5)}'")},
+                                    {(string.IsNullOrEmpty(proc.SHA2) ? "NULL" : $"'{EscapeSql(proc.SHA2)}'")}
+                                )";
+
+                            using var insertCmd = connection.CreateCommand();
+                            insertCmd.CommandText = insert;
+                            insertCmd.ExecuteNonQuery();
+                        }
+
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append(
+                            $"DuckDB updating exit for PID {message.PID} {proc.Name}: {ex.Message}",
+                            LogLevel.Error);
+                        return;
+                    }
+                }
+
+                // Start/Refresh upsert (preserve existing exit_time/exit_code if already set).
                 var query = $@"
-                    INSERT OR REPLACE INTO process (
+                    INSERT INTO process (
                             pid_hash, parent_pid_hash, process_id, parent_process_id,
                             process_name, image_path, command_line, create_time,
                             exit_time, exit_code, source, user_name, md5_hash, sha2_hash
                         ) VALUES (
-                            '{EscapeSql(message.PidHash)}',
+                            '{pidHash}',
                             {(string.IsNullOrEmpty(proc.ParentPidHash) ? "NULL" : $"'{EscapeSql(proc.ParentPidHash)}'")},
                             {message.PID},
                             {proc.ParentPID},
@@ -192,7 +256,21 @@ namespace gov.llnl.wintap.core.infrastructure
                             '{EscapeSql(proc.User)}',
                             {(string.IsNullOrEmpty(proc.MD5) ? "NULL" : $"'{EscapeSql(proc.MD5)}'")},
                             {(string.IsNullOrEmpty(proc.SHA2) ? "NULL" : $"'{EscapeSql(proc.SHA2)}'")}
-                        )";
+                        )
+                    ON CONFLICT(pid_hash) DO UPDATE SET
+                        parent_pid_hash = excluded.parent_pid_hash,
+                        parent_process_id = excluded.parent_process_id,
+                        process_id = excluded.process_id,
+                        process_name = excluded.process_name,
+                        image_path = excluded.image_path,
+                        command_line = excluded.command_line,
+                        create_time = excluded.create_time,
+                        source = excluded.source,
+                        user_name = excluded.user_name,
+                        md5_hash = excluded.md5_hash,
+                        sha2_hash = excluded.sha2_hash,
+                        exit_time = COALESCE(process.exit_time, excluded.exit_time),
+                        exit_code = COALESCE(process.exit_code, excluded.exit_code)";
 
                 using var command = connection.CreateCommand();
                 command.CommandText = query;

@@ -31,15 +31,49 @@ namespace gov.llnl.wintap.platform.linux.collect
             {
                 var evt = Marshal.PtrToStructure<ExitEvent>(data);
 
-                // Try to get process info from resolver
-                string processName = evt.GetComm() ?? "unknown";
-                string commandLine = "";
-                string userName = "unknown";
-                string processPath = "";
-                int ppid = 0;
+                DateTime exitUtc = DateTime.UtcNow;
+
+                // Prefer resolver data so Stop events match the original Start PidHash.
+                var resolved = EventChannel.GetProcessHistory((int)evt.Pid, exitUtc);
+
+                // Best-effort /proc read (may still be available briefly during exit).
+                var procData = ProcReader.ReadProcessInfo(evt.Pid);
+
+                string processName = resolved?.ProcessName ?? evt.GetComm() ?? "unknown";
+                string commandLine = resolved?.CommandLine ?? "";
+                string userName = resolved?.UserName ?? "unknown";
+                string processPath = resolved?.ProcessPath ?? "";
+                int ppid = resolved?.ParentProcessId ?? (int)evt.PPid;
+
+                // Fallback to /proc when resolver doesn't have details.
+                if (resolved == null || string.IsNullOrWhiteSpace(processPath) || string.IsNullOrWhiteSpace(commandLine))
+                {
+                    if (procData.Exists)
+                    {
+                        if (ppid <= 0)
+                        {
+                            ppid = procData.PPid;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(commandLine))
+                        {
+                            commandLine = procData.CommandLine ?? "";
+                        }
+
+                        if (string.IsNullOrWhiteSpace(userName) || userName == "unknown")
+                        {
+                            userName = procData.Username ?? userName;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(processPath))
+                        {
+                            processPath = procData.ExecutablePath ?? processPath;
+                        }
+                    }
+                }
 
                 var message = new WintapMessage(
-                    DateTime.UtcNow,
+                    exitUtc,
                     (int)evt.Pid,
                     WintapMessage.MessageTypeEnum.Process
                 );
@@ -56,8 +90,27 @@ namespace gov.llnl.wintap.platform.linux.collect
                     exitCode: evt.ExitCode
                 );
 
-                message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
+                // Stable PidHash: use resolver PidHash if available; else try /proc start time; else fall back to exit time.
+                if (!string.IsNullOrWhiteSpace(resolved?.PidHash))
+                {
+                    message.PidHash = resolved.PidHash;
+                }
+                else
+                {
+                    var startUtc = procData.StartTimeUtc != default ? procData.StartTimeUtc.ToUniversalTime() : exitUtc;
+                    message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, startUtc.ToFileTimeUtc()) ?? "";
+                }
                 message.ProcessName = processName;
+
+                // Prefer parent's PidHash from resolver, else populate via /proc.
+                if (!string.IsNullOrWhiteSpace(resolved?.ParentPidHash))
+                {
+                    message.Process.ParentPidHash = resolved.ParentPidHash;
+                }
+                else
+                {
+                    ProcessSensorHelper.EnrichParentProcess(message, _pidHashGenerator);
+                }
 
                 // Unregister from resolver (process is terminating)
 //                _processResolver?.UnregisterProcess((int)evt.Pid);

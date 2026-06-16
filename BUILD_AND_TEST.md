@@ -44,11 +44,23 @@ Quick build
 
    To bypass the native-heavy eBPF sensor startup path too, run `WINTAP_DISABLE_SENSORS=true make run` or use `make run-host-only`.
 
-   Fedora bring-up currently keeps individual Linux sensors opt-in even when `WINTAP_DISABLE_SENSORS=false`. Enable one sensor at a time with:
+   Linux sensors default to enabled when `WINTAP_DISABLE_SENSORS=false` and the per-sensor env var is unset.
+   Note: `wintap/Makefile` exports the per-sensor env vars explicitly and defaults them to `false` for bring-up, so using `make run` is effectively opt-in unless you override the variables.
 
-   WINTAP_ENABLE_EXECVE_SENSOR=true WINTAP_DISABLE_ETL=true make run
+   To disable a specific sensor when it would otherwise be enabled, set its `WINTAP_ENABLE_<SENSOR>_SENSOR` variable to `false` (or `0`).
 
-   Available per-sensor switches:
+   Example: run with ETL disabled and only Execve enabled:
+
+   WINTAP_DISABLE_ETL=true \
+     WINTAP_ENABLE_EXECVE_SENSOR=true \
+     WINTAP_ENABLE_CLONE_SENSOR=false \
+     WINTAP_ENABLE_EXIT_SENSOR=false \
+     WINTAP_ENABLE_NETWORK_SENSOR=false \
+     WINTAP_ENABLE_FILEOPS_SENSOR=false \
+     WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR=false \
+     make run
+
+   Per-sensor switches (default: enabled unless explicitly set to false/0):
 
    - `WINTAP_ENABLE_EXECVE_SENSOR`
    - `WINTAP_ENABLE_CLONE_SENSOR`
@@ -99,6 +111,37 @@ Related ETL tuning overrides (without editing `ETLConfig.json`):
 
 - `WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=<seconds>`
 - `WINTAP_ETL_UPLOAD_INTERVAL_SEC=<seconds>`
+
+## 30-Minute Soak Test (Network + Process)
+
+This is a practical end-to-end validation run for long-running deployments:
+
+1. Start Lintap with a dedicated data root and a short serialization interval:
+
+   ```bash
+   export WINTAP_DATA_ROOT=/tmp/lintap-qa-30m-$(date +%s)
+   export WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=10
+   export WINTAP_DISABLE_MCP=true
+   export WINTAP_DISABLE_DUCKDB_UI=true
+   sudo -E make run
+   ```
+
+2. Run smoke tests periodically during the soak window:
+
+   ```bash
+   for i in 1 2 3 4 5; do
+     python3 devtools/network_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
+     python3 devtools/process_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5
+     sleep 360
+   done
+   ```
+
+3. After 30 minutes, summarize QA with DuckDB by scanning parquet:
+
+   - Network: `parquet/tcpconnectionserializer/*.parquet` and `parquet/udppacketserializer/*.parquet`
+   - Process: `parquet/processserializer/*.parquet`
+
+   If any in-memory backlogs overflowed, Lintap will emit throttled warnings and increment `EventChannel.DroppedEventCount`.
 
 4. Run the MCP server directly for startup diagnostics:
 

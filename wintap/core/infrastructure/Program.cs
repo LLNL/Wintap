@@ -10,6 +10,7 @@
 using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.etl.load;
 using gov.llnl.wintap.core.shared;
 using EtlPaths = gov.llnl.wintap.core.etl.shared.Paths;
 using gov.llnl.wintap.Properties;
@@ -51,7 +52,16 @@ using gov.llnl.wintap.platform.windows.infrastructure;
 // APPLICATION INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
 
+if (string.Equals(Environment.GetEnvironmentVariable("WINTAP_EARLY_CONSOLE"), "true", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(Environment.GetEnvironmentVariable("WINTAP_EARLY_CONSOLE"), "1", StringComparison.OrdinalIgnoreCase))
+{
+    Console.WriteLine($"EARLY: starting {Env.AppName} pid={Environment.ProcessId} WINTAP_DATA_ROOT={Environment.GetEnvironmentVariable("WINTAP_DATA_ROOT") ?? ""}");
+}
+
 var builder = WebApplication.CreateBuilder(args);
+
+bool settingsDisabled = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_SETTINGS"), "true", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_SETTINGS"), "1", StringComparison.OrdinalIgnoreCase);
 
 // ─── Configure Wintap to listen on port 8099 ───────────────────────────────
 builder.WebHost.UseUrls("http://localhost:8099");
@@ -64,7 +74,11 @@ builder.Services.AddControllers();
 
 // ─── AI Provider Selection ─────────────────────────────────────────────────
 string aiProvider = "OpenAI"; // "OpenAI" or "Ollama"
-string configuredUrl = Settings.Default.AiApiUrl;
+string configuredUrl = string.Empty;
+if (!settingsDisabled)
+{
+    configuredUrl = Settings.Default.AiApiUrl;
+}
 
 WintapLogger.Log.Append($"Configured AI URL: {configuredUrl}", LogLevel.Info);
 
@@ -280,8 +294,20 @@ WintapLogger.Log.Append("Registering platform-specific process resolver", LogLev
 
 // ─── Process Resolver Registration (cross-platform) ────────────────────
 WintapLogger.Log.Append("Registering cross-platform process resolver", LogLevel.Info);
-IProcessResolver processResolver = new ProcessResolver();
-builder.Services.AddSingleton<IProcessResolver>(processResolver);
+
+bool disableProcessResolver = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_PROCESS_RESOLVER"), "true", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_PROCESS_RESOLVER"), "1", StringComparison.OrdinalIgnoreCase);
+
+// Direct-parquet mode bypasses resolver/Esper anyway, so allow running without DuckDB.
+if (DirectParquetSink.IsEnabled || disableProcessResolver)
+{
+    WintapLogger.Log.Append("Process resolver disabled (direct-parquet or WINTAP_DISABLE_PROCESS_RESOLVER)", LogLevel.Warn);
+}
+else
+{
+    IProcessResolver processResolver = new ProcessResolver();
+    builder.Services.AddSingleton<IProcessResolver>(processResolver);
+}
 
 
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
@@ -312,7 +338,7 @@ var app = builder.Build();
 ServiceProviderAccessor.Services = app.Services;
 
 // ─── Middleware Pipeline ───────────────────────────────────────────────────
-if (Settings.Default.EnableWorkbench)
+if (!settingsDisabled && Settings.Default.EnableWorkbench)
 {
     app.UseStaticFiles();
     app.UseSpaStaticFiles();
@@ -323,7 +349,7 @@ app.UseAuthorization();
 app.MapControllers();  // Map routes to API controllers
 
 // ─── SPA Configuration (Serve Angular Static Files) ───────────────────────
-if (Settings.Default.EnableWorkbench)
+if (!settingsDisabled && Settings.Default.EnableWorkbench)
 {
     app.UseSpa(spa =>
     {

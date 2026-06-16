@@ -94,7 +94,11 @@ namespace gov.llnl.wintap.platform.linux.collect
                     processName = ProcessSensorHelper.ExtractProcessNameFromCmdline(rawCmdline, "unknown-2");
                 }
 
-                var message = new WintapMessage(DateTime.UtcNow, (int)evt.Pid, WintapMessage.MessageTypeEnum.Process);
+                // Use process start time for EventTime so PidHash is stable and matches
+                // other lifecycle events (clone/exit) and handles PID reuse correctly.
+                DateTime startUtc = procData.StartTimeUtc != default ? procData.StartTimeUtc.ToUniversalTime() : DateTime.UtcNow;
+
+                var message = new WintapMessage(startUtc, (int)evt.Pid, WintapMessage.MessageTypeEnum.Process);
                 message.ActivityType = WintapMessage.ActivityTypeEnum.Start;
 
                 message.Process = ProcessSensorHelper.CreateProcessObject(

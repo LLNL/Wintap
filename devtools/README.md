@@ -59,11 +59,89 @@ PASS: captured recent outbound network records for the generated traffic.
 Matched resolved target IPs: 104.16.124.96, 104.20.23.154
 ```
 
+## Process Capture Smoke Test
+
+`process_capture_smoke_test.py` is an integration smoke test for Linux process capture correctness. It spawns a small parent/child process tree, waits for parquet output, then queries the parquet files with DuckDB to confirm the child process has the expected parent PID and parent hash.
+
+It supports both schemas:
+
+- ETL serializer parquet (e.g. `parquet/processserializer/*.parquet` with `ParentPid`/`ParentPidHash`)
+- Direct-parquet bring-up mode (e.g. `Process_ParentPID`/`Process_ParentPidHash`)
+
+The script probes the parquet schema first to avoid DuckDB binder errors when columns differ.
+
+The test validates the end-to-end path:
+
+```text
+generated process tree -> eBPF process sensors -> parquet writer -> DuckDB query -> expected parent PID/hash
+```
+
+Usage:
+
+```bash
+python3 devtools/process_capture_smoke_test.py \
+  --data-root /var/log/lintap \
+  --timeout 240 \
+  --poll-interval 10
+```
+
+Optional: override the parquet root (defaults to `<data-root>/parquet`):
+
+```bash
+python3 devtools/process_capture_smoke_test.py \
+  --data-root /var/log/lintap \
+  --parquet-root /var/log/lintap/parquet
+```
+
+Optional stricter validation requires Stop events for both processes:
+
+```bash
+python3 devtools/process_capture_smoke_test.py --require-stop
+```
+
 The captured local endpoint should show the host/VM's routable local address with ephemeral ports, for example:
 
 ```text
 local=192.168.252.9:37804 -> remote=104.20.23.154:80 proto=TCP rows=2
 ```
+
+## 30-Minute Soak Test (Network + Process)
+
+This is a practical validation run for long-running deployments: keep Lintap running for 30 minutes, run both smoke tests 5 times during that window, then produce a compact QA summary from parquet and logs.
+
+Example (foreground run):
+
+```bash
+export WINTAP_DATA_ROOT=/tmp/lintap-qa-30m-$(date +%s)
+export WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=10
+export WINTAP_DISABLE_MCP=true
+export WINTAP_DISABLE_DUCKDB_UI=true
+sudo -E dotnet /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll
+```
+
+In another shell, run 5 rounds (every ~6 minutes):
+
+```bash
+for i in 1 2 3 4 5; do
+  python3 devtools/network_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
+  python3 devtools/process_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5
+  sleep 360
+done
+```
+
+QA summaries (DuckDB CLI):
+
+```bash
+duckdb -json -c "SELECT COUNT(*) AS tcp_rows, COUNT(DISTINCT RemotePort) AS distinct_remote_ports FROM read_parquet('$WINTAP_DATA_ROOT/parquet/tcpconnectionserializer/*.parquet');"
+duckdb -json -c "SELECT COUNT(*) AS udp_rows, COUNT(DISTINCT RemotePort) AS distinct_remote_ports FROM read_parquet('$WINTAP_DATA_ROOT/parquet/udppacketserializer/*.parquet');"
+duckdb -json -c "SELECT COUNT(*) AS process_rows, COUNT(DISTINCT PID) AS distinct_pids, COUNT(*) FILTER (WHERE PidHash IS NULL OR PidHash='') AS missing_pid_hash_rows, COUNT(*) FILTER (WHERE ParentPid IS NOT NULL AND ParentPid>0 AND (ParentPidHash IS NULL OR ParentPidHash='')) AS missing_parent_pid_hash_rows FROM read_parquet('$WINTAP_DATA_ROOT/parquet/processserializer/*.parquet');"
+```
+
+Backlog / drop signals to check:
+
+- Look for `in-memory backlog limit reached` (per-serializer)
+- Look for `ParquetWriter backlog limit reached`
+- Track `EventChannel.DroppedEventCount` (increments when drops occur)
 
 ## Log Message Semantic Clustering
 
