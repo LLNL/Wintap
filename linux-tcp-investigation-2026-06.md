@@ -1,12 +1,14 @@
-# TCP Network Capture Investigation - grantj-ebf-fixes Branch
+# TCP Network Capture Investigation
 
 **Date:** 2026-06-11  
-**Branch:** `grantj-ebf-fixes`  
+**Investigated Branch:** `grantj-ebf-fixes`  
 **Status:** TCP events not reaching EventChannel; UDP working normally
+
+This is a dated investigation memo for one debugging session. It is not a canonical setup or deployment guide.
 
 ## Problem Statement
 
-LinTap running on `grantj-ebf-fixes` shows zero TCP activity despite the branch including a full TCP capture rearchitecture (commit `66769d4`). Log analysis confirms:
+Lintap running on `grantj-ebf-fixes` showed zero TCP activity despite the branch including a full TCP capture rearchitecture (commit `66769d4`). Log analysis confirmed:
 
 1. **No TCP events flowing**: The `UdpPacketSerializer` 60-second watchdog timer fired (indicating UDP events arrived then stopped), but the identical `TcpConnectionSerializer` timer never fired — meaning zero TCP events have reached the serializer since startup.
 
@@ -176,7 +178,7 @@ This is how `bcc/tools/tcpconnect.py` and `tcptracer` work. The join on `skaddr`
 
 File events arriving for PIDs not in the process resolver's DuckDB table. Three causes on this branch:
 
-1. **CloneSensor failure**: `FEDORA_HANDOFF.md` documents it failing to attach `sched_process_fork` with `-EACCES`. Fork-only children (worker processes, shells) never get registered via execve or clone sensors.
+1. **CloneSensor failure**: `fedora-handoff-2026-06.md` documents it failing to attach `sched_process_fork` with `-EACCES`. Fork-only children (worker processes, shells) never get registered via execve or clone sensors.
 
 2. **ProcessRundownSensor not enabled**: Gated behind `WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR=true`. Pre-existing processes (started before Lintap) have no registration events.
 

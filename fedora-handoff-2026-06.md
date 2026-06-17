@@ -2,19 +2,17 @@
 
 Date: 2026-06-09
 
-This handoff captures the current Fedora 44 VM bring-up state for the Lintap/Wintap Linux build and runtime test. It is intended to be loaded from inside the Fedora VM at:
+This handoff captures the Fedora 44 VM bring-up state as of 2026-06-09.
 
-```bash
-/home/grantj/git/LLNL/wintap/FEDORA_HANDOFF.md
-```
+This is a dated investigation memo, not the canonical build guide. For current general-purpose build and run instructions, use `BUILD_AND_TEST.md`.
 
 ## Environment
 
 - Host: macOS using UTM
 - Guest: Fedora 44
-- Shared repo root in VM: `/home/grantj/git/LLNL`
-- Main project path in VM: `/home/grantj/git/LLNL/wintap/wintap`
-- Fedora setup script added at: `/home/grantj/git/LLNL/Lintap/fedora-setup-first-pass.sh`
+- Shared repo root in the original VM session: `/home/<user>/git/LLNL`
+- Main project path in the original VM session: `/home/<user>/git/LLNL/wintap/wintap`
+- Fedora setup script used in that session: `/home/<user>/git/LLNL/Lintap/fedora-setup-first-pass.sh`
 - Runtime data root for dev/test: `/tmp/lintap-data`
 
 ## High-Level Status
@@ -57,7 +55,7 @@ The setup script was partially updated, but if it still has `Development Tools`,
 
 ### 2. .NET CreateAppHost mmap failures on shared mount
 
-Building from `/home/grantj/git` (host-shared mount) triggered:
+Building from the host-shared mount under `/home/<user>/git` triggered:
 
 ```text
 CreateAppHost failed unexpectedly
@@ -71,7 +69,7 @@ Root cause: .NET SDK apphost creation uses mmap and fails on the VM shared mount
 Mitigations added:
 
 - `wintap/wintap/Makefile` detects shared mount types and adds `-p:UseAppHost=false` for the outer build.
-- `wintap/Directory.Build.props` maps `DISABLE_APPHOST=true` to `<UseAppHost>false</UseAppHost>`.
+- `wintap/wintap/Directory.Build.props` maps `DISABLE_APPHOST=true` to `<UseAppHost>false</UseAppHost>`.
 - `wintap/wintap/Lintap.csproj` publishes the MCP single-file executable through a VM-local temp path under `/tmp` when MCP is enabled.
 
 ### 3. MCP server single-file publish
@@ -168,7 +166,7 @@ These were added to simplify Fedora bring-up and isolate native crashes.
 
 ### Default Makefile behavior
 
-From `/home/grantj/git/LLNL/wintap/wintap`:
+From the project directory (`wintap/wintap` in the original VM session):
 
 ```bash
 make run
@@ -203,10 +201,10 @@ Current status: this is stable.
 
 ### Isolation commands
 
-Run from:
+Run from the project directory:
 
 ```bash
-cd /home/grantj/git/LLNL/wintap/wintap
+cd /path/to/wintap/wintap
 ```
 
 Host only:
@@ -259,12 +257,12 @@ WINTAP_DISABLE_DUCKDB_UI=false make run
   - Added host-shared filesystem notes.
 - `wintap/BUILD_AND_TEST.md`
   - Added detailed Fedora/shared-mount build/run troubleshooting.
-- `wintap/FEDORA_HANDOFF.md`
+- `wintap/fedora-handoff-2026-06.md`
   - This file.
 
 ### Shared-mount / apphost handling
 
-- `wintap/Directory.Build.props`
+- `wintap/wintap/Directory.Build.props`
   - Supports `DISABLE_APPHOST=true` -> `UseAppHost=false`.
 - `wintap/wintap/Makefile`
   - Added shared-mount detection.
@@ -305,7 +303,7 @@ WINTAP_DISABLE_DUCKDB_UI=false make run
 
 ### Working Fedora Path
 
-Build/run from `/home/grantj/git/LLNL/wintap/wintap` with source on the shared mount:
+Build/run from the project directory with source on the shared mount:
 
 ```bash
 make build_ebpf
@@ -445,8 +443,10 @@ coredumpctl list dotnet
 coredumpctl info dotnet
 ```
 
-## Suggested Prompt For Next OpenCode Session In Fedora
+## Handoff Summary
 
-```text
-You are continuing Fedora 44 Linux bring-up for a .NET 8 + eBPF project. Read /home/grantj/git/LLNL/wintap/FEDORA_HANDOFF.md first. The build succeeds from the shared mount by using native /tmp output. Host-only, ETL, Execve, FileOps, Network, Exit, and ProcessRundown paths have produced validated Parquet without dotnet coredumps. The remaining sensor blocker is CloneSensor failing to attach sched_process_fork with libbpf -EACCES. Prefer minimal changes, keep Fedora bring-up switches documented, and update BUILD_AND_TEST.md with every new finding.
-```
+- Native `/tmp/lintap-build/wintap` output is the key shared-mount fix.
+- Host-only mode is stable.
+- ETL, Execve, FileOps, Network, Exit, and ProcessRundown paths were validated in this session.
+- The remaining blocker captured here is CloneSensor attach failure with libbpf `-EACCES` on `sched/sched_process_fork` in this Fedora VM.
+- New general guidance should go into `BUILD_AND_TEST.md`; keep this file as dated session history.

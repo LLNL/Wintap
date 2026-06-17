@@ -1,67 +1,77 @@
-﻿# How to Contribute
-Wintap is an open source project. Our team welcomes contributions from collaborators in the form of raising issues as well as code contributions including hotfixes, code improvements, and new features.
+# Contributing to Wintap
 
-Wintap is distributed under the terms of the MIT license. All new contributions must be made under this license.
+Wintap is an open-source LLNL project. Contributions are welcome in the form of bug reports, design discussion, documentation improvements, and code changes.
 
-If you identify a problem such as a bug or awkward or confusing code, or require a new feature, please feel free to start a thread on our issue tracker. Please first review the existing issues prior to avoid duplicate issues.
+All contributions are made under the MIT license used by this repository.
 
-If you plan on contributing to Wintap, please review the issue tracker to check for threads related to your desired contribution. We recommend creating an issue prior to issuing a pull request if you are planning significant code changes or have questions.
+## Before You Start
 
-# Contribution Workflow
-These guidelines assume that the reader is familiar with the basics of collaborative development using git and GitHub. This section will walk through our preferred pull request workflow for contributing code to Wintap. The tl;dr guidance is:
+- Search for existing issues, pull requests, or design notes related to your change.
+- Open an issue or discussion first for larger changes, new features, or cross-cutting refactors.
+- Prefer small, reviewable pull requests over large mixed changes.
 
-Fork the LLNL Wintap repository
-Create a descriptively named branch (feature/myfeature, iss/##, hotfix/bugname, etc) in your fork off of the develop branch
-Commit code, following our guidelines
-Create a pull request from your branch targeting the LLNL develop branch
-# Forking Wintap
-If you are not a Wintap developer at LLNL, you will not have permissions to push new branches to the repository. Even Wintap developers at LLNL will want to use forks for most contributions. This will create a clean copy of the repository that you own, and will allow for exploration and experimentation without muddying the history of the central repository.
+## Development Workflow
 
-If you intend to maintain a persistent fork of Wintap, it is a best practice to set the LLNL repository as the upstream remote in your fork.
+1. Fork the repository or create a topic branch if you already have push access.
+2. Branch from the repository's current default branch or the base branch requested by maintainers.
+3. Make focused changes.
+4. Run the relevant build, test, or smoke-test steps.
+5. Update documentation when behavior, commands, or operational guidance changes.
+6. Open a pull request with a clear summary of what changed and how it was validated.
 
-$ git clone git@github.com:your_name/Wintap.git
-$ cd Wintap
-$ git remote add upstream git@github.com:LLNL/Wintap.git
-This will allow you to incorporate changes to the master and develop branches as they evolve. For example, to your fork's develop branch perform the following commands:
+## Branch Naming
 
-$ git fetch upstream
-$ git checkout develop
-$ git pull upstream develop
-$ git push origin develop
-It is important to keep your develop branch up-to-date to reduce merge conflicts resulting from future PRs.
+Use descriptive branch names, for example:
 
-# Contribution Types
-Most contributions will fit into one of the following categories, which by convention should be committed to branches with descriptive names. Here are some examples:
+- `feature/<short-name>`
+- `fix/<short-name>`
+- `docs/<short-name>`
+- `spike/<short-name>`
 
-A new feature (feature/<feature-name>)
-A bug or hotfix (hotfix/<bug-name> or hotfix/<issue-number>)
-A response to a tracked issue (iss/<issue-number>)
-A work in progress, not to be merged for some time (wip/<change-name>)
-# Developing a new feature
-New features should be based on the develop branch:
+## Pull Request Expectations
 
-$ git checkout develop
-$ git pull upstream develop
-You can then create new local and remote branches on which to develop your feature.
+Include the following in your pull request description:
 
-$ git checkout -b feature/<feature-name>
-$ git push --set-upstream origin feature/<feature-name>
-Commit code changes to this branch.
+- the problem being solved
+- the scope of the change
+- any user-visible behavior changes
+- the commands or tests you ran
+- follow-up work that is intentionally out of scope
 
-Once your feature is complete, ensure that your remote fork is up-to-date and create a PR.
+## Documentation Expectations
 
-# Developing a hotfix
-Firstly, please check to ensure that the bug you have found has not already been fixed in develop. If it has, we suggest that you temporarily swap to the develop branch.
+If your change affects any of the following, update the corresponding docs in the same pull request:
 
-If you have identified an unsolved bug, you can document the problem and create an issue. If you would like to solve the bug yourself, follow a similar protocol to feature development. First, ensure that your fork's develop branch is up-to-date.
+- build or run commands
+- deployment steps
+- environment variables
+- troubleshooting guidance
+- smoke-test or validation workflows
 
-$ git checkout develop
-$ git pull upstream develop
-You can then create new local and remote branches on which to write your bug fix.
+The highest-signal operational docs today are:
 
-$ git checkout -b hotfix/<bug-name>
-$ git push --set-upstream origin hotfix/<bug-name>
+- [`../README.md`](../README.md)
+- [`../BUILD_AND_TEST.md`](../BUILD_AND_TEST.md)
+- [`../devtools/README.md`](../devtools/README.md)
 
-Please update function and class documentation to reflect any changes as appropriate.
+## Validation Guidance
 
-Once your are satisfied that the bug is fixed, ensure that your remote fork is up-to-date and create a PR.
+Run the narrowest useful validation for your change.
+
+Examples:
+
+- Documentation-only changes: verify links, commands, and paths against the repo
+- Linux build changes: `make -C wintap/wintap build_dotnet` and, if relevant, `make -C wintap/wintap build_ebpf`
+- Linux runtime changes: `make -C wintap/wintap run-env` plus the relevant smoke tests
+- eBPF or telemetry changes: update the related handoff or diagnostic notes when they materially change investigation state
+
+## Reporting Bugs
+
+Useful bug reports usually include:
+
+- host OS and version
+- kernel version for Linux issues
+- whether the repo is on a native filesystem or a host-shared mount
+- exact command run
+- relevant log excerpts
+- whether the issue reproduces with isolation flags such as `WINTAP_DISABLE_ETL`, `WINTAP_DISABLE_SENSORS`, or per-sensor `WINTAP_ENABLE_*` settings
