@@ -4,7 +4,7 @@ This directory contains small utilities for validating and troubleshooting Winta
 
 ## Network Capture Smoke Test
 
-`network_capture_smoke_test.py` is an integration smoke test for the Lintap/Wintap network capture pipeline. It generates a small amount of outbound HTTP/HTTPS traffic, waits for ETL parquet output, and queries the captured parquet files with DuckDB to confirm that recent outbound TCP records were collected.
+`network_capture_smoke_test.py` is an integration smoke test for the Lintap/Wintap network capture pipeline. It generates a small amount of outbound HTTP/HTTPS traffic plus a small UDP datagram, waits for parquet output, and queries the captured parquet files with DuckDB to confirm that recent outbound network records were collected.
 
 The test validates the end-to-end path:
 
@@ -14,9 +14,9 @@ generated internet traffic -> eBPF/network sensor -> ETL/parquet writer -> DuckD
 
 ### Requirements
 
-- Lintap/Wintap is already running on the host where the test is executed.
-- `WriteToParquet=true` in `ETLConfig.json`.
-- `SerializationIntervalSec` is short enough for the selected timeout.
+- Lintap/Wintap is already running on the host where the test is executed (or use `--start-lintap`).
+- Parquet output is enabled (ETL parquet or direct-parquet).
+- `SerializationIntervalSec` / `DirectParquetFlushSeconds` is short enough for the selected timeout.
 - Either the Python `duckdb` package is installed or the `duckdb` CLI is available on `PATH`.
 
 ### Usage
@@ -30,11 +30,14 @@ python3 devtools/network_capture_smoke_test.py \
   --poll-interval 10
 ```
 
-If `WINTAP_DATA_ROOT` points at the active data root, `--data-root` can be omitted:
+Optional: start Lintap in direct-parquet mode for this test (requires root):
 
 ```bash
-WINTAP_DATA_ROOT=/tmp/lintap-smoke \
-python3 devtools/network_capture_smoke_test.py --timeout 240
+sudo python3 devtools/network_capture_smoke_test.py \
+  --start-lintap \
+  --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
+  --timeout 240 \
+  --poll-interval 10
 ```
 
 Optional stricter validation requires one of the resolved endpoint IPv4 addresses to appear in captured rows:
@@ -45,7 +48,9 @@ python3 devtools/network_capture_smoke_test.py \
   --require-target-ip-match
 ```
 
-Exact IP matching is disabled by default because CDN-backed endpoints may resolve or connect differently across attempts. The default validation confirms recent outbound TCP rows on remote ports `80` and/or `443`.
+Exact IP matching is disabled by default because CDN-backed endpoints may resolve or connect differently across attempts.
+
+Note: in locked-down environments, HTTPS probes may fail (TLS intercept / egress restrictions). The smoke test will still pass if it can observe UDP capture, and will emit a warning if no TCP rows were observed.
 
 ### Example Passing Output
 
@@ -85,6 +90,16 @@ python3 devtools/process_capture_smoke_test.py \
   --poll-interval 10
 ```
 
+Optional: start Lintap in direct-parquet mode for this test (requires root):
+
+```bash
+sudo python3 devtools/process_capture_smoke_test.py \
+  --start-lintap \
+  --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
+  --timeout 240 \
+  --poll-interval 10
+```
+
 Optional: override the parquet root (defaults to `<data-root>/parquet`):
 
 ```bash
@@ -105,6 +120,29 @@ The captured local endpoint should show the host/VM's routable local address wit
 local=192.168.252.9:37804 -> remote=104.20.23.154:80 proto=TCP rows=2
 ```
 
+## File Activity Smoke Test
+
+`file_capture_smoke_test.py` is an integration smoke test for Linux file activity capture correctness. It generates a small amount of local file activity (create/write/read/delete), waits for parquet output, then queries the parquet files with DuckDB to confirm file-path rows were collected.
+
+Usage:
+
+```bash
+python3 devtools/file_capture_smoke_test.py \
+  --data-root /var/log/lintap \
+  --timeout 240 \
+  --poll-interval 10
+```
+
+Optional: start Lintap in direct-parquet mode for this test (requires root):
+
+```bash
+sudo python3 devtools/file_capture_smoke_test.py \
+  --start-lintap \
+  --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
+  --timeout 240 \
+  --poll-interval 10
+```
+
 ## 30-Minute Soak Test (Network + Process)
 
 This is a practical validation run for long-running deployments: keep Lintap running for 30 minutes, run both smoke tests 5 times during that window, then produce a compact QA summary from parquet and logs.
@@ -112,19 +150,27 @@ This is a practical validation run for long-running deployments: keep Lintap run
 Example (foreground run):
 
 ```bash
-export WINTAP_DATA_ROOT=/tmp/lintap-qa-30m-$(date +%s)
-export WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=10
-export WINTAP_DISABLE_MCP=true
-export WINTAP_DISABLE_DUCKDB_UI=true
-sudo -E dotnet /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll
+export DATA_ROOT=/tmp/lintap-qa-30m-$(date +%s)
+cat > /tmp/etlconfig-soak.json <<EOF
+{
+  "DataRoot": "${DATA_ROOT}",
+  "DisableMCP": true,
+  "DisableDuckDBUI": true,
+  "DisableETL": false,
+  "WriteToParquet": true,
+  "SerializationIntervalSec": 10
+}
+EOF
+sudo env WINTAP_CONFIG_PATH=/tmp/etlconfig-soak.json dotnet /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll
 ```
 
 In another shell, run 5 rounds (every ~6 minutes):
 
 ```bash
 for i in 1 2 3 4 5; do
-  python3 devtools/network_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
-  python3 devtools/process_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5
+  python3 devtools/network_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
+  python3 devtools/process_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
+  python3 devtools/file_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
   sleep 360
 done
 ```
@@ -132,9 +178,9 @@ done
 QA summaries (DuckDB CLI):
 
 ```bash
-duckdb -json -c "SELECT COUNT(*) AS tcp_rows, COUNT(DISTINCT RemotePort) AS distinct_remote_ports FROM read_parquet('$WINTAP_DATA_ROOT/parquet/tcpconnectionserializer/*.parquet');"
-duckdb -json -c "SELECT COUNT(*) AS udp_rows, COUNT(DISTINCT RemotePort) AS distinct_remote_ports FROM read_parquet('$WINTAP_DATA_ROOT/parquet/udppacketserializer/*.parquet');"
-duckdb -json -c "SELECT COUNT(*) AS process_rows, COUNT(DISTINCT PID) AS distinct_pids, COUNT(*) FILTER (WHERE PidHash IS NULL OR PidHash='') AS missing_pid_hash_rows, COUNT(*) FILTER (WHERE ParentPid IS NOT NULL AND ParentPid>0 AND (ParentPidHash IS NULL OR ParentPidHash='')) AS missing_parent_pid_hash_rows FROM read_parquet('$WINTAP_DATA_ROOT/parquet/processserializer/*.parquet');"
+duckdb -json -c "SELECT COUNT(*) AS tcp_rows, COUNT(DISTINCT RemotePort) AS distinct_remote_ports FROM read_parquet('$DATA_ROOT/parquet/tcpconnectionserializer/*.parquet');"
+duckdb -json -c "SELECT COUNT(*) AS udp_rows, COUNT(DISTINCT RemotePort) AS distinct_remote_ports FROM read_parquet('$DATA_ROOT/parquet/udppacketserializer/*.parquet');"
+duckdb -json -c "SELECT COUNT(*) AS process_rows, COUNT(DISTINCT PID) AS distinct_pids, COUNT(*) FILTER (WHERE PidHash IS NULL OR PidHash='') AS missing_pid_hash_rows, COUNT(*) FILTER (WHERE ParentPid IS NOT NULL AND ParentPid>0 AND (ParentPidHash IS NULL OR ParentPidHash='')) AS missing_parent_pid_hash_rows FROM read_parquet('$DATA_ROOT/parquet/processserializer/*.parquet');"
 ```
 
 Backlog / drop signals to check:

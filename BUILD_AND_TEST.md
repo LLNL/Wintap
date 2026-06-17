@@ -107,10 +107,9 @@ Lintap supports optional queue limits and configurable overflow policy:
 
 When drops occur, Lintap increments `EventChannel.DroppedEventCount` and emits throttled warnings indicating the queue and the configured policy.
 
-Related ETL tuning overrides (without editing `ETLConfig.json`):
+Related ETL tuning overrides:
 
-- `WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=<seconds>`
-- `WINTAP_ETL_UPLOAD_INTERVAL_SEC=<seconds>`
+- Prefer a dedicated JSON config file and point the runtime at it via `WINTAP_CONFIG_PATH`.
 
 ## 30-Minute Soak Test (Network + Process)
 
@@ -119,19 +118,26 @@ This is a practical end-to-end validation run for long-running deployments:
 1. Start Lintap with a dedicated data root and a short serialization interval:
 
    ```bash
-   export WINTAP_DATA_ROOT=/tmp/lintap-qa-30m-$(date +%s)
-   export WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=10
-   export WINTAP_DISABLE_MCP=true
-   export WINTAP_DISABLE_DUCKDB_UI=true
-   sudo -E make run
+   export DATA_ROOT=/tmp/lintap-qa-30m-$(date +%s)
+   cat > /tmp/etlconfig-soak.json <<EOF
+   {
+     "DataRoot": "${DATA_ROOT}",
+     "DisableMCP": true,
+     "DisableDuckDBUI": true,
+     "WriteToParquet": true,
+     "SerializationIntervalSec": 10
+   }
+   EOF
+   sudo env WINTAP_CONFIG_PATH=/tmp/etlconfig-soak.json make run
    ```
 
 2. Run smoke tests periodically during the soak window:
 
    ```bash
    for i in 1 2 3 4 5; do
-     python3 devtools/network_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
-     python3 devtools/process_capture_smoke_test.py --data-root "$WINTAP_DATA_ROOT" --timeout 120 --poll-interval 5
+     python3 devtools/network_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
+     python3 devtools/process_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
+     python3 devtools/file_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
      sleep 360
    done
    ```

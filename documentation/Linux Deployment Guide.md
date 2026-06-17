@@ -240,7 +240,18 @@ Run the network capture smoke test to verify that generated HTTP/HTTPS traffic a
 sudo rm -rf /tmp/lintap-smoke
 mkdir -p /tmp/lintap-smoke
 cd /opt/lintap
-sudo env WINTAP_DATA_ROOT=/tmp/lintap-smoke WINTAP_ETL_SERIALIZATION_INTERVAL_SEC=10 ./Lintap
+
+# Create a minimal runtime config and point Lintap at it.
+cat > /tmp/etlconfig-lintap-smoke.json <<EOF
+{
+  "DataRoot": "/tmp/lintap-smoke",
+  "DisableMCP": true,
+  "DisableDuckDBUI": true,
+  "WriteToParquet": true,
+  "SerializationIntervalSec": 10
+}
+EOF
+sudo env WINTAP_CONFIG_PATH=/tmp/etlconfig-lintap-smoke.json ./Lintap
 
 # In another shell on the same host/VM
 python3 /path/to/wintap/devtools/network_capture_smoke_test.py \
@@ -260,6 +271,15 @@ Run the process capture smoke test to verify parent PID/hash linkage in process 
 
 ```bash
 python3 /path/to/wintap/devtools/process_capture_smoke_test.py \
+    --data-root /tmp/lintap-smoke \
+    --timeout 240 \
+    --poll-interval 10
+```
+
+Run the file activity smoke test to verify file create/write/delete events appear in parquet:
+
+```bash
+python3 /path/to/wintap/devtools/file_capture_smoke_test.py \
     --data-root /tmp/lintap-smoke \
     --timeout 240 \
     --poll-interval 10

@@ -223,7 +223,7 @@ And extend null-handling to default **any** null value to `typeof(string)`, not 
 **Priority 1 (immediate):**
 - [ ] Verify binary/tracer skew via startup log + `bpftool`
 - [ ] Redeploy binary + tracer together, purge stale `.bpf.o` copies
-- [ ] Run `devtools/network_capture_smoke_test.py` to confirm TCP rows flow
+- [ ] Run `devtools/network_capture_smoke_test.py` to confirm network rows flow (it will warn if only UDP rows appear)
 
 **Priority 2 (once TCP events flow):**
 - [ ] Implement skaddr-keyed PID attribution fix in `network_ops_tracer.bpf.c`

@@ -20,6 +20,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import platform
@@ -29,6 +30,13 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+
+# Ensure test stimulus uses fork/execve rather than posix_spawn/execveat on some Python builds.
+try:
+    subprocess._USE_POSIX_SPAWN = False  # type: ignore[attr-defined]
+except Exception:
+    pass
 
 
 @dataclass
@@ -157,7 +165,9 @@ SELECT * FROM data LIMIT 1;
 def spawn_process_tree() -> ProcessTree:
     start_epoch = time.time()
     proc = subprocess.run(
-        ["bash", "-c", "echo BASH_PID=$$; sleep 0.2 & echo CHILD_PID=$!; wait"],
+        # Keep the child alive long enough that eBPF + parquet flush timing variance
+        # does not cause us to miss the exec events.
+        ["bash", "-c", "echo BASH_PID=$$; sleep 5 & echo CHILD_PID=$!; wait"],
         check=True,
         text=True,
         capture_output=True,
@@ -188,16 +198,18 @@ def find_candidate_parquet_files(parquet_root: Path, start_epoch: float) -> list
     if not parquet_root.exists():
         return []
 
-    cutoff = start_epoch - 30
     files: list[Path] = []
-    for path in parquet_root.rglob("*.parquet"):
-        if path.name.endswith(".active"):
-            continue
-        try:
-            if path.stat().st_mtime >= cutoff:
-                files.append(path)
-        except FileNotFoundError:
-            continue
+    for file_path in glob.glob(str(parquet_root / "**" / "*.parquet*"), recursive=True):
+        path = Path(file_path)
+        if path.is_file():
+            files.append(path)
+
+    # Prefer recent files, but avoid relying on tight timestamp cutoffs.
+    try:
+        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    except Exception:
+        pass
+    files = files[:200]
 
     process_files = [p for p in files if "process" in str(p).lower()]
     return process_files or files
@@ -316,7 +328,7 @@ def main() -> int:
                 return 2
             lintap_proc = start_lintap_direct_parquet(args.lintap_dll, data_root)
             # WinTapSvc has plugin init + a 5s delay before sensors start.
-            time.sleep(12)
+            time.sleep(20)
 
             if lintap_proc.poll() is not None:
                 out_lines, err_lines = drain_lines(lintap_proc)
@@ -398,27 +410,48 @@ def main() -> int:
 def start_lintap_direct_parquet(lintap_dll: Path, data_root: Path) -> subprocess.Popen:
     data_root.mkdir(parents=True, exist_ok=True)
 
+    # Wintap no longer reads arbitrary environment variables for configuration.
+    # For smoke tests, write a minimal JSON config and point Lintap at it.
+    temp_config = {
+        "DataRoot": str(data_root),
+        "DisableMCP": True,
+        "DisableDuckDBUI": True,
+        "DisableSettings": True,
+        "DisableETL": True,
+        "EnableDirectParquet": True,
+        "DirectParquetFlushSeconds": 2,
+        "SkipEsperSend": True,
+        "SkipProcessResolve": True,
+        "SkipParentProcessResolve": True,
+        "SkipProcessRegister": True,
+        "DisableSensors": False,
+        # Keep only the execve process sensor on.
+        # ExitSensor is currently noisy on some kernels (ring buffer handler NRE).
+        "Execve": True,
+        "Exit": False,
+        "Clone": False,
+        "ProcessRundown": False,
+        "Network": False,
+        "FileOps": False,
+    }
+    config_path = Path("/tmp") / ("etlconfig-process-smoke-" + str(int(time.time())) + ".json")
+    config_path.write_text(json.dumps(temp_config, indent=2))
+
     env = os.environ.copy()
-    env["WINTAP_DATA_ROOT"] = str(data_root)
-    env["WINTAP_DISABLE_MCP"] = "true"
-    env["WINTAP_DISABLE_SETTINGS"] = "true"
-    env["WINTAP_DISABLE_DUCKDB_UI"] = "true"
-    env["WINTAP_DISABLE_ETL"] = "true"
-    env["WINTAP_ENABLE_DIRECT_PARQUET"] = "true"
-    env["WINTAP_DIRECT_PARQUET_FLUSH_SECONDS"] = "2"
-    env["WINTAP_DISABLE_PROCESS_RESOLVER"] = "true"
-    env["WINTAP_SKIP_ESPER_SEND"] = "true"
-    # Keep only process sensors on.
-    env["WINTAP_ENABLE_EXECVE_SENSOR"] = "true"
-    env["WINTAP_ENABLE_EXIT_SENSOR"] = "true"
-    env["WINTAP_ENABLE_CLONE_SENSOR"] = "false"
-    env["WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR"] = "false"
-    env["WINTAP_ENABLE_NETWORK_SENSOR"] = "false"
-    env["WINTAP_ENABLE_FILEOPS_SENSOR"] = "false"
+    env["WINTAP_CONFIG_PATH"] = str(config_path)
+    # Avoid port collisions when multiple smoke tests run concurrently.
+    env.setdefault("ASPNETCORE_URLS", "http://127.0.0.1:0")
 
     cmd = ["dotnet", str(lintap_dll)]
     print(f"starting lintap: {' '.join(cmd)}")
-    return subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return subprocess.Popen(
+        cmd,
+        env=env,
+        cwd=str(lintap_dll.parent),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
 
 
 def stop_process(proc: subprocess.Popen) -> None:
