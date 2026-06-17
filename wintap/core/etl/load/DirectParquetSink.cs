@@ -1,5 +1,6 @@
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -47,15 +48,15 @@ namespace gov.llnl.wintap.core.etl.load
 
         static DirectParquetSink()
         {
-            if (!int.TryParse(Environment.GetEnvironmentVariable("WINTAP_DIRECT_PARQUET_MAX_QUEUE_EVENTS"), out maxQueueEvents) || maxQueueEvents < 0)
+            if (!int.TryParse(ConfigManager.GetValue<string>("WINTAP_DIRECT_PARQUET_MAX_QUEUE_EVENTS"), out maxQueueEvents) || maxQueueEvents < 0)
             {
                 maxQueueEvents = 0;
             }
 
-            backlogDropPolicy = ParseDropPolicy(Environment.GetEnvironmentVariable("WINTAP_DIRECT_PARQUET_QUEUE_DROP_POLICY"));
+            backlogDropPolicy = ParseDropPolicy(ConfigManager.GetValue<string>("WINTAP_DIRECT_PARQUET_QUEUE_DROP_POLICY"));
 
             int flushSeconds = 15;
-            if (int.TryParse(Environment.GetEnvironmentVariable("WINTAP_DIRECT_PARQUET_FLUSH_SECONDS"), out int configuredSeconds) && configuredSeconds > 0)
+            if (int.TryParse(ConfigManager.GetValue<string>("WINTAP_DIRECT_PARQUET_FLUSH_SECONDS"), out int configuredSeconds) && configuredSeconds > 0)
             {
                 flushSeconds = configuredSeconds;
             }
@@ -66,9 +67,20 @@ namespace gov.llnl.wintap.core.etl.load
             flushTimer.Start();
         }
 
-        internal static bool IsEnabled =>
-            string.Equals(Environment.GetEnvironmentVariable("WINTAP_ENABLE_DIRECT_PARQUET"), "true", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(Environment.GetEnvironmentVariable("WINTAP_ENABLE_DIRECT_PARQUET"), "1", StringComparison.OrdinalIgnoreCase);
+        internal static bool IsEnabled
+        {
+            get
+            {
+                var val = ConfigManager.GetValue<string>("WINTAP_ENABLE_DIRECT_PARQUET");
+                if (!string.IsNullOrEmpty(val) && (string.Equals(val, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(val, "1", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+
+                // Fallback to environment variable
+                return false;
+            }
+        }
 
         internal static void Save(WintapMessage message)
         {

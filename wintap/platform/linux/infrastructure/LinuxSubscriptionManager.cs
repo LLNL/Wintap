@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.linux.collect;
 
 namespace gov.llnl.wintap.platform.linux.infrastructure
@@ -26,85 +27,84 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
 
             List<BaseSensor> baseSensors = new List<BaseSensor>();
 
-            // Default to enabled unless the environment variable explicitly
-            // disables the sensor by being set to "false" or "0". This reverses
-            // the previous opt-in behavior so sensors are on by default and
-            // can be disabled via configuration.
-            bool IsEnabled(string envVar)
+            bool IsEnabled(string sensorKey)
             {
-                var v = Environment.GetEnvironmentVariable(envVar);
-                if (string.IsNullOrEmpty(v))
-                    return true; // default ON
-                if (string.Equals(v, "false", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(v, "0", StringComparison.OrdinalIgnoreCase))
-                    return false;
-                return true;
+                // Sensor keys are config properties (Execve, Clone, Exit, Network, FileOps, ProcessRundown).
+                // Defaults live in ConfigRoot, so a missing key still yields a sensible behavior.
+                return ConfigManager.GetValue<bool>(sensorKey);
             }
 
-            if (IsEnabled("WINTAP_ENABLE_EXECVE_SENSOR"))
+            void TryStart(BaseSensor sensor)
+            {
+                if (sensor.Start())
+                {
+                    baseSensors.Add(sensor);
+                    WintapLogger.Log.Append($"{sensor.SensorName} sensor registered", LogLevel.Info);
+                }
+                else
+                {
+                    WintapLogger.Log.Append($"{sensor.SensorName} sensor failed to start and will not be registered", LogLevel.Warn);
+                }
+            }
+
+            if (IsEnabled("Execve"))
             {
                 ExecveSensor execveSensor = new ExecveSensor();
-                execveSensor.Start();
-                baseSensors.Add(execveSensor);
+                TryStart(execveSensor);
             }
             else
             {
-                WintapLogger.Log.Append("ExecveSensor disabled by WINTAP_ENABLE_EXECVE_SENSOR", LogLevel.Warn);
+                WintapLogger.Log.Append("ExecveSensor disabled by config (Execve=false)", LogLevel.Warn);
             }
 
-            if (IsEnabled("WINTAP_ENABLE_CLONE_SENSOR"))
+            if (IsEnabled("Clone"))
             {
                 CloneSensor cloneSensor = new CloneSensor();
-                cloneSensor.Start();
-                baseSensors.Add(cloneSensor);
+                TryStart(cloneSensor);
             }
             else
             {
-                WintapLogger.Log.Append("CloneSensor disabled by WINTAP_ENABLE_CLONE_SENSOR", LogLevel.Warn);
+                WintapLogger.Log.Append("CloneSensor disabled by config (Clone=false)", LogLevel.Warn);
             }
 
-            if (IsEnabled("WINTAP_ENABLE_EXIT_SENSOR"))
+            if (IsEnabled("Exit"))
             {
                 ExitSensor exitSensor = new ExitSensor();
-                exitSensor.Start();
-                baseSensors.Add(exitSensor);
+                TryStart(exitSensor);
             }
             else
             {
-                WintapLogger.Log.Append("ExitSensor disabled by WINTAP_ENABLE_EXIT_SENSOR", LogLevel.Warn);
+                WintapLogger.Log.Append("ExitSensor disabled by config (Exit=false)", LogLevel.Warn);
             }
 
-            if (IsEnabled("WINTAP_ENABLE_NETWORK_SENSOR"))
+            if (IsEnabled("Network"))
             {
                 NetworkSensor networkSensor = new NetworkSensor();
-                networkSensor.Start();
-                baseSensors.Add(networkSensor);
+                TryStart(networkSensor);
             }
             else
             {
-                WintapLogger.Log.Append("NetworkSensor disabled by WINTAP_ENABLE_NETWORK_SENSOR", LogLevel.Warn);
+                WintapLogger.Log.Append("NetworkSensor disabled by config (Network=false)", LogLevel.Warn);
             }
 
-            if (IsEnabled("WINTAP_ENABLE_FILEOPS_SENSOR"))
+            if (IsEnabled("FileOps"))
             {
                 FileOpsSensor fileOpsSensor = new FileOpsSensor();
-                fileOpsSensor.Start();
-                baseSensors.Add(fileOpsSensor);
+                TryStart(fileOpsSensor);
             }
             else
             {
-                WintapLogger.Log.Append("FileOpsSensor disabled by WINTAP_ENABLE_FILEOPS_SENSOR", LogLevel.Warn);
+                WintapLogger.Log.Append("FileOpsSensor disabled by config (FileOps=false)", LogLevel.Warn);
             }
 
-            if (IsEnabled("WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR"))
+            if (IsEnabled("ProcessRundown"))
             {
                 ProcessRundownSensor processRundownSensor = new ProcessRundownSensor();
-                processRundownSensor.Start();
-                baseSensors.Add(processRundownSensor);
+                TryStart(processRundownSensor);
             }
             else
             {
-                WintapLogger.Log.Append("ProcessRundownSensor disabled by WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR", LogLevel.Warn);
+                WintapLogger.Log.Append("ProcessRundownSensor disabled by config (ProcessRundown=false)", LogLevel.Warn);
             }
 
             return baseSensors;

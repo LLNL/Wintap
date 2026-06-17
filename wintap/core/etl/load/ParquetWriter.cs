@@ -5,6 +5,7 @@
  */
 
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using Parquet;
 using Parquet.Data;
 using Parquet.Schema;
@@ -58,12 +59,12 @@ namespace gov.llnl.wintap.core.etl.load
 
         internal ParquetWriter()
         {
-            if (!int.TryParse(Environment.GetEnvironmentVariable("WINTAP_PARQUET_MAX_BATCH_BACKLOG"), out maxBatchBacklog) || maxBatchBacklog < 0)
+            if (!int.TryParse(ConfigManager.GetValue<string>("WINTAP_PARQUET_MAX_BATCH_BACKLOG"), out maxBatchBacklog) || maxBatchBacklog < 0)
             {
                 maxBatchBacklog = 0;
             }
 
-            backlogDropPolicy = ParseDropPolicy(Environment.GetEnvironmentVariable("WINTAP_PARQUET_BACKLOG_DROP_POLICY"));
+            backlogDropPolicy = ParseDropPolicy(ConfigManager.GetValue<string>("WINTAP_PARQUET_BACKLOG_DROP_POLICY"));
 
             batchWorker = new BackgroundWorker();
             batchWorker.DoWork += BatchWorker_DoWork;
@@ -178,7 +179,7 @@ namespace gov.llnl.wintap.core.etl.load
 
         internal static CompressionMethod GetCompressionMethod()
         {
-            string configured = Environment.GetEnvironmentVariable("WINTAP_PARQUET_COMPRESSION");
+            string configured = ConfigManager.GetValue<string>("WINTAP_PARQUET_COMPRESSION");
             if (string.IsNullOrWhiteSpace(configured))
             {
                 return CompressionMethod.Snappy;

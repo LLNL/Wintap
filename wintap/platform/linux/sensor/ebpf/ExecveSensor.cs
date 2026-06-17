@@ -14,6 +14,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         private ProcessHash _pidHashGenerator;
 
         protected override string BpfObjectFileName => "execve_tracer.bpf.o";
+        protected override string[] FallbackBpfObjectFileNames => new[] { "execve_tracepoint.bpf.o" };
         protected override string BpfProgramName => "trace_execve_entry";
 
         internal ExecveSensor()

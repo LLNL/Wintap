@@ -232,8 +232,9 @@ namespace gov.llnl.wintap
                 }
 
                 // ─── DuckDB UI Server ──────────────────────────────────────────
-                bool duckDbUiDisabled = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_DUCKDB_UI"), "true", StringComparison.OrdinalIgnoreCase) ||
-                                        string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_DUCKDB_UI"), "1", StringComparison.OrdinalIgnoreCase);
+                 string duckVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_DUCKDB_UI");
+                 bool duckDbUiDisabled = string.Equals(duckVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(duckVal, "1", StringComparison.OrdinalIgnoreCase);
                 if (duckDbUiDisabled)
                 {
                     WintapLogger.Log.Append("DuckDB UI server disabled by WINTAP_DISABLE_DUCKDB_UI", LogLevel.Warn);
@@ -262,8 +263,9 @@ namespace gov.llnl.wintap
                 await Task.Delay(5000);
 
                 // ─── Collector Startup ─────────────────────────────────────────
-                bool sensorsDisabled = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_SENSORS"), "true", StringComparison.OrdinalIgnoreCase) ||
-                                       string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_SENSORS"), "1", StringComparison.OrdinalIgnoreCase);
+                 string sensorsVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_SENSORS");
+                 bool sensorsDisabled = string.Equals(sensorsVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                                       string.Equals(sensorsVal, "1", StringComparison.OrdinalIgnoreCase);
                 if (sensorsDisabled)
                 {
                     WintapLogger.Log.Append("Sensors disabled by WINTAP_DISABLE_SENSORS", LogLevel.Warn);

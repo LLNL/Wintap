@@ -52,19 +52,22 @@ using gov.llnl.wintap.platform.windows.infrastructure;
 // APPLICATION INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-if (string.Equals(Environment.GetEnvironmentVariable("WINTAP_EARLY_CONSOLE"), "true", StringComparison.OrdinalIgnoreCase) ||
-    string.Equals(Environment.GetEnvironmentVariable("WINTAP_EARLY_CONSOLE"), "1", StringComparison.OrdinalIgnoreCase))
+string earlyVal = ConfigManager.GetValue<string>("WINTAP_EARLY_CONSOLE");
+if (string.Equals(earlyVal, "true", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(earlyVal, "1", StringComparison.OrdinalIgnoreCase))
 {
-    Console.WriteLine($"EARLY: starting {Env.AppName} pid={Environment.ProcessId} WINTAP_DATA_ROOT={Environment.GetEnvironmentVariable("WINTAP_DATA_ROOT") ?? ""}");
+    Console.WriteLine($"EARLY: starting {Env.AppName} pid={Environment.ProcessId} WINTAP_DATA_ROOT={ConfigManager.GetValue<string>("DataRoot") ?? ""}");
 }
 
 var builder = WebApplication.CreateBuilder(args);
 
-bool settingsDisabled = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_SETTINGS"), "true", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_SETTINGS"), "1", StringComparison.OrdinalIgnoreCase);
+string settingsVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_SETTINGS");
+bool settingsDisabled = string.Equals(settingsVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(settingsVal, "1", StringComparison.OrdinalIgnoreCase);
 
 // ─── Configure Wintap to listen on port 8099 ───────────────────────────────
-builder.WebHost.UseUrls("http://localhost:8099");
+// Bind explicitly to IPv4 loopback to avoid hostname resolution stalls in some environments.
+builder.WebHost.UseUrls("http://127.0.0.1:8099");
 
 builder.Services.AddControllers();
 
@@ -90,8 +93,9 @@ if (configuredUrl.Contains("localhost"))
 IMcpClient mcpClient = null;
 IChatClient chatClient = null;
 PluginMcpManager pluginMcpManager = null;
-bool mcpDisabled = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_MCP"), "true", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_MCP"), "1", StringComparison.OrdinalIgnoreCase);
+string mcpVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_MCP");
+bool mcpDisabled = string.Equals(mcpVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(mcpVal, "1", StringComparison.OrdinalIgnoreCase);
 
 if (mcpDisabled)
 {
@@ -237,8 +241,9 @@ catch (Exception ex)
 
 WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
 
-if (string.Equals(Environment.GetEnvironmentVariable("WINTAP_ESPER_REPRO"), "true", StringComparison.OrdinalIgnoreCase) ||
-    string.Equals(Environment.GetEnvironmentVariable("WINTAP_ESPER_REPRO"), "1", StringComparison.OrdinalIgnoreCase))
+string esperReproVal = ConfigManager.GetValue<string>("WINTAP_ESPER_REPRO");
+if (string.Equals(esperReproVal, "true", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(esperReproVal, "1", StringComparison.OrdinalIgnoreCase))
 {
     string[] reproQueries =
     {
@@ -295,8 +300,9 @@ WintapLogger.Log.Append("Registering platform-specific process resolver", LogLev
 // ─── Process Resolver Registration (cross-platform) ────────────────────
 WintapLogger.Log.Append("Registering cross-platform process resolver", LogLevel.Info);
 
-bool disableProcessResolver = string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_PROCESS_RESOLVER"), "true", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_PROCESS_RESOLVER"), "1", StringComparison.OrdinalIgnoreCase);
+string disableProcessResolverVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_PROCESS_RESOLVER");
+bool disableProcessResolver = string.Equals(disableProcessResolverVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(disableProcessResolverVal, "1", StringComparison.OrdinalIgnoreCase);
 
 // Direct-parquet mode bypasses resolver/Esper anyway, so allow running without DuckDB.
 if (DirectParquetSink.IsEnabled || disableProcessResolver)

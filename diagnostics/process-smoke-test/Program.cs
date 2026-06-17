@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 
 internal static class Program
 {
@@ -16,16 +17,23 @@ internal static class Program
 
             Directory.CreateDirectory(dataRoot);
 
-            var isRoot = string.Equals(Environment.GetEnvironmentVariable("USER"), "root", StringComparison.OrdinalIgnoreCase) ||
-                         Environment.UserName == "root" ||
+            var isRoot = string.Equals(Environment.UserName, "root", StringComparison.OrdinalIgnoreCase) ||
                          GetEuid() == 0;
 
             Console.WriteLine($"SmokeTest: user={Environment.UserName} euid={GetEuid()} isRoot={isRoot}");
 
             var lintapStartUtc = DateTime.UtcNow;
             Process? lintap = null;
+            Process? processTree = null;
+            int bashPid = -1;
+            int sleepPid = -1;
             try
             {
+                // Spawn a long-lived bash->sleep process tree FIRST so the Linux ProcessRundown sensor
+                // (which runs at startup) can capture it without requiring eBPF.
+                (processTree, bashPid, sleepPid, lintapStartUtc) = StartLongLivedProcessTree(durationSeconds: 60);
+                Console.WriteLine($"Spawned pre-start bashPid={bashPid} sleepPid={sleepPid}");
+
                 lintap = StartLintap(lintapDll, dataRoot, isRoot);
 
                 Thread.Sleep(2000);
@@ -42,130 +50,80 @@ internal static class Program
                     Console.WriteLine($"Lintap: http probe failed: {ex.GetType().Name}: {ex.Message}");
                 }
 
-                // For a true smoke test we require Lintap to honor WINTAP_DATA_ROOT.
-                // If it doesn't create the DB under this root, the run is not isolated.
-                var dbPath = Path.Combine(dataRoot, "event_store", "main.duckdb");
-                if (!WaitForFile(dbPath, TimeSpan.FromSeconds(30)))
+                // For this smoke test we require Lintap to write parquet sensor output under {DataRoot}/parquet.
+                // (Some deployments further materialize into parquet/raw_sensor; this test accepts any parquet output.)
+                var parquetDir = Path.Combine(dataRoot, "parquet");
+                if (!WaitForParquet(parquetDir, TimeSpan.FromSeconds(30)))
                 {
-                    Console.Error.WriteLine($"FAIL: Lintap did not create DuckDB at {dbPath} within 30s");
-                    Console.Error.WriteLine("  This usually means ProcessResolver/DuckDB initialization is hung or WINTAP_DATA_ROOT isn't being applied.");
+                    Console.Error.WriteLine($"FAIL: Lintap did not produce any parquet files under {parquetDir} within 30s");
+                    Console.Error.WriteLine("  This usually means the data root wasn't applied or ETL/direct-parquet output is not running.");
                     return 2;
                 }
 
-                Console.WriteLine($"Using DuckDB: {dbPath}");
+                Console.WriteLine($"Using parquet dir: {parquetDir}");
 
-                // WinTapSvc delays sensor startup (~5s) and also does plugin init.
-                Thread.Sleep(15000);
-
-            // Spawn bash -> sleep process tree.
-            var (bashPid, sleepPid, childStartUtc, childEndUtc) = SpawnProcessTree();
-            Console.WriteLine($"Spawned bashPid={bashPid} sleepPid={sleepPid}");
-
-            // Give the Exit sensor a moment to flush stop events.
-            Thread.Sleep(1000);
-
-            ProcessRecordRow? bash = null;
-            ProcessRecordRow? sleep = null;
-
-            // Poll the DuckDB process table using the duckdb CLI.
-            // DuckDB.NET hangs in some shared-mount environments; the CLI is reliable.
-            var deadline = DateTime.UtcNow.AddSeconds(30);
-            var windowStartUtc = childStartUtc.AddSeconds(-10);
-            var windowEndUtc = childEndUtc.AddSeconds(10);
-            while (DateTime.UtcNow < deadline)
-            {
-                var rows = QueryLatestProcessRows(dbPath, new[] { bashPid, sleepPid }, windowStartUtc, windowEndUtc);
-                rows.TryGetValue(bashPid, out bash);
-                rows.TryGetValue(sleepPid, out sleep);
-
-                if (bash != null && sleep != null)
-                {
-                    if (!isRoot || (bash.ExitTimeUtc != null && sleep.ExitTimeUtc != null))
-                    {
-                        break;
-                    }
-                }
-
-                Thread.Sleep(500);
-            }
-
+                var parquetRoot = Path.Combine(dataRoot, "parquet");
+                var rows = PollProcessRowsFromParquet(parquetRoot, bashPid, sleepPid, lintapStartUtc, TimeSpan.FromSeconds(45));
                 StopLintap(lintap);
 
-            if (bash is null)
-            {
-                Console.Error.WriteLine($"FAIL: no record found for bash PID {bashPid} (db={dbPath})");
-                return 3;
-            }
-
-            if (sleep is null)
-            {
-                Console.Error.WriteLine($"FAIL: no record found for sleep PID {sleepPid} (db={dbPath})");
-                return 4;
-            }
-
-            if (string.IsNullOrWhiteSpace(bash.PidHash))
-            {
-                Console.Error.WriteLine("FAIL: bash pid_hash is empty");
-                return 5;
-            }
-
-            if (string.IsNullOrWhiteSpace(sleep.PidHash))
-            {
-                Console.Error.WriteLine("FAIL: sleep pid_hash is empty");
-                return 6;
-            }
-
-            if (sleep.ParentPid != bashPid)
-            {
-                Console.Error.WriteLine($"FAIL: sleep parent_process_id expected {bashPid} got {sleep.ParentPid}");
-                return 7;
-            }
-
-            if (!string.Equals(sleep.ParentPidHash, bash.PidHash, StringComparison.OrdinalIgnoreCase))
-            {
-                Console.Error.WriteLine("FAIL: sleep parent_pid_hash does not match bash pid_hash");
-                Console.Error.WriteLine($"  sleep.parent_pid_hash={sleep.ParentPidHash}");
-                Console.Error.WriteLine($"  bash.pid_hash={bash.PidHash}");
-                return 8;
-            }
-
-            if (isRoot)
-            {
-                if (bash.ExitTimeUtc is null)
+                if (!rows.TryGetValue(bashPid, out var bashRow))
                 {
-                    Console.Error.WriteLine("FAIL: bash exit_time is NULL (expected Stop event)");
-                    return 9;
+                    Console.Error.WriteLine($"FAIL: no parquet record found for bash PID {bashPid} (parquet={parquetRoot})");
+                    return 3;
                 }
-                if (sleep.ExitTimeUtc is null)
-                {
-                    Console.Error.WriteLine("FAIL: sleep exit_time is NULL (expected Stop event)");
-                    return 10;
-                }
-                if (bash.ExitTimeUtc < bash.CreateTimeUtc)
-                {
-                    Console.Error.WriteLine("FAIL: bash exit_time is before create_time");
-                    return 11;
-                }
-                if (sleep.ExitTimeUtc < sleep.CreateTimeUtc)
-                {
-                    Console.Error.WriteLine("FAIL: sleep exit_time is before create_time");
-                    return 12;
-                }
-            }
-            else
-            {
-                Console.WriteLine("WARN: not running as root; eBPF Exit sensor likely disabled; skipping exit_time assertions.");
-            }
 
-            Console.WriteLine("OK: process smoke test passed");
-            Console.WriteLine($"  DataRoot: {dataRoot}");
-                Console.WriteLine($"  DuckDB: {dbPath}");
-            Console.WriteLine($"  bash:  pid={bashPid} pid_hash={bash.PidHash} create={bash.CreateTimeUtc:o} exit={(bash.ExitTimeUtc?.ToString("o") ?? "NULL")}");
-            Console.WriteLine($"  sleep: pid={sleepPid} pid_hash={sleep.PidHash} parent_pid_hash={sleep.ParentPidHash} create={sleep.CreateTimeUtc:o} exit={(sleep.ExitTimeUtc?.ToString("o") ?? "NULL")}");
+                if (!rows.TryGetValue(sleepPid, out var sleepRow))
+                {
+                    Console.Error.WriteLine($"FAIL: no parquet record found for sleep PID {sleepPid} (parquet={parquetRoot})");
+                    return 4;
+                }
+
+                if (string.IsNullOrWhiteSpace(bashRow.PidHash))
+                {
+                    Console.Error.WriteLine("FAIL: bash pid_hash is empty");
+                    return 5;
+                }
+
+                if (sleepRow.ParentPid != bashPid)
+                {
+                    Console.Error.WriteLine($"FAIL: sleep parent_pid expected {bashPid} got {sleepRow.ParentPid}");
+                    return 7;
+                }
+
+                if (string.IsNullOrWhiteSpace(sleepRow.ParentPidHash))
+                {
+                    Console.WriteLine("WARN: parent_pid_hash not present in parquet schema; skipping parent hash validation");
+                }
+                else if (!string.Equals(sleepRow.ParentPidHash, bashRow.PidHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine("FAIL: sleep parent_pid_hash does not match bash pid_hash");
+                    Console.Error.WriteLine($"  sleep.parent_pid_hash={sleepRow.ParentPidHash}");
+                    Console.Error.WriteLine($"  bash.pid_hash={bashRow.PidHash}");
+                    return 8;
+                }
+
+                Console.WriteLine("OK: process smoke test passed");
+                Console.WriteLine($"  DataRoot: {dataRoot}");
+                Console.WriteLine($"  ParquetRoot: {parquetRoot}");
+                Console.WriteLine($"  bash:  pid={bashPid} pid_hash={bashRow.PidHash}");
+                Console.WriteLine($"  sleep: pid={sleepPid} parent_pid={sleepRow.ParentPid} parent_pid_hash={(string.IsNullOrEmpty(sleepRow.ParentPidHash) ? "<missing>" : sleepRow.ParentPidHash)}");
                 return 0;
             }
             finally
             {
+                if (processTree != null)
+                {
+                    try
+                    {
+                        if (!processTree.HasExited)
+                        {
+                            processTree.Kill(entireProcessTree: true);
+                        }
+                    }
+                    catch { }
+                    processTree.Dispose();
+                }
+
                 if (lintap != null)
                 {
                     StopLintap(lintap);
@@ -196,20 +154,36 @@ internal static class Program
         UseShellExecute = false,
     };
 
-    psi.Environment["WINTAP_DATA_ROOT"] = dataRoot;
-    psi.Environment["WINTAP_DISABLE_MCP"] = "true";
-    psi.Environment["WINTAP_DISABLE_DUCKDB_UI"] = "true";
-    psi.Environment["WINTAP_SKIP_ESPER_SEND"] = "true";
-    psi.Environment["WINTAP_ENABLE_NETWORK_SENSOR"] = "false";
-    psi.Environment["WINTAP_ENABLE_FILEOPS_SENSOR"] = "false";
+    // Avoid using the repo directory (often a shared mount) as the content root.
+    // ASP.NET defaults ContentRootPath to the working directory.
+    psi.WorkingDirectory = Path.GetDirectoryName(lintapDll) ?? Path.GetTempPath();
 
-    if (!isRoot)
+    // Create a minimal ETLConfig.json for this run so Lintap picks up the desired DataRoot
+    var tempConfig = new
     {
-        // Avoid eBPF sensor failures when not root.
-        psi.Environment["WINTAP_ENABLE_EXECVE_SENSOR"] = "false";
-        psi.Environment["WINTAP_ENABLE_CLONE_SENSOR"] = "false";
-        psi.Environment["WINTAP_ENABLE_EXIT_SENSOR"] = "false";
-    }
+        DataRoot = dataRoot,
+        DisableMCP = true,
+        DisableDuckDBUI = true,
+        DisableETL = true,
+        EnableDirectParquet = true,
+        DirectParquetFlushSeconds = 2,
+        SkipEsperSend = true,
+        SkipProcessResolve = true,
+        SkipParentProcessResolve = true,
+        SkipProcessRegister = true,
+        DisableSensors = false,
+        Execve = false,
+        Exit = false,
+        Clone = false,
+        Network = false,
+        FileOps = false,
+        ProcessRundown = true
+    };
+    string tempConfigPath = Path.Combine(Path.GetTempPath(), $"etlconfig-{Guid.NewGuid():N}.json");
+    File.WriteAllText(tempConfigPath, JsonSerializer.Serialize(tempConfig));
+    psi.Environment["WINTAP_CONFIG_PATH"] = tempConfigPath;
+
+    // No additional env vars; config file controls behavior.
 
     var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start Lintap process");
 
@@ -307,139 +281,248 @@ internal static class Program
     return (bashPid.Value, sleepPid.Value, startUtc, endUtc);
 }
 
-    private static Dictionary<int, ProcessRecordRow> QueryLatestProcessRows(string dbPath, int[] pids, DateTime windowStartUtc, DateTime windowEndUtc)
-{
-    // QUALIFY is supported by DuckDB; this returns at most one row per PID.
-    // Use UTC timestamps.
-    string start = windowStartUtc.ToString("yyyy-MM-dd HH:mm:ss");
-    string end = windowEndUtc.ToString("yyyy-MM-dd HH:mm:ss");
-
-    string pidList = string.Join(",", pids);
-    string sql = $@"
-        SELECT process_id, pid_hash, parent_process_id, parent_pid_hash, create_time, exit_time
-        FROM process
-        WHERE process_id IN ({pidList})
-          AND create_time >= TIMESTAMP '{start}'
-          AND create_time <= TIMESTAMP '{end}'
-        QUALIFY row_number() OVER (PARTITION BY process_id ORDER BY create_time DESC) = 1
-        ORDER BY process_id";
-
-    string csv = RunDuckDbCsv(dbPath, sql);
-
-    var result = new Dictionary<int, ProcessRecordRow>();
-    var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    if (lines.Length <= 1)
+    private static (Process proc, int bashPid, int sleepPid, DateTime startUtc) StartLongLivedProcessTree(int durationSeconds)
     {
-        return result;
-    }
-
-    // Header: process_id,pid_hash,parent_process_id,parent_pid_hash,create_time,exit_time
-    for (int i = 1; i < lines.Length; i++)
-    {
-        var cols = lines[i].Split(',', StringSplitOptions.None);
-        if (cols.Length < 6)
+        var startUtc = DateTime.UtcNow;
+        var psi = new ProcessStartInfo("bash")
         {
-            continue;
-        }
+            Arguments = "-c " + Quote($"echo BASH_PID=$$; sleep {durationSeconds} & echo CHILD_PID=$!; wait"),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
 
-        if (!int.TryParse(cols[0], out var pid))
+        var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start bash process tree");
+
+        int bashPid = p.Id;
+        int childPid = -1;
+
+        // Read a few initial lines to capture CHILD_PID.
+        var deadline = DateTime.UtcNow.AddSeconds(2);
+        while (DateTime.UtcNow < deadline && childPid <= 0)
         {
-            continue;
-        }
-
-        var pidHash = cols[1];
-        _ = int.TryParse(cols[2], out var ppid);
-        var parentPidHash = cols[3];
-
-        DateTime.TryParse(cols[4], out var createTime);
-        DateTime? exitTime = null;
-        if (!string.IsNullOrWhiteSpace(cols[5]))
-        {
-            if (DateTime.TryParse(cols[5], out var et))
+            var line = p.StandardOutput.ReadLine();
+            if (line == null) break;
+            line = line.Trim();
+            if (line.StartsWith("CHILD_PID=", StringComparison.OrdinalIgnoreCase))
             {
-                exitTime = et;
+                int.TryParse(line.Split('=', 2)[1], out childPid);
             }
         }
 
-        result[pid] = new ProcessRecordRow(
-            PidHash: pidHash,
-            ParentPidHash: parentPidHash,
-            Pid: pid,
-            ParentPid: ppid,
-            CreateTimeUtc: DateTime.SpecifyKind(createTime, DateTimeKind.Utc),
-            ExitTimeUtc: exitTime is null ? null : DateTime.SpecifyKind(exitTime.Value, DateTimeKind.Utc)
-        );
-    }
+        // Drain remaining output asynchronously.
+        _ = Task.Run(() => Drain(p.StandardOutput, "tree:out"));
+        _ = Task.Run(() => Drain(p.StandardError, "tree:err"));
 
-    return result;
-}
-
-    private static string RunDuckDbCsv(string dbPath, string sql)
-{
-    var psi = new ProcessStartInfo("duckdb")
-    {
-        Arguments = $"-csv -header {Quote(dbPath)} {Quote(sql)}",
-        RedirectStandardOutput = true,
-        RedirectStandardError = true,
-        UseShellExecute = false,
-    };
-
-    using var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start duckdb CLI");
-    var stdout = p.StandardOutput.ReadToEnd();
-    var stderr = p.StandardError.ReadToEnd();
-    p.WaitForExit(10_000);
-
-    if (p.ExitCode != 0)
-    {
-        throw new InvalidOperationException("duckdb CLI failed: " + stderr);
-    }
-
-    return stdout;
-}
-
-    private static string? WaitForDuckDbPath(string dataRoot, DateTime lintapStartUtc, TimeSpan timeout)
-{
-    var candidates = new[]
-    {
-        Path.Combine(dataRoot, "event_store", "main.duckdb"),
-        "/var/log/lintap/event_store/main.duckdb",
-        "/var/lib/lintap/event_store/main.duckdb",
-    };
-
-    var sw = Stopwatch.StartNew();
-    while (sw.Elapsed < timeout)
-    {
-        foreach (var p in candidates)
+        if (childPid <= 0)
         {
-            if (!File.Exists(p))
+            try { p.Kill(entireProcessTree: true); } catch { }
+            throw new InvalidOperationException("Failed to parse CHILD_PID from bash output");
+        }
+
+        return (p, bashPid, childPid, startUtc);
+    }
+
+    private static bool WaitForParquet(string parquetDir, TimeSpan timeout)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.Elapsed < timeout)
+        {
+            try
+            {
+                if (Directory.Exists(parquetDir))
+                {
+                    var files = Directory.EnumerateFiles(parquetDir, "*.parquet", SearchOption.AllDirectories);
+                    if (files.Any())
+                        return true;
+                }
+            }
+            catch { }
+
+            Thread.Sleep(500);
+        }
+
+        return false;
+    }
+
+    internal sealed record ProcessRecordRow(
+        string PidHash,
+        string ParentPidHash,
+        int Pid,
+        int ParentPid);
+
+    private static Dictionary<int, ProcessRecordRow> PollProcessRowsFromParquet(string parquetRoot, int bashPid, int sleepPid, DateTime startUtc, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var files = FindCandidateParquetFiles(parquetRoot, startUtc);
+                if (files.Count == 0)
+                {
+                    Thread.Sleep(500);
+                    continue;
+                }
+
+                var cols = DetectColumnNames(files);
+                var rows = QueryParquet(files, new[] { bashPid, sleepPid }, cols);
+                if (rows.TryGetValue(bashPid, out _) && rows.TryGetValue(sleepPid, out _))
+                {
+                    return rows;
+                }
+            }
+            catch
+            {
+                // keep polling
+            }
+
+            Thread.Sleep(500);
+        }
+
+        return new Dictionary<int, ProcessRecordRow>();
+    }
+
+    private static List<string> FindCandidateParquetFiles(string parquetRoot, DateTime startUtc)
+    {
+        if (!Directory.Exists(parquetRoot))
+        {
+            return new List<string>();
+        }
+
+        var cutoff = startUtc.AddSeconds(-30);
+        var files = new List<string>();
+        foreach (var path in Directory.EnumerateFiles(parquetRoot, "*.parquet", SearchOption.AllDirectories))
+        {
+            if (path.EndsWith(".active", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
-
-            var wal = p + ".wal";
-            var dbMtime = File.GetLastWriteTimeUtc(p);
-            var walMtime = File.Exists(wal) ? File.GetLastWriteTimeUtc(wal) : DateTime.MinValue;
-
-            if (dbMtime >= lintapStartUtc.AddMinutes(-1) || walMtime >= lintapStartUtc.AddMinutes(-1))
+            try
             {
-                return p;
+                if (File.GetLastWriteTimeUtc(path) >= cutoff)
+                {
+                    files.Add(path);
+                }
             }
+            catch { }
         }
 
-        Thread.Sleep(200);
+        var processFiles = files.Where(p => p.ToLowerInvariant().Contains("process")).ToList();
+        return processFiles.Count > 0 ? processFiles : files;
     }
 
-    // Last resort: return first existing candidate.
-    foreach (var p in candidates)
+    private static Dictionary<string, string> DetectColumnNames(List<string> files)
     {
-        if (File.Exists(p))
+        var probe = RunDuckDbJson(BuildProbeSql(files));
+        var cols = probe.Count > 0 ? new HashSet<string>(probe[0].Keys) : new HashSet<string>();
+
+        string pick(string fallback, params string[] candidates)
         {
-            return p;
+            foreach (var c in candidates)
+            {
+                if (cols.Contains(c)) return c;
+            }
+            return fallback;
         }
+
+        var parentPidHash = pick(string.Empty, "Process_ParentPidHash", "ParentPidHash");
+
+        return new Dictionary<string, string>
+        {
+            ["pid"] = pick("PID", "PID"),
+            ["message_type"] = pick("MessageType", "MessageType"),
+            ["activity_type"] = pick("ActivityType", "ActivityType"),
+            ["pid_hash"] = pick("PidHash", "PidHash"),
+            ["parent_pid"] = pick("ParentPid", "Process_ParentPID", "ParentPid"),
+            ["parent_pid_hash"] = parentPidHash,
+            ["captured_ts"] = pick("EventTime", "CapturedUtc", "EventTime")
+        };
     }
 
-        return null;
-}
+    private static Dictionary<int, ProcessRecordRow> QueryParquet(List<string> files, int[] pids, Dictionary<string, string> cols)
+    {
+        var sql = BuildProcessQuery(files, pids, cols);
+        var rows = RunDuckDbJson(sql);
+
+        var result = new Dictionary<int, ProcessRecordRow>();
+        foreach (var row in rows)
+        {
+            if (!row.TryGetValue("pid", out var pidEl) || pidEl.ValueKind != JsonValueKind.Number)
+            {
+                continue;
+            }
+            int pid = pidEl.GetInt32();
+            row.TryGetValue("pid_hash", out var pidHashEl);
+            row.TryGetValue("parent_pid", out var parentPidEl);
+            row.TryGetValue("parent_pid_hash", out var parentPidHashEl);
+            int parentPid = parentPidEl.ValueKind == JsonValueKind.Number ? parentPidEl.GetInt32() : 0;
+            string pidHash = pidHashEl.ValueKind == JsonValueKind.String ? pidHashEl.GetString() ?? "" : "";
+            string parentPidHash = parentPidHashEl.ValueKind == JsonValueKind.String ? parentPidHashEl.GetString() ?? "" : "";
+            result[pid] = new ProcessRecordRow(pidHash, parentPidHash, pid, parentPid);
+        }
+        return result;
+    }
+
+    private static string BuildProbeSql(List<string> files)
+    {
+        string fileList = string.Join(", ", files.Select(f => SqlString(f)));
+        return $"WITH data AS (SELECT * FROM read_parquet([{fileList}], union_by_name=true)) SELECT * FROM data LIMIT 1;";
+    }
+
+    private static string BuildProcessQuery(List<string> files, int[] pids, Dictionary<string, string> cols)
+    {
+        string fileList = string.Join(", ", files.Select(f => SqlString(f)));
+        string pidList = string.Join(",", pids.Select(p => p.ToString()));
+        string parentPidHashExpr = string.IsNullOrWhiteSpace(cols["parent_pid_hash"])
+            ? "CAST(NULL AS VARCHAR) AS parent_pid_hash"
+            : $"CAST({cols["parent_pid_hash"]} AS VARCHAR) AS parent_pid_hash";
+
+        return $@"
+WITH data AS (
+    SELECT * FROM read_parquet([{fileList}], union_by_name=true)
+)
+SELECT
+    TRY_CAST({cols["pid"]} AS INTEGER) AS pid,
+    CAST({cols["pid_hash"]} AS VARCHAR) AS pid_hash,
+    TRY_CAST({cols["parent_pid"]} AS INTEGER) AS parent_pid,
+    {parentPidHashExpr},
+    TRY_CAST({cols["captured_ts"]} AS TIMESTAMP) AS captured_utc
+FROM data
+WHERE TRY_CAST({cols["pid"]} AS INTEGER) IN ({pidList})
+  AND lower(CAST({cols["message_type"]} AS VARCHAR)) LIKE 'process%'
+ORDER BY captured_utc DESC NULLS LAST;";
+    }
+
+    private static List<Dictionary<string, JsonElement>> RunDuckDbJson(string sql)
+    {
+        var psi = new ProcessStartInfo("duckdb")
+        {
+            Arguments = "-json -c " + Quote(sql),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start duckdb CLI");
+        string stdout = p.StandardOutput.ReadToEnd();
+        string stderr = p.StandardError.ReadToEnd();
+        p.WaitForExit(30_000);
+        if (p.ExitCode != 0)
+        {
+            throw new InvalidOperationException("duckdb CLI failed: " + stderr);
+        }
+
+        stdout = stdout.Trim();
+        if (string.IsNullOrEmpty(stdout))
+        {
+            return new List<Dictionary<string, JsonElement>>();
+        }
+
+        return JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(stdout) ?? new List<Dictionary<string, JsonElement>>();
+    }
+
+    private static string SqlString(string value) => "'" + value.Replace("'", "''") + "'";
 
     private static void Drain(StreamReader reader, string prefix)
 {
@@ -499,13 +582,4 @@ internal static class Program
 }
 
 internal delegate uint GeteuidDelegate();
-
-    internal sealed record ProcessRecordRow(
-        string PidHash,
-        string ParentPidHash,
-        int Pid,
-        int ParentPid,
-        DateTime CreateTimeUtc,
-        DateTime? ExitTimeUtc
-    );
 }

@@ -269,13 +269,13 @@ namespace gov.llnl.wintap.core.etl.extract
             // Per serializer: WINTAP_ETL_MAX_QUEUE_EVENTS_<SERIALIZERNAME>
             // (e.g., WINTAP_ETL_MAX_QUEUE_EVENTS_TCPCONNECTIONSERIALIZER)
             maxInMemoryEvents = 0;
-            if (int.TryParse(Environment.GetEnvironmentVariable("WINTAP_ETL_MAX_QUEUE_EVENTS"), out int globalMax) && globalMax > 0)
+            if (int.TryParse(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>("WINTAP_ETL_MAX_QUEUE_EVENTS"), out int globalMax) && globalMax > 0)
             {
                 maxInMemoryEvents = globalMax;
             }
 
             string perSensorName = $"WINTAP_ETL_MAX_QUEUE_EVENTS_{this.GetType().Name.ToUpperInvariant()}";
-            if (int.TryParse(Environment.GetEnvironmentVariable(perSensorName), out int perMax) && perMax > 0)
+            if (int.TryParse(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>(perSensorName), out int perMax) && perMax > 0)
             {
                 maxInMemoryEvents = perMax;
             }
@@ -283,9 +283,9 @@ namespace gov.llnl.wintap.core.etl.extract
             // Backlog drop policy (default drop newest).
             // Global: WINTAP_ETL_QUEUE_DROP_POLICY ("newest"|"oldest")
             // Per serializer: WINTAP_ETL_QUEUE_DROP_POLICY_<SERIALIZERNAME>
-            backlogDropPolicy = ParseDropPolicy(Environment.GetEnvironmentVariable("WINTAP_ETL_QUEUE_DROP_POLICY"));
+            backlogDropPolicy = ParseDropPolicy(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>("WINTAP_ETL_QUEUE_DROP_POLICY"));
             string perPolicyName = $"WINTAP_ETL_QUEUE_DROP_POLICY_{this.GetType().Name.ToUpperInvariant()}";
-            backlogDropPolicy = ParseDropPolicy(Environment.GetEnvironmentVariable(perPolicyName)) == DropPolicy.DropOldest
+            backlogDropPolicy = ParseDropPolicy(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>(perPolicyName)) == DropPolicy.DropOldest
                 ? DropPolicy.DropOldest
                 : backlogDropPolicy;
 

@@ -21,6 +21,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         private List<IntPtr> _additionalLinks;
 
         protected override string BpfObjectFileName => "file_ops_tracer.bpf.o";
+        protected override string[] FallbackBpfObjectFileNames => new[] { "file_ops_tracepoint.bpf.o" };
         protected override string BpfProgramName => "trace_openat";  // First program
 
         internal FileOpsSensor()

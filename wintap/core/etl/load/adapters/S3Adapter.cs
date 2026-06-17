@@ -4,6 +4,7 @@ using Amazon.S3.Model;
 using gov.llnl.wintap.core.etl.load.adapters.baseclass;
 using gov.llnl.wintap.core.etl.load.interfaces;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -175,7 +176,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
             if (string.IsNullOrWhiteSpace(clientId))
             {
-                clientId = Environment.GetEnvironmentVariable("CF_ACCESS_CLIENT_ID");
+                clientId = ConfigManager.GetValue<string>("CF_ACCESS_CLIENT_ID");
             }
 
             string clientSecret = getParameter(parameters, "CloudflareAccessClientSecret");
@@ -185,7 +186,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
             if (string.IsNullOrWhiteSpace(clientSecret))
             {
-                clientSecret = Environment.GetEnvironmentVariable("CF_ACCESS_CLIENT_SECRET");
+                clientSecret = ConfigManager.GetValue<string>("CF_ACCESS_CLIENT_SECRET");
             }
 
             if (string.IsNullOrWhiteSpace(clientId) && string.IsNullOrWhiteSpace(clientSecret))

@@ -31,6 +31,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         // Abstract properties - subclasses define these
         protected abstract string BpfObjectFileName { get; }
         protected abstract string BpfProgramName { get; }
+        protected virtual string[] FallbackBpfObjectFileNames => Array.Empty<string>();
 
         /// <summary>
         /// Start the sensor - loads eBPF program and starts polling
@@ -48,22 +49,15 @@ namespace gov.llnl.wintap.platform.linux.collect
                     return false;
                 }
 
-                // Find eBPF object file
-                string bpfPath = FindBpfObject(BpfObjectFileName);
-                WintapLogger.Log.Append($"{SensorName} searching for: {BpfObjectFileName}", LogLevel.Debug);
-                WintapLogger.Log.Append($"{SensorName} found at: {bpfPath}", LogLevel.Debug);
-                
-                if (!File.Exists(bpfPath))
+                LogEbpfEnvironment();
+
+                string[] candidates = GetBpfObjectCandidates();
+                if (!TryLoadBpfProgram(candidates, out string loadedPath))
                 {
-                    WintapLogger.Log.Append($"{SensorName} BPF object not found: {bpfPath}", LogLevel.Error);
                     return false;
                 }
 
-                // Load and attach eBPF program
-                if (!LoadBpfProgram(bpfPath))
-                {
-                    return false;
-                }
+                WintapLogger.Log.Append($"{SensorName} loaded eBPF object: {loadedPath}", LogLevel.Info);
 
                 // Allow subclass to do additional initialization
                 if (!OnStarting())
@@ -96,6 +90,36 @@ namespace gov.llnl.wintap.platform.linux.collect
         /// <summary>
         /// Load and attach eBPF program to kernel
         /// </summary>
+        private bool TryLoadBpfProgram(string[] candidates, out string loadedPath)
+        {
+            loadedPath = string.Empty;
+
+            foreach (string candidate in candidates)
+            {
+                string bpfPath = FindBpfObject(candidate);
+                WintapLogger.Log.Append($"{SensorName} searching for eBPF object: {candidate}", LogLevel.Debug);
+                WintapLogger.Log.Append($"{SensorName} candidate path: {bpfPath}", LogLevel.Debug);
+
+                if (!File.Exists(bpfPath))
+                {
+                    WintapLogger.Log.Append($"{SensorName} BPF object not found: {bpfPath}", LogLevel.Warn);
+                    continue;
+                }
+
+                if (LoadBpfProgram(bpfPath))
+                {
+                    loadedPath = bpfPath;
+                    return true;
+                }
+
+                WintapLogger.Log.Append($"{SensorName} failed to load candidate eBPF object: {bpfPath}", LogLevel.Warn);
+                CleanupBpfResources();
+            }
+
+            WintapLogger.Log.Append($"{SensorName} could not load any eBPF object candidate", LogLevel.Error);
+            return false;
+        }
+
         private bool LoadBpfProgram(string bpfPath)
         {
             // Open BPF object
@@ -111,8 +135,6 @@ namespace gov.llnl.wintap.platform.linux.collect
             if (ret != 0)
             {
                 WintapLogger.Log.Append($"{SensorName} failed to load BPF: {ret}", LogLevel.Error);
-                LibBpf.bpf_object__close(BpfObject);
-                BpfObject = IntPtr.Zero;
                 return false;
             }
 
@@ -159,6 +181,32 @@ namespace gov.llnl.wintap.platform.linux.collect
             StartDiagMonitor();
 
             return true;
+        }
+
+        private string[] GetBpfObjectCandidates()
+        {
+            string[] fallbacks = FallbackBpfObjectFileNames ?? Array.Empty<string>();
+            string[] candidates = new string[1 + fallbacks.Length];
+            candidates[0] = BpfObjectFileName;
+            for (int i = 0; i < fallbacks.Length; i++)
+            {
+                candidates[i + 1] = fallbacks[i];
+            }
+            return candidates;
+        }
+
+        private void LogEbpfEnvironment()
+        {
+            try
+            {
+                string arch = RuntimeInformation.ProcessArchitecture.ToString();
+                bool btfPresent = File.Exists("/sys/kernel/btf/vmlinux");
+                WintapLogger.Log.Append($"{SensorName} eBPF environment: arch={arch}, kernel_btf_present={btfPresent}", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"{SensorName} could not inspect eBPF environment: {ex.Message}", LogLevel.Debug);
+            }
         }
 
         /// <summary>
@@ -208,7 +256,13 @@ namespace gov.llnl.wintap.platform.linux.collect
             // Allow subclass cleanup
             OnStopping();
 
-            // Cleanup eBPF resources
+            CleanupBpfResources();
+
+            WintapLogger.Log.Append($"{SensorName} sensor stopped", LogLevel.Info);
+        }
+
+        private void CleanupBpfResources()
+        {
             if (RingBuffer != IntPtr.Zero)
             {
                 LibBpf.ring_buffer__free(RingBuffer);
@@ -226,8 +280,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                 LibBpf.bpf_object__close(BpfObject);
                 BpfObject = IntPtr.Zero;
             }
-
-            WintapLogger.Log.Append($"{SensorName} sensor stopped", LogLevel.Info);
         }
 
         /// <summary>

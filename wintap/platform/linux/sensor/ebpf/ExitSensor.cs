@@ -15,6 +15,7 @@ namespace gov.llnl.wintap.platform.linux.collect
     {
         private ProcessHash _pidHashGenerator;
         protected override string BpfObjectFileName => "exit_tracer.bpf.o";
+        protected override string[] FallbackBpfObjectFileNames => new[] { "exit_tracepoint.bpf.o" };
         protected override string BpfProgramName => "trace_process_exit";
 
         internal ExitSensor()

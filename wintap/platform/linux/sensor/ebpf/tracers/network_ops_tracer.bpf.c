@@ -1,28 +1,12 @@
-#include <linux/bpf.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
-// Ensure user_pt_regs is visible for PT_REGS_* macros on some platforms
-#include <linux/ptrace.h>
+#include <bpf/bpf_core_read.h>
 
 // Network byte order conversion
 #define bpf_ntohs(x) __builtin_bswap16(x)
 
 #define TASK_COMM_LEN 16
-
-// Minimal kernel struct definitions for reading the 4-tuple from struct sock.
-// This is not CO-RE; it assumes a compatible kernel layout for __sk_common.
-// We only use these reads as a pragmatic way to populate UDP local tuple
-// fields for connected UDP sockets (e.g. dig uses sendmsg/recvmsg).
-struct sock_common {
-    __u32 skc_daddr;
-    __u32 skc_rcv_saddr;
-    __u16 skc_dport;
-    __u16 skc_num;
-};
-
-struct sock {
-    struct sock_common __sk_common;
-};
 
 // TCP state values from include/net/tcp_states.h
 #define TCP_ESTABLISHED 1
@@ -228,13 +212,6 @@ static __always_inline void emit_diag_event(__u8 diag_code, __u32 pid, void *sk)
     // Use emit_network_event with protocol=0xFF to signal a diagnostic
     emit_network_event(pid, 0, 0, 0, sk_lo16, 0xFF, diag_code, sk_lo);
 }
-
-// sockaddr_in structure (IPv4)
-struct sockaddr_in {
-    __u16 sin_family;
-    __u16 sin_port;
-    __u32 sin_addr;
-};
 
 // sock:inet_sock_set_state tracepoint context. This tracepoint fires after
 // the kernel has assigned socket addresses, so it includes the local address
@@ -539,10 +516,11 @@ int kprobe__udp_sendmsg(struct pt_regs *ctx)
 
     __u32 saddr = 0, daddr = 0;
     __u16 sport = 0, dport = 0;
-    bpf_probe_read_kernel(&daddr, sizeof(daddr), &((struct sock *)sk)->__sk_common.skc_daddr);
-    bpf_probe_read_kernel(&saddr, sizeof(saddr), &((struct sock *)sk)->__sk_common.skc_rcv_saddr);
-    bpf_probe_read_kernel(&dport, sizeof(dport), &((struct sock *)sk)->__sk_common.skc_dport);
-    bpf_probe_read_kernel(&sport, sizeof(sport), &((struct sock *)sk)->__sk_common.skc_num);
+    struct sock *sock = (struct sock *)sk;
+    daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+    saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+    dport = BPF_CORE_READ(sock, __sk_common.skc_dport);
+    sport = BPF_CORE_READ(sock, __sk_common.skc_num);
     dport = bpf_ntohs(dport);
 
     // Many local resolvers bind sockets to INADDR_ANY, leaving skc_rcv_saddr=0.
@@ -585,10 +563,11 @@ int kprobe__udp_recvmsg(struct pt_regs *ctx)
 
     __u32 laddr = 0, raddr = 0;
     __u16 lport = 0, rport = 0;
-    bpf_probe_read_kernel(&raddr, sizeof(raddr), &((struct sock *)sk)->__sk_common.skc_daddr);
-    bpf_probe_read_kernel(&laddr, sizeof(laddr), &((struct sock *)sk)->__sk_common.skc_rcv_saddr);
-    bpf_probe_read_kernel(&rport, sizeof(rport), &((struct sock *)sk)->__sk_common.skc_dport);
-    bpf_probe_read_kernel(&lport, sizeof(lport), &((struct sock *)sk)->__sk_common.skc_num);
+    struct sock *sock = (struct sock *)sk;
+    raddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+    laddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+    rport = BPF_CORE_READ(sock, __sk_common.skc_dport);
+    lport = BPF_CORE_READ(sock, __sk_common.skc_num);
     rport = bpf_ntohs(rport);
 
     // For loopback peers, map INADDR_ANY local addr to 127.0.0.1 for clarity.
@@ -696,7 +675,7 @@ int trace_sendto(struct sendto_args *ctx)
         
         if (addr.sin_family == 2)
         {
-            emit_network_event(pid, 0, addr.sin_addr, 0,
+            emit_network_event(pid, 0, addr.sin_addr.s_addr, 0,
                               bpf_ntohs(addr.sin_port), PROTO_UDP,
                               NET_OP_UDP_SEND, (__u32)ctx->len);
         }
@@ -766,7 +745,7 @@ int trace_recvfrom_exit(struct sys_exit_args *ctx)
     if (!pid_allowed(pid))
         return 0;
     emit_network_event(pid,
-                       addr.sin_addr, 0,
+                       addr.sin_addr.s_addr, 0,
                        bpf_ntohs(addr.sin_port), 0,
                        PROTO_UDP,
                        NET_OP_UDP_RECV,

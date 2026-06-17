@@ -1,30 +1,68 @@
 # Output files
-OBJS = file_ops_tracer.bpf.o execve_tracer.bpf.o exit_tracer.bpf.o clone_tracer.bpf.o network_ops_tracer.bpf.o openat_tracer.bpf.o
-VMLINUX = vmlinux.h
+# CO-RE objects require kernel BTF/vmlinux.h and provide richer kernel-internal context.
+CORE_OBJS = execve_tracer.bpf.o exit_tracer.bpf.o network_ops_tracer.bpf.o
+
+# Tracepoint-only objects avoid vmlinux.h and are the portability fallback tier.
+TRACEPOINT_OBJS = file_ops_tracer.bpf.o clone_tracer.bpf.o openat_tracer.bpf.o execve_tracepoint.bpf.o exit_tracepoint.bpf.o network_tracepoint.bpf.o file_ops_tracepoint.bpf.o
+KERNEL_RELEASE := $(shell uname -r)
+VMLINUX_BTF ?= /sys/kernel/btf/vmlinux
 
 # Auto-detect architecture
 ARCH := $(shell uname -m)
 ifeq ($(ARCH),aarch64)
 	TARGET_ARCH := arm64
 else ifeq ($(ARCH),x86_64)
-	TARGET_ARCH := x86_64
+	TARGET_ARCH := x86
+else ifeq ($(ARCH),armv7l)
+	TARGET_ARCH := arm
+else ifeq ($(ARCH),ppc64le)
+	TARGET_ARCH := powerpc
+else ifeq ($(ARCH),s390x)
+	TARGET_ARCH := s390
 else
 	TARGET_ARCH := $(ARCH)
 endif
 
-.PHONY: all clean test
+BPF_BUILD_DIR ?= .build/$(ARCH)-$(KERNEL_RELEASE)
+VMLINUX = $(BPF_BUILD_DIR)/vmlinux.h
+BTF_AVAILABLE := $(shell test -r "$(VMLINUX_BTF)" && echo yes || echo no)
+ifeq ($(BTF_AVAILABLE),yes)
+OBJS = $(TRACEPOINT_OBJS) $(CORE_OBJS)
+else
+OBJS = $(TRACEPOINT_OBJS)
+endif
 
-all: $(VMLINUX) $(OBJS)
+.PHONY: all clean test preflight
 
-# Pattern rule: This handles ALL .c to .o conversions
-# $< is the source file (.c), $@ is the target file (.o)
-%.bpf.o: %.bpf.c
+all: preflight $(VMLINUX) $(OBJS)
+
+preflight:
+	@echo "--- eBPF build preflight ---"
+	@echo "kernel=$$(uname -r) arch=$$(uname -m) target_arch=$(TARGET_ARCH)"
+	@command -v clang >/dev/null || { echo "ERROR: clang is required to build eBPF objects."; exit 1; }
+	@if test "$(BTF_AVAILABLE)" = "yes"; then \
+		command -v bpftool >/dev/null || { echo "ERROR: bpftool is required to generate vmlinux.h from BTF."; exit 1; }; \
+		echo "btf=$(VMLINUX_BTF)"; \
+	else \
+		echo "WARN: $(VMLINUX_BTF) is missing or unreadable; building tracepoint fallback objects only."; \
+	fi
+
+# CO-RE objects compile against generated vmlinux.h.
+$(CORE_OBJS): %.bpf.o: %.bpf.c $(VMLINUX)
+	clang -g -O2 -target bpf -D__TARGET_ARCH_$(TARGET_ARCH) \
+	-I$(BPF_BUILD_DIR) -I/usr/include/bpf -c $< -o $@
+	@echo "Compiled CO-RE $< for architecture: $(TARGET_ARCH)"
+
+# Tracepoint fallback objects do not require BTF/vmlinux.h.
+$(TRACEPOINT_OBJS): %.bpf.o: %.bpf.c
 	clang -g -O2 -target bpf -D__TARGET_ARCH_$(TARGET_ARCH) \
 	-I/usr/include/bpf -c $< -o $@
-	@echo "Compiled $< for architecture: $(TARGET_ARCH)"
+	@echo "Compiled tracepoint fallback $< for architecture: $(TARGET_ARCH)"
 
 $(VMLINUX):
-	bpftool btf dump file /sys/kernel/btf/vmlinux format c > $(VMLINUX)
+	@mkdir -p $(BPF_BUILD_DIR)
+	bpftool btf dump file $(VMLINUX_BTF) format c > $(VMLINUX)
+	@echo "Generated $(VMLINUX) from $(VMLINUX_BTF)"
 
 # Placeholder for your test logic
 test: all
@@ -34,4 +72,5 @@ test: all
 	@echo "eBPF tests passed!"
 
 clean:
-	rm -f $(OBJS) $(VMLINUX)
+	rm -f $(OBJS)
+	rm -rf .build

@@ -2,6 +2,7 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared.helpers;
+using gov.llnl.wintap.core.shared;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -24,6 +25,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         private List<IntPtr> _additionalLinks;
 
         protected override string BpfObjectFileName => "network_ops_tracer.bpf.o";
+        protected override string[] FallbackBpfObjectFileNames => new[] { "network_tracepoint.bpf.o" };
         protected override string BpfProgramName => "trace_inet_sock_set_state";
 
         internal NetworkSensor()
@@ -42,7 +44,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             // This is primarily for validation/benchmark runs.
             try
             {
-                var pidStr = Environment.GetEnvironmentVariable("WINTAP_NETWORK_CAPTURE_PID");
+                var pidStr = ConfigManager.GetValue<string>("WINTAP_NETWORK_CAPTURE_PID");
                 if (!string.IsNullOrWhiteSpace(pidStr) && uint.TryParse(pidStr, out var capturePid) && capturePid > 0)
                 {
                     IntPtr map = LibBpf.bpf_object__find_map_by_name(BpfObject, "capture_pid");

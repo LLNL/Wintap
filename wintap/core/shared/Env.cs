@@ -81,32 +81,33 @@ namespace gov.llnl.wintap.core.shared
         {
             get
             {
-                if (!string.IsNullOrEmpty(_overriddenDataRoot))
-                {
-                    return _overriddenDataRoot;
-                }
+                        if (!string.IsNullOrEmpty(_overriddenDataRoot))
+                        {
+                            return _overriddenDataRoot;
+                        }
+                        
+                        string configDataRoot = ConfigManager.GetValue<string>("DataRoot");
+                        if (!string.IsNullOrEmpty(configDataRoot))
+                        {
+                            return configDataRoot;
+                        }
+                        
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        {
+                            return Path.Combine(
+                                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                                "Wintap"
+                            );
+                        }
+                        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                        {
+                            return "/Library/Application Support/Mactap";
+                        }
+                        else // Linux and other Unix
+                        {
+                            return "/var/lib/lintap";
+                        }
 
-                string envOverride = Environment.GetEnvironmentVariable("WINTAP_DATA_ROOT");
-                if (!string.IsNullOrEmpty(envOverride))
-                {
-                    return envOverride;
-                }
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                        "Wintap"
-                    );
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    return "/Library/Application Support/Mactap";
-                }
-                else // Linux and other Unix
-                {
-                    return "/var/lib/lintap";
-                }
             }
         }
 

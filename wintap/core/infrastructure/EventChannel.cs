@@ -366,8 +366,8 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private static bool IsEnvEnabled(string name)
         {
-            return string.Equals(Environment.GetEnvironmentVariable(name), "true", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(Environment.GetEnvironmentVariable(name), "1", StringComparison.OrdinalIgnoreCase);
+            var val = ConfigManager.GetValue<string>(name);
+            return !string.IsNullOrEmpty(val) && (string.Equals(val, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(val, "1", StringComparison.OrdinalIgnoreCase));
         }
 
         // **************************************************************************
@@ -654,8 +654,8 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 // Try to use EnumFormatter if available
                 string formattedEpl = EnumFormatter.FormatQueryForCompile(epl);
-                if (string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_ESPER_ENUM_CAST"), "true", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(Environment.GetEnvironmentVariable("WINTAP_DISABLE_ESPER_ENUM_CAST"), "1", StringComparison.OrdinalIgnoreCase))
+                 if (string.Equals(ConfigManager.GetValue<string>("WINTAP_DISABLE_ESPER_ENUM_CAST"), "true", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(ConfigManager.GetValue<string>("WINTAP_DISABLE_ESPER_ENUM_CAST"), "1", StringComparison.OrdinalIgnoreCase))
                 {
                     formattedEpl = FormatEnumCastsAsEnumLiterals(formattedEpl);
                 }
