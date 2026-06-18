@@ -59,7 +59,7 @@ namespace gov.llnl.wintap.core.shared
         {
             get
             {
-                return AppDomain.CurrentDomain.BaseDirectory + "\\Plugins";
+                return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins");
             }
         }
 

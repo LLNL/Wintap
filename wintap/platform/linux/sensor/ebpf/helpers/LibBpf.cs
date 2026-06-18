@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace gov.llnl.wintap.platform.linux.collect
@@ -10,6 +11,39 @@ namespace gov.llnl.wintap.platform.linux.collect
     public static class LibBpf
     {
         private const string LibBpfLib = "libbpf.so.1";
+
+        static LibBpf()
+        {
+            // RHEL 8 commonly ships libbpf with SONAME libbpf.so.0, while other
+            // distros may ship libbpf.so.1. Try both at runtime.
+            NativeLibrary.SetDllImportResolver(typeof(LibBpf).Assembly, ResolveLibbpf);
+        }
+
+        private static IntPtr ResolveLibbpf(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            if (!string.Equals(libraryName, LibBpfLib, StringComparison.Ordinal))
+            {
+                return IntPtr.Zero;
+            }
+
+            // Keep the original first, then fall back for older distros.
+            string[] candidates =
+            {
+                "libbpf.so.1",
+                "libbpf.so.0",
+                "libbpf.so",
+            };
+
+            foreach (string candidate in candidates)
+            {
+                if (NativeLibrary.TryLoad(candidate, assembly, searchPath, out IntPtr handle))
+                {
+                    return handle;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
 
         // BPF object management
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]

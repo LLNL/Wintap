@@ -171,12 +171,14 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 try
                 {
-                    Type type = kvp.Value?.GetType();
+                    Type type = kvp.Value?.GetType() ?? typeof(string);
                     DataField field = new DataField(kvp.Key, type);
                     fields.Add(field);
                 }
                 catch (Exception ex)
-                { }
+                {
+                    WintapLogger.Log.Append($"Error on determining parquet schema: {ex}", LogLevel.Error);
+                }
             }
             ParquetSchema schema = new ParquetSchema(fields.ToArray());
             return schema;

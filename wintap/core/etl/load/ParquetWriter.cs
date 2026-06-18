@@ -271,18 +271,18 @@ namespace gov.llnl.wintap.core.etl.load
                     {
                         // HACK: Just set type to "string". Not sure how to get the base type correctly, but Key is the type we want.
                         // Next HACK, set a default on the ProcessRecord
-                        Type type = kvp.Key?.GetType();
+                        Type type = kvp.Key?.GetType() ?? typeof(string);
                         field = new DataField(kvp.Key, type);                        
                     } else
                     {
-                        Type type = kvp.Value?.GetType();
+                        Type type = kvp.Value?.GetType() ?? typeof(string);
                         field = new DataField(kvp.Key, type);                        
                     }
                     fields.Add(field);
                 }
                 catch (Exception ex)
                 {
-                        WintapLogger.Log.Append($"Error on determining parquet schema: {ex.ToString}", LogLevel.Error);
+                        WintapLogger.Log.Append($"Error on determining parquet schema: {ex}", LogLevel.Error);
                 }
             }
             ParquetSchema schema = new ParquetSchema(fields.ToArray());

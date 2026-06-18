@@ -4,6 +4,9 @@ CORE_OBJS = execve_tracer.bpf.o exit_tracer.bpf.o network_ops_tracer.bpf.o
 
 # Tracepoint-only objects avoid vmlinux.h and are the portability fallback tier.
 TRACEPOINT_OBJS = file_ops_tracer.bpf.o clone_tracer.bpf.o openat_tracer.bpf.o execve_tracepoint.bpf.o exit_tracepoint.bpf.o network_tracepoint.bpf.o file_ops_tracepoint.bpf.o
+
+# Always-clean set (avoid stale CO-RE objs when building tracepoint-only).
+ALL_OBJS = $(TRACEPOINT_OBJS) $(CORE_OBJS)
 KERNEL_RELEASE := $(shell uname -r)
 VMLINUX_BTF ?= /sys/kernel/btf/vmlinux
 
@@ -32,9 +35,17 @@ else
 OBJS = $(TRACEPOINT_OBJS)
 endif
 
+# Only generate vmlinux.h when BTF is available/readable. This matters for
+# cross-build packaging where we intentionally disable BTF to build tracepoint
+# fallback objects without requiring a target-arch BTF.
+VMLINUX_DEP :=
+ifeq ($(BTF_AVAILABLE),yes)
+VMLINUX_DEP := $(VMLINUX)
+endif
+
 .PHONY: all clean test preflight
 
-all: preflight $(VMLINUX) $(OBJS)
+all: preflight $(VMLINUX_DEP) $(OBJS)
 
 preflight:
 	@echo "--- eBPF build preflight ---"
@@ -72,5 +83,5 @@ test: all
 	@echo "eBPF tests passed!"
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(ALL_OBJS)
 	rm -rf .build
