@@ -139,73 +139,50 @@ namespace gov.llnl.wintap.platform.linux.collect
 
             try
             {
-                var programNames = new[]
+                // BaseEbpfSensor attaches only the primary program (BpfProgramName).
+                // For network we need the rest of the kprobe/tracepoint programs too.
+                // Instead of naming them (libbpf/kernel name truncation), iterate and
+                // attach all remaining programs in the object.
+                int attached = 0;
+                int skipped = 0;
+                IntPtr prev = IntPtr.Zero;
+                while (true)
                 {
-                    "trace_sendto",
-                    "trace_recvfrom",
-                    "trace_recvfrom_exit"
-                };
-
-                foreach (var progName in programNames)
-                {
-                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, progName);
+                    IntPtr prog = LibBpf.bpf_object__next_program(BpfObject, prev);
                     if (prog == IntPtr.Zero)
+                        break;
+                    prev = prog;
+
+                    string name;
+                    try
                     {
-                        WintapLogger.Log.Append($"{SensorName} program '{progName}' not found", LogLevel.Warn);
+                        name = Marshal.PtrToStringAnsi(LibBpf.bpf_program__name(prog)) ?? "";
+                    }
+                    catch
+                    {
+                        name = "";
+                    }
+
+                    // Skip the primary program already attached by BaseEbpfSensor.
+                    if (!string.IsNullOrEmpty(name) && string.Equals(name, BpfProgramName, StringComparison.Ordinal))
+                    {
+                        skipped++;
                         continue;
                     }
 
                     IntPtr link = LibBpf.bpf_program__attach(prog);
                     if (link == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} failed to attach '{progName}'", LogLevel.Warn);
+                        // Some programs may not be attachable on a given kernel; don't fail the sensor.
+                        skipped++;
                         continue;
                     }
 
                     _additionalLinks.Add(link);
-                    WintapLogger.Log.Append($"{SensorName} attached '{progName}'", LogLevel.Info);
+                    attached++;
                 }
 
-                // Also attempt to attach kprobe/kretprobe programs that populate
-                // the sock_pid_map. These are not always auto-attached by libbpf
-                // in all environments, so attach them explicitly when present.
-                 var kprobeNames = new[]
-                 {
-                     "kprobe__tcp_v4_connect",
-                     "kprobe__tcp_v6_connect",
-                     "kprobe__tcp_connect",
-                     "kretprobe__inet_csk_accept",
-
-                     // TCP send/recv coverage
-                     "kprobe__tcp_sendmsg",
-                     "kprobe__tcp_recvmsg",
-
-                     // UDP send/recv for connected UDP sockets (sendmsg/recvmsg)
-                     "kprobe__udp_sendmsg",
-                     "kprobe__udp_recvmsg"
-                 };
-
-                foreach (var progName in kprobeNames)
-                {
-                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, progName);
-                    if (prog == IntPtr.Zero)
-                    {
-                        WintapLogger.Log.Append($"{SensorName} program '{progName}' not found", LogLevel.Debug);
-                        continue;
-                    }
-
-                    IntPtr link = LibBpf.bpf_program__attach(prog);
-                    if (link == IntPtr.Zero)
-                    {
-                        WintapLogger.Log.Append($"{SensorName} failed to attach '{progName}'", LogLevel.Warn);
-                        continue;
-                    }
-
-                    _additionalLinks.Add(link);
-                    WintapLogger.Log.Append($"{SensorName} attached '{progName}'", LogLevel.Info);
-                }
-
-                WintapLogger.Log.Append($"{SensorName} attached {_additionalLinks.Count + 1} network programs", LogLevel.Info);
+                WintapLogger.Log.Append($"{SensorName} attached {attached} additional network programs (skipped={skipped})", LogLevel.Info);
                 return true;
             }
             catch (Exception ex)
@@ -245,8 +222,13 @@ namespace gov.llnl.wintap.platform.linux.collect
                 }
 
                 int pid = (int)evt.Pid;
-                bool isTcp = evt.Protocol == 6;
-                bool isUdp = evt.Protocol == 17;
+
+                // Some kernels/backports can result in protocol being unreliable for
+                // certain probe sites. Fall back to op_type classification so TCP
+                // connect/accept/disconnect events still flow into the TCP Esper
+                // stream and parquet outputs.
+                bool isTcp = evt.Protocol == 6 || (evt.OpType >= 1 && evt.OpType <= 5);
+                bool isUdp = evt.Protocol == 17 || (evt.OpType == 6 || evt.OpType == 7);
 
                 // Map operation type to activity
                 WintapMessage.ActivityTypeEnum activityType = evt.OpType switch
@@ -262,8 +244,8 @@ namespace gov.llnl.wintap.platform.linux.collect
                 };
 
                 // Create appropriate message type
-                var messageType = isTcp 
-                    ? WintapMessage.MessageTypeEnum.TcpConnection 
+                var messageType = isTcp
+                    ? WintapMessage.MessageTypeEnum.TcpConnection
                     : WintapMessage.MessageTypeEnum.UdpPacket;
 
                 var message = new WintapMessage(

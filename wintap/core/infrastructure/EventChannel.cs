@@ -16,6 +16,7 @@ using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.core.shared.helpers;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -57,6 +58,10 @@ namespace gov.llnl.wintap.core.infrastructure
         private static long lastTotalEvents;
         private static int droppedEventCount;
         private static IProcessResolver _processResolver;
+
+        // Avoid spamming logs when process attribution is missing.
+        private static readonly ConcurrentDictionary<int, byte> _loggedMissingOwnerPid = new ConcurrentDictionary<int, byte>();
+        private static readonly ConcurrentDictionary<int, byte> _loggedMissingParentPid = new ConcurrentDictionary<int, byte>();
 
         private static readonly Lazy<string> UnknownPidHash = new Lazy<string>(() => new ProcessHash().GenPidHash(-1, 0));
 
@@ -268,14 +273,18 @@ namespace gov.llnl.wintap.core.infrastructure
                         }
                         else
                         {
-                            // On Linux or if process not found, generate PidHash without full resolution
-                            WintapLogger.Log.Append($"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})",LogLevel.Warn);
-
                             // Generate a best-effort PidHash so events still have an identifier.
                             // Prefer resolver lookup; fall back to a local hash when resolver has no record.
                             var fallbackPidHash = _processResolver.GetPidHash(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
                             streamedEvent.PidHash = fallbackPidHash ?? new ProcessHash().GenPidHash(streamedEvent.PID, streamedEvent.EventTime);
                             streamedEvent.ProcessName = "Unknown";
+
+                            // Log only once per PID to avoid log floods.
+                            if (_loggedMissingOwnerPid.TryAdd(streamedEvent.PID, 0))
+                            {
+                                var level = fallbackPidHash == null ? LogLevel.Warn : LogLevel.Debug;
+                                WintapLogger.Log.Append($"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})", level);
+                            }
                         }
                     }
                     else if (!skipParentProcessResolve)
@@ -312,16 +321,19 @@ namespace gov.llnl.wintap.core.infrastructure
                                         streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
                                         streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
                                     }
-                                    else
-                                    {
-                                        WintapLogger.Log.Append(
-                                            $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
-                                            LogLevel.Warn);
+                                     else
+                                     {
+                                        if (_loggedMissingParentPid.TryAdd(streamedEvent.Process.ParentPID, 0))
+                                        {
+                                            WintapLogger.Log.Append(
+                                                $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
+                                                LogLevel.Warn);
+                                        }
 
                                         // Stable sentinel for unknown parent attribution.
                                         streamedEvent.Process.ParentPidHash = UnknownPidHash.Value;
                                         streamedEvent.Process.ParentProcessName = "Unknown";
-                                    }
+                                     }
                                 }
                             }
                         }

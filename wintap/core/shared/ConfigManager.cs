@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Reflection;
 using System.Linq;
+using System.Globalization;
 
 namespace gov.llnl.wintap.core.shared
 {
@@ -57,12 +58,26 @@ namespace gov.llnl.wintap.core.shared
 
         // Attempts to resolve a configuration value by the provided key. The key may be either the
         // canonical config property name (e.g. "DataRoot") or an environment-style name
-        // (e.g. "WINTAP_DATA_ROOT"). If no matching property exists, falls back to reading the
-        // environment variable directly.
+        // (e.g. "WINTAP_DATA_ROOT").
         public static T GetValue<T>(string key)
         {
             try
             {
+                // Environment overrides (only for WINTAP_* keys, or keys that map to ConfigRoot properties).
+                // This is required for packaged/systemd deployments where /etc/lintap/lintap.env sets
+                // WINTAP_DATA_ROOT and runtime isolation flags.
+                if (!string.IsNullOrEmpty(key))
+                {
+                    if (key.StartsWith("WINTAP_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var envVal = Environment.GetEnvironmentVariable(key);
+                        if (!string.IsNullOrEmpty(envVal) && TryConvertFromString(envVal, out T envTyped))
+                        {
+                            return envTyped;
+                        }
+                    }
+                }
+
                 // Try direct property lookup (case-insensitive)
                 var prop = typeof(ConfigRoot).GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (prop == null)
@@ -74,18 +89,116 @@ namespace gov.llnl.wintap.core.shared
 
                 if (prop != null)
                 {
+                    // Allow env override for known ConfigRoot properties (e.g. DataRoot -> WINTAP_DATA_ROOT)
+                    string envName = ToWintapEnvName(prop.Name);
+                    var envVal = Environment.GetEnvironmentVariable(envName);
+                    if (!string.IsNullOrEmpty(envVal) && TryConvertFromString(envVal, out T envTyped))
+                    {
+                        return envTyped;
+                    }
+
                     var value = prop.GetValue(_config);
                     if (value == null) return default;
                     return (T)Convert.ChangeType(value, typeof(T));
                 }
 
-                // If no property matched, return default (do not read arbitrary OS environment variables).
+                // If no property matched and key wasn't WINTAP_* above, return default (do not read arbitrary env vars).
                 return default;
             }
             catch
             {
                 return default;
             }
+        }
+
+        private static bool TryConvertFromString<T>(string value, out T typed)
+        {
+            typed = default;
+            try
+            {
+                var targetType = typeof(T);
+                if (targetType == typeof(string))
+                {
+                    typed = (T)(object)value;
+                    return true;
+                }
+
+                if (targetType == typeof(bool) || targetType == typeof(bool?))
+                {
+                    var v = value.Trim();
+                    if (string.Equals(v, "1", StringComparison.OrdinalIgnoreCase))
+                    {
+                        typed = (T)(object)true;
+                        return true;
+                    }
+                    if (string.Equals(v, "0", StringComparison.OrdinalIgnoreCase))
+                    {
+                        typed = (T)(object)false;
+                        return true;
+                    }
+                    if (bool.TryParse(v, out var b))
+                    {
+                        typed = (T)(object)b;
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Numeric types
+                if (targetType == typeof(int) || targetType == typeof(int?))
+                {
+                    if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
+                    {
+                        typed = (T)(object)i;
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (targetType == typeof(long) || targetType == typeof(long?))
+                {
+                    if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l))
+                    {
+                        typed = (T)(object)l;
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (targetType == typeof(double) || targetType == typeof(double?))
+                {
+                    if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var d))
+                    {
+                        typed = (T)(object)d;
+                        return true;
+                    }
+                    return false;
+                }
+
+                typed = (T)Convert.ChangeType(value, targetType, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string ToWintapEnvName(string propertyName)
+        {
+            // DataRoot -> WINTAP_DATA_ROOT
+            if (string.IsNullOrEmpty(propertyName)) return "WINTAP_";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < propertyName.Length; i++)
+            {
+                char c = propertyName[i];
+                if (char.IsUpper(c) && i > 0)
+                {
+                    sb.Append('_');
+                }
+                sb.Append(char.ToUpperInvariant(c));
+            }
+            return "WINTAP_" + sb.ToString();
         }
 
         private static string MapEnvNameToProperty(string key)

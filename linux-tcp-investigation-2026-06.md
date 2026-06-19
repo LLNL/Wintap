@@ -6,6 +6,18 @@
 
 This is a dated investigation memo for one debugging session. It is not a canonical setup or deployment guide.
 
+## Update (2026-06-18)
+
+On RHEL8 bring-up we confirmed a second (Linux-specific) failure mode beyond binary/tracer skew: **not all eBPF programs in `network_ops_tracer.bpf.o` were being attached**, which prevents `TcpIpConnect`/`TcpIpDisconnect` (and UDP recv peer tuple fixes) from ever entering the `WintapMessage` stream.
+
+Changes applied:
+
+1. **Attach all programs in the object** (do not rely on program-name strings).
+1. **Emit TCP connect/disconnect from more reliable hooks** (`tcp_*_connect` kretprobes + `tcp_close`), because `sock:inet_sock_set_state` old/new state classification can be unreliable on some RHEL8 kernels.
+1. **Fallback protocol classification in userland**: treat `op_type 1..5` as TCP even if `evt.Protocol` is unreliable.
+
+Result: `TcpIpConnect`, `TcpIpSend`, `TcpIpRecv`, `TcpIpDisconnect` are present in the raw_sensor conn increment parquet and flow through Esper and the TCP serializer parquet.
+
 ## Problem Statement
 
 Lintap running on `grantj-ebf-fixes` showed zero TCP activity despite the branch including a full TCP capture rearchitecture (commit `66769d4`). Log analysis confirmed:

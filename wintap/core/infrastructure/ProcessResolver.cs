@@ -10,7 +10,10 @@ using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.core.shared.helpers;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace gov.llnl.wintap.core.infrastructure
 {
@@ -372,7 +375,13 @@ namespace gov.llnl.wintap.core.infrastructure
 
                     if (result == null)
                     {
-                        WintapLogger.Log.Append($"No PidHash found for PID {pid} at or before {createTime:yyyy-MM-dd HH:mm:ss}", LogLevel.Warn);
+                        // If the process wasn't registered (ordering/rundown gaps), attempt a best-effort
+                        // stable PidHash based on /proc start time on Linux.
+                        var startFileTimeUtc = TryGetLinuxProcStartFileTimeUtc(pid);
+                        if (startFileTimeUtc != null)
+                        {
+                            return processHash.GenPidHash(pid, startFileTimeUtc.Value);
+                        }
                         return null;
                     }
 
@@ -387,6 +396,56 @@ namespace gov.llnl.wintap.core.infrastructure
                 return null;
             }
 
+        }
+
+        [DllImport("libc", SetLastError = true)]
+        private static extern long sysconf(int name);
+
+        private const int _SC_CLK_TCK = 2;
+
+        private static long? TryGetLinuxProcStartFileTimeUtc(int pid)
+        {
+            try
+            {
+                if (!OperatingSystem.IsLinux())
+                    return null;
+
+                string statPath = $"/proc/{pid}/stat";
+                if (!File.Exists(statPath))
+                    return null;
+
+                string stat = File.ReadAllText(statPath);
+                int endComm = stat.LastIndexOf(')');
+                if (endComm < 0)
+                    return null;
+
+                // Tokens after ") " correspond to fields 3..N.
+                string after = stat.Substring(endComm + 1).Trim();
+                var parts = after.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                // starttime is field 22 => index 19 in this post-comm array.
+                if (parts.Length <= 19)
+                    return null;
+
+                if (!long.TryParse(parts[19], NumberStyles.Integer, CultureInfo.InvariantCulture, out var startTicks))
+                    return null;
+
+                string uptimeText = File.ReadAllText("/proc/uptime");
+                string uptimeFirst = uptimeText.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (!double.TryParse(uptimeFirst, NumberStyles.Float, CultureInfo.InvariantCulture, out var uptimeSeconds))
+                    return null;
+
+                long hz = sysconf(_SC_CLK_TCK);
+                if (hz <= 0)
+                    hz = 100;
+
+                var bootUtc = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(uptimeSeconds);
+                var procStartUtc = bootUtc + TimeSpan.FromSeconds((double)startTicks / hz);
+                return procStartUtc.UtcDateTime.ToFileTimeUtc();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>

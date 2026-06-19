@@ -21,15 +21,18 @@ This is most visible when UDP events are emitted from syscall tracepoints (`sys_
    - Outcome: for these callers, the tuple is generally complete.
 
 2. **Unconnected UDP using recvfrom**
-   - We fixed `UdpIpRecv` emission by moving to `sys_exit_recvfrom` (because `src_addr` is written on return).
-   - Outcome: `UdpIpRecv` exists and remote tuple is correct, but local tuple may still be `0.0.0.0:0`.
+    - We fixed `UdpIpRecv` by emitting in `kretprobe/udp_recvmsg` using the user-provided peer buffer:
+      - read peer from `msghdr->msg_name` (recvmsg/recvmmsg) or `recvfrom()`'s `src_addr` pointer
+      - read destination tuple (local IP/port) from `struct sock`
+    - The `sys_exit_recvfrom` tracepoint is now cleanup-only (avoid emitting partial rows).
+    - Outcome: `UdpIpRecv` peer and destination tuples are populated when the caller provides an address buffer.
 
 ### Still incomplete
 
 1. **Unconnected UDP using sendto**
    - `sys_enter_sendto` provides only the destination sockaddr.
    - The local tuple is not known at syscall entry (the ephemeral port may not be assigned yet, and local IP depends on routing/bind).
-   - Current emission uses `saddr=0` and `sport=0` (by design), hence `0.0.0.0:0`.
+    - Current emission uses only the destination sockaddr (by design), hence `0.0.0.0:0` local tuple.
 
 2. **Sockets bound to INADDR_ANY**
    - Even for connected sockets, the kernel may report `skc_rcv_saddr == 0` (bound to 0.0.0.0).
@@ -73,9 +76,10 @@ We are intentionally putting these follow-ups on hold for now, but these are the
 ## Where To Look In Code
 
 - Tracer: `wintap/platform/linux/sensor/ebpf/tracers/network_ops_tracer.bpf.c`
-  - `trace_sendto` (currently only destination tuple for UDP)
-  - `trace_recvfrom` + `trace_recvfrom_exit` (source tuple on exit, local tuple not filled)
-  - `kprobe__udp_sendmsg` / `kprobe__udp_recvmsg` (connected UDP tuple population)
+   - `trace_sendto` (currently only destination tuple for UDP)
+   - `trace_recvfrom` (stashes user pointers for recvfrom)
+   - `kprobe__udp_recvmsg` + `kretprobe__udp_recvmsg` (peer sockaddr + local tuple for recv)
+   - `kprobe__udp_sendmsg` (connected UDP tuple population)
 
 - Userland: `wintap/platform/linux/sensor/ebpf/NetworkSensor.cs`
   - Maps `NET_OP_UDP_SEND/NET_OP_UDP_RECV` into `UdpIpSend/UdpIpRecv` and writes `WintapMessage.UdpPacket`.

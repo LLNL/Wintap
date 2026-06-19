@@ -31,6 +31,9 @@ namespace gov.llnl.wintap.core.etl.extract
 {
     internal abstract class Serializer
     {
+        // Ensure the shared Esper context is deployed once per process.
+        private static int _esperContextRegistered = 0;
+
         private List<string> esperQueries = new List<string>();  // the query epl files used by this sensor
         private int maxEventsPerSec = 25000;
         private System.Timers.Timer backoffTimer;
@@ -399,6 +402,13 @@ namespace gov.llnl.wintap.core.etl.extract
         {
             try
             {
+                // All serializers share the same Esper context; registering it per serializer
+                // causes duplicate-context warnings and extra compile/deploy work.
+                if (Interlocked.CompareExchange(ref _esperContextRegistered, 1, 0) != 0)
+                {
+                    return;
+                }
+
                 var esper1 = esperNameSpacePrefix + "esper-context.epl";
                 string esperQuery = readQueryFromFile(esper1);
                 gov.llnl.wintap.core.infrastructure.EventChannel.CompileDeploy(esperQuery, "esper_context");

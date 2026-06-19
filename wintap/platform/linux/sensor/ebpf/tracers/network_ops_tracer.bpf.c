@@ -107,7 +107,11 @@ static __always_inline void diag_inc(__u32 idx)
 struct sock_info {
     __u32 pid;
     __u64 start_ns;
+    __u8 source; // 1=connect path, 2=accept path
 };
+
+#define SOCK_SRC_CONNECT 1
+#define SOCK_SRC_ACCEPT  2
 
 // Use a 64-bit integer key for socket pointer to avoid ABI/typing issues when
 // passing pointers between kprobe and tracepoint contexts. Using __u64 is
@@ -118,6 +122,14 @@ struct {
     __type(value, struct sock_info);
     __uint(max_entries, 10240);
 } sock_pid_map SEC(".maps");
+
+// pid_tgid -> sock pointer for tcp_*_connect kretprobes
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u64);
+    __type(value, __u64);
+    __uint(max_entries, 8192);
+} tcp_connect_sk_map SEC(".maps");
 
 // Connection info stored keyed by socket pointer so we can attribute
 // send/recv events with addresses without reading kernel struct layout.
@@ -167,6 +179,23 @@ struct {
     __type(value, struct recvfrom_ctx);
     __uint(max_entries, 8192);
 } recvfrom_ctx_map SEC(".maps");
+
+// For recvfrom syscalls, stash the sock pointer so the udp_recvmsg kretprobe can
+// read local port/address and combine it with the user-provided peer sockaddr.
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u64);
+    __type(value, __u64);
+    __uint(max_entries, 8192);
+} udp_recvmsg_sock_map SEC(".maps");
+
+// pid_tgid -> user-space peer sockaddr pointer (msg_name / src_addr).
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u64);
+    __type(value, __u64);
+    __uint(max_entries, 8192);
+} udp_recvmsg_peer_map SEC(".maps");
 
 // Helper to emit network event
 static __always_inline void emit_network_event(__u32 pid, __u32 saddr, __u32 daddr,
@@ -234,34 +263,35 @@ struct inet_sock_set_state_args {
 SEC("tracepoint/sock/inet_sock_set_state")
 int trace_inet_sock_set_state(struct inet_sock_set_state_args *ctx)
 {
-    if (ctx->family != AF_INET)
+    // NOTE: The kernel tracepoint argument layout can vary across distros and
+    // backports. To keep address/port extraction robust on RHEL8 kernels, we
+    // derive tuple information from the live `struct sock` via CO-RE reads
+    // rather than trusting ctx->{family,protocol,saddr,daddr,sport,dport}.
+    void *sk = (void *)ctx->skaddr;
+    if (!sk)
         return 0;
 
-    // We use this tracepoint for:
-    // - TCP: emit connect/accept/close + populate conn_map
-    // - UDP: populate conn_map for connected UDP sockets (no emit here)
-    if (ctx->protocol != PROTO_TCP && ctx->protocol != PROTO_UDP)
+    struct sock *sock = (struct sock *)sk;
+    __u16 family = BPF_CORE_READ(sock, __sk_common.skc_family);
+    if (family != AF_INET)
         return 0;
 
+    // Protocol is provided by the tracepoint; avoid reading sk_protocol here
+    // because it is a bitfield on some kernels. If the tracepoint layout is
+    // different (backports), default to TCP so we don't silently drop events.
+    __u16 proto = ctx->protocol;
+    if (proto != PROTO_TCP && proto != PROTO_UDP)
+        proto = PROTO_TCP;
+
+    // NOTE: On some RHEL8 kernels, the inet_sock_set_state tracepoint's
+    // old/new state fields don't reliably match the TCP_* constants. We keep
+    // this tracepoint purely for populating conn_map (tuple cache), and emit
+    // TcpIpConnect/TcpIpDisconnect from tcp_v4_connect kretprobes / tcp_close
+    // kprobes instead.
     __u8 op_type = 0;
-    if (ctx->protocol == PROTO_TCP)
-    {
-        if (ctx->newstate == TCP_ESTABLISHED)
-        {
-            if (ctx->oldstate == TCP_SYN_SENT)
-                op_type = NET_OP_TCP_CONNECT;
-            else if (ctx->oldstate == TCP_SYN_RECV || ctx->oldstate == TCP_LISTEN)
-                op_type = NET_OP_TCP_ACCEPT;
-        }
-        else if (ctx->newstate == TCP_CLOSE)
-        {
-            op_type = NET_OP_TCP_CLOSE;
-        }
-    }
 
     // Prefer PID captured at syscall/kprobe time (stored keyed by socket ptr).
     // Fall back to bpf_get_current_pid_tgid() if no entry exists.
-    void *sk = (void *)ctx->skaddr;
     __u32 pid = 0;
     // Use a u64 key that holds the pointer value for map operations.
     __u64 sk_key = (__u64)sk;
@@ -299,10 +329,10 @@ int trace_inet_sock_set_state(struct inet_sock_set_state_args *ctx)
         diag_inc(2);
     }
 
-    __u32 saddr = 0;
-    __u32 daddr = 0;
-    __builtin_memcpy(&saddr, ctx->saddr, sizeof(saddr));
-    __builtin_memcpy(&daddr, ctx->daddr, sizeof(daddr));
+    __u32 saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+    __u32 daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+    __u16 sport = BPF_CORE_READ(sock, __sk_common.skc_num);
+    __u16 dport = bpf_ntohs(BPF_CORE_READ(sock, __sk_common.skc_dport));
 
     // Store a copy of the connection tuple keyed by socket pointer so other
     // kprobe-based handlers can later lookup addresses without reading
@@ -312,22 +342,61 @@ int trace_inet_sock_set_state(struct inet_sock_set_state_args *ctx)
     struct conn_info cinfo = {};
     cinfo.saddr = saddr;
     cinfo.daddr = daddr;
-    cinfo.sport = ctx->sport;
-    cinfo.dport = ctx->dport;
+    cinfo.sport = sport;
+    cinfo.dport = dport;
     cinfo.start_ns = bpf_ktime_get_ns();
     __u64 sk_key_for_store = (__u64)sk;
     bpf_map_update_elem(&conn_map, &sk_key_for_store, &cinfo, BPF_ANY);
 
-    // For UDP we only use this tracepoint to populate conn_map; we do not
-    // emit a separate connect event here.
-    if (ctx->protocol == PROTO_TCP && op_type != 0)
-    {
-        // The tracepoint exposes sport/dport in host byte order.
-        emit_network_event(pid, saddr, daddr, ctx->sport, ctx->dport,
-                           PROTO_TCP, op_type, 0);
+    return 0;
+}
+
+static __always_inline void emit_tcp_connect_event(__u32 pid, void *sk)
+{
+    struct sock *sock = (struct sock *)sk;
+    __u16 family = BPF_CORE_READ(sock, __sk_common.skc_family);
+    if (family != AF_INET)
+        return;
+
+    __u32 saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+    __u32 daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+    __u16 sport = BPF_CORE_READ(sock, __sk_common.skc_num);
+    __u16 dport = bpf_ntohs(BPF_CORE_READ(sock, __sk_common.skc_dport));
+
+    // Seed conn_map for subsequent send/recv lookups.
+    struct conn_info cinfo = {};
+    cinfo.saddr = saddr;
+    cinfo.daddr = daddr;
+    cinfo.sport = sport;
+    cinfo.dport = dport;
+    cinfo.start_ns = bpf_ktime_get_ns();
+    __u64 sk_key = (__u64)sk;
+    bpf_map_update_elem(&conn_map, &sk_key, &cinfo, BPF_ANY);
+
+    emit_network_event(pid, saddr, daddr, sport, dport, PROTO_TCP, NET_OP_TCP_CONNECT, 0);
+}
+
+static __always_inline void emit_tcp_disconnect_event(__u32 pid, void *sk)
+{
+    __u64 sk_key = (__u64)sk;
+    struct conn_info *ci = bpf_map_lookup_elem(&conn_map, &sk_key);
+    if (ci) {
+        emit_network_event(pid, ci->saddr, ci->daddr, ci->sport, ci->dport,
+                           PROTO_TCP, NET_OP_TCP_CLOSE, 0);
+        bpf_map_delete_elem(&conn_map, &sk_key);
+        return;
     }
 
-    return 0;
+    // Fallback to live socket fields.
+    struct sock *sock = (struct sock *)sk;
+    __u16 family = BPF_CORE_READ(sock, __sk_common.skc_family);
+    if (family != AF_INET)
+        return;
+    __u32 saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+    __u32 daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+    __u16 sport = BPF_CORE_READ(sock, __sk_common.skc_num);
+    __u16 dport = bpf_ntohs(BPF_CORE_READ(sock, __sk_common.skc_dport));
+    emit_network_event(pid, saddr, daddr, sport, dport, PROTO_TCP, NET_OP_TCP_CLOSE, 0);
 }
 
 // Kprobe on tcp_v4_connect to capture the socket pointer in process context.
@@ -341,16 +410,43 @@ int kprobe__tcp_v4_connect(struct pt_regs *ctx)
         return 0;
 
     __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 sk_key_tmp = (__u64)sk;
+    bpf_map_update_elem(&tcp_connect_sk_map, &pid_tgid, &sk_key_tmp, BPF_ANY);
+
     struct sock_info info = {};
     info.pid = (__u32)(pid_tgid >> 32);
     if (!pid_allowed(info.pid))
         return 0;
     info.start_ns = bpf_ktime_get_ns();
+    info.source = SOCK_SRC_CONNECT;
     __u64 sk_key = (__u64)sk;
     bpf_map_update_elem(&sock_pid_map, &sk_key, &info, BPF_ANY);
     // Emit in-band diagnostic: STORE (code 0)
     emit_diag_event(0, info.pid, sk);
     diag_inc(0);
+    return 0;
+}
+
+SEC("kretprobe/tcp_v4_connect")
+int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
+{
+    long rc = (long)PT_REGS_RC(ctx);
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 *skp = bpf_map_lookup_elem(&tcp_connect_sk_map, &pid_tgid);
+    if (!skp)
+        return 0;
+    __u64 sk_key_tmp = *skp;
+    // Always cleanup.
+    bpf_map_delete_elem(&tcp_connect_sk_map, &pid_tgid);
+    if (rc != 0)
+        return 0;
+    void *sk = (void *)sk_key_tmp;
+    if (!sk)
+        return 0;
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    if (!pid_allowed(pid))
+        return 0;
+    emit_tcp_connect_event(pid, sk);
     return 0;
 }
 
@@ -364,16 +460,42 @@ int kprobe__tcp_v6_connect(struct pt_regs *ctx)
         return 0;
 
     __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 sk_key_tmp = (__u64)sk;
+    bpf_map_update_elem(&tcp_connect_sk_map, &pid_tgid, &sk_key_tmp, BPF_ANY);
+
     struct sock_info info = {};
     info.pid = (__u32)(pid_tgid >> 32);
     if (!pid_allowed(info.pid))
         return 0;
     info.start_ns = bpf_ktime_get_ns();
+    info.source = SOCK_SRC_CONNECT;
     __u64 sk_key = (__u64)sk;
     bpf_map_update_elem(&sock_pid_map, &sk_key, &info, BPF_ANY);
     // Emit in-band diagnostic: STORE (code 0)
     emit_diag_event(0, info.pid, sk);
     diag_inc(0);
+    return 0;
+}
+
+SEC("kretprobe/tcp_v6_connect")
+int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
+{
+    long rc = (long)PT_REGS_RC(ctx);
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 *skp = bpf_map_lookup_elem(&tcp_connect_sk_map, &pid_tgid);
+    if (!skp)
+        return 0;
+    __u64 sk_key_tmp = *skp;
+    bpf_map_delete_elem(&tcp_connect_sk_map, &pid_tgid);
+    if (rc != 0)
+        return 0;
+    void *sk = (void *)sk_key_tmp;
+    if (!sk)
+        return 0;
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    if (!pid_allowed(pid))
+        return 0;
+    emit_tcp_connect_event(pid, sk);
     return 0;
 }
 
@@ -387,16 +509,56 @@ int kprobe__tcp_connect(struct pt_regs *ctx)
         return 0;
 
     __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 sk_key_tmp = (__u64)sk;
+    bpf_map_update_elem(&tcp_connect_sk_map, &pid_tgid, &sk_key_tmp, BPF_ANY);
+
     struct sock_info info = {};
     info.pid = (__u32)(pid_tgid >> 32);
     if (!pid_allowed(info.pid))
         return 0;
     info.start_ns = bpf_ktime_get_ns();
+    info.source = SOCK_SRC_CONNECT;
     __u64 sk_key = (__u64)sk;
     bpf_map_update_elem(&sock_pid_map, &sk_key, &info, BPF_ANY);
     // Emit in-band diagnostic: STORE (code 0)
     emit_diag_event(0, info.pid, sk);
     diag_inc(0);
+    return 0;
+}
+
+SEC("kretprobe/tcp_connect")
+int kretprobe__tcp_connect(struct pt_regs *ctx)
+{
+    long rc = (long)PT_REGS_RC(ctx);
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 *skp = bpf_map_lookup_elem(&tcp_connect_sk_map, &pid_tgid);
+    if (!skp)
+        return 0;
+    __u64 sk_key_tmp = *skp;
+    bpf_map_delete_elem(&tcp_connect_sk_map, &pid_tgid);
+    if (rc != 0)
+        return 0;
+    void *sk = (void *)sk_key_tmp;
+    if (!sk)
+        return 0;
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    if (!pid_allowed(pid))
+        return 0;
+    emit_tcp_connect_event(pid, sk);
+    return 0;
+}
+
+SEC("kprobe/tcp_close")
+int kprobe__tcp_close(struct pt_regs *ctx)
+{
+    void *sk = (void *)PT_REGS_PARM1(ctx);
+    if (!sk)
+        return 0;
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    if (!pid_allowed(pid))
+        return 0;
+    emit_tcp_disconnect_event(pid, sk);
     return 0;
 }
 
@@ -415,6 +577,7 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     if (!pid_allowed(info.pid))
         return 0;
     info.start_ns = bpf_ktime_get_ns();
+    info.source = SOCK_SRC_ACCEPT;
     __u64 sk_key = (__u64)sk;
     bpf_map_update_elem(&sock_pid_map, &sk_key, &info, BPF_ANY);
     return 0;
@@ -436,14 +599,34 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx)
     __u64 len = (__u64)PT_REGS_PARM3(ctx);
 
     // Prefer connection tuple from conn_map (populated by
-    // trace_inet_sock_set_state). Avoid direct reads from kernel struct
-    // layouts (struct sock may be incomplete depending on build headers).
+    // trace_inet_sock_set_state). However, on some kernels the tracepoint
+    // argument layout differs enough that saddr/daddr may stay zero. For data
+    // quality, fall back to reading from `struct sock`.
     __u64 sk_key = (__u64)sk;
-    struct conn_info *ci = bpf_map_lookup_elem(&conn_map, &sk_key);
-    if (!ci)
-        return 0;
-
     __u64 now = bpf_ktime_get_ns();
+    struct conn_info *ci = bpf_map_lookup_elem(&conn_map, &sk_key);
+    if (!ci) {
+        struct conn_info tmp = {};
+        struct sock *sock = (struct sock *)sk;
+        tmp.daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+        tmp.saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+        tmp.dport = bpf_ntohs(BPF_CORE_READ(sock, __sk_common.skc_dport));
+        tmp.sport = BPF_CORE_READ(sock, __sk_common.skc_num);
+        tmp.start_ns = now;
+        tmp.last_send_ns = now;
+        bpf_map_update_elem(&conn_map, &sk_key, &tmp, BPF_ANY);
+        emit_network_event(pid, tmp.saddr, tmp.daddr, tmp.sport, tmp.dport, PROTO_TCP, NET_OP_TCP_SEND, (__u32)len);
+        return 0;
+    }
+
+    // Refresh zero tuples from the live socket.
+    if (ci->saddr == 0 && ci->daddr == 0) {
+        struct sock *sock = (struct sock *)sk;
+        ci->daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+        ci->saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+        ci->dport = bpf_ntohs(BPF_CORE_READ(sock, __sk_common.skc_dport));
+        ci->sport = BPF_CORE_READ(sock, __sk_common.skc_num);
+    }
     const __u64 min_interval_ns = 1ULL * 1000000000ULL; // 1 second
     if (ci->last_send_ns && (now - ci->last_send_ns) < min_interval_ns)
         return 0;
@@ -469,17 +652,42 @@ int kprobe__tcp_recvmsg(struct pt_regs *ctx)
     __u64 len = (__u64)PT_REGS_PARM3(ctx);
 
     __u64 sk_key = (__u64)sk;
-    struct conn_info *ci = bpf_map_lookup_elem(&conn_map, &sk_key);
-    if (!ci)
-        return 0;
-
     __u64 now = bpf_ktime_get_ns();
+    struct conn_info *ci = bpf_map_lookup_elem(&conn_map, &sk_key);
+    if (!ci) {
+        // For recv, the remote is the source and local is the destination.
+        struct conn_info tmp = {};
+        struct sock *sock = (struct sock *)sk;
+        __u32 daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+        __u32 saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+        __u16 dport = bpf_ntohs(BPF_CORE_READ(sock, __sk_common.skc_dport));
+        __u16 sport = BPF_CORE_READ(sock, __sk_common.skc_num);
+        tmp.saddr = saddr;
+        tmp.daddr = daddr;
+        tmp.sport = sport;
+        tmp.dport = dport;
+        tmp.start_ns = now;
+        tmp.last_recv_ns = now;
+        bpf_map_update_elem(&conn_map, &sk_key, &tmp, BPF_ANY);
+        emit_network_event(pid, daddr, saddr, dport, sport, PROTO_TCP, NET_OP_TCP_RECV, (__u32)len);
+        return 0;
+    }
+
+    // Refresh zero tuples from the live socket.
+    if (ci->saddr == 0 && ci->daddr == 0) {
+        struct sock *sock = (struct sock *)sk;
+        ci->daddr = BPF_CORE_READ(sock, __sk_common.skc_daddr);
+        ci->saddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+        ci->dport = bpf_ntohs(BPF_CORE_READ(sock, __sk_common.skc_dport));
+        ci->sport = BPF_CORE_READ(sock, __sk_common.skc_num);
+    }
     const __u64 min_interval_ns = 1ULL * 1000000000ULL; // 1 second
     if (ci->last_recv_ns && (now - ci->last_recv_ns) < min_interval_ns)
         return 0;
     ci->last_recv_ns = now;
 
-    emit_network_event(pid, ci->saddr, ci->daddr, ci->sport, ci->dport, PROTO_TCP, NET_OP_TCP_RECV, (__u32)len);
+    // For recv, swap tuple: remote is the source and local is the destination.
+    emit_network_event(pid, ci->daddr, ci->saddr, ci->dport, ci->sport, PROTO_TCP, NET_OP_TCP_RECV, (__u32)len);
     return 0;
 }
 
@@ -546,6 +754,27 @@ int kprobe__udp_recvmsg(struct pt_regs *ctx)
         return 0;
     (void)PT_REGS_PARM3(ctx);
 
+    // If the caller provided a peer address buffer (recvfrom/recvmsg/recvmmsg),
+    // defer emitting until return so we can read the populated sockaddr.
+    __u64 peer_ptr = 0;
+    struct msghdr *msg = (struct msghdr *)PT_REGS_PARM2(ctx);
+    if (msg) {
+        void *name = BPF_CORE_READ(msg, msg_name);
+        if (name)
+            peer_ptr = (__u64)name;
+    }
+    if (peer_ptr == 0) {
+        struct recvfrom_ctx *rctx = bpf_map_lookup_elem(&recvfrom_ctx_map, &pid_tgid);
+        if (rctx)
+            peer_ptr = (__u64)rctx->src_addr;
+    }
+    if (peer_ptr != 0) {
+        __u64 sk_key = (__u64)sk;
+        bpf_map_update_elem(&udp_recvmsg_sock_map, &pid_tgid, &sk_key, BPF_ANY);
+        bpf_map_update_elem(&udp_recvmsg_peer_map, &pid_tgid, &peer_ptr, BPF_ANY);
+        return 0;
+    }
+
     __u64 sk_key = (__u64)sk;
 
     __u64 now = bpf_ktime_get_ns();
@@ -570,12 +799,74 @@ int kprobe__udp_recvmsg(struct pt_regs *ctx)
     lport = BPF_CORE_READ(sock, __sk_common.skc_num);
     rport = bpf_ntohs(rport);
 
+    // Unconnected sockets (skc_daddr/skc_dport == 0) don't have a peer tuple.
+    // If the caller didn't request the peer sockaddr, we can't recover it
+    // from the sock at this probe site.
+    if (raddr == 0 && rport == 0)
+        return 0;
+
     // For loopback peers, map INADDR_ANY local addr to 127.0.0.1 for clarity.
     if (laddr == 0 && ((raddr & 0xff) == 0x7f))
         laddr = 0x0100007f;
 
     // For recv, remote is the source and local is the destination.
     emit_network_event(pid, raddr, laddr, rport, lport, PROTO_UDP, NET_OP_UDP_RECV, 0);
+    return 0;
+}
+
+// When recvfrom() is used, the kernel fills the caller-provided src_addr on
+// udp_recvmsg return. Use that sockaddr for the peer and the sock tuple for
+// the local port/address so UdpIpRecv includes the destination fields.
+SEC("kretprobe/udp_recvmsg")
+int kretprobe__udp_recvmsg(struct pt_regs *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    if (!pid_allowed(pid))
+        return 0;
+
+    long ret = (long)PT_REGS_RC(ctx);
+    if (ret <= 0) {
+        bpf_map_delete_elem(&udp_recvmsg_sock_map, &pid_tgid);
+        bpf_map_delete_elem(&udp_recvmsg_peer_map, &pid_tgid);
+        bpf_map_delete_elem(&recvfrom_ctx_map, &pid_tgid);
+        return 0;
+    }
+
+    __u64 *sk_keyp = bpf_map_lookup_elem(&udp_recvmsg_sock_map, &pid_tgid);
+    if (!sk_keyp) {
+        return 0;
+    }
+
+    __u64 *peer_ptrp = bpf_map_lookup_elem(&udp_recvmsg_peer_map, &pid_tgid);
+    if (!peer_ptrp) {
+        return 0;
+    }
+
+    struct sockaddr_in peer = {};
+    bpf_probe_read_user(&peer, sizeof(peer), (void *)(*peer_ptrp));
+    if (peer.sin_family != AF_INET) {
+        bpf_map_delete_elem(&udp_recvmsg_sock_map, &pid_tgid);
+        bpf_map_delete_elem(&udp_recvmsg_peer_map, &pid_tgid);
+        bpf_map_delete_elem(&recvfrom_ctx_map, &pid_tgid);
+        return 0;
+    }
+
+    struct sock *sock = (struct sock *)(*sk_keyp);
+    __u32 laddr = BPF_CORE_READ(sock, __sk_common.skc_rcv_saddr);
+    __u16 lport = BPF_CORE_READ(sock, __sk_common.skc_num);
+
+    __u32 raddr = peer.sin_addr.s_addr;
+    __u16 rport = bpf_ntohs(peer.sin_port);
+
+    if (laddr == 0 && ((raddr & 0xff) == 0x7f))
+        laddr = 0x0100007f;
+
+    emit_network_event(pid, raddr, laddr, rport, lport, PROTO_UDP, NET_OP_UDP_RECV, (__u32)ret);
+
+    bpf_map_delete_elem(&udp_recvmsg_sock_map, &pid_tgid);
+    bpf_map_delete_elem(&udp_recvmsg_peer_map, &pid_tgid);
+    bpf_map_delete_elem(&recvfrom_ctx_map, &pid_tgid);
     return 0;
 }
 
@@ -704,9 +995,13 @@ int trace_recvfrom(struct recvfrom_args *ctx)
 {
     // src_addr is written by the kernel on syscall return, so stash the user
     // pointers here and read them in sys_exit_recvfrom.
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = (__u32)(pid_tgid >> 32);
+    if (!pid_allowed(pid))
+        return 0;
+
     if (ctx->src_addr)
     {
-        __u64 pid_tgid = bpf_get_current_pid_tgid();
         struct recvfrom_ctx rctx = {};
         rctx.src_addr = (void *)ctx->src_addr;
         rctx.addrlen = ctx->addrlen;
@@ -732,24 +1027,22 @@ int trace_recvfrom_exit(struct sys_exit_args *ctx)
     // Always delete to avoid leaks.
     bpf_map_delete_elem(&recvfrom_ctx_map, &pid_tgid);
 
-    // ret is the number of bytes received (or <0 on error)
-    if (ctx->ret <= 0)
+    // Best-effort cleanup if kretprobe didn't run.
+    bpf_map_delete_elem(&udp_recvmsg_peer_map, &pid_tgid);
+
+    // If the udp_recvmsg kretprobe handled this recvfrom, it will have already
+    // emitted a fully-populated event and deleted the sock map entry. In that
+    // case, do nothing here.
+    if (!bpf_map_lookup_elem(&udp_recvmsg_sock_map, &pid_tgid))
         return 0;
 
-    struct sockaddr_in addr;
-    bpf_probe_read_user(&addr, sizeof(addr), rctx->src_addr);
-    if (addr.sin_family != AF_INET)
-        return 0;
+    // Best-effort cleanup.
+    bpf_map_delete_elem(&udp_recvmsg_sock_map, &pid_tgid);
 
-    __u32 pid = (__u32)(pid_tgid >> 32);
-    if (!pid_allowed(pid))
-        return 0;
-    emit_network_event(pid,
-                       addr.sin_addr.s_addr, 0,
-                       bpf_ntohs(addr.sin_port), 0,
-                       PROTO_UDP,
-                       NET_OP_UDP_RECV,
-                       (__u32)ctx->ret);
+    // NOTE: recvfrom events are emitted from the udp_recvmsg kretprobe so we
+    // can combine the peer sockaddr (written into user memory) with the local
+    // sock tuple. Keeping this tracepoint as "cleanup only" avoids emitting
+    // partial events with missing destination fields.
     return 0;
 }
 
