@@ -24,28 +24,28 @@ generated internet traffic -> eBPF/network sensor -> ETL/parquet writer -> DuckD
 Run the test on the same host/VM where Lintap is collecting network data:
 
 ```bash
-python3 devtools/network_capture_smoke_test.py \
-  --data-root /tmp/lintap-smoke \
-  --timeout 240 \
-  --poll-interval 10
+  uv run python devtools/network_capture_smoke_test.py \
+    --data-root /tmp/lintap-smoke \
+    --timeout 240 \
+    --poll-interval 10
 ```
 
 Optional: start Lintap in direct-parquet mode for this test (requires root):
 
 ```bash
-sudo python3 devtools/network_capture_smoke_test.py \
-  --start-lintap \
-  --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
-  --timeout 240 \
-  --poll-interval 10
+ sudo uv run python devtools/network_capture_smoke_test.py \
+    --start-lintap \
+    --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
+    --timeout 240 \
+    --poll-interval 10
 ```
 
 Optional stricter validation requires one of the resolved endpoint IPv4 addresses to appear in captured rows:
 
 ```bash
-python3 devtools/network_capture_smoke_test.py \
-  --data-root /tmp/lintap-smoke \
-  --require-target-ip-match
+ uv run python devtools/network_capture_smoke_test.py \
+    --data-root /tmp/lintap-smoke \
+    --require-target-ip-match
 ```
 
 Exact IP matching is disabled by default because CDN-backed endpoints may resolve or connect differently across attempts.
@@ -66,7 +66,7 @@ Matched resolved target IPs: 104.16.124.96, 104.20.23.154
 
 ## Process Capture Smoke Test
 
-`process_capture_smoke_test.py` is an integration smoke test for Linux process capture correctness. It spawns a small parent/child process tree, waits for parquet output, then queries the parquet files with DuckDB to confirm the child process has the expected parent PID and parent hash.
+`process_capture_smoke_test.py` is an integration smoke test for Linux process capture correctness. It generates several process creation variants (fork/exec, posix_spawn, execveat via fexecve, and short-lived children), waits for parquet output, then queries the parquet files with DuckDB to confirm parent PID/hash linkage and expected breadcrumbs.
 
 It supports both schemas:
 
@@ -78,40 +78,46 @@ The script probes the parquet schema first to avoid DuckDB binder errors when co
 The test validates the end-to-end path:
 
 ```text
-generated process tree -> eBPF process sensors -> parquet writer -> DuckDB query -> expected parent PID/hash
+generated process activity -> eBPF process sensors -> parquet writer -> DuckDB query -> expected parent PID/hash (+ breadcrumbs)
 ```
 
 Usage:
 
 ```bash
-python3 devtools/process_capture_smoke_test.py \
-  --data-root /var/log/lintap \
-  --timeout 240 \
-  --poll-interval 10
+ uv run python devtools/process_capture_smoke_test.py \
+    --data-root /var/log/lintap \
+    --timeout 240 \
+    --poll-interval 10
 ```
 
 Optional: start Lintap in direct-parquet mode for this test (requires root):
 
 ```bash
-sudo python3 devtools/process_capture_smoke_test.py \
-  --start-lintap \
-  --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
-  --timeout 240 \
-  --poll-interval 10
+ sudo uv run python devtools/process_capture_smoke_test.py \
+    --start-lintap \
+    --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
+    --timeout 240 \
+    --poll-interval 10
 ```
 
 Optional: override the parquet root (defaults to `<data-root>/parquet`):
 
 ```bash
-python3 devtools/process_capture_smoke_test.py \
-  --data-root /var/log/lintap \
-  --parquet-root /var/log/lintap/parquet
+ uv run python devtools/process_capture_smoke_test.py \
+    --data-root /var/log/lintap \
+    --parquet-root /var/log/lintap/parquet
 ```
 
 Optional stricter validation requires Stop events for both processes:
 
 ```bash
-python3 devtools/process_capture_smoke_test.py --require-stop
+ uv run python devtools/process_capture_smoke_test.py --require-stop
+```
+
+Optional: increase the number of short-lived children (helps exercise parent attribution when /proc races occur):
+
+```bash
+ uv run python devtools/process_capture_smoke_test.py --short-lived-children 20
 ```
 
 The captured local endpoint should show the host/VM's routable local address with ephemeral ports, for example:
@@ -127,20 +133,20 @@ local=192.168.252.9:37804 -> remote=104.20.23.154:80 proto=TCP rows=2
 Usage:
 
 ```bash
-python3 devtools/file_capture_smoke_test.py \
-  --data-root /var/log/lintap \
-  --timeout 240 \
-  --poll-interval 10
+ uv run python devtools/file_capture_smoke_test.py \
+    --data-root /var/log/lintap \
+    --timeout 240 \
+    --poll-interval 10
 ```
 
 Optional: start Lintap in direct-parquet mode for this test (requires root):
 
 ```bash
-sudo python3 devtools/file_capture_smoke_test.py \
-  --start-lintap \
-  --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
-  --timeout 240 \
-  --poll-interval 10
+ sudo uv run python devtools/file_capture_smoke_test.py \
+    --start-lintap \
+    --lintap-dll /tmp/lintap-build/wintap/bin/Debug/net8.0/Lintap.dll \
+    --timeout 240 \
+    --poll-interval 10
 ```
 
 ## 30-Minute Soak Test (Network + Process)
@@ -168,9 +174,9 @@ In another shell, run 5 rounds (every ~6 minutes):
 
 ```bash
 for i in 1 2 3 4 5; do
-  python3 devtools/network_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
-  python3 devtools/process_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
-  python3 devtools/file_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
+  uv run python devtools/network_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5 --rounds 1
+  uv run python devtools/process_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
+  uv run python devtools/file_capture_smoke_test.py --data-root "$DATA_ROOT" --timeout 120 --poll-interval 5
   sleep 360
 done
 ```
