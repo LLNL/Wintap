@@ -16,6 +16,7 @@ namespace gov.llnl.wintap.platform.linux.collect
     internal class CloneSensor : BaseEbpfSensor
     {
         private ProcessHash _pidHashGenerator;
+        private readonly System.Collections.Generic.List<IntPtr> _additionalLinks = new System.Collections.Generic.List<IntPtr>();
         protected override string BpfObjectFileName => "clone_tracer.bpf.o";
         protected override string BpfProgramName => "trace_process_fork";
 
@@ -26,6 +27,60 @@ namespace gov.llnl.wintap.platform.linux.collect
         }
 
         protected override LibBpf.RingBufferCallback GetRingBufferCallback() => HandleEvent;
+
+        protected override bool OnStarting()
+        {
+            // BaseEbpfSensor attaches the primary sched_process_fork tracepoint program.
+            // Attach clone/vfork syscall tracepoints too for best-effort clone_flags.
+            try
+            {
+                var extraSections = new[]
+                {
+                    "tracepoint/syscalls/sys_enter_clone",
+                    "tracepoint/syscalls/sys_enter_vfork",
+                };
+
+                foreach (var section in extraSections)
+                {
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_title(BpfObject, section);
+                    if (prog == IntPtr.Zero)
+                    {
+                        WintapLogger.Log.Append($"{SensorName} program section '{section}' not found", LogLevel.Debug);
+                        continue;
+                    }
+
+                    IntPtr link = LibBpf.bpf_program__attach(prog);
+                    if (link == IntPtr.Zero)
+                    {
+                        WintapLogger.Log.Append($"{SensorName} failed to attach section '{section}'", LogLevel.Warn);
+                        continue;
+                    }
+
+                    _additionalLinks.Add(link);
+                    WintapLogger.Log.Append($"{SensorName} attached '{section}'", LogLevel.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"{SensorName} error attaching clone/vfork: {ex.Message}", LogLevel.Warn);
+            }
+
+            return true;
+        }
+
+        protected override void OnStopping()
+        {
+            foreach (var link in _additionalLinks)
+            {
+                try
+                {
+                    if (link != IntPtr.Zero)
+                        LibBpf.bpf_link__destroy(link);
+                }
+                catch { }
+            }
+            _additionalLinks.Clear();
+        }
 
         /// <summary>
         /// Resolves /proc symlinks to actual executable paths
