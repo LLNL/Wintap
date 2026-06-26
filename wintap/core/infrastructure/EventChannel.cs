@@ -322,21 +322,44 @@ namespace gov.llnl.wintap.core.infrastructure
                                         streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
                                     }
                                      else
-                                     {
-                                        if (_loggedMissingParentPid.TryAdd(streamedEvent.Process.ParentPID, 0))
-                                        {
-                                            WintapLogger.Log.Append(
-                                                $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
-                                                LogLevel.Warn);
-                                        }
+                                      {
+                                         if (_loggedMissingParentPid.TryAdd(streamedEvent.Process.ParentPID, 0))
+                                         {
+                                             // Best-effort: if the parent wasn't registered (ordering/rundown gaps),
+                                             // try to derive a stable ParentPidHash from /proc start time on Linux.
+                                             // This keeps parent lineage usable even when we missed the parent's
+                                             // process event.
+                                             string? fallbackParentPidHash = null;
+                                             try
+                                             {
+                                                 fallbackParentPidHash = _processResolver?.GetPidHash(
+                                                     streamedEvent.Process.ParentPID,
+                                                     DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                                             }
+                                             catch { }
 
-                                        // Stable sentinel for unknown parent attribution.
-                                        streamedEvent.Process.ParentPidHash = UnknownPidHash.Value;
-                                        streamedEvent.Process.ParentProcessName = "Unknown";
-                                     }
-                                }
-                            }
-                        }
+                                             var level = string.IsNullOrEmpty(fallbackParentPidHash) ? LogLevel.Warn : LogLevel.Debug;
+                                             WintapLogger.Log.Append(
+                                                 $"Could not resolve parent process (childPid={streamedEvent.PID}, parentPid={streamedEvent.Process.ParentPID})",
+                                                 level);
+
+                                             if (!string.IsNullOrEmpty(fallbackParentPidHash))
+                                             {
+                                                 streamedEvent.Process.ParentPidHash = fallbackParentPidHash;
+                                                 streamedEvent.Process.ParentProcessName = "Unknown";
+                                             }
+                                         }
+
+                                         // Stable sentinel for unknown parent attribution.
+                                         if (string.IsNullOrWhiteSpace(streamedEvent.Process.ParentPidHash))
+                                         {
+                                             streamedEvent.Process.ParentPidHash = UnknownPidHash.Value;
+                                             streamedEvent.Process.ParentProcessName = "Unknown";
+                                         }
+                                      }
+                                 }
+                             }
+                         }
                         catch (Exception ex)
                         {
                             WintapLogger.Log.Append($"Could not resolve parent process for pid {streamedEvent.PID}", LogLevel.Warn);

@@ -103,6 +103,12 @@ namespace gov.llnl.wintap.platform.linux.collect
                 return;
             }
 
+            // Don't clobber an already-attributed parent hash.
+            if (!string.IsNullOrWhiteSpace(message.Process.ParentPidHash))
+            {
+                return;
+            }
+
             ProcReader.ProcessInfo parentInfo = ProcReader.ReadProcessInfo((uint)message.Process.ParentPID);
             if (!parentInfo.Exists)
             {
@@ -118,6 +124,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
             message.Process.ParentPidHash = pidHashGenerator.GenPidHash(message.Process.ParentPID, parentStartUtc.ToFileTimeUtc());
             message.Process.ParentProcessName = ExtractProcessName(parentInfo.ExecutablePath, parentInfo.Name);
+
+            // Breadcrumb for downstream debugging.
+            message.Process.Arguments = string.IsNullOrWhiteSpace(message.Process.Arguments)
+                ? "PARENT_HASH_SRC=proc"
+                : message.Process.Arguments + " PARENT_HASH_SRC=proc";
         }
 
         /// <summary>
