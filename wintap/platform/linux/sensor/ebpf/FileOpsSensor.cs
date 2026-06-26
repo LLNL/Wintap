@@ -1,12 +1,14 @@
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.core.shared.helpers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace gov.llnl.wintap.platform.linux.collect
 {
@@ -19,6 +21,16 @@ namespace gov.llnl.wintap.platform.linux.collect
         private ProcessHash _pidHashGenerator;
         private ConcurrentDictionary<int, ConcurrentDictionary<uint, string>> _fdToPath;
         private List<IntPtr> _additionalLinks;
+        private readonly string? _dataRoot;
+        private readonly string? _dataRootLower;
+
+        // Pseudo-filesystems (/sys, /proc, /dev) can generate extremely high volume,
+        // starving the serializer and destroying signal quality. We filter them and
+        // track per-prefix drop counts for visibility.
+        private long _droppedSys;
+        private long _droppedProc;
+        private long _droppedDev;
+        private long _nextPseudoDropLogTickMs;
 
         protected override string BpfObjectFileName => "file_ops_tracer.bpf.o";
         protected override string[] FallbackBpfObjectFileNames => new[] { "file_ops_tracepoint.bpf.o" };
@@ -30,6 +42,19 @@ namespace gov.llnl.wintap.platform.linux.collect
             _pidHashGenerator = new ProcessHash();
             _fdToPath = new ConcurrentDictionary<int, ConcurrentDictionary<uint, string>>();
             _additionalLinks = new List<IntPtr>();
+
+            try
+            {
+                _dataRoot = ConfigManager.GetValue<string>("WINTAP_DATA_ROOT");
+                _dataRootLower = string.IsNullOrWhiteSpace(_dataRoot) ? null : _dataRoot.Trim().ToLowerInvariant();
+            }
+            catch
+            {
+                _dataRoot = null;
+                _dataRootLower = null;
+            }
+
+            _nextPseudoDropLogTickMs = Environment.TickCount64 + 60_000;
         }
 
         public override bool Start()
@@ -43,11 +68,18 @@ namespace gov.llnl.wintap.platform.linux.collect
             {
                 var programNames = new[]
                 {
-                    "trace_read_enter",
-                    "trace_write_enter",
-                    "trace_close",
-                    "trace_mmap",
-                    "trace_unlinkat"
+                    // Support both openat(2) and legacy open(2) paths.
+                    // Program names in libbpf are limited to 15 chars (BPF_OBJ_NAME_LEN-1);
+                    // keep these short so lookups work reliably across distros.
+                    "t_openat_ent",
+                    "t_open_ent",
+                    "t_open_exit",
+                    "t_read_ent",
+                    "t_write_ent",
+                    "t_close",
+                    "t_mmap",
+                    "t_unlinkat",
+                    "t_unlink",
                 };
 
                 foreach (var progName in programNames)
@@ -103,9 +135,38 @@ namespace gov.llnl.wintap.platform.linux.collect
                 // Skip if still no path
                 if (string.IsNullOrEmpty(filePath))
                     return 0;
+
+                filePath = NormalizeFilePath(filePath);
+
+                // Drop pseudo-filesystem activity early; these are high-volume and
+                // rarely useful for host telemetry, and they can overwhelm the pipeline.
+                if (IsPseudoPath(filePath, out PseudoPathBucket bucket))
+                {
+                    CountPseudoDrop(bucket);
+                    MaybeLogPseudoDrops();
+                    return 0;
+                }
+
+                // Periodic visibility into pseudo-path drops even when we didn't
+                // hit a pseudo-path on this specific event.
+                MaybeLogPseudoDrops();
+
+                // Avoid self-feedback and noise from our own data root. This can
+                // overwhelm the serializer and destroy signal quality.
+                if (!string.IsNullOrEmpty(_dataRootLower))
+                {
+                    // Compare on the normalized lowercase path.
+                    if (filePath.StartsWith(_dataRootLower, StringComparison.Ordinal))
+                        return 0;
+                }
                 
                 // Skip .etl files (feedback loop prevention)
                 if (filePath.EndsWith(".etl"))
+                    return 0;
+
+                // Skip parquet writes as well; these are high-volume and not
+                // interesting for host telemetry.
+                if (filePath.EndsWith(".parquet") || filePath.EndsWith(".parquet.active"))
                     return 0;
 
                 // Map eBPF op_type to ActivityType
@@ -142,7 +203,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                 
                 message.File = new WintapMessage.FileActivityObject
                 {
-                    Path = filePath.ToLower(),
+                    Path = filePath,
                     BytesRequested = (int)evt.Bytes,
                     PID = pid
                 };
@@ -160,6 +221,88 @@ namespace gov.llnl.wintap.platform.linux.collect
                 WintapLogger.Log.Append($"{SensorName} event handler error: {ex.Message}", LogLevel.Error);
                 return -1;
             }
+        }
+
+        private enum PseudoPathBucket
+        {
+            Sys,
+            Proc,
+            Dev,
+        }
+
+        private static bool IsPseudoPath(string normalizedLowerPath, out PseudoPathBucket bucket)
+        {
+            // normalizedLowerPath is expected to be already lowercased.
+            if (string.IsNullOrEmpty(normalizedLowerPath))
+            {
+                bucket = PseudoPathBucket.Proc;
+                return false;
+            }
+
+            // Keep comparisons simple and cheap; these paths are extremely common.
+            if (normalizedLowerPath == "/sys" || normalizedLowerPath.StartsWith("/sys/", StringComparison.Ordinal))
+            {
+                bucket = PseudoPathBucket.Sys;
+                return true;
+            }
+            if (normalizedLowerPath == "/proc" || normalizedLowerPath.StartsWith("/proc/", StringComparison.Ordinal))
+            {
+                bucket = PseudoPathBucket.Proc;
+                return true;
+            }
+            if (normalizedLowerPath == "/dev" || normalizedLowerPath.StartsWith("/dev/", StringComparison.Ordinal))
+            {
+                bucket = PseudoPathBucket.Dev;
+                return true;
+            }
+
+            bucket = PseudoPathBucket.Proc;
+            return false;
+        }
+
+        private void CountPseudoDrop(PseudoPathBucket bucket)
+        {
+            switch (bucket)
+            {
+                case PseudoPathBucket.Sys:
+                    Interlocked.Increment(ref _droppedSys);
+                    break;
+                case PseudoPathBucket.Proc:
+                    Interlocked.Increment(ref _droppedProc);
+                    break;
+                case PseudoPathBucket.Dev:
+                    Interlocked.Increment(ref _droppedDev);
+                    break;
+            }
+        }
+
+        private void MaybeLogPseudoDrops()
+        {
+            long now = Environment.TickCount64;
+            long next = Interlocked.Read(ref _nextPseudoDropLogTickMs);
+            if (now < next)
+            {
+                return;
+            }
+
+            // Win the race to log for this interval.
+            if (Interlocked.CompareExchange(ref _nextPseudoDropLogTickMs, now + 60_000, next) != next)
+            {
+                return;
+            }
+
+            long sys = Interlocked.Exchange(ref _droppedSys, 0);
+            long proc = Interlocked.Exchange(ref _droppedProc, 0);
+            long dev = Interlocked.Exchange(ref _droppedDev, 0);
+            long total = sys + proc + dev;
+            if (total <= 0)
+            {
+                return;
+            }
+
+            WintapLogger.Log.Append(
+                $"{SensorName} filtered pseudo-path file events (last ~60s): /sys={sys} /proc={proc} /dev={dev} total={total}",
+                LogLevel.Info);
         }
 
         private void StoreFdPath(int pid, uint fd, string path)
@@ -187,6 +330,24 @@ namespace gov.llnl.wintap.platform.linux.collect
             catch { }
             
             return "";
+        }
+
+        private static string NormalizeFilePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return "";
+
+            string p = path.Trim();
+
+            // /proc/<pid>/fd/<n> targets often include " (deleted)"; strip to
+            // keep stable matching for short-lived temp files.
+            const string deletedSuffix = " (deleted)";
+            if (p.EndsWith(deletedSuffix, StringComparison.Ordinal))
+            {
+                p = p.Substring(0, p.Length - deletedSuffix.Length);
+            }
+
+            return p.ToLowerInvariant();
         }
 
         private void RemoveFdPath(int pid, uint fd)
