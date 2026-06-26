@@ -140,41 +140,49 @@ namespace gov.llnl.wintap.platform.linux.collect
             try
             {
                 // BaseEbpfSensor attaches only the primary program (BpfProgramName).
-                // For network we need the rest of the kprobe/tracepoint programs too.
-                // Instead of naming them (libbpf/kernel name truncation), iterate and
-                // attach all remaining programs in the object.
-                int attached = 0;
-                int skipped = 0;
-                IntPtr prev = IntPtr.Zero;
-                while (true)
+                // For network we also need additional tracepoints/kprobes/kretprobes.
+                // Do NOT rely on bpf_program__name: it is truncated on older libbpf
+                // versions and can cause ambiguous lookups. Instead attach by section
+                // title (SEC("...") string), which remains unique.
+                var sections = new[]
                 {
-                    IntPtr prog = LibBpf.bpf_object__next_program(BpfObject, prev);
+                    // syscall tracepoints
+                    "tracepoint/syscalls/sys_enter_sendto",
+                    "tracepoint/syscalls/sys_enter_recvfrom",
+                    "tracepoint/syscalls/sys_exit_recvfrom",
+
+                    // TCP lifecycle + send/recv
+                    "kprobe/tcp_v4_connect",
+                    "kretprobe/tcp_v4_connect",
+                    "kprobe/tcp_v6_connect",
+                    "kretprobe/tcp_v6_connect",
+                    "kprobe/tcp_connect",
+                    "kretprobe/tcp_connect",
+                    "kprobe/tcp_close",
+                    "kretprobe/inet_csk_accept",
+                    "kprobe/tcp_sendmsg",
+                    "kprobe/tcp_recvmsg",
+
+                    // UDP send/recv (connected + recv peer tuple)
+                    "kprobe/udp_sendmsg",
+                    "kprobe/udp_recvmsg",
+                    "kretprobe/udp_recvmsg",
+                };
+
+                int attached = 0;
+                foreach (var section in sections)
+                {
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_title(BpfObject, section);
                     if (prog == IntPtr.Zero)
-                        break;
-                    prev = prog;
-
-                    string name;
-                    try
                     {
-                        name = Marshal.PtrToStringAnsi(LibBpf.bpf_program__name(prog)) ?? "";
-                    }
-                    catch
-                    {
-                        name = "";
-                    }
-
-                    // Skip the primary program already attached by BaseEbpfSensor.
-                    if (!string.IsNullOrEmpty(name) && string.Equals(name, BpfProgramName, StringComparison.Ordinal))
-                    {
-                        skipped++;
+                        WintapLogger.Log.Append($"{SensorName} program section '{section}' not found", LogLevel.Debug);
                         continue;
                     }
 
                     IntPtr link = LibBpf.bpf_program__attach(prog);
                     if (link == IntPtr.Zero)
                     {
-                        // Some programs may not be attachable on a given kernel; don't fail the sensor.
-                        skipped++;
+                        WintapLogger.Log.Append($"{SensorName} failed to attach section '{section}'", LogLevel.Warn);
                         continue;
                     }
 
@@ -182,7 +190,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                     attached++;
                 }
 
-                WintapLogger.Log.Append($"{SensorName} attached {attached} additional network programs (skipped={skipped})", LogLevel.Info);
+                WintapLogger.Log.Append($"{SensorName} attached {attached} additional network programs", LogLevel.Info);
                 return true;
             }
             catch (Exception ex)

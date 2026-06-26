@@ -59,12 +59,11 @@ namespace gov.llnl.wintap.platform.linux.collect
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr bpf_object__find_program_by_name(IntPtr obj, string name);
 
-        // Iterate programs in an object. Pass IntPtr.Zero to get the first program.
+        // Find a program by its section title (SEC("...") string). This is more
+        // stable than bpf_program__name() on older libbpf versions where program
+        // names are truncated and iteration APIs may not exist.
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern IntPtr bpf_object__next_program(IntPtr obj, IntPtr prev);
-
-        [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern IntPtr bpf_program__name(IntPtr prog);
+        public static extern IntPtr bpf_object__find_program_by_title(IntPtr obj, string title);
 
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr bpf_program__attach(IntPtr prog);
