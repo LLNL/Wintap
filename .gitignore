@@ -356,3 +356,10 @@ wintap/platform/linux/sensor/ebpf/tracers/*.bpf.o
 /documentation/instructions/workbench-on-linux.md
 /wintap/mcp/libduckdb.so
 /wintap/mcp/wintap_mcp_server
+
+# Local AI dev methodology (Architect/Engineer/Developer) — kept per-developer,
+# not shared, so personal wiki/agent paths never collide on pull.
+/CLAUDE.md
+/.claude/agents/
+/*-wiki/
+/developer_docs/
