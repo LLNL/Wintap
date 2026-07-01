@@ -134,6 +134,8 @@ Updated S3 behavior:
   - fallback alias `Endpoint`
 - Supports `RegionEndpoint` for standard AWS regions and as `AuthenticationRegion` when `ServiceURL` is used.
 - Supports `ForcePathStyle` for MinIO/path-style S3-compatible deployments.
+
+Practical tip (S3-compatible/on-prem): if you see DNS errors that look like `Name or service not known (<bucket>.<host>:<port>)`, the SDK is trying virtual-hosted-style bucket addressing. Set `ForcePathStyle` to `"true"` so requests go to `http(s)://<host>:<port>/<bucket>/<key>` instead.
 - Uses `client?.Dispose()` and nulls the client in `PostUpload()`.
 - Calls `updateSessionStats()` on successful upload.
 

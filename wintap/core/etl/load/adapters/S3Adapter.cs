@@ -231,9 +231,31 @@ namespace gov.llnl.wintap.core.etl.load.adapters
                 WintapLogger.Log.Append("Using S3 region endpoint: " + regionEndpoint, LogLevel.Info);
             }
 
-            if (bool.TryParse(getParameter(parameters, "ForcePathStyle"), out bool forcePathStyle))
+            // S3-compatible/on-prem endpoints often do not have wildcard DNS for virtual-host bucket addressing.
+            // If ForcePathStyle isn't explicitly set and this isn't an AWS host, default to path-style to avoid
+            // hostname lookups like: <bucket>.<host>.
+            string forcePathStyleRaw = getParameter(parameters, "ForcePathStyle");
+            if (bool.TryParse(forcePathStyleRaw, out bool forcePathStyle))
             {
                 config.ForcePathStyle = forcePathStyle;
+                WintapLogger.Log.Append("S3 ForcePathStyle: " + config.ForcePathStyle, LogLevel.Info);
+            }
+            else if (string.IsNullOrWhiteSpace(forcePathStyleRaw) && !string.IsNullOrWhiteSpace(serviceUrl))
+            {
+                try
+                {
+                    var uri = new Uri(serviceUrl);
+                    bool isAwsHost = uri.Host.EndsWith("amazonaws.com", StringComparison.OrdinalIgnoreCase);
+                    if (!isAwsHost)
+                    {
+                        config.ForcePathStyle = true;
+                        WintapLogger.Log.Append("S3 ForcePathStyle defaulted to true for non-AWS ServiceURL host: " + uri.Host, LogLevel.Info);
+                    }
+                }
+                catch
+                {
+                    // Keep SDK default behavior if the URL can't be parsed.
+                }
             }
 
             return config;
