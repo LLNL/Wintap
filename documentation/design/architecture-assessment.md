@@ -156,10 +156,15 @@ Testability requirements
 - The contract must be testable with synthetic event sequences (no OS dependencies): ordering, PID reuse, missing starts, and mixed-source events.
 
 Contract invariants (candidate)
-- INV-001 (Non-Process attribution): after a Process Start for PID X has been observed, all subsequent non-Process events with PID X must have a non-empty `PidHash` matching the active instance, without requiring a DB query.
+> Note: INV-001..INV-005 were reworded on 2026-06-30 to be **mechanism-agnostic**
+> (asserting correctness, not prescribing a memory-first vs. DB substrate). See
+> Decisions Log (2026-06-30) — DuckDB substrate decision. Original intent is
+> preserved; only the substrate/"without a DB query" prescription was removed so
+> that Stage 1 contract tests stay valid regardless of substrate.
+- INV-001 (Non-Process attribution): after a Process Start for PID X has been observed, all subsequent non-Process events with PID X must have a non-empty `PidHash` matching the active instance.
 - INV-002 (Start/Stop identity): Process Start and Process Stop events for the same process instance must share the same `PidHash`.
 - INV-003 (PID reuse): if PID X is reused after a Stop, the new Process Start must produce a different `PidHash` than the prior instance.
-- INV-004 (Unattributed behavior): if attribution fails (no active instance and no cold fallback), events must be marked unattributed deterministically (sentinel identity) and must not crash downstream ETL.
+- INV-004 (Unattributed behavior): if attribution cannot resolve an event to an active instance, the event must be marked unattributed deterministically (sentinel identity) and must not crash downstream ETL.
 - INV-005 (Ordering tolerance): out-of-order arrival (non-Process events preceding the Process Start) must not crash; attribution may be delayed, best-effort, or marked unattributed, but behavior must be deterministic and observable.
 
 ### Candidate minimal interface boundaries (no code changes yet)
@@ -425,9 +430,105 @@ Validation:
 ## Decisions Log (Append-Only)
 (entries below)
 
+### DEC-001 - PidHash ownership: Core owns generation (resolves OQ-001)
+Type: Decision
+Date: 2026-06-30
+Status: Accepted
+Resolves: OQ-001; relates to AA-004, AA-009, AA-010
+Decision:
+- Core owns derivation of `PidHash` (and `ParentPidHash`). Sensors do NOT supply
+  `PidHash` or `ParentPidHash`. Core derives both from the canonical identity key.
+Why:
+- Two-team model: requiring every platform sensor to implement hashing
+  consistently is error-prone and a chronic integration risk (AA-009 shows
+  producers already compute it from inconsistent timestamps).
+- Hashing rules (`ProcessHash`, which mixes in host-level identity inputs) belong
+  in exactly one place if they are part of the event contract.
+Tradeoffs / Consequences:
+- Sensors get simpler: they describe what they observed, not derived identity.
+- Core takes on the responsibility (and the testable seam) for identity
+  derivation, including backfilling `ParentPidHash` (see DEC-003).
+- Any sensor-provided `PidHash`/`ParentPidHash` is ignored/overridden by core.
+
+### DEC-002 - Minimal sensor-supplied field set (resolves OQ-002)
+Type: Decision
+Date: 2026-06-30
+Status: Accepted
+Resolves: OQ-002; relates to AA-004, AA-010, DEC-001
+Decision:
+- Sensors supply only attributes knowable at event time, expressed as a single
+  flat list applying to all activity types. A field is simply absent when not
+  knowable for a given event/platform (no hard per-activity-type requirement):
+  `EventTime`, `ReceiveTime`, `PID`, `ProcessName`, `ProcessPath`, `ActivityType`,
+  `ParentPID`, `CommandLine`, `Arguments`, `User`, `MD5`, `SHA2`.
+- The list deliberately excludes `PidHash` and `ParentPidHash` (consistent with
+  DEC-001 / OQ-001 — core derives those).
+Why:
+- A flat "supply what you know" list is implementable independently by platform
+  teams and is straightforward to assert in contract tests.
+- It is viable precisely because core backfills Stop/identity fields from a
+  durable store (see DEC-003), so a sensor need not carry fields it cannot know
+  at event time (e.g., original start time on a Stop event).
+Tradeoffs / Consequences:
+- Lower per-event sensor burden and a clearer contract surface.
+- Shifts the burden of completeness (identity + parent + Stop reconciliation)
+  onto core's backfill logic, which must be correct and tested.
+
+### DEC-003 - EventTime semantics / Stop-event identity via durable-store backfill (resolves OQ-004)
+Type: Decision
+Date: 2026-06-30
+Status: Accepted
+Resolves: OQ-004; relates to AA-008, AA-009, DEC-001, DEC-002
+Decision:
+- Canonical identity key for a process instance remains `(PID, start_time)`, and
+  core owns `PidHash` (DEC-001).
+- A Stop event, which may not carry the original process start time, resolves its
+  identity and backfills required fields (including `ParentPidHash`) from a
+  durable store rather than carrying them on the event.
+Why:
+- Producers vary in what timestamp they can attach to a Stop (AA-008, AA-009);
+  forcing every Stop to carry start time is not achievable cross-platform.
+- Durable-store backfill is exactly what makes the flat OQ-002 field list (DEC-002)
+  workable: core reconstitutes identity/parent fields for Stop and identity
+  resolution from the store.
+Tradeoffs / Consequences:
+- Start and Stop for the same instance share one `PidHash` (satisfies INV-002)
+  because both resolve through the same durable record.
+- Core depends on the durable store being authoritative and available for
+  identity resolution; the choice of substrate is settled in DEC-004.
+
+### DEC-004 - Durable substrate is DuckDB, used for BOTH durable persistence AND hot-path lookups, to start
+Type: Decision
+Date: 2026-06-30
+Status: Accepted
+Relates to: AA-006, AA-012, OQ-003, OQ-005; supports DEC-003
+Decision:
+- Start with DuckDB as the single substrate for everything — both durable
+  persistence and non-Process hot-path attribution lookups. DuckDB is already the
+  current `ProcessResolver` implementation.
+- Let testing/measurement dictate whether a more complex design is warranted.
+- The memory-first cache described in AA-006 / OQ-003 / OQ-005 / Stage 2 is
+  recorded as a **DEFERRED OPTIMIZATION** — NOT adopted now. It is revisited only
+  if testing reveals a throughput/latency ceiling.
+Why:
+- Use the simplest thing that already exists and works; avoid premature
+  optimization and the added complexity/coupling of a second (in-memory) identity
+  store before measurement justifies it.
+- Keeping one substrate keeps Start/Stop identity reconciliation (DEC-003) in one
+  place.
+Tradeoffs / Consequences:
+- Accepts the known per-event DB-lookup cost on the non-Process hot path (AA-006)
+  as a starting point, pending measurement.
+- The contract (INV-001..INV-005) is deliberately mechanism-agnostic so that, if
+  the memory-first optimization is later adopted, the same Stage 1 contract tests
+  remain valid without rewrite.
+- Stages 2 and 4 of the staging plan (memory-first attribution; separating
+  persistence from the hot path) are deferred, not cancelled.
+
 ## Open Questions
 
 ### OQ-001 - Who owns `PidHash` generation: sensors or core?
+> RESOLVED 2026-06-30 — Core owns `PidHash`/`ParentPidHash`. See Decisions Log DEC-001.
 Context:
 - Linux Example sensor generates `PidHash` before calling `EventChannel.Send`.
 - `ProcessHash` includes `StateManager.AgentId` and `Environment.MachineName`, implying host-level identity inputs.
@@ -443,6 +544,7 @@ Evidence:
 - `wintap/core/infrastructure/EventChannel.cs`
 
 ### OQ-002 - What is the minimal required field set for a Process event at the sensor/core boundary?
+> RESOLVED 2026-06-30 — Flat sensor-supplied field set (fields absent when unknowable), excluding `PidHash`/`ParentPidHash`. See Decisions Log DEC-002.
 Goal:
 - Define a stable contract so platform teams can implement sensors independently and tests can assert correctness.
 
@@ -465,6 +567,7 @@ Evidence:
 - `wintap/core/sensor/OSQuerySensor.cs`
 
 ### OQ-003 - How do we attribute high-volume events without DB lookups on the hot path?
+> DEFERRED 2026-06-30 — Starting with DuckDB for both persistence and hot-path lookups; memory-first attribution is a deferred optimization revisited only if measurement reveals a ceiling. See Decisions Log DEC-004.
 Context:
 - `EventChannel.Send` currently calls `ResolveProcessAtTime(pid, eventTime)` for non-Process events.
 - Some sensors (e.g., file activity) can emit thousands of events/second.
@@ -480,6 +583,7 @@ Evidence:
 - `wintap/core/infrastructure/ProcessResolver.cs` (`ResolveProcessAtTime`)
 
 ### OQ-004 - What are the semantics of `EventTime` for Process Start vs Stop across platforms?
+> RESOLVED 2026-06-30 — Stop events resolve identity and backfill required fields (incl. `ParentPidHash`) from a durable store; identity key stays `(PID, start_time)`. See Decisions Log DEC-003.
 Context:
 - `PidHash` stability appears to depend on process creation time, but some sources only provide an event timestamp (which may be stop time).
 Why it matters:
@@ -489,6 +593,7 @@ Evidence:
 - `wintap/core/sensor/OSQuerySensor.cs` (PidHash derived from parsed OSQuery timestamp for both start/stop)
 
 ### OQ-005 - What should the core in-memory attribution contract look like?
+> DEFERRED 2026-06-30 — In-memory attribution is a deferred optimization; DuckDB is the single substrate to start. See Decisions Log DEC-004.
 Goal:
 - Avoid DB lookups on hot paths while keeping correct PID reuse handling and cross-platform support.
 
