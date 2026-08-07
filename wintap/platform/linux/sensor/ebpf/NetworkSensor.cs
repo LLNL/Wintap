@@ -70,119 +70,124 @@ namespace gov.llnl.wintap.platform.linux.collect
                 WintapLogger.Log.Append($"{SensorName} failed to configure PID filter: {ex.Message}", LogLevel.Debug);
             }
 
-            // Start a small diag reporter that logs aggregated ringbuffer diag events
-            try
+            // Start a small diag reporter that logs aggregated ringbuffer diag events.
+            // This shells out/persists generic diagnostic messages, so keep it opt-in.
+            if (ConfigManager.GetValue<bool>("EnableBpfDiagMonitor"))
             {
-                _diagReporterCancel = new System.Threading.CancellationTokenSource();
-                var ct = _diagReporterCancel.Token;
-                _diagReporterThread = new System.Threading.Thread(() =>
+                try
                 {
-                    while (!ct.IsCancellationRequested)
+                    _diagReporterCancel = new System.Threading.CancellationTokenSource();
+                    var ct = _diagReporterCancel.Token;
+                    _diagReporterThread = new System.Threading.Thread(() =>
                     {
-                        try
+                        while (!ct.IsCancellationRequested)
                         {
-                            System.Threading.Thread.Sleep(10000);
-                            var s = System.Threading.Interlocked.Read(ref _diagStore);
-                            var h = System.Threading.Interlocked.Read(ref _diagHit);
-                            var m = System.Threading.Interlocked.Read(ref _diagMiss);
-                            WintapLogger.Log.Append($"NetworkSensor aggregated BPF diag (STORE/HIT/MISS) = {s}/{h}/{m}", LogLevel.Info);
+                            try
+                            {
+                                System.Threading.Thread.Sleep(10000);
+                                var s = System.Threading.Interlocked.Read(ref _diagStore);
+                                var h = System.Threading.Interlocked.Read(ref _diagHit);
+                                var m = System.Threading.Interlocked.Read(ref _diagMiss);
+                                WintapLogger.Log.Append($"NetworkSensor aggregated BPF diag (STORE/HIT/MISS) = {s}/{h}/{m}", LogLevel.Info);
 
-                            // Persist a generic message so ETL will serialize these counters
-                            try
-                            {
-                                var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
-                                var msg = new gov.llnl.wintap.collect.models.WintapMessage(DateTime.UtcNow, pid, gov.llnl.wintap.collect.models.WintapMessage.MessageTypeEnum.GenericMessage);
-                                msg.ActivityType = gov.llnl.wintap.collect.models.WintapMessage.ActivityTypeEnum.Other;
-                                msg.GenericMessage = new gov.llnl.wintap.collect.models.WintapMessage.GenericMessageObject
+                                // Persist a generic message so ETL will serialize these counters
+                                try
                                 {
-                                    ProviderId = "BPFDiag",
-                                    ProviderName = "BPFDiag",
-                                    EventName = "DiagCounters",
-                                    PID = pid,
-                                    EventTime = DateTime.UtcNow,
-                                    Payload = $"STORE={s};HIT={h};MISS={m}"
-                                };
-                                gov.llnl.wintap.core.infrastructure.EventChannel.Send(msg);
-                            }
-                            catch (Exception ex)
-                            {
-                                WintapLogger.Log.Append($"Failed to persist BPF diag counters: {ex.Message}", LogLevel.Debug);
-                            }
-                            // Also append a local CSV for immediate DuckDB queries and persistence
-                            try
-                            {
-                                var diagDir = System.IO.Path.Combine("/var/lib/lintap", "diag");
-                                System.IO.Directory.CreateDirectory(diagDir);
-                                var csvPath = System.IO.Path.Combine(diagDir, "diag_counters.csv");
-                                bool writeHeader = !System.IO.File.Exists(csvPath);
-                                using (var sw = new System.IO.StreamWriter(csvPath, true))
+                                    var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                                    var msg = new gov.llnl.wintap.collect.models.WintapMessage(DateTime.UtcNow, pid, gov.llnl.wintap.collect.models.WintapMessage.MessageTypeEnum.GenericMessage);
+                                    msg.ActivityType = gov.llnl.wintap.collect.models.WintapMessage.ActivityTypeEnum.Other;
+                                    msg.GenericMessage = new gov.llnl.wintap.collect.models.WintapMessage.GenericMessageObject
+                                    {
+                                        ProviderId = "BPFDiag",
+                                        ProviderName = "BPFDiag",
+                                        EventName = "DiagCounters",
+                                        PID = pid,
+                                        EventTime = DateTime.UtcNow,
+                                        Payload = $"STORE={s};HIT={h};MISS={m}"
+                                    };
+                                    gov.llnl.wintap.core.infrastructure.EventChannel.Send(msg);
+                                }
+                                catch (Exception ex)
                                 {
-                                    if (writeHeader)
-                                        sw.WriteLine("TimestampUtc,Store,Hit,Miss");
-                                    sw.WriteLine($"{DateTime.UtcNow:o},{s},{h},{m}");
+                                    WintapLogger.Log.Append($"Failed to persist BPF diag counters: {ex.Message}", LogLevel.Debug);
+                                }
+                                // Also append a local CSV for immediate DuckDB queries and persistence
+                                try
+                                {
+                                    var diagDir = System.IO.Path.Combine("/var/lib/lintap", "diag");
+                                    System.IO.Directory.CreateDirectory(diagDir);
+                                    var csvPath = System.IO.Path.Combine(diagDir, "diag_counters.csv");
+                                    bool writeHeader = !System.IO.File.Exists(csvPath);
+                                    using (var sw = new System.IO.StreamWriter(csvPath, true))
+                                    {
+                                        if (writeHeader)
+                                            sw.WriteLine("TimestampUtc,Store,Hit,Miss");
+                                        sw.WriteLine($"{DateTime.UtcNow:o},{s},{h},{m}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    WintapLogger.Log.Append($"Failed to write local diag CSV: {ex.Message}", LogLevel.Debug);
                                 }
                             }
-                            catch (Exception ex)
-                            {
-                                WintapLogger.Log.Append($"Failed to write local diag CSV: {ex.Message}", LogLevel.Debug);
-                            }
+                            catch { }
                         }
-                        catch { }
-                    }
-                }) { IsBackground = true };
-                _diagReporterThread.Start();
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Failed to start NetworkSensor diag reporter: {ex.Message}", LogLevel.Debug);
+                    }) { IsBackground = true };
+                    _diagReporterThread.Start();
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Failed to start NetworkSensor diag reporter: {ex.Message}", LogLevel.Debug);
+                }
             }
 
             try
             {
                 // BaseEbpfSensor attaches only the primary program (BpfProgramName).
                 // For network we also need additional tracepoints/kprobes/kretprobes.
-                // Do NOT rely on bpf_program__name: it is truncated on older libbpf
-                // versions and can cause ambiguous lookups. Instead attach by section
-                // title (SEC("...") string), which remains unique.
-                var sections = new[]
+                // Attach by BPF function name for compatibility with libbpf builds
+                // that do not export bpf_object__find_program_by_title.
+                var programs = new[]
                 {
                     // syscall tracepoints
-                    "tracepoint/syscalls/sys_enter_sendto",
-                    "tracepoint/syscalls/sys_enter_recvfrom",
-                    "tracepoint/syscalls/sys_exit_recvfrom",
+                    "trace_sendto",
+                    "trace_recvfrom",
+                    "trace_recvfrom_exit",
+                    "trace_connect",
+                    "trace_accept",
 
                     // TCP lifecycle + send/recv
-                    "kprobe/tcp_v4_connect",
-                    "kretprobe/tcp_v4_connect",
-                    "kprobe/tcp_v6_connect",
-                    "kretprobe/tcp_v6_connect",
-                    "kprobe/tcp_connect",
-                    "kretprobe/tcp_connect",
-                    "kprobe/tcp_close",
-                    "kretprobe/inet_csk_accept",
-                    "kprobe/tcp_sendmsg",
-                    "kprobe/tcp_recvmsg",
+                    "kprobe__tcp_v4_connect",
+                    "kretprobe__tcp_v4_connect",
+                    "kprobe__tcp_v6_connect",
+                    "kretprobe__tcp_v6_connect",
+                    "kprobe__tcp_connect",
+                    "kretprobe__tcp_connect",
+                    "kprobe__tcp_close",
+                    "kretprobe__inet_csk_accept",
+                    "kprobe__tcp_sendmsg",
+                    "kprobe__tcp_recvmsg",
 
                     // UDP send/recv (connected + recv peer tuple)
-                    "kprobe/udp_sendmsg",
-                    "kprobe/udp_recvmsg",
-                    "kretprobe/udp_recvmsg",
+                    "kprobe__udp_sendmsg",
+                    "kprobe__udp_recvmsg",
+                    "kretprobe__udp_recvmsg",
                 };
 
                 int attached = 0;
-                foreach (var section in sections)
+                foreach (var programName in programs)
                 {
-                    IntPtr prog = LibBpf.bpf_object__find_program_by_title(BpfObject, section);
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, programName);
                     if (prog == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} program section '{section}' not found", LogLevel.Debug);
+                        WintapLogger.Log.Append($"{SensorName} program '{programName}' not found", LogLevel.Debug);
                         continue;
                     }
 
                     IntPtr link = LibBpf.bpf_program__attach(prog);
                     if (link == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} failed to attach section '{section}'", LogLevel.Warn);
+                        WintapLogger.Log.Append($"{SensorName} failed to attach program '{programName}'", LogLevel.Warn);
                         continue;
                     }
 
