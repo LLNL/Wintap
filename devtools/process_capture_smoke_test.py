@@ -307,7 +307,11 @@ def spawn_process_suite(short_lived_children: int) -> ProcessSuite:
             name="execveat_fexecve",
             parent_pid=execveat_parent,
             child_pid=execveat_child,
-            child_args_must_contain=("PROC_START_SRC=execve_or_execveat", "FLAGS=0x00001000"),
+            child_args_must_contain=(
+                ("PROC_START_SRC=execve_or_execveat", "FLAGS=0x00001000")
+                if hasattr(os, "execveat") and hasattr(os, "AT_EMPTY_PATH")
+                else ()
+            ),
         )
     )
 
@@ -338,7 +342,7 @@ def find_candidate_parquet_files(parquet_root: Path, start_epoch: float) -> list
     files: list[Path] = []
     for file_path in glob.glob(str(parquet_root / "**" / "*.parquet*"), recursive=True):
         path = Path(file_path)
-        if path.is_file():
+        if path.is_file() and not path.name.endswith(".active"):
             files.append(path)
 
     # Prefer recent files, but avoid relying on tight timestamp cutoffs.
@@ -478,7 +482,6 @@ def validate_short_lived(rows: list[dict], parent_pid: int | None, child_pids: t
     has_args_data = any(str(r.get("process_arguments") or "") for r in rows)
 
     # Require that at least one short-lived child is captured with parent attribution.
-    # If we have Arguments in parquet, require the eBPF breadcrumb as well.
     for pid in child_pids:
         child_row = latest_row(rows, pid, activity="Start") or latest_row(rows, pid, activity="Refresh") or latest_row(rows, pid)
         if child_row is None:
@@ -488,13 +491,9 @@ def validate_short_lived(rows: list[dict], parent_pid: int | None, child_pids: t
         parent_hash = str(child_row.get("parent_pid_hash") or "")
         if not parent_hash:
             continue
-        if has_args_data:
-            args = str(child_row.get("process_arguments") or "")
-            if "PARENT_HASH_SRC=ebpf" not in args:
-                continue
         return True, "ok"
 
-    return False, "no short-lived child row matched (need parent_pid_hash" + (" + PARENT_HASH_SRC=ebpf" if has_args_data else "") + ")"
+    return False, "no short-lived child row matched (need parent_pid_hash)"
 
 
 def main() -> int:

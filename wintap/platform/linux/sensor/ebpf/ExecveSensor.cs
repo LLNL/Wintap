@@ -13,8 +13,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 {
     internal class ExecveSensor : BaseEbpfSensor
     {
+        private const int _SC_CLK_TCK = 2;
         private ProcessHash _pidHashGenerator;
         private readonly System.Collections.Generic.List<IntPtr> _additionalLinks = new System.Collections.Generic.List<IntPtr>();
+        private static DateTimeOffset? _cachedBootUtc;
+        private static long? _cachedClockTicksPerSecond;
 
         protected override string BpfObjectFileName => "execve_tracer.bpf.o";
         protected override string[] FallbackBpfObjectFileNames => new[] { "execve_tracepoint.bpf.o" };
@@ -34,37 +37,37 @@ namespace gov.llnl.wintap.platform.linux.collect
             // Attach execveat as well to improve coverage for callers that use execveat.
             try
             {
-                var extraSections = new[]
+                var extraPrograms = new[]
                 {
-                    "tracepoint/syscalls/sys_enter_execveat",
-                    "tracepoint/sched/sched_process_exec",
+                    "trace_execveat_entry",
+                    "trace_sched_process_exec",
                 };
 
-                foreach (var section in extraSections)
+                foreach (var programName in extraPrograms)
                 {
-                    IntPtr prog = LibBpf.bpf_object__find_program_by_title(BpfObject, section);
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, programName);
                     if (prog == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} program section '{section}' not found", LogLevel.Debug);
+                        WintapLogger.Log.Append($"{SensorName} program '{programName}' not found", LogLevel.Debug);
                         continue;
                     }
 
                     IntPtr link = LibBpf.bpf_program__attach(prog);
                     if (link == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} failed to attach section '{section}'", LogLevel.Warn);
+                        WintapLogger.Log.Append($"{SensorName} failed to attach program '{programName}'", LogLevel.Warn);
                         continue;
                     }
 
                     _additionalLinks.Add(link);
-                    WintapLogger.Log.Append($"{SensorName} attached '{section}'", LogLevel.Info);
+                    WintapLogger.Log.Append($"{SensorName} attached '{programName}'", LogLevel.Info);
                 }
 
                 return true;
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append($"{SensorName} error attaching execveat: {ex.Message}", LogLevel.Warn);
+                WintapLogger.Log.Append($"{SensorName} error attaching extra exec programs: {ex.Message}", LogLevel.Warn);
                 return true; // best-effort: keep execve working
             }
         }
@@ -126,17 +129,38 @@ namespace gov.llnl.wintap.platform.linux.collect
                 if (!OperatingSystem.IsLinux())
                     return null;
 
-                string uptimeText = File.ReadAllText("/proc/uptime");
-                string uptimeFirst = uptimeText.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                if (!double.TryParse(uptimeFirst, NumberStyles.Float, CultureInfo.InvariantCulture, out var uptimeSeconds))
-                    return null;
+                if (_cachedBootUtc != null)
+                    return _cachedBootUtc;
 
-                return DateTimeOffset.UtcNow - TimeSpan.FromSeconds(uptimeSeconds);
+                foreach (string line in File.ReadLines("/proc/stat"))
+                {
+                    if (!line.StartsWith("btime ", StringComparison.Ordinal))
+                        continue;
+
+                    string value = line.Substring("btime ".Length).Trim();
+                    if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long bootUnixSeconds))
+                        return null;
+
+                    _cachedBootUtc = DateTimeOffset.FromUnixTimeSeconds(bootUnixSeconds);
+                    return _cachedBootUtc;
+                }
+
+                return null;
             }
             catch
             {
                 return null;
             }
+        }
+
+        private static long GetClockTicksPerSecond()
+        {
+            if (_cachedClockTicksPerSecond != null)
+                return _cachedClockTicksPerSecond.Value;
+
+            long ticks = sysconf(_SC_CLK_TCK);
+            _cachedClockTicksPerSecond = ticks > 0 ? ticks : 100;
+            return _cachedClockTicksPerSecond.Value;
         }
 
         private static long? TryConvertBootNsToFileTimeUtc(ulong startNs)
@@ -147,7 +171,12 @@ namespace gov.llnl.wintap.platform.linux.collect
 
             try
             {
-                var startUtc = bootUtc.Value + TimeSpan.FromSeconds(startNs / 1_000_000_000.0);
+                // /proc/<pid>/stat exposes start time in clock ticks after boot.
+                // Round eBPF nanoseconds to the same basis so parent hashes match
+                // ProcessRundown/ProcReader-derived PidHash values.
+                long ticksPerSecond = GetClockTicksPerSecond();
+                ulong startTicks = (startNs * (ulong)ticksPerSecond) / 1_000_000_000UL;
+                var startUtc = bootUtc.Value + TimeSpan.FromSeconds(startTicks / (double)ticksPerSecond);
                 return startUtc.UtcDateTime.ToFileTimeUtc();
             }
             catch
@@ -155,6 +184,9 @@ namespace gov.llnl.wintap.platform.linux.collect
                 return null;
             }
         }
+
+        [DllImport("libc")]
+        private static extern long sysconf(int name);
 
         private int HandleEvent(IntPtr ctx, IntPtr data, UIntPtr size)
         {
@@ -192,7 +224,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 // Use process start time for EventTime so PidHash is stable and matches
                 // other lifecycle events (clone/exit) and handles PID reuse correctly.
-                DateTime startUtc = procData.StartTimeUtc != default ? procData.StartTimeUtc.ToUniversalTime() : DateTime.UtcNow;
+                DateTime startUtc = procData.StartTimeUtc != default
+                    ? procData.StartTimeUtc.ToUniversalTime()
+                    : evt.StartTime != 0 && TryConvertBootNsToFileTimeUtc(evt.StartTime) is long startFileTimeUtc
+                        ? DateTime.FromFileTimeUtc(startFileTimeUtc)
+                        : DateTime.UtcNow;
 
                 var message = new WintapMessage(startUtc, (int)evt.Pid, WintapMessage.MessageTypeEnum.Process);
                 message.ActivityType = WintapMessage.ActivityTypeEnum.Start;
@@ -224,9 +260,12 @@ namespace gov.llnl.wintap.platform.linux.collect
                         : message.Process.Arguments + $" PROC_START_SRC=execve_or_execveat FLAGS=0x{evt.Flags:x8}";
                 }
 
-                // Best-effort parent attribution without /proc. We prefer the kernel-provided
-                // real_start_time (boottime ns) because it is stable even if /proc/<ppid> is
-                // gone by the time we process this event.
+                message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
+                message.ProcessName = processName;
+                ProcessSensorHelper.EnrichParentProcess(message, _pidHashGenerator);
+
+                // Best-effort parent attribution without /proc. This is a fallback for cases
+                // where the parent exits before userspace can read /proc/<ppid>.
                 if (message.Process.ParentPID > 0 && string.IsNullOrWhiteSpace(message.Process.ParentPidHash) && evt.ParentStartNs != 0)
                 {
                     var parentFileTimeUtc = TryConvertBootNsToFileTimeUtc(evt.ParentStartNs);
@@ -240,10 +279,6 @@ namespace gov.llnl.wintap.platform.linux.collect
                             : message.Process.Arguments + " PARENT_HASH_SRC=ebpf";
                     }
                 }
-
-                message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
-                message.ProcessName = processName;
-                ProcessSensorHelper.EnrichParentProcess(message, _pidHashGenerator);
 
                 EventChannel.Send(message);
                 return 0;

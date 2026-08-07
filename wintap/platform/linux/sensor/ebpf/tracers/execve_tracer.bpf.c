@@ -109,13 +109,14 @@ int trace_execve_entry(struct trace_event_raw_sys_enter_execve *ctx)
     
     // Fields filled in userspace
     struct task_struct *task = (struct task_struct *)bpf_get_current_task_btf();
+    event->start_time = BPF_CORE_READ(task, start_time);
     struct task_struct *parent = BPF_CORE_READ(task, real_parent);
     event->ppid = parent ? BPF_CORE_READ(parent, tgid) : 0;
 
-    // Capture parent comm + real_start_time for stable parent hashing without /proc.
+    // Capture parent comm + start_time for stable parent hashing without /proc.
     if (parent) {
         bpf_core_read(event->parent_comm, sizeof(event->parent_comm), &parent->comm);
-        event->parent_start_ns = BPF_CORE_READ(parent, real_start_time);
+        event->parent_start_ns = BPF_CORE_READ(parent, start_time);
     } else {
         __builtin_memset(event->parent_comm, 0, sizeof(event->parent_comm));
         event->parent_start_ns = 0;
@@ -123,7 +124,6 @@ int trace_execve_entry(struct trace_event_raw_sys_enter_execve *ctx)
     event->sid = 0;
     event->exit_code = 0;
     event->flags = 0;
-    event->start_time = 0;
     event->capabilities = 0;
     event->seccomp_mode = 0;
     
@@ -166,7 +166,7 @@ int trace_execveat_entry(struct trace_event_raw_sys_enter_execveat *ctx)
 
     if (parent) {
         bpf_core_read(event->parent_comm, sizeof(event->parent_comm), &parent->comm);
-        event->parent_start_ns = BPF_CORE_READ(parent, real_start_time);
+        event->parent_start_ns = BPF_CORE_READ(parent, start_time);
     } else {
         __builtin_memset(event->parent_comm, 0, sizeof(event->parent_comm));
         event->parent_start_ns = 0;
@@ -175,10 +175,11 @@ int trace_execveat_entry(struct trace_event_raw_sys_enter_execveat *ctx)
     // Preserve the execveat flags (helps explain odd path forms in post-processing).
     event->flags = (__u32)ctx->flags;
 
+    event->start_time = BPF_CORE_READ(task, start_time);
+
     // Remaining fields are filled in userspace
     event->sid = 0;
     event->exit_code = 0;
-    event->start_time = 0;
     event->capabilities = 0;
     event->seccomp_mode = 0;
 
@@ -218,7 +219,7 @@ int trace_sched_process_exec(struct sched_process_exec_args *ctx)
 
     if (parent) {
         bpf_core_read(event->parent_comm, sizeof(event->parent_comm), &parent->comm);
-        event->parent_start_ns = BPF_CORE_READ(parent, real_start_time);
+        event->parent_start_ns = BPF_CORE_READ(parent, start_time);
     } else {
         __builtin_memset(event->parent_comm, 0, sizeof(event->parent_comm));
         event->parent_start_ns = 0;
@@ -227,7 +228,7 @@ int trace_sched_process_exec(struct sched_process_exec_args *ctx)
     event->sid = 0;
     event->exit_code = 0;
     event->flags = EXEC_EVT_FLAG_SCHED_EXEC;
-    event->start_time = 0;
+    event->start_time = BPF_CORE_READ(task, start_time);
     event->capabilities = 0;
     event->seccomp_mode = 0;
 

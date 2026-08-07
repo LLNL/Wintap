@@ -58,6 +58,7 @@
   "Network": true,
   "FileOps": true,
   "ProcessRundown": true,
+  "EnableBpfDiagMonitor": false,
   "SkipProcessResolve": false,
   "SkipParentProcessResolve": false,
   "SkipProcessRegister": false,

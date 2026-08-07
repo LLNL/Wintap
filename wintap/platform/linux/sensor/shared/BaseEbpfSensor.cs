@@ -1,5 +1,6 @@
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -174,11 +175,13 @@ namespace gov.llnl.wintap.platform.linux.collect
                 return false;
             }
 
-            // Start diagnostics monitor in background. It will look for a map named
-            // "diag_counters" and periodically log STORE/HIT/MISS counts. This is
-            // intentionally lightweight and uses bpftool to read map contents so we
-            // do not add extensive libbpf P/Invoke surface.
-            StartDiagMonitor();
+            if (ConfigManager.GetValue<bool>("EnableBpfDiagMonitor"))
+            {
+                // Start diagnostics monitor in background. It will look for a map named
+                // "diag_counters" and periodically log STORE/HIT/MISS counts. This uses
+                // bpftool and creates subprocess noise, so it is opt-in only.
+                StartDiagMonitor();
+            }
 
             return true;
         }

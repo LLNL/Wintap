@@ -234,6 +234,7 @@ namespace gov.llnl.wintap.core.shared
         public bool Network { get; set; } = true;
         public bool FileOps { get; set; } = true;
         public bool ProcessRundown { get; set; } = true;
+        public bool EnableBpfDiagMonitor { get; set; } = false;
         public bool SkipProcessResolve { get; set; } = false;
         public bool SkipParentProcessResolve { get; set; } = false;
         public bool SkipProcessRegister { get; set; } = false;

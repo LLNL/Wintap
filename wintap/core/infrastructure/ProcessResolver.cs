@@ -28,6 +28,15 @@ namespace gov.llnl.wintap.core.infrastructure
         private DuckDBConnection connection;
         private readonly object _dbLock = new object();
         private string agentId;
+        private readonly Dictionary<int, List<PendingExit>> _pendingExits = new Dictionary<int, List<PendingExit>>();
+
+        private struct PendingExit
+        {
+            public DateTime ExitTime;
+            public long ExitCode;
+            public string ParentPidHash;
+            public int ParentPid;
+        }
 
         public ProcessResolver()
         {
@@ -199,32 +208,10 @@ namespace gov.llnl.wintap.core.infrastructure
                         var rows = updateCmd.ExecuteNonQuery();
                         if (rows == 0)
                         {
-                            // No matching start record; insert a minimal record so the stop isn't lost.
-                            var insert = $@"
-                                INSERT INTO process (
-                                    pid_hash, parent_pid_hash, process_id, parent_process_id,
-                                    process_name, image_path, command_line, create_time,
-                                    exit_time, exit_code, source, user_name, md5_hash, sha2_hash
-                                ) VALUES (
-                                    '{pidHash}',
-                                    {(string.IsNullOrEmpty(proc.ParentPidHash) ? "NULL" : $"'{EscapeSql(proc.ParentPidHash)}'")},
-                                    {message.PID},
-                                    {proc.ParentPID},
-                                    '{EscapeSql(proc.Name)}',
-                                    '{EscapeSql(proc.Path)}',
-                                    '{EscapeSql(proc.CommandLine)}',
-                                    TIMESTAMP '{exitTime:yyyy-MM-dd HH:mm:ss}',
-                                    TIMESTAMP '{exitTime:yyyy-MM-dd HH:mm:ss}',
-                                    {exitCode},
-                                    'real_time',
-                                    '{EscapeSql(proc.User)}',
-                                    {(string.IsNullOrEmpty(proc.MD5) ? "NULL" : $"'{EscapeSql(proc.MD5)}'")},
-                                    {(string.IsNullOrEmpty(proc.SHA2) ? "NULL" : $"'{EscapeSql(proc.SHA2)}'")}
-                                )";
-
-                            using var insertCmd = connection.CreateCommand();
-                            insertCmd.CommandText = insert;
-                            insertCmd.ExecuteNonQuery();
+                            AddPendingExit(message.PID, exitTime, exitCode, proc.ParentPidHash, proc.ParentPID);
+                            WintapLogger.Log.Append(
+                                $"Queued unmatched Stop for PID {message.PID} {proc.Name}; no existing process row for PidHash {pidHash}",
+                                LogLevel.Debug);
                         }
 
                         return;
@@ -280,6 +267,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 try
                 {
                     command.ExecuteNonQuery();
+                    ApplyPendingExit(message.PID, pidHash, createTime);
 
                     WintapLogger.Log.Append(
                         $"Registered process PID {message.PID}: {proc.Name} with process resolver",
@@ -302,6 +290,84 @@ namespace gov.llnl.wintap.core.infrastructure
             if (string.IsNullOrEmpty(value))
                 return "";
             return value.Replace("'", "''");
+        }
+
+        private void AddPendingExit(int pid, DateTime exitTime, long exitCode, string parentPidHash, int parentPid)
+        {
+            PrunePendingExits(exitTime.AddMinutes(-15));
+
+            if (!_pendingExits.TryGetValue(pid, out var exits))
+            {
+                exits = new List<PendingExit>();
+                _pendingExits[pid] = exits;
+            }
+
+            exits.Add(new PendingExit
+            {
+                ExitTime = exitTime,
+                ExitCode = exitCode,
+                ParentPidHash = parentPidHash,
+                ParentPid = parentPid
+            });
+        }
+
+        private void ApplyPendingExit(int pid, string escapedPidHash, DateTime createTime)
+        {
+            if (!_pendingExits.TryGetValue(pid, out var exits) || exits.Count == 0)
+            {
+                return;
+            }
+
+            int bestIndex = -1;
+            DateTime bestExit = DateTime.MaxValue;
+            for (int i = 0; i < exits.Count; i++)
+            {
+                if (exits[i].ExitTime >= createTime && exits[i].ExitTime < bestExit)
+                {
+                    bestIndex = i;
+                    bestExit = exits[i].ExitTime;
+                }
+            }
+
+            if (bestIndex < 0)
+            {
+                return;
+            }
+
+            PendingExit pending = exits[bestIndex];
+            exits.RemoveAt(bestIndex);
+            if (exits.Count == 0)
+            {
+                _pendingExits.Remove(pid);
+            }
+
+            var update = $@"
+                UPDATE process
+                SET exit_time = COALESCE(exit_time, TIMESTAMP '{pending.ExitTime:yyyy-MM-dd HH:mm:ss}'),
+                    exit_code = COALESCE(exit_code, {pending.ExitCode}),
+                    parent_pid_hash = {(string.IsNullOrEmpty(pending.ParentPidHash) ? "parent_pid_hash" : $"'{EscapeSql(pending.ParentPidHash)}'")},
+                    parent_process_id = CASE WHEN {pending.ParentPid} > 0 THEN {pending.ParentPid} ELSE parent_process_id END
+                WHERE pid_hash = '{escapedPidHash}'";
+
+            using var updateCmd = connection.CreateCommand();
+            updateCmd.CommandText = update;
+            updateCmd.ExecuteNonQuery();
+
+            WintapLogger.Log.Append(
+                $"Applied pending Stop for PID {pid} to PidHash {escapedPidHash}",
+                LogLevel.Debug);
+        }
+
+        private void PrunePendingExits(DateTime olderThan)
+        {
+            foreach (int pid in _pendingExits.Keys.ToList())
+            {
+                _pendingExits[pid].RemoveAll(exit => exit.ExitTime < olderThan);
+                if (_pendingExits[pid].Count == 0)
+                {
+                    _pendingExits.Remove(pid);
+                }
+            }
         }
 
         private void InitializeDatabase()
@@ -361,6 +427,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 FROM process
                 WHERE process_id = {pid}
                   AND create_time <=  TIMESTAMP '{createTime:yyyy-MM-dd HH:mm:ss.fff}'
+                  AND (exit_time IS NULL OR exit_time >= TIMESTAMP '{createTime:yyyy-MM-dd HH:mm:ss.fff}')
                 ORDER BY create_time DESC
                 LIMIT 1";
 

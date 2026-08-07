@@ -34,30 +34,30 @@ namespace gov.llnl.wintap.platform.linux.collect
             // Attach clone/vfork syscall tracepoints too for best-effort clone_flags.
             try
             {
-                var extraSections = new[]
+                var extraPrograms = new[]
                 {
-                    "tracepoint/syscalls/sys_enter_clone",
-                    "tracepoint/syscalls/sys_enter_vfork",
+                    "trace_sys_enter_clone",
+                    "trace_sys_enter_vfork",
                 };
 
-                foreach (var section in extraSections)
+                foreach (var programName in extraPrograms)
                 {
-                    IntPtr prog = LibBpf.bpf_object__find_program_by_title(BpfObject, section);
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, programName);
                     if (prog == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} program section '{section}' not found", LogLevel.Debug);
+                        WintapLogger.Log.Append($"{SensorName} program '{programName}' not found", LogLevel.Debug);
                         continue;
                     }
 
                     IntPtr link = LibBpf.bpf_program__attach(prog);
                     if (link == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} failed to attach section '{section}'", LogLevel.Warn);
+                        WintapLogger.Log.Append($"{SensorName} failed to attach program '{programName}'", LogLevel.Warn);
                         continue;
                     }
 
                     _additionalLinks.Add(link);
-                    WintapLogger.Log.Append($"{SensorName} attached '{section}'", LogLevel.Info);
+                    WintapLogger.Log.Append($"{SensorName} attached '{programName}'", LogLevel.Info);
                 }
             }
             catch (Exception ex)
