@@ -8,7 +8,6 @@ using DuckDB.NET.Data;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.core.shared.helpers;
-using gov.llnl.wintap.platform.linux.collect;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -694,6 +693,43 @@ namespace gov.llnl.wintap.core.infrastructure
             return TryGetLinuxProcStartFileTimeUtc(pid) ?? TryGetWindowsProcStartFileTimeUtc(pid);
         }
 
+        private static bool TryGetLinuxProcReaderStartTimeUtc(int pid, out DateTime startTimeUtc)
+        {
+            startTimeUtc = default;
+            try
+            {
+                if (!OperatingSystem.IsLinux() || pid <= 0)
+                    return false;
+
+                var procReaderType = typeof(ProcessResolver).Assembly.GetType("gov.llnl.wintap.platform.linux.collect.ProcReader");
+                var readMethod = procReaderType?.GetMethod("ReadProcessInfo", new[] { typeof(uint) });
+                if (readMethod == null)
+                    return false;
+
+                object procInfo = readMethod.Invoke(null, new object[] { (uint)pid });
+                if (procInfo == null)
+                    return false;
+
+                var infoType = procInfo.GetType();
+                var existsField = infoType.GetField("Exists");
+                var startTimeField = infoType.GetField("StartTimeUtc");
+                if (existsField == null || startTimeField == null)
+                    return false;
+
+                bool exists = (bool)existsField.GetValue(procInfo);
+                DateTime candidateStart = (DateTime)startTimeField.GetValue(procInfo);
+                if (!exists || candidateStart == default)
+                    return false;
+
+                startTimeUtc = candidateStart.ToUniversalTime();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         /// <summary>
         /// Retrieve all process records from the event store
         /// </summary>
@@ -1059,20 +1095,12 @@ namespace gov.llnl.wintap.core.infrastructure
 
             if (OperatingSystem.IsLinux() && pid > 0)
             {
-                try
+                if (TryGetLinuxProcReaderStartTimeUtc(pid, out DateTime procReaderStartUtc))
                 {
-                    ProcReader.ProcessInfo procInfo = ProcReader.ReadProcessInfo((uint)pid);
-                    if (procInfo.Exists && procInfo.StartTimeUtc != default)
-                    {
-                        liveStartUtc = procInfo.StartTimeUtc.ToUniversalTime();
-                        long procStartFileTimeUtc = liveStartUtc.ToFileTimeUtc();
-                        pidHash = processHash.GenPidHash(pid, procStartFileTimeUtc);
-                        return true;
-                    }
-                }
-                catch
-                {
-                    // Fall back to the lighter-weight /proc parser below.
+                    liveStartUtc = procReaderStartUtc;
+                    long procStartFileTimeUtc = liveStartUtc.ToFileTimeUtc();
+                    pidHash = processHash.GenPidHash(pid, procStartFileTimeUtc);
+                    return true;
                 }
             }
 
