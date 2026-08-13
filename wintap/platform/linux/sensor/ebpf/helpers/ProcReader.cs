@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace gov.llnl.wintap.platform.linux.collect
@@ -10,19 +11,37 @@ namespace gov.llnl.wintap.platform.linux.collect
     /// </summary>
     public static class ProcReader
     {
+        private const int _SC_CLK_TCK = 2;
+        private static readonly object passwdLock = new object();
+        private static Dictionary<uint, string> passwdUserLookup;
+        private static DateTime? cachedBootTimeUtc;
+        private static long? cachedClockTicksPerSecond;
+
         /// <summary>
         /// Read comprehensive process information from /proc
         /// </summary>
         public static ProcessInfo ReadProcessInfo(uint pid)
         {
-            var info = new ProcessInfo();
+            var info = new ProcessInfo
+            {
+                Pid = pid
+            };
 
             try
             {
                 var procDir = $"/proc/{pid}";
+                if (!Directory.Exists(procDir))
+                {
+                    return info;
+                }
+
+                info.Exists = true;
 
                 // Read /proc/<pid>/status
                 ReadStatus(procDir, ref info);
+
+                // Read /proc/<pid>/stat for kernel start time
+                ReadStat(procDir, ref info);
 
                 // Read /proc/<pid>/cmdline
                 ReadCmdline(procDir, ref info);
@@ -35,6 +54,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 // /proc/<pid>/exe for executable path
                 ReadExe(procDir, ref info);
+
+                if (string.IsNullOrWhiteSpace(info.Username) && info.Uid > 0)
+                {
+                    info.Username = LookupUsername(info.Uid);
+                }
             }
             catch
             {
@@ -42,6 +66,29 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
 
             return info;
+        }
+
+        /// <summary>
+        /// Enumerate live processes from /proc. Processes can exit while being read;
+        /// those entries are skipped if their /proc directory disappears before basic
+        /// metadata can be collected.
+        /// </summary>
+        public static IEnumerable<ProcessInfo> EnumerateProcesses()
+        {
+            foreach (string procDir in Directory.EnumerateDirectories("/proc"))
+            {
+                string name = Path.GetFileName(procDir);
+                if (!uint.TryParse(name, out uint pid))
+                {
+                    continue;
+                }
+
+                ProcessInfo info = ReadProcessInfo(pid);
+                if (info.Exists)
+                {
+                    yield return info;
+                }
+            }
         }
 
         /// <summary>
@@ -110,11 +157,29 @@ namespace gov.llnl.wintap.platform.linux.collect
 
             foreach (var line in File.ReadLines(statusPath))
             {
-                if (line.StartsWith("PPid:"))
+                if (line.StartsWith("Name:"))
+                {
+                    var parts = line.Split(new[] { ':', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2)
+                        info.Name = parts[1].Trim();
+                }
+                else if (line.StartsWith("PPid:"))
                 {
                     var parts = line.Split(new[] { ':', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length >= 2 && int.TryParse(parts[1], out int ppid))
                         info.PPid = ppid;
+                }
+                else if (line.StartsWith("Uid:"))
+                {
+                    var parts = line.Split(new[] { ':', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2 && uint.TryParse(parts[1], out uint uid))
+                        info.Uid = uid;
+                }
+                else if (line.StartsWith("Gid:"))
+                {
+                    var parts = line.Split(new[] { ':', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2 && uint.TryParse(parts[1], out uint gid))
+                        info.Gid = gid;
                 }
                 else if (line.StartsWith("NSpid:"))
                 {
@@ -122,6 +187,29 @@ namespace gov.llnl.wintap.platform.linux.collect
                     if (parts.Length >= 2 && int.TryParse(parts[1], out int sid))
                         info.SessionId = sid;
                 }
+            }
+        }
+
+        private static void ReadStat(string procDir, ref ProcessInfo info)
+        {
+            var statPath = $"{procDir}/stat";
+            if (!File.Exists(statPath))
+                return;
+
+            string stat = File.ReadAllText(statPath);
+            int closeParen = stat.LastIndexOf(')');
+            if (closeParen < 0 || closeParen + 2 >= stat.Length)
+                return;
+
+            string[] fieldsAfterComm = stat.Substring(closeParen + 2).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            // /proc/<pid>/stat field 22 is starttime. fieldsAfterComm[0] is field 3 (state),
+            // so starttime is index 19.
+            if (fieldsAfterComm.Length > 19 && ulong.TryParse(fieldsAfterComm[19], out ulong startTicks))
+            {
+                DateTime bootTimeUtc = GetBootTimeUtc();
+                long ticksPerSecond = GetClockTicksPerSecond();
+                info.StartTimeUtc = bootTimeUtc.AddSeconds(startTicks / (double)ticksPerSecond);
             }
         }
 
@@ -260,10 +348,79 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
         }
 
+        private static DateTime GetBootTimeUtc()
+        {
+            if (cachedBootTimeUtc.HasValue)
+            {
+                return cachedBootTimeUtc.Value;
+            }
+
+            foreach (string line in File.ReadLines("/proc/stat"))
+            {
+                if (line.StartsWith("btime "))
+                {
+                    string value = line.Substring("btime ".Length).Trim();
+                    if (long.TryParse(value, out long bootUnixSeconds))
+                    {
+                        cachedBootTimeUtc = DateTimeOffset.FromUnixTimeSeconds(bootUnixSeconds).UtcDateTime;
+                        return cachedBootTimeUtc.Value;
+                    }
+                }
+            }
+
+            cachedBootTimeUtc = DateTime.UtcNow;
+            return cachedBootTimeUtc.Value;
+        }
+
+        private static long GetClockTicksPerSecond()
+        {
+            if (cachedClockTicksPerSecond.HasValue)
+            {
+                return cachedClockTicksPerSecond.Value;
+            }
+
+            long ticks = sysconf(_SC_CLK_TCK);
+            cachedClockTicksPerSecond = ticks > 0 ? ticks : 100;
+            return cachedClockTicksPerSecond.Value;
+        }
+
+        private static string LookupUsername(uint uid)
+        {
+            lock (passwdLock)
+            {
+                if (passwdUserLookup == null)
+                {
+                    passwdUserLookup = new Dictionary<uint, string>();
+                    if (File.Exists("/etc/passwd"))
+                    {
+                        foreach (string line in File.ReadLines("/etc/passwd"))
+                        {
+                            string[] parts = line.Split(':');
+                            if (parts.Length > 2 && uint.TryParse(parts[2], out uint passwdUid))
+                            {
+                                passwdUserLookup[passwdUid] = parts[0];
+                            }
+                        }
+                    }
+                }
+
+                return passwdUserLookup.TryGetValue(uid, out string userName) ? userName : uid.ToString();
+            }
+        }
+
+        [DllImport("libc")]
+        private static extern long sysconf(int name);
+
         public struct ProcessInfo
         {
+            public bool Exists;
+            public uint Pid;
             public int PPid;
             public int SessionId;
+            public uint Uid;
+            public uint Gid;
+            public string Name;
+            public DateTime StartTimeUtc;
             public string CommandLine;
             public string Username;
             public string Home;

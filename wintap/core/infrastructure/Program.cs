@@ -10,6 +10,7 @@
 using gov.llnl.wintap;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.etl.load;
 using gov.llnl.wintap.core.shared;
 using EtlPaths = gov.llnl.wintap.core.etl.shared.Paths;
 using gov.llnl.wintap.Properties;
@@ -51,10 +52,22 @@ using gov.llnl.wintap.platform.windows.infrastructure;
 // APPLICATION INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
 
+string earlyVal = ConfigManager.GetValue<string>("WINTAP_EARLY_CONSOLE");
+if (string.Equals(earlyVal, "true", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(earlyVal, "1", StringComparison.OrdinalIgnoreCase))
+{
+    Console.WriteLine($"EARLY: starting {Env.AppName} pid={Environment.ProcessId} WINTAP_DATA_ROOT={ConfigManager.GetValue<string>("DataRoot") ?? ""}");
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
+string settingsVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_SETTINGS");
+bool settingsDisabled = string.Equals(settingsVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(settingsVal, "1", StringComparison.OrdinalIgnoreCase);
+
 // ─── Configure Wintap to listen on port 8099 ───────────────────────────────
-builder.WebHost.UseUrls("http://localhost:8099");
+// Bind explicitly to IPv4 loopback to avoid hostname resolution stalls in some environments.
+builder.WebHost.UseUrls("http://127.0.0.1:8099");
 
 builder.Services.AddControllers();
 
@@ -64,7 +77,11 @@ builder.Services.AddControllers();
 
 // ─── AI Provider Selection ─────────────────────────────────────────────────
 string aiProvider = "OpenAI"; // "OpenAI" or "Ollama"
-string configuredUrl = Settings.Default.AiApiUrl;
+string configuredUrl = string.Empty;
+if (!settingsDisabled)
+{
+    configuredUrl = Settings.Default.AiApiUrl;
+}
 
 WintapLogger.Log.Append($"Configured AI URL: {configuredUrl}", LogLevel.Info);
 
@@ -73,10 +90,18 @@ if (configuredUrl.Contains("localhost"))
     aiProvider = "Ollama";
 }
 
-IMcpClient mcpClient;
-IChatClient chatClient;
+IMcpClient mcpClient = null;
+IChatClient chatClient = null;
+PluginMcpManager pluginMcpManager = null;
+string mcpVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_MCP");
+bool mcpDisabled = string.Equals(mcpVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(mcpVal, "1", StringComparison.OrdinalIgnoreCase);
 
-try
+if (mcpDisabled)
+{
+    WintapLogger.Log.Append("MCP/AI initialization disabled by WINTAP_DISABLE_MCP", LogLevel.Warn);
+}
+else try
 {
     // ─── MCP Server Configuration ──────────────────────────────────────────
     string fileRootPath = Env.FileRootPath;
@@ -181,13 +206,25 @@ try
 
     // ─── Create Plugin MCP Manager ─────────────────────────────────────────
     WintapLogger.Log.Append("Creating Plugin MCP Manager", LogLevel.Info);
-    var pluginMcpManager = new PluginMcpManager(mcpClient, WintapLogger.Log);
+    pluginMcpManager = new PluginMcpManager(mcpClient, WintapLogger.Log);
 
     // ─── AI Service Registration ──────────────────────────────────────────
     builder.Services.AddSingleton(chatHistory);
-    builder.Services.AddSingleton<IMcpClient>(mcpClient);
-    builder.Services.AddSingleton<IChatClient>(chatClient);
-    builder.Services.AddSingleton<PluginMcpManager>(pluginMcpManager);
+
+    if (mcpClient != null)
+    {
+        builder.Services.AddSingleton<IMcpClient>(mcpClient);
+    }
+
+    if (chatClient != null)
+    {
+        builder.Services.AddSingleton<IChatClient>(chatClient);
+    }
+
+    if (pluginMcpManager != null)
+    {
+        builder.Services.AddSingleton<PluginMcpManager>(pluginMcpManager);
+    }
 
     WintapLogger.Log.Append("AI services registered in DI container", LogLevel.Info);
 
@@ -204,6 +241,38 @@ catch (Exception ex)
 
 WintapLogger.Log.Append("Configuring dependencies", LogLevel.Info);
 
+string esperReproVal = ConfigManager.GetValue<string>("WINTAP_ESPER_REPRO");
+if (string.Equals(esperReproVal, "true", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(esperReproVal, "1", StringComparison.OrdinalIgnoreCase))
+{
+    string[] reproQueries =
+    {
+        "SELECT * FROM WintapMessage",
+        "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = 'Process'",
+        "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) <> 'ProcessPartial'",
+        "SELECT * FROM WintapMessage WHERE CAST(MessageType, string) = 'SessionChange'",
+        "@Name(\"Every10Seconds Context DDL\")\ncreate context Every10Seconds initiated @now and pattern [every timer:interval(10 seconds)] terminated after 10 seconds\n"
+    };
+
+    Console.WriteLine("WINTAP_ESPER_REPRO_BEGIN");
+    for (int i = 0; i < reproQueries.Length; i++)
+    {
+        string name = "esper_repro_" + i;
+        try
+        {
+            EventChannel.CompileDeploy(reproQueries[i], name);
+            Console.WriteLine($"WINTAP_ESPER_REPRO_RESULT|{i}|OK|{reproQueries[i].Replace('\n', ' ')}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"WINTAP_ESPER_REPRO_RESULT|{i}|FAIL|{ex.GetType().FullName}|{ex.Message.Replace('\n', ' ')}|{reproQueries[i].Replace('\n', ' ')}");
+        }
+    }
+    Console.WriteLine("WINTAP_ESPER_REPRO_END");
+    WintapLogger.Log.Close();
+    return;
+}
+
 // ─── Logger Registration ───────────────────────────────────────────────────
 // Register WintapLogger as IWintapLogger for plugin dependency injection
 builder.Services.AddSingleton<IWintapLogger>(sp => WintapLogger.Log);
@@ -213,12 +282,12 @@ builder.Services.AddSingleton<IWintapLogger>(sp => WintapLogger.Log);
 builder.Services.AddSingleton<IInfer>(sp =>
 {
     var chatClient = sp.GetService<IChatClient>();
-    var mcpManager = sp.GetRequiredService<PluginMcpManager>();
+    var mcpManager = sp.GetService<PluginMcpManager>();
     var logger = sp.GetService<IWintapLogger>();
 
-    if (chatClient == null)
+    if (chatClient == null || mcpManager == null)
     {
-        WintapLogger.Log.Append("Warning: IChatClient not available. IInfer will not be available to plugins.", LogLevel.Warn);
+        WintapLogger.Log.Append("Warning: AI/MCP services not available. IInfer will not be available to plugins.", LogLevel.Warn);
         return null;
     }
 
@@ -230,8 +299,21 @@ WintapLogger.Log.Append("Registering platform-specific process resolver", LogLev
 
 // ─── Process Resolver Registration (cross-platform) ────────────────────
 WintapLogger.Log.Append("Registering cross-platform process resolver", LogLevel.Info);
-IProcessResolver processResolver = new ProcessResolver();
-builder.Services.AddSingleton<IProcessResolver>(processResolver);
+
+string disableProcessResolverVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_PROCESS_RESOLVER");
+bool disableProcessResolver = string.Equals(disableProcessResolverVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(disableProcessResolverVal, "1", StringComparison.OrdinalIgnoreCase);
+
+// Direct-parquet mode bypasses resolver/Esper anyway, so allow running without DuckDB.
+if (DirectParquetSink.IsEnabled || disableProcessResolver)
+{
+    WintapLogger.Log.Append("Process resolver disabled (direct-parquet or WINTAP_DISABLE_PROCESS_RESOLVER)", LogLevel.Warn);
+}
+else
+{
+    IProcessResolver processResolver = new ProcessResolver();
+    builder.Services.AddSingleton<IProcessResolver>(processResolver);
+}
 
 
 // ─── Windows Service & Hosted Services ─────────────────────────────────────
@@ -262,7 +344,7 @@ var app = builder.Build();
 ServiceProviderAccessor.Services = app.Services;
 
 // ─── Middleware Pipeline ───────────────────────────────────────────────────
-if (Settings.Default.EnableWorkbench)
+if (!settingsDisabled && Settings.Default.EnableWorkbench)
 {
     app.UseStaticFiles();
     app.UseSpaStaticFiles();
@@ -273,7 +355,7 @@ app.UseAuthorization();
 app.MapControllers();  // Map routes to API controllers
 
 // ─── SPA Configuration (Serve Angular Static Files) ───────────────────────
-if (Settings.Default.EnableWorkbench)
+if (!settingsDisabled && Settings.Default.EnableWorkbench)
 {
     app.UseSpa(spa =>
     {

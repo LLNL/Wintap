@@ -141,7 +141,7 @@ namespace gov.llnl.wintap.core.collect
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                string programFiles = Environment.GetEnvironmentVariable("PROGRAMFILES") ?? @"C:\Program Files";
+                string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
                 searchPaths = new[]
                 {
                     @"C:\Program Files\osquery\osqueryd\osqueryd.exe",

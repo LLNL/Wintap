@@ -305,8 +305,37 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         private string fromEnvironment(string processName)
         {
             string winPath = processName;
-            string envString = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);
-            envString = envString + ";" + Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
+            // Read system and user PATH from the registry instead of using environment variables directly.
+            string envString = "";
+            try
+            {
+                using (var machineKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"))
+                {
+                    if (machineKey != null)
+                    {
+                        var mPath = machineKey.GetValue("Path") as string;
+                        if (!string.IsNullOrEmpty(mPath)) envString = mPath;
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                using (var userKey = Registry.CurrentUser.OpenSubKey("Environment"))
+                {
+                    if (userKey != null)
+                    {
+                        var uPath = userKey.GetValue("Path") as string;
+                        if (!string.IsNullOrEmpty(uPath))
+                        {
+                            if (string.IsNullOrEmpty(envString)) envString = uPath;
+                            else envString = envString + ";" + uPath;
+                        }
+                    }
+                }
+            }
+            catch { }
             string[] paths = envString.Split(new char[] { ';' });
             foreach (string path in paths)
             {

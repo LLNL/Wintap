@@ -1,171 +1,138 @@
-﻿# Deploying Lintap to Linux - Step-by-Step Guide
+# Linux Deployment Guide
+
+This guide describes the current Linux deployment flow for `Lintap`.
+
+For build troubleshooting and Fedora/shared-mount notes, see [`../BUILD_AND_TEST.md`](../BUILD_AND_TEST.md).
+
+## Deployment Model
+
+The recommended Linux deployment model is:
+
+1. Build `Lintap` from `wintap/wintap`
+2. Copy the built output directory to the target host
+3. Run `Lintap.dll` with `dotnet`
+4. Configure runtime behavior with environment variables
+
+This is preferred over older docs that assumed a standalone `/opt/lintap/Lintap` binary by default.
 
 ## Prerequisites
-- Development machine with Lintap source code
-- Ubuntu Linux system (24.04+ recommended, tested with Multipass)
-- .NET 8 SDK installed on development machine
-- Root/sudo access on target Linux system
 
-## Step 1: Install Dependencies on Ubuntu
+On the target Linux host, install:
 
-### .NET 8 Runtime
+- .NET 8 runtime or SDK
+- `libbpf`, `clang`, `llvm`, and kernel headers if building eBPF locally
+- root or `sudo` access for eBPF sensor loading
+
+Example Ubuntu packages:
+
 ```bash
-# Add Microsoft package repository
-wget https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
-sudo dpkg -i packages-microsoft-prod.deb
-rm packages-microsoft-prod.deb
-
-# Update and install
 sudo apt update
 sudo apt install -y dotnet-sdk-8.0 aspnetcore-runtime-8.0
+sudo apt install -y libbpf-dev libbpf1 clang llvm libelf-dev linux-headers-$(uname -r) build-essential
 ```
 
-### eBPF Development Tools
-```bash
-# Install eBPF toolchain and dependencies
-sudo apt install -y \
-    libbpf-dev \
-    libbpf1 \
-    linux-headers-$(uname -r) \
-    clang \
-    llvm \
-    libelf-dev \
-    linux-tools-common \
-    build-essential
+## Build Lintap
 
-# Verify installations
-clang --version
-bpftool version
-dotnet --version
+From the repo root:
+
+```bash
+make -C wintap/wintap all
+make -C wintap/wintap run-env
 ```
 
-_On OSX ARM, you will get an error about a missing include (asm/types.h). Fix with:_
+`run-env` prints the effective runtime paths, including:
 
-```bash
-# The headers should already be there, just create the symlink
-sudo ln -s /usr/include/aarch64-linux-gnu/asm /usr/include/asm
+- `LINTAP_DLL`
+- `MCP_EXE`
+- `NATIVE_BUILD_ROOT`
+- `DOTNET_BUILD_FLAGS`
+
+On shared mounts, the effective Linux output directory is typically:
+
+```text
+/tmp/lintap-build/wintap/bin/Debug/net8.0
 ```
 
-### Verify eBPF Support
-```bash
-# Check if BPF is enabled in kernel
-cat /boot/config-$(uname -r) | grep BPF
+On native filesystems, it is typically:
 
-# Should see CONFIG_BPF=y and CONFIG_BPF_SYSCALL=y
+```text
+wintap/wintap/bin/Debug/net8.0
 ```
 
-## Step 2: Build eBPF Programs
+## Copy Build Output
 
-On the Linux development system (or target if building locally):
+Copy the entire Linux output directory, not just `Lintap.dll`. The runtime needs the adjacent dependencies, `esper/`, `tracers/`, `ETLConfig.json`, and `mcp/` content.
+
+Example:
+
 ```bash
-cd ~/gitlab/Lintap/wintap/platform/linux/sensor/ebpf/tracers
-
-# Build all eBPF tracer programs
-make all
-
-# Or build individually:
-# make clone
-# make execve
-# make exit
-# make network
-# make fileops
-
-# Verify .bpf.o files were created
-ls -lh *.bpf.o
-```
-
-## Step 3: Build and Publish Lintap for Linux
-
-From your development machine (in the Lintap solution directory):
-```bash
-# Build
-dotnet publish \
-    -c Debug \
-    -p:PublishSingleFile=false \
-    -f net8.0 
-    Lintap.csproj
-
-# Output will be in: wintap/bin/Release/net8.0/linux-x64/publish/
-```
-
-## Step 4: Create Lintap Directory on Linux
-
-On the Ubuntu system:
-```bash
-# Create application directory
 sudo mkdir -p /opt/lintap
-sudo chown -R $USER:$USER /opt/lintap
+sudo rsync -a /tmp/lintap-build/wintap/bin/Debug/net8.0/ /opt/lintap/
+```
 
-# Create data directory
+If your build output is in the repo tree instead of `/tmp`, copy that directory instead.
+
+## Create Runtime Directories
+
+```bash
 sudo mkdir -p /var/lib/lintap
-sudo chown -R $USER:$USER /var/lib/lintap
-
-# Create log directory
-sudo mkdir -p /var/log/lintap
-sudo chown -R $USER:$USER /var/log/lintap
+sudo mkdir -p /var/lib/lintap/Logs
+sudo chown -R root:root /opt/lintap /var/lib/lintap
 ```
 
-## Step 5: Transfer Files to Linux
+## Recommended Bring-Up
 
-### Option A: Using multipass (from Windows/Mac)
+Before creating a long-running service, do one foreground validation run:
+
 ```bash
-multipass transfer -r ./wintap/bin/Debug/net8.0/publish/* <vm-name>:/opt/lintap/
+cd /opt/lintap
+sudo env \
+  WINTAP_DATA_ROOT=/var/lib/lintap \
+  WINTAP_DISABLE_MCP=true \
+  WINTAP_DISABLE_DUCKDB_UI=true \
+  WINTAP_DISABLE_ETL=true \
+  WINTAP_DISABLE_SENSORS=false \
+  WINTAP_ENABLE_EXECVE_SENSOR=true \
+  WINTAP_ENABLE_CLONE_SENSOR=false \
+  WINTAP_ENABLE_EXIT_SENSOR=false \
+  WINTAP_ENABLE_NETWORK_SENSOR=false \
+  WINTAP_ENABLE_FILEOPS_SENSOR=false \
+  WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR=false \
+  dotnet /opt/lintap/Lintap.dll
 ```
 
-### Option B: Using scp
-```bash
-scp -r ./wintap/bin/Debug/net8.0/publish/* user@linux-host:/opt/lintap/
-```
+That profile keeps startup narrow and is easier to debug than enabling every sensor immediately.
 
-### Option C: Local build
-```bash
-# If building on the target Linux system
-cp -r ./wintap/bin/Debug/net8.0/publish/* /opt/lintap/
-```
+## Example systemd Service
 
-## Step 6: Verify eBPF Tracers
+Create `/etc/systemd/system/lintap.service`:
 
-Ensure eBPF object files are in the correct location:
-```bash
-# Check that tracers directory exists
-ls -lh /opt/lintap/tracers/
-
-# Should contain:
-# - clone_tracer.bpf.o
-# - execve_tracer.bpf.o
-# - exit_tracer.bpf.o
-# - network_ops_tracer.bpf.o
-# - file_ops_tracer.bpf.o
-```
-
-## Step 7: Create systemd Service
-```bash
-sudo nano /etc/systemd/system/lintap.service
-```
-
-Paste this content:
 ```ini
 [Unit]
-Description=Lintap Security Monitoring Service
+Description=Lintap telemetry service
 After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/lintap
-ExecStart=/opt/lintap/Lintap
+ExecStart=/usr/bin/dotnet /opt/lintap/Lintap.dll
 Restart=on-failure
 RestartSec=10
-KillMode=mixed
-KillSignal=SIGTERM
-TimeoutStartSec=300
-TimeoutStopSec=90
-
-# IMPORTANT: Lintap requires root for eBPF operations
 User=root
 Group=root
 
-Environment="DOTNET_ENVIRONMENT=Production"
-Environment="ASPNETCORE_URLS=http://0.0.0.0:8099"
+Environment=WINTAP_DATA_ROOT=/var/lib/lintap
+Environment=WINTAP_DISABLE_MCP=true
+Environment=WINTAP_DISABLE_DUCKDB_UI=true
+Environment=WINTAP_DISABLE_ETL=false
+Environment=WINTAP_DISABLE_SENSORS=false
+Environment=WINTAP_ENABLE_DIRECT_PARQUET=false
+Environment=WINTAP_ENABLE_EXECVE_SENSOR=true
+Environment=WINTAP_ENABLE_CLONE_SENSOR=false
+Environment=WINTAP_ENABLE_EXIT_SENSOR=true
+Environment=WINTAP_ENABLE_NETWORK_SENSOR=true
+Environment=WINTAP_ENABLE_FILEOPS_SENSOR=true
+Environment=WINTAP_ENABLE_PROCESS_RUNDOWN_SENSOR=true
 
 StandardOutput=journal
 StandardError=journal
@@ -175,11 +142,14 @@ SyslogIdentifier=lintap
 WantedBy=multi-user.target
 ```
 
-**Note:** Lintap requires root privileges to load eBPF programs. The service runs as root but includes security hardening directives.
+Notes:
 
-Save (Ctrl+O, Enter, Ctrl+X)
+- Running as `root` is expected when loading eBPF programs.
+- The per-sensor variables are set explicitly so service behavior stays predictable.
+- `CloneSensor` is still a known trouble spot on some Fedora environments; enable it only after validating your kernel and permissions.
 
-## Step 8: Enable and Start Service
+## Enable and Start
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable lintap
@@ -187,208 +157,46 @@ sudo systemctl start lintap
 sudo systemctl status lintap
 ```
 
-## Step 9: Verify Deployment
+## Verify Deployment
 
-Check service status:
-```bash
-sudo systemctl status lintap
-```
+Check service logs:
 
-View logs:
 ```bash
 sudo journalctl -u lintap -f
 ```
 
-Check Lintap log file:
+Check the app log under the configured data root:
+
 ```bash
-tail -f /var/log/lintap/Lintap.log
+sudo tail -f /var/lib/lintap/Logs/Lintap.log
 ```
 
-Verify eBPF programs are loaded:
+Verify the web host:
+
 ```bash
-sudo bpftool prog list | grep -i lintap
+curl http://localhost:8099
 ```
 
-Access web workbench:
-```
-http://<linux-host-ip>:8099
-```
+Verify loaded BPF programs:
 
-(Get IP: `ip addr show` or `hostname -I`)
-
-## Step 10: Test eBPF Sensors
-
-Generate some activity to test sensors:
 ```bash
-# Test process creation (execve sensor)
-ls -la
-
-# Test process forking (clone sensor)
-bash -c "echo test"
-
-# Test network activity (network sensor)
-curl https://example.com
-
-# Test file operations (fileops sensor)
-touch /tmp/test.txt && rm /tmp/test.txt
-```
-
-Check that events appear in logs:
-```bash
-# TBD
-```
-
-## Service Management Commands
-```bash
-# Stop service
-sudo systemctl stop lintap
-
-# Start service
-sudo systemctl start lintap
-
-# Restart service
-sudo systemctl restart lintap
-
-# View logs (follow mode)
-sudo journalctl -u lintap -f
-
-# View recent logs
-sudo journalctl -u lintap -n 100
-
-# View eBPF-specific logs
-sudo journalctl -u lintap | grep -i ebpf
-```
-
-## Expected Behavior on Linux
-
-✅ **Working:**
-- Service starts and runs as daemon
-- Web workbench accessible on port 8099
-- Plugin architecture loads
-- MCP server functionality
-- eBPF-based process monitoring (execve, clone, exit)
-- eBPF-based network monitoring
-- eBPF-based file operations monitoring
-- Event pipeline flows to Esper
-- Real-time system telemetry collection
-
-⚠️ **Known Limitations:**
-- Requires root privileges for eBPF operations
-- Some Windows-specific features not available (ETW, COM+, etc.)
-
-## Troubleshooting
-
-### Service won't start
-```bash
-# Check detailed logs
-sudo journalctl -u lintap -n 50 --no-pager
-
-# Check if process is running
-ps aux | grep Lintap
-```
-
-### eBPF programs fail to load
-```bash
-# Check kernel BPF support
-cat /proc/sys/kernel/unprivileged_bpf_disabled
-
-# Verify libbpf is installed
-ldconfig -p | grep libbpf
-
-# Check BPF filesystem is mounted
-mount | grep bpf
-
-# Manually test loading a BPF program
-sudo bpftool prog load /opt/lintap/tracers/clone_tracer.bpf.o /sys/fs/bpf/test_clone
-```
-
-### Permission errors
-```bash
-# Ensure service runs as root (required for eBPF)
-sudo systemctl cat lintap | grep User
-
-# Fix data directory permissions if needed
-sudo chown -R root:root /opt/lintap
-sudo chmod -R 755 /opt/lintap
-sudo chown -R root:root /var/lib/lintap
-sudo chmod -R 755 /var/lib/lintap
-```
-
-### Can't access web workbench
-- Verify service is listening: `curl http://localhost:8099`
-- Check firewall: `sudo ufw status`
-- If using firewall, allow port: `sudo ufw allow 8099/tcp`
-- Ensure `ASPNETCORE_URLS=http://0.0.0.0:8099` in service file
-
-### eBPF tracers not found
-```bash
-# Verify tracers exist
-ls -lh /opt/lintap/tracers/
-
-# If missing, rebuild and copy
-cd ~/gitlab/Lintap/wintap/platform/linux/sensor/ebpf/tracers
-make clean && make all
-sudo cp *.bpf.o /opt/lintap/tracers/
-sudo systemctl restart lintap
-```
-
-### After updating code
-```bash
-# Rebuild eBPF programs
-cd wintap/platform/linux/sensor/ebpf/tracers
-make clean && make all
-
-# Rebuild Lintap
-dotnet publish -c Release -r linux-x64
-
-# Stop service
-sudo systemctl stop lintap
-
-# Update files
-sudo cp -r bin/Release/net8.0/linux-x64/publish/* /opt/lintap/
-
-# Restart service
-sudo systemctl start lintap
-```
-
-## Development Notes
-
-### Rebuilding eBPF Programs Only
-```bash
-cd wintap/platform/linux/sensor/ebpf/tracers
-make clean
-make all
-sudo cp *.bpf.o /opt/lintap/tracers/
-sudo systemctl restart lintap
-```
-
-### Viewing eBPF Debug Info
-```bash
-# List loaded BPF programs
 sudo bpftool prog list
-
-# Show program details
-sudo bpftool prog show id <id>
-
-# Dump program bytecode
-sudo bpftool prog dump xlated id <id>
 ```
 
-## Security Considerations
+## Smoke Tests
 
-- Lintap requires root privileges to load eBPF programs into the kernel
-- The systemd service includes security hardening directives where possible
-- eBPF programs are verified by the kernel before loading
-- Consider running behind a firewall and restricting web workbench access
-- Review logs regularly for any suspicious activity
+Once `Lintap` is running, use the developer tools from the repo:
 
-## Minimum Kernel Requirements
-
-- Linux Kernel: 5.8+ (for CO-RE eBPF support)
-- Ubuntu: 20.04+ (24.04+ recommended)
-- BTF (BPF Type Format) enabled in kernel
-
-Check your kernel version:
 ```bash
-uname -r
+python3 devtools/network_capture_smoke_test.py --data-root /var/lib/lintap --timeout 240 --poll-interval 10
+python3 devtools/process_capture_smoke_test.py --data-root /var/lib/lintap --timeout 240 --poll-interval 10
+python3 devtools/file_capture_smoke_test.py --data-root /var/lib/lintap --timeout 240 --poll-interval 10
 ```
+
+See [`../devtools/README.md`](../devtools/README.md) for details.
+
+## Operational Notes
+
+- Prefer `make -C wintap/wintap run-env` during packaging and troubleshooting so you copy the actual active output directory.
+- If the repo lives on a host-shared filesystem, copy deployment artifacts from `/tmp/lintap-build/wintap/...`, not from stale in-repo `bin/` directories.
+- For Fedora bring-up, keep `WINTAP_DISABLE_MCP=true` and `WINTAP_DISABLE_DUCKDB_UI=true` until the basic host and sensor path is stable.

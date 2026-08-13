@@ -5,6 +5,7 @@
  */
 
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using Parquet;
 using Parquet.Data;
 using Parquet.Schema;
@@ -24,57 +25,173 @@ namespace gov.llnl.wintap.core.etl.load
     internal class ParquetWriter : FileWriter
     {
         private ConcurrentQueue<Batch> batches = new ConcurrentQueue<Batch>();  // complete collection of all sensor data awaiting serialization
-        private BackgroundWorker batchWorker;
+        private readonly BackgroundWorker batchWorker;
+
+        // Bound memory usage if downstream IO falls behind.
+        // 0 means unlimited (default).
+        private readonly int maxBatchBacklog;
+        private readonly DropPolicy backlogDropPolicy;
+        private long droppedBatches;
+        private DateTime lastDropLogUtc = DateTime.MinValue;
+
+        private enum DropPolicy
+        {
+            DropNewest,
+            DropOldest
+        }
+
+        private static DropPolicy ParseDropPolicy(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return DropPolicy.DropNewest;
+            }
+
+            if (string.Equals(value, "oldest", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "drop_oldest", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "dropoldest", StringComparison.OrdinalIgnoreCase))
+            {
+                return DropPolicy.DropOldest;
+            }
+
+            return DropPolicy.DropNewest;
+        }
 
         internal ParquetWriter()
         {
+            if (!int.TryParse(ConfigManager.GetValue<string>("WINTAP_PARQUET_MAX_BATCH_BACKLOG"), out maxBatchBacklog) || maxBatchBacklog < 0)
+            {
+                maxBatchBacklog = 0;
+            }
+
+            backlogDropPolicy = ParseDropPolicy(ConfigManager.GetValue<string>("WINTAP_PARQUET_BACKLOG_DROP_POLICY"));
+
             batchWorker = new BackgroundWorker();
             batchWorker.DoWork += BatchWorker_DoWork;
-            batchWorker.RunWorkerCompleted += BatchWorker_RunWorkerCompleted;
             batchWorker.RunWorkerAsync();
         }
 
-        private void BatchWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        // BackgroundWorker does not support async work reliably. Using async void here
+        // causes RunWorkerCompleted to fire early and can create multiple concurrent
+        // writers (memory spike + file contention). Keep this worker strictly sync.
+        private void BatchWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            batchWorker.RunWorkerAsync();
-        }
-
-        private async void BatchWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-
-            while (batches.TryDequeue(out Batch batch))
+            while (true)
             {
-                while (batch.Set.TryDequeue(out Batch.SensorData dataSet))
+                bool didWork = false;
+
+                while (batches.TryDequeue(out Batch batch))
                 {
-                    string fileName = "NA";
-                    fileName = await Write(dataSet);
-                    if (fileName != "NA")
+                    didWork = true;
+
+                    while (batch.Set.TryDequeue(out Batch.SensorData dataSet))
                     {
+                        string fileName = "NA";
                         try
                         {
-                            FileInfo flushedFile = new FileInfo(fileName);
-                            flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
-                            WintapLogger.Log.Append($" ready for merge: {fileName}", LogLevel.Info);
+                            fileName = Write(dataSet).GetAwaiter().GetResult();
                         }
                         catch (Exception ex)
                         {
-                            WintapLogger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Info);
+                            WintapLogger.Log.Append($"Error in ParquetWriter worker for {dataSet.SensorName}: {ex.Message}", LogLevel.Info);
+                        }
+
+                        if (fileName != "NA")
+                        {
+                            try
+                            {
+                                FileInfo flushedFile = new FileInfo(fileName);
+                                flushedFile.MoveTo(flushedFile.FullName.Replace(".parquet.active", ".parquet"));
+                                WintapLogger.Log.Append($" ready for merge: {fileName}", LogLevel.Info);
+                            }
+                            catch (Exception ex)
+                            {
+                                WintapLogger.Log.Append($"ERROR renaming parquet for upload: {ex.Message}", LogLevel.Info);
+                            }
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"{dataSet.SensorName}: Call to WRITE returned no parquet data file.", LogLevel.Info);
                         }
                     }
-                    else
-                    {
-                        WintapLogger.Log.Append($"{dataSet.SensorName}: Call to async WRITE returned no parquet data file.", LogLevel.Info);
-                    }
+                }
+
+                // No batches queued; avoid busy looping.
+                if (!didWork)
+                {
+                    System.Threading.Thread.Sleep(250);
                 }
             }
-            System.Threading.Thread.Sleep(30000);
         }
 
         internal int Backlog { get { return batches.Count; } }
 
         internal void Add(Batch batch)
         {
+            if (maxBatchBacklog > 0 && batches.Count >= maxBatchBacklog)
+            {
+                if (backlogDropPolicy == DropPolicy.DropOldest)
+                {
+                    // Evict one oldest batch to make room.
+                    if (batches.TryDequeue(out _))
+                    {
+                        droppedBatches++;
+                    }
+                    else
+                    {
+                        droppedBatches++;
+                        // Nothing to evict; fall back to dropping newest below.
+                        var now2 = DateTime.UtcNow;
+                        if ((now2 - lastDropLogUtc).TotalSeconds >= 5)
+                        {
+                            lastDropLogUtc = now2;
+                            WintapLogger.Log.Append($"ParquetWriter backlog limit reached (max={maxBatchBacklog}, policy={backlogDropPolicy}). Dropping batches. dropped={droppedBatches}", LogLevel.Warn);
+                        }
+                        return;
+                    }
+
+                    // now there should be room
+                }
+                else
+                {
+                    // Drop newest batch
+                    droppedBatches++;
+                    var now = DateTime.UtcNow;
+                    if ((now - lastDropLogUtc).TotalSeconds >= 5)
+                    {
+                        lastDropLogUtc = now;
+                        WintapLogger.Log.Append($"ParquetWriter backlog limit reached (max={maxBatchBacklog}, policy={backlogDropPolicy}). Dropping batches. dropped={droppedBatches}", LogLevel.Warn);
+                    }
+                    return;
+                }
+
+                // Throttle logging; this can occur under sustained load.
+                var nowLog = DateTime.UtcNow;
+                if ((nowLog - lastDropLogUtc).TotalSeconds >= 5)
+                {
+                    lastDropLogUtc = nowLog;
+                    WintapLogger.Log.Append($"ParquetWriter backlog limit reached (max={maxBatchBacklog}, policy={backlogDropPolicy}). Dropping batches. dropped={droppedBatches}", LogLevel.Warn);
+                }
+            }
+
             batches.Enqueue(batch);
+        }
+
+        internal static CompressionMethod GetCompressionMethod()
+        {
+            string configured = ConfigManager.GetValue<string>("WINTAP_PARQUET_COMPRESSION");
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                return CompressionMethod.Snappy;
+            }
+
+            if (Enum.TryParse(configured, ignoreCase: true, out CompressionMethod method))
+            {
+                return method;
+            }
+
+            WintapLogger.Log.Append($"Unknown WINTAP_PARQUET_COMPRESSION '{configured}', using Snappy", LogLevel.Warn);
+            return CompressionMethod.Snappy;
         }
 
         internal async Task<string> Write(Batch.SensorData dataSet)
@@ -108,7 +225,7 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
                 ParquetSerializerOptions options = new ParquetSerializerOptions();
-                options.CompressionMethod = CompressionMethod.Snappy;
+                options.CompressionMethod = GetCompressionMethod();
                 using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
                 {
                     await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
@@ -127,7 +244,7 @@ namespace gov.llnl.wintap.core.etl.load
                     {
                         ParquetSchema schema = DetermineSchemaFromExpando(dataSet.Data.First());
                         ParquetSerializerOptions options = new ParquetSerializerOptions();
-                        options.CompressionMethod = CompressionMethod.Snappy;
+                        options.CompressionMethod = GetCompressionMethod();
                         using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
                         {
                             await ParquetSerializer.SerializeAsync(schema, dataSet.Data, fileStream, options);
@@ -154,18 +271,18 @@ namespace gov.llnl.wintap.core.etl.load
                     {
                         // HACK: Just set type to "string". Not sure how to get the base type correctly, but Key is the type we want.
                         // Next HACK, set a default on the ProcessRecord
-                        Type type = kvp.Key?.GetType();
+                        Type type = kvp.Key?.GetType() ?? typeof(string);
                         field = new DataField(kvp.Key, type);                        
                     } else
                     {
-                        Type type = kvp.Value?.GetType();
+                        Type type = kvp.Value?.GetType() ?? typeof(string);
                         field = new DataField(kvp.Key, type);                        
                     }
                     fields.Add(field);
                 }
                 catch (Exception ex)
                 {
-                        WintapLogger.Log.Append($"Error on determining parquet schema: {ex.ToString}", LogLevel.Error);
+                        WintapLogger.Log.Append($"Error on determining parquet schema: {ex}", LogLevel.Error);
                 }
             }
             ParquetSchema schema = new ParquetSchema(fields.ToArray());

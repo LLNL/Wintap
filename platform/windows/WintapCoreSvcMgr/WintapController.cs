@@ -45,7 +45,7 @@ namespace gov.llnl.wintap
             {
                 WintapLogger.Log.Append("Attempting to set Wintap service start type.", LogLevel.Info   );
                 ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\System32\\sc.exe";
+                psi.FileName = Path.Combine(Environment.SystemDirectory, "sc.exe");
                 psi.Arguments = "config wintap start=auto";
                 System.Diagnostics.Process p = new System.Diagnostics.Process();
                 p.StartInfo = psi;

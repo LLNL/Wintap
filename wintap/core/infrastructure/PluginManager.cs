@@ -95,8 +95,19 @@ namespace gov.llnl.wintap.core.infrastructure
 
             runQueue = new ConcurrentQueue<Runnable>();
             loadedPluginNames = new HashSet<string>();
-            etl = new WintapETL();
-            doETL = etl.Start();
+            string etlVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_ETL");
+            bool etlDisabled = string.Equals(etlVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(etlVal, "1", StringComparison.OrdinalIgnoreCase);
+            if (etlDisabled)
+            {
+                WintapLogger.Log.Append("ETL disabled by WINTAP_DISABLE_ETL", LogLevel.Warn);
+                doETL = false;
+            }
+            else
+            {
+                etl = new WintapETL();
+                doETL = etl.Start();
+            }
 
             // Initialize exception handler
             PluginExceptionHandler.Instance.Initialize();
@@ -141,7 +152,7 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         internal async Task UnregisterPluginsAsync()
         {
-            watchdog.Stop();
+            watchdog?.Stop();
 
             try
             {

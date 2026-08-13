@@ -5,6 +5,10 @@
 #define TASK_COMM_LEN 16
 #define MAX_FILENAME_LEN 256
 
+// open(2) flags we care about.
+// Keep this local to avoid pulling in additional headers.
+#define O_DIRECTORY 00200000
+
 // File operation types
 enum file_op_type {
     FILE_OP_OPEN = 1,
@@ -26,6 +30,19 @@ struct file_event {
     __u32 op_type;         // Which operation (open/read/write/etc)
 };
 
+// Track openat pathname across sys_enter/sys_exit so we can emit the returned fd.
+struct openat_state {
+    char filename[MAX_FILENAME_LEN];
+    __u32 flags;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 8192);
+    __type(key, __u64);               // pid_tgid
+    __type(value, struct openat_state);
+} openat_state_map SEC(".maps");
+
 // Ring buffer map
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -34,7 +51,7 @@ struct {
 
 // Helper to emit event
 static __always_inline void emit_file_event(__u32 pid, const char *filename, 
-                                             __u32 fd, __u32 bytes, __u32 op_type)
+                                              __u32 fd, __u32 bytes, __u32 op_type)
 {
     struct file_event *event;
     
@@ -58,7 +75,32 @@ static __always_inline void emit_file_event(__u32 pid, const char *filename,
     bpf_ringbuf_submit(event, 0);
 }
 
-// openat - File open
+static __always_inline void emit_file_event_saved(__u32 pid, const char *filename_buf,
+                                                  __u32 fd, __u32 bytes, __u32 op_type)
+{
+    struct file_event *event;
+
+    event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
+    if (!event)
+        return;
+
+    event->pid = pid;
+    bpf_get_current_comm(&event->comm, sizeof(event->comm));
+
+    if (filename_buf)
+        __builtin_memcpy(event->filename, filename_buf, sizeof(event->filename));
+    else
+        event->filename[0] = '\0';
+
+    event->timestamp_ns = bpf_ktime_get_ns();
+    event->fd = fd;
+    event->bytes = bytes;
+    event->op_type = op_type;
+
+    bpf_ringbuf_submit(event, 0);
+}
+
+// openat - File open (emit on sys_exit to capture returned fd)
 struct openat_args {
     unsigned long long unused;
     long syscall_nr;
@@ -68,13 +110,103 @@ struct openat_args {
     long mode;
 };
 
+// Common sys_exit tracepoint layout for syscalls.
+struct sys_exit_args {
+    unsigned long long unused;
+    long syscall_nr;
+    long ret;
+};
+
 SEC("tracepoint/syscalls/sys_enter_openat")
-int trace_openat(struct openat_args *ctx)
+int t_openat_ent(struct openat_args *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+
+    struct openat_state st = {};
+    st.flags = (__u32)ctx->flags;
+    if (ctx->filename)
+        bpf_probe_read_user_str(st.filename, sizeof(st.filename), ctx->filename);
+    else
+        st.filename[0] = '\0';
+
+    bpf_map_update_elem(&openat_state_map, &pid_tgid, &st, BPF_ANY);
+    return 0;
+}
+
+// open - legacy open syscall (some runtimes still use it)
+struct open_args {
+    unsigned long long unused;
+    long syscall_nr;
+    const char *filename;
+    long flags;
+    long mode;
+};
+
+SEC("tracepoint/syscalls/sys_enter_open")
+int t_open_ent(struct open_args *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+
+    struct openat_state st = {};
+    st.flags = (__u32)ctx->flags;
+    if (ctx->filename)
+        bpf_probe_read_user_str(st.filename, sizeof(st.filename), ctx->filename);
+    else
+        st.filename[0] = '\0';
+
+    bpf_map_update_elem(&openat_state_map, &pid_tgid, &st, BPF_ANY);
+    return 0;
+}
+
+SEC("tracepoint/syscalls/sys_exit_open")
+int t_open_exit(struct sys_exit_args *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
-    
-    emit_file_event(pid, ctx->filename, 0, 0, FILE_OP_OPEN);
+
+    struct openat_state *stp = bpf_map_lookup_elem(&openat_state_map, &pid_tgid);
+    if (!stp)
+        return 0;
+
+    struct openat_state st = {};
+    __builtin_memcpy(&st, stp, sizeof(st));
+
+    long fd = ctx->ret;
+    bpf_map_delete_elem(&openat_state_map, &pid_tgid);
+
+    if (fd < 0)
+        return 0;
+    if (st.flags & O_DIRECTORY)
+        return 0;
+
+    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN);
+    return 0;
+}
+
+SEC("tracepoint/syscalls/sys_exit_openat")
+int trace_openat(struct sys_exit_args *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+
+    struct openat_state *stp = bpf_map_lookup_elem(&openat_state_map, &pid_tgid);
+    if (!stp)
+        return 0;
+
+    // Copy out of the map value before deleting it.
+    struct openat_state st = {};
+    __builtin_memcpy(&st, stp, sizeof(st));
+
+    long fd = ctx->ret;
+    // Always cleanup the map entry.
+    bpf_map_delete_elem(&openat_state_map, &pid_tgid);
+
+    if (fd < 0)
+        return 0;
+    if (st.flags & O_DIRECTORY)
+        return 0;
+
+    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN);
     return 0;
 }
 
@@ -88,12 +220,12 @@ struct read_enter_args {
 };
 
 SEC("tracepoint/syscalls/sys_enter_read")
-int trace_read_enter(struct read_enter_args *ctx)
+int t_read_ent(struct read_enter_args *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
     
-    emit_file_event(pid, NULL, ctx->fd, 0, FILE_OP_READ);
+    emit_file_event(pid, NULL, ctx->fd, (__u32)ctx->count, FILE_OP_READ);
     return 0;
 }
 
@@ -107,7 +239,7 @@ struct write_enter_args {
 };
 
 SEC("tracepoint/syscalls/sys_enter_write")
-int trace_write_enter(struct write_enter_args *ctx)
+int t_write_ent(struct write_enter_args *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
@@ -124,7 +256,7 @@ struct close_args {
 };
 
 SEC("tracepoint/syscalls/sys_enter_close")
-int trace_close(struct close_args *ctx)
+int t_close(struct close_args *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
@@ -146,7 +278,7 @@ struct mmap_args {
 };
 
 SEC("tracepoint/syscalls/sys_enter_mmap")
-int trace_mmap(struct mmap_args *ctx)
+int t_mmap(struct mmap_args *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
@@ -168,11 +300,28 @@ struct unlinkat_args {
 };
 
 SEC("tracepoint/syscalls/sys_enter_unlinkat")
-int trace_unlinkat(struct unlinkat_args *ctx)
+int t_unlinkat(struct unlinkat_args *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
     
+    emit_file_event(pid, ctx->pathname, 0, 0, FILE_OP_UNLINK);
+    return 0;
+}
+
+// unlink - File deletion (non-*at variant)
+struct unlink_args {
+    unsigned long long unused;
+    long syscall_nr;
+    const char *pathname;
+};
+
+SEC("tracepoint/syscalls/sys_enter_unlink")
+int t_unlink(struct unlink_args *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+
     emit_file_event(pid, ctx->pathname, 0, 0, FILE_OP_UNLINK);
     return 0;
 }

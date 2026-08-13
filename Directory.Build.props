@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <!--
+      Disable apphost when DISABLE_APPHOST environment variable is set to true.
+      This ensures inner `dotnet publish`/SDK tasks also respect the setting when
+      builds are invoked from Makefile or CI that export DISABLE_APPHOST.
+      Developers can override by setting the UseAppHost property explicitly.
+    -->
+    <UseAppHost Condition="'$(UseAppHost)'=='' and '$(DISABLE_APPHOST)'=='true'">false</UseAppHost>
+    <!--
+      NativeBuildRoot keeps build outputs and intermediates off host-shared mounts.
+      NEsper/Roslyn runtime compilation on Fedora fails when app assemblies are loaded
+      from the shared mount, so each project gets an isolated native output subtree.
+    -->
+    <NativeBuildRoot Condition="'$(NativeBuildRoot)' != ''">$([MSBuild]::EnsureTrailingSlash('$(NativeBuildRoot)'))</NativeBuildRoot>
+    <BaseOutputPath Condition="'$(NativeBuildRoot)' != '' and '$(BaseOutputPath)' == ''">$(NativeBuildRoot)$(MSBuildProjectName)/bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath Condition="'$(NativeBuildRoot)' != '' and '$(BaseIntermediateOutputPath)' == ''">$(NativeBuildRoot)$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

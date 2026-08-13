@@ -5,7 +5,6 @@
 	<PropertyGroup>
 		<AssemblyName>Mactap</AssemblyName>
 		<RuntimeIdentifiers>osx-x64;osx-arm64</RuntimeIdentifiers>
-		<BaseIntermediateOutputPath>obj\macOS\</BaseIntermediateOutputPath>
 		<DefineConstants>$(DefineConstants);MACOS</DefineConstants>
 		<UseSharedCompilation>false</UseSharedCompilation>
 		<UseCommonOutputDirectory>false</UseCommonOutputDirectory>

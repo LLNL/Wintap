@@ -1,32 +1,61 @@
 # Wintap Workbench
-Web front end for the Wintap API.
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 15.1.
+This directory contains the Angular-based web workbench used by Wintap.
 
-## Development server
+The built frontend is copied into the .NET output during application builds when the workbench `dist/Workbench` directory exists.
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+## Tech Stack
 
-## Code scaffolding
+- Angular 15
+- PrimeNG
+- SignalR client
+- CodeMirror and charting dependencies for interactive views
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## Common Commands
 
-## Build
+Install dependencies:
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+```bash
+npm install
+```
 
-## Running unit tests
+Start the frontend dev server:
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+```bash
+npm start
+```
 
-## Running end-to-end tests
+Build the workbench:
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+```bash
+npm run build
+```
 
-## Further help
+Run unit tests:
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+```bash
+npm test
+```
 
+Run lint checks:
 
-# Release
-LLNL-CODE-837816
+```bash
+npm run lint
+```
+
+## Build Integration
+
+The .NET build copies frontend assets from:
+
+```text
+shared/Wintap-Workbench/dist/Workbench
+```
+
+into the application output `Workbench/` directory when that build output exists.
+
+If the frontend changes are not appearing in the app output, rebuild the workbench first and then rebuild the .NET project.
+
+## Notes
+
+- This README is intentionally project-specific and replaces the default Angular CLI boilerplate.
+- The workbench is part of the larger Wintap build and deployment story; see `../../BUILD_AND_TEST.md` for the backend/runtime side.

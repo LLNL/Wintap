@@ -14,7 +14,7 @@ namespace gov.llnl.wintap.helpers
         private string logName;
         private LogType logType = LogType.Overwrite;
         private LogVerboseLevel verbosity;
-        private string logDir = Environment.GetEnvironmentVariable("temp");
+        private string logDir = Path.GetTempPath();
         private string userName;
         private string logPath;
         DateTime startTime;
@@ -27,7 +27,7 @@ namespace gov.llnl.wintap.helpers
         private Status status;
         private string author = "not set";
         private string codeVersion;
-        private string clientName = Environment.GetEnvironmentVariable("COMPUTERNAME");
+        private string clientName = Environment.MachineName;
         private ConcurrentQueue<LogEntry> pendingEntries;
         private BackgroundWorker loggingThread;
         private bool logIsOpen;
@@ -72,7 +72,7 @@ namespace gov.llnl.wintap.helpers
             // user might not be logged in, so try this
             try
             {
-                userName = Environment.GetEnvironmentVariable("username");
+                userName = Environment.UserName;
             }
             catch
             {

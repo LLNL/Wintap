@@ -50,7 +50,16 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             try
             {
                 FileInfo fileInfo = new FileInfo(localFile);
-                fileInfo.CopyTo(Path.Combine(uncPath.OriginalString, fileInfo.Name));
+                string relativePath = getFileShareRelativePathForFile(fileInfo.FullName, parameters);
+                string destinationFile = Path.Combine(uncPath.LocalPath, relativePath);
+                string destinationDirectory = Path.GetDirectoryName(destinationFile);
+
+                if (!Directory.Exists(destinationDirectory))
+                {
+                    Directory.CreateDirectory(destinationDirectory);
+                }
+
+                fileInfo.CopyTo(destinationFile, true);
                 this.updateSessionStats();
             }
             catch (Exception ex)

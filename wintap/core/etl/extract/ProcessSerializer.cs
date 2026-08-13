@@ -87,8 +87,14 @@ namespace gov.llnl.wintap.core.etl.extract
             string procName = "PARSE_ERROR";
             try
             {
-                procName = path.Split(new char[] { '\\' }).Last();
-                procName = procName.ToLower();
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    return "unknown";
+                }
+
+                // Handle both Windows (\) and Linux (/) separators.
+                procName = path.Replace('\\', '/').Split(new char[] { '/' }).Last();
+                procName = procName.ToLowerInvariant();
             }
             catch (Exception ex)
             {
