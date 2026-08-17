@@ -6,12 +6,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
+using System.Threading;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
@@ -21,6 +23,7 @@ using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+using Microsoft.Diagnostics.Tracing.Session;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
@@ -30,7 +33,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     internal class WindowsProcessSensor : EtwProviderCollector
     {
         private static readonly TimeSpan SnapshotStartMatchTolerance = TimeSpan.FromSeconds(2);
+        internal static readonly TimeSpan StopMetricCorrelationWindow = TimeSpan.FromSeconds(5);
+        internal static readonly TimeSpan QaCounterLogInterval = TimeSpan.FromSeconds(60);
         private const int DefaultSidAccountCacheSize = 1024;
+        private const string ManifestProcessProviderName = "Microsoft-Windows-Kernel-Process";
+        private const string ManifestMetricSessionName = "Wintap.Collectors.WindowsProcess.Metrics";
+        private const ulong ManifestProcessKeyword = 0x10;
+        private static readonly Guid ManifestProcessProviderGuid = new Guid("22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716");
 
         private readonly Func<int, DateTime, ProcessRecord> resolveProcessAtTime;
         private readonly Action<WintapMessage> emit;
@@ -49,6 +58,24 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private readonly int sidAccountCacheMaxSize;
         private readonly Dictionary<string, string> sidAccountCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Queue<string> sidAccountCacheOrder = new Queue<string>();
+        private readonly object stopMetricLock = new object();
+        private readonly List<PendingKernelStop> pendingKernelStops = new List<PendingKernelStop>();
+        private readonly List<ManifestStopMetrics> recentManifestStops = new List<ManifestStopMetrics>();
+        private TraceEventSession manifestMetricSession;
+        private ETWTraceEventSource manifestMetricSource;
+        private BackgroundWorker manifestMetricWorker;
+        private System.Timers.Timer qaCounterTimer;
+        private readonly bool enableQaCounterTimer;
+        private long stopWithoutStartCount;
+        private long snapshotDedupSuppressedCount;
+        private long manifestMetricMissesCount;
+        private long sidExtractedCount;
+        private long sidNullCount;
+        private long sidMalformedCount;
+        private long sidFallbackCount;
+        private long cmdlineEmptyCount;
+        private long cmdlinePebRecoveredCount;
+        private long snapshotCount;
 
         internal WindowsProcessSensor(
             Func<int, DateTime, ProcessRecord> resolveProcessAtTime = null,
@@ -64,7 +91,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             Func<int, string> lookupPebCommandLineByPid = null,
             Func<int, string> lookupFullProcessImagePathByPid = null,
             Func<string, string> translateDevicePath = null,
-            int sidAccountCacheMaxSize = DefaultSidAccountCacheSize) : base()
+            int sidAccountCacheMaxSize = DefaultSidAccountCacheSize,
+            bool enableQaCounterTimer = true) : base()
         {
             SensorName = "WindowsProcess";
             EtwProviderId = "SystemTraceControlGuid";
@@ -83,21 +111,204 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             this.lookupFullProcessImagePathByPid = lookupFullProcessImagePathByPid ?? TryGetProcessPathByPid;
             this.translateDevicePath = translateDevicePath ?? TryTranslateDevicePathToWin32Path;
             this.sidAccountCacheMaxSize = Math.Max(1, sidAccountCacheMaxSize);
+            this.enableQaCounterTimer = enableQaCounterTimer;
             processHash = new ProcessHash();
             this.genPidHash = genPidHash ?? processHash.GenPidHash;
         }
 
-        internal long StopWithoutStartCount { get; private set; }
-        internal long SnapshotDedupSuppressedCount { get; private set; }
+        internal long StopWithoutStartCount => Interlocked.Read(ref stopWithoutStartCount);
+        internal long SnapshotDedupSuppressedCount => Interlocked.Read(ref snapshotDedupSuppressedCount);
+        internal long ManifestMetricMissesCount => Interlocked.Read(ref manifestMetricMissesCount);
         internal int SidAccountCacheCount => sidAccountCache.Count;
 
         public override bool Start()
         {
             KernelParser.Instance.EtwParser.ProcessStart += EtwParser_ProcessStart;
             KernelParser.Instance.EtwParser.ProcessStop += EtwParser_ProcessStop;
+            StartManifestMetricSubscription();
+            StartQaCounterTimer();
 
             WintapLogger.Log.Append("Windows process sensor core subscribed to shared kernel ProcessStart/ProcessStop events", LogLevel.Info);
             return true;
+        }
+
+        public override void Stop()
+        {
+            StopQaCounterTimer();
+            LogQaCounterSnapshot();
+            StopManifestMetricSubscription();
+
+            try
+            {
+                KernelParser.Instance.EtwParser.ProcessStart -= EtwParser_ProcessStart;
+                KernelParser.Instance.EtwParser.ProcessStop -= EtwParser_ProcessStop;
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process sensor shared-kernel unsubscribe failed during shutdown: {ex.Message}", LogLevel.Debug);
+            }
+        }
+
+        private void StartQaCounterTimer()
+        {
+            if (!enableQaCounterTimer)
+            {
+                return;
+            }
+
+            try
+            {
+                qaCounterTimer = new System.Timers.Timer(QaCounterLogInterval.TotalMilliseconds);
+                qaCounterTimer.AutoReset = true;
+                qaCounterTimer.Elapsed += QaCounterTimer_Elapsed;
+                qaCounterTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process QA counter timer failed to start: {ex.Message}", LogLevel.Debug);
+            }
+        }
+
+        private void QaCounterTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            LogQaCounterSnapshot();
+        }
+
+        private void StopQaCounterTimer()
+        {
+            try
+            {
+                if (qaCounterTimer != null)
+                {
+                    qaCounterTimer.Stop();
+                    qaCounterTimer.Elapsed -= QaCounterTimer_Elapsed;
+                    qaCounterTimer.Dispose();
+                    qaCounterTimer = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process QA counter timer failed to stop: {ex.Message}", LogLevel.Debug);
+            }
+        }
+
+        internal void LogQaCounterSnapshot()
+        {
+            try
+            {
+                log(FormatQaCounterSnapshot(GetQaCounterSnapshot()), LogLevel.Info);
+            }
+            catch
+            {
+            }
+        }
+
+        internal WindowsProcessQaCounters GetQaCounterSnapshot()
+        {
+            return new WindowsProcessQaCounters
+            {
+                SidExtracted = Interlocked.Read(ref sidExtractedCount),
+                SidNull = Interlocked.Read(ref sidNullCount),
+                SidMalformed = Interlocked.Read(ref sidMalformedCount),
+                SidFallback = Interlocked.Read(ref sidFallbackCount),
+                CmdlineEmpty = Interlocked.Read(ref cmdlineEmptyCount),
+                CmdlinePebRecovered = Interlocked.Read(ref cmdlinePebRecoveredCount),
+                StopWithoutStart = StopWithoutStartCount,
+                ManifestMetricMisses = ManifestMetricMissesCount,
+                SnapshotCount = Interlocked.Read(ref snapshotCount),
+                DedupSuppressed = SnapshotDedupSuppressedCount
+            };
+        }
+
+        internal static string FormatQaCounterSnapshot(WindowsProcessQaCounters counters)
+        {
+            counters ??= new WindowsProcessQaCounters();
+            return "Windows process QA counters: " +
+                $"sid_extracted={counters.SidExtracted} " +
+                $"sid_null={counters.SidNull} " +
+                $"sid_malformed={counters.SidMalformed} " +
+                $"sid_fallback={counters.SidFallback} " +
+                $"cmdline_empty={counters.CmdlineEmpty} " +
+                $"cmdline_peb_recovered={counters.CmdlinePebRecovered} " +
+                $"stop_without_start={counters.StopWithoutStart} " +
+                $"manifest_metric_misses={counters.ManifestMetricMisses} " +
+                $"snapshot_count={counters.SnapshotCount} " +
+                $"dedup_suppressed={counters.DedupSuppressed}";
+        }
+
+        private void StartManifestMetricSubscription()
+        {
+            try
+            {
+                manifestMetricWorker = new BackgroundWorker { WorkerSupportsCancellation = true };
+                manifestMetricWorker.DoWork += ManifestMetricWorker_DoWork;
+                manifestMetricWorker.RunWorkerAsync();
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process manifest metric subscription failed; continuing without Stop metrics: {ex.Message}", LogLevel.Warn);
+            }
+        }
+
+        private void StopManifestMetricSubscription()
+        {
+            try
+            {
+                if (manifestMetricSource != null)
+                {
+                    manifestMetricSource.StopProcessing();
+                    manifestMetricSource.Dispose();
+                    manifestMetricSource = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process manifest metric source stop failed: {ex.Message}", LogLevel.Debug);
+            }
+
+            try
+            {
+                if (manifestMetricSession != null)
+                {
+                    manifestMetricSession.Stop();
+                    manifestMetricSession.Dispose();
+                    manifestMetricSession = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process manifest metric session stop failed: {ex.Message}", LogLevel.Debug);
+            }
+
+            try
+            {
+                if (manifestMetricWorker != null && manifestMetricWorker.IsBusy)
+                {
+                    manifestMetricWorker.CancelAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process manifest metric worker cancel failed: {ex.Message}", LogLevel.Debug);
+            }
+        }
+
+        private void ManifestMetricWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            try
+            {
+                manifestMetricSession = new TraceEventSession(ManifestMetricSessionName, TraceEventSessionOptions.Create);
+                manifestMetricSession.EnableProvider(ManifestProcessProviderGuid, TraceEventLevel.Verbose, ManifestProcessKeyword);
+                manifestMetricSource = new ETWTraceEventSource(ManifestMetricSessionName, TraceEventSourceType.Session);
+                var parser = new RegisteredTraceEventParser(manifestMetricSource);
+                parser.All += ProcessManifestMetricEvent;
+                log($"Windows process manifest metric provider enabled: {ManifestProcessProviderGuid}, keyword: 0x{ManifestProcessKeyword:X}", LogLevel.Info);
+                manifestMetricSource.Process();
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process manifest metric subscription failed; continuing without Stop metrics: {ex.Message}", LogLevel.Warn);
+            }
         }
 
         internal DateTime CanonicalizeCreateTimeUtc(int pid, DateTime etwTimestampUtc)
@@ -120,7 +331,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 {
                     if (!processInfo.IsSynthetic && IsDuplicateSnapshotRefresh(processInfo))
                     {
-                        SnapshotDedupSuppressedCount++;
+                        Interlocked.Increment(ref snapshotDedupSuppressedCount);
                         continue;
                     }
 
@@ -129,6 +340,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     sent++;
                 }
 
+                Interlocked.Exchange(ref snapshotCount, sent);
                 log($"Windows process snapshot refresh complete. Refreshed {sent} existing processes", LogLevel.Info);
                 return true;
             }
@@ -283,12 +495,161 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 string imageFileName = TryGetStringPayload(data, "ImageFileName");
                 long exitCode = TryGetLongPayload(data, "ExitStatus", 0);
 
-                EmitStop(pid, data.TimeStamp, imageFileName, exitCode);
+                EnqueueKernelStop(pid, data.TimeStamp, imageFileName, exitCode);
             }
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error handling Windows process Stop event: {ex.Message}", LogLevel.Debug);
             }
+        }
+
+        internal void EnqueueKernelStop(int pid, DateTime stopTimestamp, string imageFileName, long exitCode)
+        {
+            var pendingStop = new PendingKernelStop
+            {
+                Pid = pid,
+                StopTimeUtc = stopTimestamp.ToUniversalTime(),
+                ImageFileName = imageFileName ?? string.Empty,
+                ExitCode = exitCode,
+                ExpiresAtUtc = stopTimestamp.ToUniversalTime() + StopMetricCorrelationWindow
+            };
+
+            List<StopEmission> readyToEmit;
+            lock (stopMetricLock)
+            {
+                pendingKernelStops.Add(pendingStop);
+                readyToEmit = DrainStopMetricCorrelationLocked(utcNow().ToUniversalTime());
+            }
+
+            EmitReadyStops(readyToEmit);
+        }
+
+        internal void EnqueueManifestStopMetrics(ManifestStopMetrics metrics)
+        {
+            if (metrics == null)
+            {
+                return;
+            }
+
+            List<StopEmission> readyToEmit;
+            lock (stopMetricLock)
+            {
+                DateTime nowUtc = utcNow().ToUniversalTime();
+                if (metrics.TimestampUtc.ToUniversalTime() + StopMetricCorrelationWindow > nowUtc)
+                {
+                    metrics.TimestampUtc = metrics.TimestampUtc.ToUniversalTime();
+                    recentManifestStops.Add(metrics);
+                }
+
+                readyToEmit = DrainStopMetricCorrelationLocked(nowUtc);
+            }
+
+            EmitReadyStops(readyToEmit);
+        }
+
+        internal void DrainStopMetricCorrelation()
+        {
+            List<StopEmission> readyToEmit;
+            lock (stopMetricLock)
+            {
+                readyToEmit = DrainStopMetricCorrelationLocked(utcNow().ToUniversalTime());
+            }
+
+            EmitReadyStops(readyToEmit);
+        }
+
+        private List<StopEmission> DrainStopMetricCorrelationLocked(DateTime nowUtc)
+        {
+            var readyToEmit = new List<StopEmission>();
+
+            foreach (PendingKernelStop pendingStop in pendingKernelStops.ToList())
+            {
+                ManifestStopMetrics nearestMetrics = FindNearestManifestMetrics(pendingStop);
+                if (nearestMetrics == null)
+                {
+                    continue;
+                }
+
+                pendingKernelStops.Remove(pendingStop);
+                recentManifestStops.Remove(nearestMetrics);
+                readyToEmit.Add(new StopEmission { KernelStop = pendingStop, Metrics = nearestMetrics });
+            }
+
+            foreach (PendingKernelStop expiredStop in pendingKernelStops.Where(stop => stop.ExpiresAtUtc <= nowUtc).ToList())
+            {
+                pendingKernelStops.Remove(expiredStop);
+                Interlocked.Increment(ref manifestMetricMissesCount);
+                readyToEmit.Add(new StopEmission { KernelStop = expiredStop });
+            }
+
+            recentManifestStops.RemoveAll(metrics => metrics.TimestampUtc.ToUniversalTime() + StopMetricCorrelationWindow <= nowUtc);
+            return readyToEmit;
+        }
+
+        private ManifestStopMetrics FindNearestManifestMetrics(PendingKernelStop pendingStop)
+        {
+            return recentManifestStops
+                .Where(metrics => metrics.Pid == pendingStop.Pid && IsWithinStopMetricCorrelationWindow(metrics.TimestampUtc, pendingStop.StopTimeUtc))
+                .OrderBy(metrics => Math.Abs((metrics.TimestampUtc.ToUniversalTime() - pendingStop.StopTimeUtc).Ticks))
+                .FirstOrDefault();
+        }
+
+        private static bool IsWithinStopMetricCorrelationWindow(DateTime manifestTimeUtc, DateTime kernelStopTimeUtc)
+        {
+            return Math.Abs((manifestTimeUtc.ToUniversalTime() - kernelStopTimeUtc.ToUniversalTime()).TotalSeconds) <= StopMetricCorrelationWindow.TotalSeconds;
+        }
+
+        private void EmitReadyStops(IReadOnlyList<StopEmission> readyToEmit)
+        {
+            foreach (StopEmission emission in readyToEmit)
+            {
+                EmitStopCore(
+                    emission.KernelStop.Pid,
+                    emission.KernelStop.StopTimeUtc,
+                    emission.KernelStop.ImageFileName,
+                    emission.KernelStop.ExitCode,
+                    emission.Metrics);
+            }
+        }
+
+        internal void ProcessManifestMetricEvent(TraceEvent data)
+        {
+            try
+            {
+                if (!string.Equals(data.ProviderName, ManifestProcessProviderName, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals((data.EventName ?? string.Empty).Trim(), "ProcessStop/Stop", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                EnqueueManifestStopMetrics(ParseManifestStopMetrics(data));
+            }
+            catch (Exception ex)
+            {
+                log($"Error handling Windows process manifest Stop metrics event: {ex.Message}", LogLevel.Debug);
+            }
+        }
+
+        private static ManifestStopMetrics ParseManifestStopMetrics(TraceEvent data)
+        {
+            return new ManifestStopMetrics
+            {
+                Pid = TryGetIntPayload(data, "ProcessID", data.ProcessID),
+                TimestampUtc = data.TimeStamp.ToUniversalTime(),
+                ImageName = TryGetStringPayload(data, "ImageName"),
+                ExitCode = TryGetLongPayload(data, "ExitCode", 0),
+                CPUCycleCount = TryGetLongPayload(data, "CPUCycleCount", 0),
+                CommitCharge = TryGetLongPayload(data, "CommitCharge", 0),
+                CommitPeak = TryGetLongPayload(data, "CommitPeak", 0),
+                HardFaultCount = TryGetIntPayload(data, "HardFaultCount", 0),
+                ReadOperationCount = TryGetLongPayload(data, "ReadOperationCount", 0),
+                ReadTransferKiloBytes = TryGetLongPayload(data, "ReadTransferKiloBytes", 0),
+                TokenElevationType = TryGetIntPayload(data, "TokenElevationType", 0),
+                WriteOperationCount = TryGetLongPayload(data, "WriteOperationCount", 0),
+                WriteTransferKiloBytes = TryGetLongPayload(data, "WriteTransferKiloBytes", 0),
+                ActivityId = data.ActivityID == Guid.Empty ? string.Empty : data.ActivityID.ToString(),
+                CorrelationId = TryGetStringPayload(data, "CorrelationId")
+            };
         }
 
         internal WintapMessage EmitStart(
@@ -365,6 +726,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             SecurityIdentifier sid,
             SidParseStatus sidStatus)
         {
+            CountSidStatus(sidStatus);
             string path = string.Empty;
             string commandLine = string.Empty;
             string user = string.Empty;
@@ -389,9 +751,19 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
             try
             {
-                commandLine = !string.IsNullOrWhiteSpace(etwCommandLine)
-                    ? etwCommandLine
-                    : SafeInvoke(() => lookupPebCommandLineByPid(pid));
+                if (!string.IsNullOrWhiteSpace(etwCommandLine))
+                {
+                    commandLine = etwCommandLine;
+                }
+                else
+                {
+                    Interlocked.Increment(ref cmdlineEmptyCount);
+                    commandLine = SafeInvoke(() => lookupPebCommandLineByPid(pid));
+                    if (!string.IsNullOrWhiteSpace(commandLine))
+                    {
+                        Interlocked.Increment(ref cmdlinePebRecoveredCount);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -418,6 +790,22 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             };
         }
 
+        private void CountSidStatus(SidParseStatus sidStatus)
+        {
+            switch (sidStatus)
+            {
+                case SidParseStatus.Extracted:
+                    Interlocked.Increment(ref sidExtractedCount);
+                    break;
+                case SidParseStatus.NoSid:
+                    Interlocked.Increment(ref sidNullCount);
+                    break;
+                case SidParseStatus.Malformed:
+                    Interlocked.Increment(ref sidMalformedCount);
+                    break;
+            }
+        }
+
         private string ResolveStartUser(int pid, SecurityIdentifier sid, SidParseStatus sidStatus)
         {
             if (sidStatus == SidParseStatus.Extracted && sid != null)
@@ -440,6 +828,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
             if (sidStatus == SidParseStatus.NoSid || sidStatus == SidParseStatus.Malformed)
             {
+                Interlocked.Increment(ref sidFallbackCount);
                 return SafeInvoke(() => lookupTokenUserByPid(pid));
             }
 
@@ -505,6 +894,16 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             string imageFileName,
             long exitCode)
         {
+            return EmitStopCore(pid, stopTimestamp, imageFileName, exitCode, null);
+        }
+
+        private WintapMessage EmitStopCore(
+            int pid,
+            DateTime stopTimestamp,
+            string imageFileName,
+            long exitCode,
+            ManifestStopMetrics metrics)
+        {
             DateTime stopTimeUtc = stopTimestamp.ToUniversalTime();
             ProcessRecord processRecord = resolveProcessAtTime(pid, stopTimeUtc);
 
@@ -524,7 +923,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
             else
             {
-                StopWithoutStartCount++;
+                Interlocked.Increment(ref stopWithoutStartCount);
                 pidHash = genPidHash(pid, stopTimeUtc.ToFileTimeUtc());
                 parentPidHash = string.Empty;
                 parentPid = 0;
@@ -546,9 +945,32 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     ParentPidHash = parentPidHash,
                     Name = processName,
                     Path = processPath,
-                    ExitCode = exitCode
+                    ExitCode = exitCode,
+                    CPUCycleCount = metrics?.CPUCycleCount ?? 0,
+                    CPUUtilization = 0,
+                    CommitCharge = metrics?.CommitCharge ?? 0,
+                    CommitPeak = metrics?.CommitPeak ?? 0,
+                    HardFaultCount = metrics?.HardFaultCount ?? 0,
+                    ReadOperationCount = metrics?.ReadOperationCount ?? 0,
+                    ReadTransferKiloBytes = metrics?.ReadTransferKiloBytes ?? 0,
+                    TokenElevationType = metrics?.TokenElevationType ?? 0,
+                    WriteOperationCount = metrics?.WriteOperationCount ?? 0,
+                    WriteTransferKiloBytes = metrics?.WriteTransferKiloBytes ?? 0
                 }
             };
+
+            if (metrics != null)
+            {
+                if (!string.IsNullOrWhiteSpace(metrics.ActivityId))
+                {
+                    message.ActivityId = metrics.ActivityId;
+                }
+
+                if (!string.IsNullOrWhiteSpace(metrics.CorrelationId))
+                {
+                    message.CorrelationId = metrics.CorrelationId;
+                }
+            }
 
             emit(message);
             return message;
@@ -1101,5 +1523,53 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public string Path { get; init; }
         public string CommandLine { get; init; }
         public string User { get; init; }
+    }
+
+    internal sealed class ManifestStopMetrics
+    {
+        public int Pid { get; init; }
+        public DateTime TimestampUtc { get; set; }
+        public string ImageName { get; init; }
+        public long ExitCode { get; init; }
+        public long CPUCycleCount { get; init; }
+        public long CommitCharge { get; init; }
+        public long CommitPeak { get; init; }
+        public int HardFaultCount { get; init; }
+        public long ReadOperationCount { get; init; }
+        public long ReadTransferKiloBytes { get; init; }
+        public int TokenElevationType { get; init; }
+        public long WriteOperationCount { get; init; }
+        public long WriteTransferKiloBytes { get; init; }
+        public string ActivityId { get; init; }
+        public string CorrelationId { get; init; }
+    }
+
+    internal sealed class PendingKernelStop
+    {
+        public int Pid { get; init; }
+        public DateTime StopTimeUtc { get; init; }
+        public string ImageFileName { get; init; }
+        public long ExitCode { get; init; }
+        public DateTime ExpiresAtUtc { get; init; }
+    }
+
+    internal sealed class StopEmission
+    {
+        public PendingKernelStop KernelStop { get; init; }
+        public ManifestStopMetrics Metrics { get; init; }
+    }
+
+    internal sealed class WindowsProcessQaCounters
+    {
+        public long SidExtracted { get; init; }
+        public long SidNull { get; init; }
+        public long SidMalformed { get; init; }
+        public long SidFallback { get; init; }
+        public long CmdlineEmpty { get; init; }
+        public long CmdlinePebRecovered { get; init; }
+        public long StopWithoutStart { get; init; }
+        public long ManifestMetricMisses { get; init; }
+        public long SnapshotCount { get; init; }
+        public long DedupSuppressed { get; init; }
     }
 }

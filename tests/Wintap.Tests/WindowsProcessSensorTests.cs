@@ -473,9 +473,241 @@ namespace Wintap.Tests
             Assert.Equal(string.Empty, message.Process.User);
         }
 
+        [Fact]
+        [Trait("Category", "wpc-05")]
+        public void StopMetricCorrelationWindowHit_MergesMetricsForBothOrderingCases()
+        {
+            DateTime stopTime = new DateTime(2026, 8, 17, 18, 0, 0, DateTimeKind.Utc);
+            var resolved = new ProcessRecord
+            {
+                PidHash = "resolver-pid-hash",
+                ParentPidHash = "resolver-parent-hash",
+                ProcessId = 900,
+                ParentProcessId = 42,
+                ProcessName = "resolver.exe",
+                ProcessPath = "C:\\Resolver\\resolver.exe"
+            };
+
+            var manifestFirstSensor = CreateSensor(out List<WintapMessage> manifestFirstEmitted, resolver: (pid, time) => resolved);
+            manifestFirstSensor.EnqueueManifestStopMetrics(Metrics(900, stopTime.AddSeconds(1)));
+            manifestFirstSensor.EnqueueKernelStop(900, stopTime, "payload.exe", 23);
+
+            var kernelFirstSensor = CreateSensor(out List<WintapMessage> kernelFirstEmitted, resolver: (pid, time) => resolved);
+            kernelFirstSensor.EnqueueKernelStop(900, stopTime, "payload.exe", 23);
+            Assert.Empty(kernelFirstEmitted);
+            kernelFirstSensor.EnqueueManifestStopMetrics(Metrics(900, stopTime.AddSeconds(-1)));
+
+            WintapMessage manifestFirst = Assert.Single(manifestFirstEmitted);
+            WintapMessage kernelFirst = Assert.Single(kernelFirstEmitted);
+            AssertMergedStop(manifestFirst, resolved, 23);
+            AssertMergedStop(kernelFirst, resolved, 23);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-05")]
+        public void StopMetricCorrelationMiss_EmitsDefaultsAfterExpiry()
+        {
+            DateTime now = new DateTime(2026, 8, 17, 18, 30, 0, DateTimeKind.Utc);
+            DateTime stopTime = now;
+            var resolved = new ProcessRecord
+            {
+                PidHash = "default-pid-hash",
+                ParentPidHash = "default-parent-hash",
+                ProcessId = 901,
+                ParentProcessId = 43,
+                ProcessName = "default.exe",
+                ProcessPath = "C:\\Default\\default.exe"
+            };
+            var sensor = CreateSensor(out List<WintapMessage> emitted, resolver: (pid, time) => resolved, utcNow: () => now);
+
+            sensor.EnqueueKernelStop(901, stopTime, "payload.exe", 99);
+            Assert.Empty(emitted);
+
+            now = stopTime + WindowsProcessSensor.StopMetricCorrelationWindow + TimeSpan.FromMilliseconds(1);
+            sensor.DrainStopMetricCorrelation();
+
+            WintapMessage message = Assert.Single(emitted);
+            Assert.Equal(WintapMessage.ActivityTypeEnum.Stop, message.ActivityType);
+            Assert.Equal("default-pid-hash", message.PidHash);
+            Assert.Equal("default-parent-hash", message.Process.ParentPidHash);
+            Assert.Equal(43, message.Process.ParentPID);
+            Assert.Equal(99, message.Process.ExitCode);
+            AssertDefaultStopMetrics(message);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-05")]
+        public void StopMetricExpiry_IncrementsManifestMetricMissesAndDoesNotBlockCallback()
+        {
+            DateTime now = new DateTime(2026, 8, 17, 19, 0, 0, DateTimeKind.Utc);
+            var sensor = CreateSensor(out List<WintapMessage> emitted, utcNow: () => now);
+
+            sensor.EnqueueKernelStop(902, now, "miss.exe", 7);
+
+            Assert.Empty(emitted);
+            Assert.Equal(0, sensor.ManifestMetricMissesCount);
+
+            now = now + WindowsProcessSensor.StopMetricCorrelationWindow;
+            sensor.DrainStopMetricCorrelation();
+
+            Assert.Single(emitted);
+            Assert.Equal(1, sensor.ManifestMetricMissesCount);
+            AssertDefaultStopMetrics(emitted[0]);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-05")]
+        public void StopMetricCorrelation_UsesNearestMetricsAndResolverTimestampForPidReuse()
+        {
+            DateTime now = new DateTime(2026, 8, 17, 20, 0, 0, DateTimeKind.Utc);
+            DateTime firstStop = now;
+            DateTime secondStop = now.AddSeconds(20);
+            var firstRecord = new ProcessRecord
+            {
+                PidHash = "first-pid-hash",
+                ParentPidHash = "first-parent-hash",
+                ProcessId = 903,
+                ParentProcessId = 100,
+                ProcessName = "first.exe",
+                ProcessPath = "C:\\First\\first.exe"
+            };
+            var secondRecord = new ProcessRecord
+            {
+                PidHash = "second-pid-hash",
+                ParentPidHash = "second-parent-hash",
+                ProcessId = 903,
+                ParentProcessId = 200,
+                ProcessName = "second.exe",
+                ProcessPath = "C:\\Second\\second.exe"
+            };
+            var resolverCalls = new List<DateTime>();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) =>
+                {
+                    resolverCalls.Add(time);
+                    return time == secondStop ? secondRecord : firstRecord;
+                },
+                utcNow: () => now);
+
+            sensor.EnqueueKernelStop(903, firstStop, "first-payload.exe", 1);
+            sensor.EnqueueKernelStop(903, secondStop, "second-payload.exe", 2);
+            sensor.EnqueueManifestStopMetrics(Metrics(903, secondStop.AddMilliseconds(100)));
+
+            WintapMessage second = Assert.Single(emitted);
+            Assert.Equal("second-pid-hash", second.PidHash);
+            Assert.Equal("second-parent-hash", second.Process.ParentPidHash);
+            Assert.Equal(200, second.Process.ParentPID);
+            Assert.Equal(123456789, second.Process.CPUCycleCount);
+
+            now = firstStop + WindowsProcessSensor.StopMetricCorrelationWindow;
+            sensor.DrainStopMetricCorrelation();
+
+            Assert.Equal(2, emitted.Count);
+            WintapMessage first = emitted.Single(message => message.PidHash == "first-pid-hash");
+            Assert.Equal("first-parent-hash", first.Process.ParentPidHash);
+            Assert.Equal(100, first.Process.ParentPID);
+            AssertDefaultStopMetrics(first);
+            Assert.Contains(firstStop, resolverCalls);
+            Assert.Contains(secondStop, resolverCalls);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-06")]
+        public void QaCounterSnapshot_UsesExpectedNamesAndFormatExactlyOnce()
+        {
+            var counters = new WindowsProcessQaCounters
+            {
+                SidExtracted = 1,
+                SidNull = 2,
+                SidMalformed = 3,
+                SidFallback = 4,
+                CmdlineEmpty = 5,
+                CmdlinePebRecovered = 6,
+                StopWithoutStart = 7,
+                ManifestMetricMisses = 8,
+                SnapshotCount = 9,
+                DedupSuppressed = 10
+            };
+
+            string formatted = WindowsProcessSensor.FormatQaCounterSnapshot(counters);
+
+            Assert.StartsWith("Windows process QA counters:", formatted);
+            AssertQaCounterName(formatted, "sid_extracted", "1");
+            AssertQaCounterName(formatted, "sid_null", "2");
+            AssertQaCounterName(formatted, "sid_malformed", "3");
+            AssertQaCounterName(formatted, "sid_fallback", "4");
+            AssertQaCounterName(formatted, "cmdline_empty", "5");
+            AssertQaCounterName(formatted, "cmdline_peb_recovered", "6");
+            AssertQaCounterName(formatted, "stop_without_start", "7");
+            AssertQaCounterName(formatted, "manifest_metric_misses", "8");
+            AssertQaCounterName(formatted, "snapshot_count", "9");
+            AssertQaCounterName(formatted, "dedup_suppressed", "10");
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-06")]
+        public void QaCounterSnapshot_ReportsExpectedValuesAfterSimulatedActivity()
+        {
+            DateTime now = BootTime().AddHours(10);
+            DateTime duplicateCreateTime = BootTime().AddMinutes(1);
+            var sensor = CreateSensor(
+                out _,
+                resolver: (pid, time) => pid == 400
+                    ? new ProcessRecord { ProcessId = pid, CreateTime = duplicateCreateTime.AddSeconds(1) }
+                    : null,
+                utcNow: () => now,
+                enumerateSnapshot: () => new[]
+                {
+                    Snapshot(400, 4, duplicateCreateTime, "duplicate.exe"),
+                    Snapshot(401, 4, duplicateCreateTime.AddMinutes(1), "refresh.exe")
+                },
+                lookupAccountSid: sid => "NT AUTHORITY\\SYSTEM",
+                lookupTokenUserByPid: pid => string.Empty,
+                lookupPebCommandLineByPid: pid => pid == 101 ? "from-peb.exe --recovered" : string.Empty);
+
+            sensor.EnrichStartFields(100, "extracted.exe", "from-etw.exe", new SecurityIdentifier("S-1-5-18"), SidParseStatus.Extracted);
+            sensor.EnrichStartFields(101, "nosid.exe", string.Empty, null, SidParseStatus.NoSid);
+            sensor.EnrichStartFields(102, "malformed.exe", string.Empty, null, SidParseStatus.Malformed);
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            sensor.EmitStop(500, now, "miss.exe", 1);
+            sensor.EnqueueKernelStop(600, now, "metric-miss.exe", 2);
+            now = now + WindowsProcessSensor.StopMetricCorrelationWindow;
+            sensor.DrainStopMetricCorrelation();
+
+            WindowsProcessQaCounters snapshot = sensor.GetQaCounterSnapshot();
+            Assert.Equal(1, snapshot.SidExtracted);
+            Assert.Equal(1, snapshot.SidNull);
+            Assert.Equal(1, snapshot.SidMalformed);
+            Assert.Equal(2, snapshot.SidFallback);
+            Assert.Equal(2, snapshot.CmdlineEmpty);
+            Assert.Equal(1, snapshot.CmdlinePebRecovered);
+            Assert.Equal(2, snapshot.StopWithoutStart);
+            Assert.Equal(1, snapshot.ManifestMetricMisses);
+            Assert.Equal(4, snapshot.SnapshotCount);
+            Assert.Equal(1, snapshot.DedupSuppressed);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-06")]
+        public void Stop_LogsFinalQaCountersWithSameSnapshotFormat()
+        {
+            var logs = new List<string>();
+            var sensor = CreateSensor(out _, logs: logs);
+            sensor.EnrichStartFields(101, "nosid.exe", string.Empty, null, SidParseStatus.NoSid);
+
+            sensor.Stop();
+
+            string qaLine = Assert.Single(logs, line => line.StartsWith("Windows process QA counters:"));
+            AssertQaCounterName(qaLine, "sid_null", "1");
+            AssertQaCounterName(qaLine, "sid_fallback", "1");
+            AssertQaCounterName(qaLine, "cmdline_empty", "1");
+        }
+
         private static WindowsProcessSensor CreateSensor(
             out List<WintapMessage> emitted,
             Func<int, DateTime, ProcessRecord> resolver = null,
+            Func<DateTime> utcNow = null,
             Func<IReadOnlyList<SnapshotProcessInfo>> enumerateSnapshot = null,
             Action clearProcessDb = null,
             Action<WintapMessage> emitOverride = null,
@@ -484,26 +716,67 @@ namespace Wintap.Tests
             Func<int, string> lookupPebCommandLineByPid = null,
             Func<int, string> lookupFullProcessImagePathByPid = null,
             Func<string, string> translateDevicePath = null,
-            int sidAccountCacheMaxSize = 1024)
+            int sidAccountCacheMaxSize = 1024,
+            List<string> logs = null)
         {
             emitted = new List<WintapMessage>();
             List<WintapMessage> captured = emitted;
             return new WindowsProcessSensor(
                 resolveProcessAtTime: resolver ?? ((pid, eventTimeUtc) => null),
                 emit: emitOverride ?? captured.Add,
-                utcNow: () => new DateTime(2026, 8, 17, 0, 0, 0, DateTimeKind.Utc),
+                utcNow: utcNow ?? (() => new DateTime(2026, 8, 17, 0, 0, 0, DateTimeKind.Utc)),
                 genPidHash: TestPidHash,
                 enumerateSnapshot: enumerateSnapshot ?? (() => Array.Empty<SnapshotProcessInfo>()),
                 clearProcessDb: clearProcessDb ?? (() => { }),
                 machineBootTimeUtc: BootTime,
-                log: (message, level) => { },
+                log: (message, level) => logs?.Add(message),
                 lookupAccountSid: lookupAccountSid ?? (sid => string.Empty),
                 lookupTokenUserByPid: lookupTokenUserByPid ?? (pid => string.Empty),
                 lookupPebCommandLineByPid: lookupPebCommandLineByPid ?? (pid => string.Empty),
                 lookupFullProcessImagePathByPid: lookupFullProcessImagePathByPid ?? (pid => string.Empty),
                 translateDevicePath: translateDevicePath ?? (path => string.Empty),
-                sidAccountCacheMaxSize: sidAccountCacheMaxSize);
+                sidAccountCacheMaxSize: sidAccountCacheMaxSize,
+                enableQaCounterTimer: false);
         }
+
+        private static void AssertQaCounterName(string formatted, string name, string value)
+        {
+            Assert.Equal(1, CountOccurrences(formatted, name + "="));
+            Assert.Contains(name + "=" + value, formatted);
+        }
+
+        private static int CountOccurrences(string value, string search)
+        {
+            int count = 0;
+            int index = 0;
+            while ((index = value.IndexOf(search, index, StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                index += search.Length;
+            }
+
+            return count;
+        }
+
+        private static ManifestStopMetrics Metrics(int pid, DateTime timestampUtc)
+            => new ManifestStopMetrics
+            {
+                Pid = pid,
+                TimestampUtc = timestampUtc,
+                ImageName = "manifest.exe",
+                ExitCode = 222,
+                CPUCycleCount = 123456789,
+                CommitCharge = 111,
+                CommitPeak = 222,
+                HardFaultCount = 333,
+                ReadOperationCount = 444,
+                ReadTransferKiloBytes = 555,
+                TokenElevationType = 2,
+                WriteOperationCount = 666,
+                WriteTransferKiloBytes = 777,
+                ActivityId = "activity-id",
+                CorrelationId = "correlation-id"
+            };
 
         private static string TestPidHash(int pid, long fileTimeUtc)
             => $"pid={pid};fileTimeUtc={fileTimeUtc}";
@@ -538,6 +811,45 @@ namespace Wintap.Tests
             Assert.Equal(string.Empty, message.Process.CommandLine);
             Assert.Equal(string.Empty, message.Process.Arguments);
             Assert.Equal("SYSTEM", message.Process.User);
+        }
+
+        private static void AssertMergedStop(WintapMessage message, ProcessRecord resolved, long exitCode)
+        {
+            Assert.Equal(WintapMessage.ActivityTypeEnum.Stop, message.ActivityType);
+            Assert.Equal(resolved.PidHash, message.PidHash);
+            Assert.Equal(resolved.ParentPidHash, message.Process.ParentPidHash);
+            Assert.Equal(resolved.ParentProcessId, message.Process.ParentPID);
+            Assert.Equal(resolved.ProcessName, message.ProcessName);
+            Assert.Equal(resolved.ProcessPath, message.ProcessPath);
+            Assert.Equal(resolved.ProcessName, message.Process.Name);
+            Assert.Equal(resolved.ProcessPath, message.Process.Path);
+            Assert.Equal(exitCode, message.Process.ExitCode);
+            Assert.Equal(123456789, message.Process.CPUCycleCount);
+            Assert.Equal(0, message.Process.CPUUtilization);
+            Assert.Equal(111, message.Process.CommitCharge);
+            Assert.Equal(222, message.Process.CommitPeak);
+            Assert.Equal(333, message.Process.HardFaultCount);
+            Assert.Equal(444, message.Process.ReadOperationCount);
+            Assert.Equal(555, message.Process.ReadTransferKiloBytes);
+            Assert.Equal(2, message.Process.TokenElevationType);
+            Assert.Equal(666, message.Process.WriteOperationCount);
+            Assert.Equal(777, message.Process.WriteTransferKiloBytes);
+            Assert.Equal("activity-id", message.ActivityId);
+            Assert.Equal("correlation-id", message.CorrelationId);
+        }
+
+        private static void AssertDefaultStopMetrics(WintapMessage message)
+        {
+            Assert.Equal(0, message.Process.CPUCycleCount);
+            Assert.Equal(0, message.Process.CPUUtilization);
+            Assert.Equal(0, message.Process.CommitCharge);
+            Assert.Equal(0, message.Process.CommitPeak);
+            Assert.Equal(0, message.Process.HardFaultCount);
+            Assert.Equal(0, message.Process.ReadOperationCount);
+            Assert.Equal(0, message.Process.ReadTransferKiloBytes);
+            Assert.Equal(0, message.Process.TokenElevationType);
+            Assert.Equal(0, message.Process.WriteOperationCount);
+            Assert.Equal(0, message.Process.WriteTransferKiloBytes);
         }
     }
 }

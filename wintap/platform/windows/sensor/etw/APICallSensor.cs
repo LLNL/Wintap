@@ -4,7 +4,6 @@ using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using System;
 using System.Collections.Generic;
-using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {

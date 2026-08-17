@@ -899,8 +899,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             var flagsStr = eventFlags.ToString();
 
-            if (flagsStr.Contains("Process"))
-                Properties.Settings.Default.ProcessSensor = true;
+            // WindowsProcessSensor is mandatory and no longer settings-enabled.
             if (flagsStr.Contains("FileActivity"))
                 Properties.Settings.Default.FileSensor = true;
             if (flagsStr.Contains("RegistryActivity"))

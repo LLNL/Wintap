@@ -73,18 +73,6 @@ namespace gov.llnl.wintap.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool ProcessSensor {
-            get {
-                return ((bool)(this["ProcessSensor"]));
-            }
-            set {
-                this["ProcessSensor"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool FileSensor {
             get {
@@ -152,18 +140,6 @@ namespace gov.llnl.wintap.Properties {
             }
             set {
                 this["ImageLoadSensor"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool ProcessStopSensor {
-            get {
-                return ((bool)(this["ProcessStopSensor"]));
-            }
-            set {
-                this["ProcessStopSensor"] = value;
             }
         }
         

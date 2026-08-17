@@ -26,16 +26,12 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         {
             List<BaseWindowsSensor> baseSensors = new List<BaseWindowsSensor>();
 
-            // start process sensor first for process attribution
-            ProcessSensor pc = new ProcessSensor();
-            //if(DateTime.UtcNow.Subtract(StateManager.MachineBootTime.ToUniversalTime()).TotalMinutes < 5)
-            //{
-            //    pc.Initialize();
-            //}
-            pc.Initialize();
-            WintapLogger.Log.Append("Starting Process sensor", LogLevel.Info);
+            // start unified process sensor first for process attribution
+            WindowsProcessSensor pc = new WindowsProcessSensor();
+            pc.InitializeSnapshotRefresh();
+            WintapLogger.Log.Append("Starting Windows process sensor", LogLevel.Info);
             pc.Start();
-            WintapLogger.Log.Append("Process sensor started", LogLevel.Info);
+            WintapLogger.Log.Append("Windows process sensor started", LogLevel.Info);
             kernelFlags = KernelTraceEventParser.Keywords.Process;
             baseSensors.Add(pc);
 
@@ -46,10 +42,6 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 if (sp.Name.EndsWith("Sensor") && Properties.Settings.Default[sp.Name].ToString() == "True")
                 {
                     System.Threading.Thread.Sleep(500);  // without this you will sometimes get an exception from TraceEventSession
-                    if (sp.Name == "ProcessSensor")
-                    {
-                        continue;
-                    }
                     string sensorName = nameSpace + "." + sp.Name;
                     WintapLogger.Log.Append("Attempting to load sensor with name: " + sensorName, LogLevel.Info);
                     try
