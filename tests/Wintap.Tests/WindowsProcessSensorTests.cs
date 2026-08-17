@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Principal;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.platform.windows.collect.etw;
+using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using Xunit;
 
 namespace Wintap.Tests
@@ -279,12 +281,210 @@ namespace Wintap.Tests
             Assert.Equal(0, outsideToleranceSensor.SnapshotDedupSuppressedCount);
         }
 
+        [Fact]
+        [Trait("Category", "wpc-04")]
+        public void EnrichStartFields_CachesExtractedSidAccountLookup()
+        {
+            SecurityIdentifier sid = new SecurityIdentifier("S-1-5-18");
+            int lookupCount = 0;
+            int tokenCount = 0;
+            var sensor = CreateSensor(
+                out _,
+                lookupAccountSid: value =>
+                {
+                    lookupCount++;
+                    return "NT AUTHORITY\\SYSTEM";
+                },
+                lookupTokenUserByPid: pid =>
+                {
+                    tokenCount++;
+                    return "TOKEN\\user";
+                });
+
+            ProcessFieldEnrichment first = sensor.EnrichStartFields(100, "proc.exe", "proc.exe", sid, SidParseStatus.Extracted);
+            ProcessFieldEnrichment second = sensor.EnrichStartFields(101, "proc.exe", "proc.exe", sid, SidParseStatus.Extracted);
+
+            Assert.Equal("NT AUTHORITY\\SYSTEM", first.User);
+            Assert.Equal("NT AUTHORITY\\SYSTEM", second.User);
+            Assert.Equal(1, lookupCount);
+            Assert.Equal(0, tokenCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-04")]
+        public void EnrichStartFields_BoundsSidAccountCacheAndEvictsDeterministically()
+        {
+            int lookupCount = 0;
+            var sid18 = new SecurityIdentifier("S-1-5-18");
+            var sid19 = new SecurityIdentifier("S-1-5-19");
+            var sid20 = new SecurityIdentifier("S-1-5-20");
+            var sensor = CreateSensor(
+                out _,
+                lookupAccountSid: sid =>
+                {
+                    lookupCount++;
+                    return $"ACCOUNT-{sid.Value}";
+                },
+                sidAccountCacheMaxSize: 2);
+
+            sensor.EnrichStartFields(1, "one.exe", "one.exe", sid18, SidParseStatus.Extracted);
+            sensor.EnrichStartFields(2, "two.exe", "two.exe", sid19, SidParseStatus.Extracted);
+            sensor.EnrichStartFields(3, "three.exe", "three.exe", sid20, SidParseStatus.Extracted);
+            sensor.EnrichStartFields(4, "one.exe", "one.exe", sid18, SidParseStatus.Extracted);
+
+            Assert.Equal(2, sensor.SidAccountCacheCount);
+            Assert.Equal(4, lookupCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-04")]
+        public void EnrichStartFields_UsesExpectedUserFallbackMatrix()
+        {
+            SecurityIdentifier sid = new SecurityIdentifier("S-1-5-18");
+            int sidLookupCount = 0;
+            int tokenLookupCount = 0;
+            var sensor = CreateSensor(
+                out _,
+                lookupAccountSid: value =>
+                {
+                    sidLookupCount++;
+                    return "DOMAIN\\sid-user";
+                },
+                lookupTokenUserByPid: pid =>
+                {
+                    tokenLookupCount++;
+                    return pid == 44 ? string.Empty : $"TOKEN\\pid-{pid}";
+                });
+
+            ProcessFieldEnrichment extracted = sensor.EnrichStartFields(42, "p.exe", "p.exe", sid, SidParseStatus.Extracted);
+            ProcessFieldEnrichment noSid = sensor.EnrichStartFields(43, "p.exe", "p.exe", null, SidParseStatus.NoSid);
+            ProcessFieldEnrichment malformed = sensor.EnrichStartFields(44, "p.exe", "p.exe", null, SidParseStatus.Malformed);
+
+            Assert.Equal("DOMAIN\\sid-user", extracted.User);
+            Assert.Equal("TOKEN\\pid-43", noSid.User);
+            Assert.Equal(string.Empty, malformed.User);
+            Assert.Equal(1, sidLookupCount);
+            Assert.Equal(2, tokenLookupCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-04")]
+        public void EnrichStartFields_UsesExpectedCommandLineFallbackMatrix()
+        {
+            int pebLookupCount = 0;
+            var sensor = CreateSensor(
+                out _,
+                lookupPebCommandLineByPid: pid =>
+                {
+                    pebLookupCount++;
+                    if (pid == 52)
+                    {
+                        throw new InvalidOperationException("PEB unavailable");
+                    }
+
+                    return pid == 51 ? "from-peb.exe --fallback" : string.Empty;
+                });
+
+            ProcessFieldEnrichment etwWins = sensor.EnrichStartFields(50, "p.exe", "from-etw.exe --flag", null, SidParseStatus.Extracted);
+            ProcessFieldEnrichment pebFallback = sensor.EnrichStartFields(51, "p.exe", string.Empty, null, SidParseStatus.Extracted);
+            ProcessFieldEnrichment pebFails = sensor.EnrichStartFields(52, "p.exe", string.Empty, null, SidParseStatus.Extracted);
+
+            Assert.Equal("from-etw.exe --flag", etwWins.CommandLine);
+            Assert.Equal("from-peb.exe --fallback", pebFallback.CommandLine);
+            Assert.Equal(string.Empty, pebFails.CommandLine);
+            Assert.Equal(2, pebLookupCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-04")]
+        public void EnrichStartFields_UsesExpectedPathFallbackMatrix()
+        {
+            var fullPathSensor = CreateSensor(
+                out _,
+                lookupFullProcessImagePathByPid: pid => "C:\\Live\\live.exe");
+            var translatedSensor = CreateSensor(
+                out _,
+                lookupFullProcessImagePathByPid: pid => string.Empty,
+                translateDevicePath: path => "C:\\Translated\\translated.exe");
+            var etwFallbackSensor = CreateSensor(
+                out _,
+                lookupFullProcessImagePathByPid: pid => string.Empty,
+                translateDevicePath: path => string.Empty);
+
+            ProcessFieldEnrichment fullPath = fullPathSensor.EnrichStartFields(60, @"\Device\HarddiskVolume1\payload.exe", "", null, SidParseStatus.Extracted);
+            ProcessFieldEnrichment translated = translatedSensor.EnrichStartFields(61, @"\Device\HarddiskVolume1\payload.exe", "", null, SidParseStatus.Extracted);
+            ProcessFieldEnrichment etw = etwFallbackSensor.EnrichStartFields(62, "payload.exe", "", null, SidParseStatus.Extracted);
+
+            Assert.Equal("C:\\Live\\live.exe", fullPath.Path);
+            Assert.Equal("live.exe", fullPath.Name);
+            Assert.Equal("C:\\Translated\\translated.exe", translated.Path);
+            Assert.Equal("translated.exe", translated.Name);
+            Assert.Equal("payload.exe", etw.Path);
+            Assert.Equal("payload.exe", etw.Name);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-04")]
+        public void EmitStart_UsesEnrichedFieldsAndEtwStartTimestampPidHash()
+        {
+            SecurityIdentifier sid = new SecurityIdentifier("S-1-5-18");
+            DateTime startTimestamp = new DateTime(2026, 8, 17, 16, 0, 0, DateTimeKind.Utc);
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                lookupAccountSid: value => "DOMAIN\\enriched-user",
+                lookupFullProcessImagePathByPid: pid => "C:\\Enriched\\enriched.exe");
+
+            WintapMessage message = sensor.EmitStart(700, 42, startTimestamp, "payload.exe", "enriched.exe --from-etw", sid, SidParseStatus.Extracted);
+
+            Assert.Single(emitted);
+            Assert.Same(message, emitted[0]);
+            Assert.Equal(WintapMessage.ActivityTypeEnum.Start, message.ActivityType);
+            Assert.Equal(TestPidHash(700, startTimestamp.ToFileTimeUtc()), message.PidHash);
+            Assert.Equal("enriched.exe", message.ProcessName);
+            Assert.Equal("C:\\Enriched\\enriched.exe", message.ProcessPath);
+            Assert.Equal("enriched.exe", message.Process.Name);
+            Assert.Equal("C:\\Enriched\\enriched.exe", message.Process.Path);
+            Assert.Equal("enriched.exe --from-etw", message.Process.CommandLine);
+            Assert.Equal("enriched.exe --from-etw", message.Process.Arguments);
+            Assert.Equal("DOMAIN\\enriched-user", message.Process.User);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-04")]
+        public void EmitStart_EnrichmentExceptionsDoNotPreventEmission()
+        {
+            DateTime startTimestamp = new DateTime(2026, 8, 17, 17, 0, 0, DateTimeKind.Utc);
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                lookupFullProcessImagePathByPid: pid => throw new InvalidOperationException("path denied"),
+                translateDevicePath: path => throw new InvalidOperationException("translation denied"),
+                lookupPebCommandLineByPid: pid => throw new InvalidOperationException("peb denied"),
+                lookupTokenUserByPid: pid => throw new InvalidOperationException("token denied"));
+
+            WintapMessage message = sensor.EmitStart(800, 1, startTimestamp, "fallback.exe", string.Empty, null, SidParseStatus.NoSid);
+
+            Assert.Single(emitted);
+            Assert.Same(message, emitted[0]);
+            Assert.Equal(WintapMessage.ActivityTypeEnum.Start, message.ActivityType);
+            Assert.Equal("fallback.exe", message.ProcessName);
+            Assert.Equal("fallback.exe", message.ProcessPath);
+            Assert.Equal(string.Empty, message.Process.CommandLine);
+            Assert.Equal(string.Empty, message.Process.Arguments);
+            Assert.Equal(string.Empty, message.Process.User);
+        }
+
         private static WindowsProcessSensor CreateSensor(
             out List<WintapMessage> emitted,
             Func<int, DateTime, ProcessRecord> resolver = null,
             Func<IReadOnlyList<SnapshotProcessInfo>> enumerateSnapshot = null,
             Action clearProcessDb = null,
-            Action<WintapMessage> emitOverride = null)
+            Action<WintapMessage> emitOverride = null,
+            Func<SecurityIdentifier, string> lookupAccountSid = null,
+            Func<int, string> lookupTokenUserByPid = null,
+            Func<int, string> lookupPebCommandLineByPid = null,
+            Func<int, string> lookupFullProcessImagePathByPid = null,
+            Func<string, string> translateDevicePath = null,
+            int sidAccountCacheMaxSize = 1024)
         {
             emitted = new List<WintapMessage>();
             List<WintapMessage> captured = emitted;
@@ -296,7 +496,13 @@ namespace Wintap.Tests
                 enumerateSnapshot: enumerateSnapshot ?? (() => Array.Empty<SnapshotProcessInfo>()),
                 clearProcessDb: clearProcessDb ?? (() => { }),
                 machineBootTimeUtc: BootTime,
-                log: (message, level) => { });
+                log: (message, level) => { },
+                lookupAccountSid: lookupAccountSid ?? (sid => string.Empty),
+                lookupTokenUserByPid: lookupTokenUserByPid ?? (pid => string.Empty),
+                lookupPebCommandLineByPid: lookupPebCommandLineByPid ?? (pid => string.Empty),
+                lookupFullProcessImagePathByPid: lookupFullProcessImagePathByPid ?? (pid => string.Empty),
+                translateDevicePath: translateDevicePath ?? (path => string.Empty),
+                sidAccountCacheMaxSize: sidAccountCacheMaxSize);
         }
 
         private static string TestPidHash(int pid, long fileTimeUtc)

@@ -16,6 +16,7 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.core.shared.helpers;
+using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
@@ -29,6 +30,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     internal class WindowsProcessSensor : EtwProviderCollector
     {
         private static readonly TimeSpan SnapshotStartMatchTolerance = TimeSpan.FromSeconds(2);
+        private const int DefaultSidAccountCacheSize = 1024;
 
         private readonly Func<int, DateTime, ProcessRecord> resolveProcessAtTime;
         private readonly Action<WintapMessage> emit;
@@ -39,6 +41,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private readonly Func<DateTime> machineBootTimeUtc;
         private readonly Action<string, LogLevel> log;
         private readonly ProcessHash processHash;
+        private readonly Func<SecurityIdentifier, string> lookupAccountSid;
+        private readonly Func<int, string> lookupTokenUserByPid;
+        private readonly Func<int, string> lookupPebCommandLineByPid;
+        private readonly Func<int, string> lookupFullProcessImagePathByPid;
+        private readonly Func<string, string> translateDevicePath;
+        private readonly int sidAccountCacheMaxSize;
+        private readonly Dictionary<string, string> sidAccountCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Queue<string> sidAccountCacheOrder = new Queue<string>();
 
         internal WindowsProcessSensor(
             Func<int, DateTime, ProcessRecord> resolveProcessAtTime = null,
@@ -48,7 +58,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             Func<IReadOnlyList<SnapshotProcessInfo>> enumerateSnapshot = null,
             Action clearProcessDb = null,
             Func<DateTime> machineBootTimeUtc = null,
-            Action<string, LogLevel> log = null) : base()
+            Action<string, LogLevel> log = null,
+            Func<SecurityIdentifier, string> lookupAccountSid = null,
+            Func<int, string> lookupTokenUserByPid = null,
+            Func<int, string> lookupPebCommandLineByPid = null,
+            Func<int, string> lookupFullProcessImagePathByPid = null,
+            Func<string, string> translateDevicePath = null,
+            int sidAccountCacheMaxSize = DefaultSidAccountCacheSize) : base()
         {
             SensorName = "WindowsProcess";
             EtwProviderId = "SystemTraceControlGuid";
@@ -61,12 +77,19 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             this.clearProcessDb = clearProcessDb ?? EventChannel.ClearProcessDB;
             this.machineBootTimeUtc = machineBootTimeUtc ?? (() => StateManager.MachineBootTime.ToUniversalTime());
             this.log = log ?? ((message, level) => WintapLogger.Log.Append(message, level));
+            this.lookupAccountSid = lookupAccountSid ?? TryLookupAccountSid;
+            this.lookupTokenUserByPid = lookupTokenUserByPid ?? TryGetProcessUserByPid;
+            this.lookupPebCommandLineByPid = lookupPebCommandLineByPid ?? TryReadCommandLineByPid;
+            this.lookupFullProcessImagePathByPid = lookupFullProcessImagePathByPid ?? TryGetProcessPathByPid;
+            this.translateDevicePath = translateDevicePath ?? TryTranslateDevicePathToWin32Path;
+            this.sidAccountCacheMaxSize = Math.Max(1, sidAccountCacheMaxSize);
             processHash = new ProcessHash();
             this.genPidHash = genPidHash ?? processHash.GenPidHash;
         }
 
         internal long StopWithoutStartCount { get; private set; }
         internal long SnapshotDedupSuppressedCount { get; private set; }
+        internal int SidAccountCacheCount => sidAccountCache.Count;
 
         public override bool Start()
         {
@@ -231,8 +254,20 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 int parentPid = TryGetIntPayload(data, "ParentID", 0);
                 string imageFileName = TryGetStringPayload(data, "ImageFileName");
                 string commandLine = TryGetStringPayload(data, "CommandLine");
+                SecurityIdentifier sid = null;
+                SidParseStatus sidStatus;
 
-                EmitStart(pid, parentPid, data.TimeStamp, imageFileName, commandLine);
+                try
+                {
+                    sidStatus = data.TryGetUserSid(out sid);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Error extracting UserSID from Windows process Start event: {ex.Message}", LogLevel.Debug);
+                    sidStatus = SidParseStatus.Malformed;
+                }
+
+                EmitStart(pid, parentPid, data.TimeStamp, imageFileName, commandLine, sid, sidStatus);
             }
             catch (Exception ex)
             {
@@ -263,10 +298,41 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             string imageFileName,
             string commandLine)
         {
+            ProcessFieldEnrichment enrichment = new ProcessFieldEnrichment
+            {
+                Name = imageFileName ?? string.Empty,
+                Path = imageFileName ?? string.Empty,
+                CommandLine = commandLine ?? string.Empty,
+                User = string.Empty
+            };
+
+            return EmitStart(pid, parentPid, etwStartTimestamp, enrichment);
+        }
+
+        internal WintapMessage EmitStart(
+            int pid,
+            int parentPid,
+            DateTime etwStartTimestamp,
+            string imageFileName,
+            string commandLine,
+            SecurityIdentifier sid,
+            SidParseStatus sidStatus)
+        {
+            ProcessFieldEnrichment enrichment = EnrichStartFields(pid, imageFileName, commandLine, sid, sidStatus);
+            return EmitStart(pid, parentPid, etwStartTimestamp, enrichment);
+        }
+
+        private WintapMessage EmitStart(
+            int pid,
+            int parentPid,
+            DateTime etwStartTimestamp,
+            ProcessFieldEnrichment enrichment)
+        {
             DateTime createTimeUtc = CanonicalizeCreateTimeUtc(pid, etwStartTimestamp);
-            string processName = imageFileName ?? string.Empty;
-            string processPath = imageFileName ?? string.Empty;
-            string safeCommandLine = commandLine ?? string.Empty;
+            string processName = enrichment?.Name ?? string.Empty;
+            string processPath = enrichment?.Path ?? string.Empty;
+            string safeCommandLine = enrichment?.CommandLine ?? string.Empty;
+            string user = enrichment?.User ?? string.Empty;
 
             var message = new WintapMessage(createTimeUtc, pid, WintapMessage.MessageTypeEnum.Process)
             {
@@ -284,12 +350,153 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     Path = processPath,
                     CommandLine = safeCommandLine,
                     Arguments = safeCommandLine,
-                    User = string.Empty
+                    User = user
                 }
             };
 
             emit(message);
             return message;
+        }
+
+        internal ProcessFieldEnrichment EnrichStartFields(
+            int pid,
+            string etwImageFileName,
+            string etwCommandLine,
+            SecurityIdentifier sid,
+            SidParseStatus sidStatus)
+        {
+            string path = string.Empty;
+            string commandLine = string.Empty;
+            string user = string.Empty;
+
+            try
+            {
+                path = SafeInvoke(() => lookupFullProcessImagePathByPid(pid));
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    string etwPath = etwImageFileName ?? string.Empty;
+                    string translatedPath = SafeInvoke(() => translateDevicePath(etwPath));
+                    path = !string.IsNullOrWhiteSpace(translatedPath) ? translatedPath : etwPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process Start path enrichment failed for PID {pid}: {ex.Message}", LogLevel.Debug);
+                path = etwImageFileName ?? string.Empty;
+            }
+
+            string name = GetProcessNameFromPathOrPayload(path, etwImageFileName);
+
+            try
+            {
+                commandLine = !string.IsNullOrWhiteSpace(etwCommandLine)
+                    ? etwCommandLine
+                    : SafeInvoke(() => lookupPebCommandLineByPid(pid));
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process Start command-line enrichment failed for PID {pid}: {ex.Message}", LogLevel.Debug);
+                commandLine = string.Empty;
+            }
+
+            try
+            {
+                user = ResolveStartUser(pid, sid, sidStatus);
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process Start user enrichment failed for PID {pid}: {ex.Message}", LogLevel.Debug);
+                user = string.Empty;
+            }
+
+            return new ProcessFieldEnrichment
+            {
+                Name = name ?? string.Empty,
+                Path = path ?? string.Empty,
+                CommandLine = commandLine ?? string.Empty,
+                User = user ?? string.Empty
+            };
+        }
+
+        private string ResolveStartUser(int pid, SecurityIdentifier sid, SidParseStatus sidStatus)
+        {
+            if (sidStatus == SidParseStatus.Extracted && sid != null)
+            {
+                string sidValue = sid.Value;
+                if (sidAccountCache.TryGetValue(sidValue, out string cachedAccountName))
+                {
+                    return cachedAccountName;
+                }
+
+                string accountName = SafeInvoke(() => lookupAccountSid(sid));
+                if (!string.IsNullOrWhiteSpace(accountName))
+                {
+                    AddSidAccountCacheEntry(sidValue, accountName);
+                    return accountName;
+                }
+
+                return sidValue;
+            }
+
+            if (sidStatus == SidParseStatus.NoSid || sidStatus == SidParseStatus.Malformed)
+            {
+                return SafeInvoke(() => lookupTokenUserByPid(pid));
+            }
+
+            return string.Empty;
+        }
+
+        private void AddSidAccountCacheEntry(string sidValue, string accountName)
+        {
+            if (string.IsNullOrWhiteSpace(sidValue) || string.IsNullOrWhiteSpace(accountName))
+            {
+                return;
+            }
+
+            if (sidAccountCache.ContainsKey(sidValue))
+            {
+                sidAccountCache[sidValue] = accountName;
+                return;
+            }
+
+            while (sidAccountCache.Count >= sidAccountCacheMaxSize && sidAccountCacheOrder.Count > 0)
+            {
+                string oldestSid = sidAccountCacheOrder.Dequeue();
+                sidAccountCache.Remove(oldestSid);
+            }
+
+            sidAccountCache[sidValue] = accountName;
+            sidAccountCacheOrder.Enqueue(sidValue);
+        }
+
+        private string SafeInvoke(Func<string> lookup)
+        {
+            try
+            {
+                return lookup?.Invoke() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process Start enrichment seam failed: {ex.Message}", LogLevel.Debug);
+                return string.Empty;
+            }
+        }
+
+        private static string GetProcessNameFromPathOrPayload(string path, string etwImageFileName)
+        {
+            try
+            {
+                string name = !string.IsNullOrWhiteSpace(path) ? Path.GetFileName(path) : string.Empty;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    return name;
+                }
+            }
+            catch
+            {
+            }
+
+            return etwImageFileName ?? string.Empty;
         }
 
         internal WintapMessage EmitStop(
@@ -591,6 +798,162 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
 
+        private static string TryGetProcessUserByPid(int pid)
+        {
+            IntPtr handle = IntPtr.Zero;
+
+            try
+            {
+                handle = OpenProcess(ProcessAccessFlags.QueryLimitedInformation, false, pid);
+                return handle == IntPtr.Zero ? string.Empty : TryGetProcessUser(handle);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error reading Windows process token user for PID {pid}: {ex.Message}", LogLevel.Debug);
+                return string.Empty;
+            }
+            finally
+            {
+                if (handle != IntPtr.Zero)
+                {
+                    CloseHandle(handle);
+                }
+            }
+        }
+
+        private static string TryReadCommandLineByPid(int pid)
+        {
+            IntPtr handle = IntPtr.Zero;
+
+            try
+            {
+                handle = OpenProcess(ProcessAccessFlags.QueryLimitedInformation | ProcessAccessFlags.VirtualMemoryRead, false, pid);
+                return handle == IntPtr.Zero ? string.Empty : TryReadCommandLine(handle);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error reading Windows process command line for PID {pid}: {ex.Message}", LogLevel.Debug);
+                return string.Empty;
+            }
+            finally
+            {
+                if (handle != IntPtr.Zero)
+                {
+                    CloseHandle(handle);
+                }
+            }
+        }
+
+        private static string TryGetProcessPathByPid(int pid)
+        {
+            IntPtr handle = IntPtr.Zero;
+
+            try
+            {
+                handle = OpenProcess(ProcessAccessFlags.QueryLimitedInformation, false, pid);
+                return handle == IntPtr.Zero ? string.Empty : TryGetProcessPath(handle);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error reading Windows process image path for PID {pid}: {ex.Message}", LogLevel.Debug);
+                return string.Empty;
+            }
+            finally
+            {
+                if (handle != IntPtr.Zero)
+                {
+                    CloseHandle(handle);
+                }
+            }
+        }
+
+        private static string TryLookupAccountSid(SecurityIdentifier sid)
+        {
+            if (sid == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                byte[] sidBytes = new byte[sid.BinaryLength];
+                sid.GetBinaryForm(sidBytes, 0);
+
+                uint nameLength = 256;
+                uint domainLength = 256;
+                var name = new StringBuilder((int)nameLength);
+                var domain = new StringBuilder((int)domainLength);
+
+                if (!LookupAccountSid(null, sidBytes, name, ref nameLength, domain, ref domainLength, out _))
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    if (error != 122 || nameLength == 0)
+                    {
+                        return string.Empty;
+                    }
+
+                    name = new StringBuilder((int)nameLength);
+                    domain = new StringBuilder((int)Math.Max(domainLength, 1));
+                    if (!LookupAccountSid(null, sidBytes, name, ref nameLength, domain, ref domainLength, out _))
+                    {
+                        return string.Empty;
+                    }
+                }
+
+                string accountName = name.ToString();
+                string domainName = domain.ToString();
+                if (string.IsNullOrWhiteSpace(accountName))
+                {
+                    return string.Empty;
+                }
+
+                return string.IsNullOrWhiteSpace(domainName) ? accountName : $"{domainName}\\{accountName}";
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error resolving SID to account name: {ex.Message}", LogLevel.Debug);
+                return string.Empty;
+            }
+        }
+
+        private static string TryTranslateDevicePathToWin32Path(string imagePath)
+        {
+            if (string.IsNullOrWhiteSpace(imagePath) || !imagePath.StartsWith(@"\Device\", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                string bestDrive = string.Empty;
+                string bestDevice = string.Empty;
+
+                foreach (string driveRoot in Environment.GetLogicalDrives())
+                {
+                    string drive = driveRoot.TrimEnd('\\');
+                    var target = new StringBuilder(1024);
+                    if (!QueryDosDevice(drive, target, target.Capacity))
+                    {
+                        continue;
+                    }
+
+                    string device = target.ToString();
+                    if (imagePath.StartsWith(device, StringComparison.OrdinalIgnoreCase) && device.Length > bestDevice.Length)
+                    {
+                        bestDrive = drive;
+                        bestDevice = device;
+                    }
+                }
+
+                return string.IsNullOrEmpty(bestDevice) ? string.Empty : bestDrive + imagePath.Substring(bestDevice.Length);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Error translating Windows device path '{imagePath}': {ex.Message}", LogLevel.Debug);
+                return string.Empty;
+            }
+        }
+
         private static PROCESS_BASIC_INFORMATION QueryProcessBasicInformation(IntPtr processHandle)
         {
             int status = NtQueryInformationProcess(
@@ -646,6 +1009,21 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             VirtualMemoryRead = 0x0010
         }
 
+        private enum SidNameUse
+        {
+            User = 1,
+            Group,
+            Domain,
+            Alias,
+            WellKnownGroup,
+            DeletedAccount,
+            Invalid,
+            Unknown,
+            Computer,
+            Label,
+            LogonSession
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct PROCESS_BASIC_INFORMATION
         {
@@ -683,6 +1061,19 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         [DllImport("advapi32.dll", SetLastError = true)]
         private static extern bool OpenProcessToken(IntPtr processHandle, TokenAccessLevels desiredAccess, out IntPtr tokenHandle);
 
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool LookupAccountSid(
+            string lpSystemName,
+            byte[] sid,
+            StringBuilder name,
+            ref uint cchName,
+            StringBuilder referencedDomainName,
+            ref uint cchReferencedDomainName,
+            out SidNameUse peUse);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool QueryDosDevice(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
+
         [DllImport("ntdll.dll")]
         private static extern int NtQueryInformationProcess(
             IntPtr processHandle,
@@ -702,5 +1093,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public string CommandLine { get; init; }
         public string User { get; init; }
         internal bool IsSynthetic { get; init; }
+    }
+
+    internal sealed class ProcessFieldEnrichment
+    {
+        public string Name { get; init; }
+        public string Path { get; init; }
+        public string CommandLine { get; init; }
+        public string User { get; init; }
     }
 }
