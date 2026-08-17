@@ -13,6 +13,7 @@ namespace gov.llnl.wintap.core.etl.model
         public string SensorProfile { get; set; }
         public int SerializationIntervalSec { get; set; }
         public int UploadIntervalSec { get; set; }
+        public long RawSensorMaxCacheSizeBytes { get; set; }
         public bool WriteToParquet { get; set; }
         public bool WriteToCsv { get; set; }
         public string DataRootPath { get; set; }

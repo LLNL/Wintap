@@ -20,8 +20,6 @@ namespace gov.llnl.wintap.core.etl.load.adapters
         private AWSCredentials awsCredentials;
         private AmazonS3Client client;
 
-        public event EventHandler<string> UploadCompleted;
-
         public bool PostUpload()
         {
             WintapLogger.Log.Append(this.Name + " post upload method called", LogLevel.Info);
@@ -89,7 +87,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
                 }
                 catch (Exception ex)
                 {
-                    WintapLogger.Log.Append("Upload failed: " + ex.Message, LogLevel.Info);
+                    WintapLogger.Log.Append("Upload failed: " + ex.Message, LogLevel.Warn);
                     fileSent = false;
                 }
             }
