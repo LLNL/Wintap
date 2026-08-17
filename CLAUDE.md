@@ -60,6 +60,18 @@ xUnit trait so it can be filtered by unit:
 > run. After P1.1 lands, every unit with testable behavior must ship passing
 > tests filtered by its category.
 
+**Unit naming convention (2026-08-17).** Instruction units are named
+`<feature-abbrev>-<nn>` with a descriptive slug in filenames — e.g. feature
+`improve-windows-process-collection` declares abbreviation `wpc`, giving
+instruction `developer_docs/instructions/wpc-01-sid-helper.md`, trait
+`[Trait("Category", "wpc-01")]`, and audit
+`developer_docs/audits/wpc-01-sid-helper.md`. Each feature declares its
+abbreviation once in its implementation plan, so numbers never collide across
+features. Run one unit with `dotnet test --filter "Category=wpc-01"`; run a
+whole feature with `dotnet test --filter "Category~wpc"`. The bootstrap unit
+**P1.1** (and its owed follow-up P1.2) predate this scheme and are
+grandfathered — do not rename them.
+
 ---
 
 ## The Methodology — Three Roles

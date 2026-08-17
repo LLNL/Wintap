@@ -4,6 +4,42 @@ Append each session entry at the **top** of this file.
 
 ---
 
+## 2026-08-17 — wpc-01 SID helper completed
+**Decisions made:** None. Developer completed the approved wpc-01 unit as
+specified: added the classic kernel ETW `ProcessTraceData` UserSID extraction
+helper, added the internal payload-parser test seam, and added synthetic xUnit
+coverage for extracted SIDs, null-SID markers, and malformed payload guards.
+No sensor wiring, schema changes, PidHash/process hash changes, TraceEvent
+upgrade, or new NuGet dependencies were introduced.
+**ADRs written or updated:** None.
+**Wiki pages updated:** None beyond this log; no new architecture decision was
+made by the implementation.
+**Instructions written:** None.
+**Audit artifact:** `developer_docs/audits/wpc-01-sid-helper.md` (Status:
+Complete).
+**Verification:** `dotnet build -c Release` passed from
+`C:\PUBLIC\wintap\tests\Wintap.Tests`; `dotnet test --filter "Category=wpc-01"`
+passed with 9/9 tests selected and passing.
+**Open questions:** None for wpc-01. Next Windows process-collection unit can
+wire the helper into the chosen process sensor path.
+
+## 2026-08-17 — wpc-01 SID helper instruction drafted
+**Decisions made:** Architect approved the wpc-01 instruction for Developer
+handoff. Drafted the first implementation unit for the
+improve-windows-process-collection feature from the already-settled Analytics
+feature design. Kept the unit narrow: port the validated classic kernel ETW
+`ProcessTraceData` UserSID parser and add synthetic payload tests only; no
+sensor wiring, account-name lookup, token fallback, command-line fallback, or
+PidHash/process schema changes.
+**ADRs written or updated:** None.
+**Wiki pages updated:** None beyond this log.
+**Instructions written:** `developer_docs/instructions/wpc-01-sid-helper.md`
+(Status: Approved — Architect approval 2026-08-17).
+**Scratch notes:** `dave-wiki/sources/2026-08-17-wpc-01-sid-helper-notes.md`.
+**Open questions:** None for wpc-01. The Developer can implement wpc-01 and
+verify with `dotnet build -c Release` plus
+`dotnet test --filter "Category=wpc-01"`.
+
 ## 2026-06-30 — Stage 0 locked (process identity & attribution contract)
 **Decisions made:** Locked the Stage 0 canonical contract from the architecture
 assessment (all Accepted, recorded by the Architect in session — not re-opened):

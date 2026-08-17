@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\shared\WintapAPI\WintapAPI.csproj" />
+    <ProjectReference Include="..\..\wintap\Wintap.csproj" />
   </ItemGroup>
 
 </Project>
