@@ -2,6 +2,7 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared.helpers;
+using gov.llnl.wintap.core.shared;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -14,11 +15,18 @@ namespace gov.llnl.wintap.platform.linux.collect
     /// </summary>
     internal class NetworkSensor : BaseEbpfSensor
     {
+        // Local aggregated diagnostic counters (incremented from ringbuffer diag events)
+        private long _diagStore = 0;
+        private long _diagHit = 0;
+        private long _diagMiss = 0;
+        private System.Threading.Thread? _diagReporterThread;
+        private System.Threading.CancellationTokenSource? _diagReporterCancel;
         private ProcessHash _pidHashGenerator;
         private List<IntPtr> _additionalLinks;
 
         protected override string BpfObjectFileName => "network_ops_tracer.bpf.o";
-        protected override string BpfProgramName => "trace_connect";
+        protected override string[] FallbackBpfObjectFileNames => new[] { "network_tracepoint.bpf.o" };
+        protected override string BpfProgramName => "trace_inet_sock_set_state";
 
         internal NetworkSensor()
         {
@@ -32,36 +40,162 @@ namespace gov.llnl.wintap.platform.linux.collect
             if (!base.Start())
                 return false;
 
+            // Optional: reduce event volume by filtering the tracer to a single PID.
+            // This is primarily for validation/benchmark runs.
             try
             {
-                var programNames = new[]
+                var pidStr = ConfigManager.GetValue<string>("WINTAP_NETWORK_CAPTURE_PID");
+                if (!string.IsNullOrWhiteSpace(pidStr) && uint.TryParse(pidStr, out var capturePid) && capturePid > 0)
                 {
-                    "trace_accept",
+                    IntPtr map = LibBpf.bpf_object__find_map_by_name(BpfObject, "capture_pid");
+                    if (map != IntPtr.Zero)
+                    {
+                        int fd = LibBpf.bpf_map__fd(map);
+                        if (fd >= 0)
+                        {
+                            uint key = 0;
+                            uint value = capturePid;
+                            // flags=0 => BPF_ANY
+                            int rc = LibBpf.bpf_map_update_elem(fd, ref key, ref value, 0);
+                            if (rc == 0)
+                                WintapLogger.Log.Append($"{SensorName} tracer PID filter enabled: {capturePid}", LogLevel.Info);
+                            else
+                                WintapLogger.Log.Append($"{SensorName} failed to set tracer PID filter: rc={rc}", LogLevel.Warn);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"{SensorName} failed to configure PID filter: {ex.Message}", LogLevel.Debug);
+            }
+
+            // Start a small diag reporter that logs aggregated ringbuffer diag events.
+            // This shells out/persists generic diagnostic messages, so keep it opt-in.
+            if (ConfigManager.GetValue<bool>("EnableBpfDiagMonitor"))
+            {
+                try
+                {
+                    _diagReporterCancel = new System.Threading.CancellationTokenSource();
+                    var ct = _diagReporterCancel.Token;
+                    _diagReporterThread = new System.Threading.Thread(() =>
+                    {
+                        while (!ct.IsCancellationRequested)
+                        {
+                            try
+                            {
+                                System.Threading.Thread.Sleep(10000);
+                                var s = System.Threading.Interlocked.Read(ref _diagStore);
+                                var h = System.Threading.Interlocked.Read(ref _diagHit);
+                                var m = System.Threading.Interlocked.Read(ref _diagMiss);
+                                WintapLogger.Log.Append($"NetworkSensor aggregated BPF diag (STORE/HIT/MISS) = {s}/{h}/{m}", LogLevel.Info);
+
+                                // Persist a generic message so ETL will serialize these counters
+                                try
+                                {
+                                    var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                                    var msg = new gov.llnl.wintap.collect.models.WintapMessage(DateTime.UtcNow, pid, gov.llnl.wintap.collect.models.WintapMessage.MessageTypeEnum.GenericMessage);
+                                    msg.ActivityType = gov.llnl.wintap.collect.models.WintapMessage.ActivityTypeEnum.Other;
+                                    msg.GenericMessage = new gov.llnl.wintap.collect.models.WintapMessage.GenericMessageObject
+                                    {
+                                        ProviderId = "BPFDiag",
+                                        ProviderName = "BPFDiag",
+                                        EventName = "DiagCounters",
+                                        PID = pid,
+                                        EventTime = DateTime.UtcNow,
+                                        Payload = $"STORE={s};HIT={h};MISS={m}"
+                                    };
+                                    gov.llnl.wintap.core.infrastructure.EventChannel.Send(msg);
+                                }
+                                catch (Exception ex)
+                                {
+                                    WintapLogger.Log.Append($"Failed to persist BPF diag counters: {ex.Message}", LogLevel.Debug);
+                                }
+                                // Also append a local CSV for immediate DuckDB queries and persistence
+                                try
+                                {
+                                    var diagDir = System.IO.Path.Combine("/var/lib/lintap", "diag");
+                                    System.IO.Directory.CreateDirectory(diagDir);
+                                    var csvPath = System.IO.Path.Combine(diagDir, "diag_counters.csv");
+                                    bool writeHeader = !System.IO.File.Exists(csvPath);
+                                    using (var sw = new System.IO.StreamWriter(csvPath, true))
+                                    {
+                                        if (writeHeader)
+                                            sw.WriteLine("TimestampUtc,Store,Hit,Miss");
+                                        sw.WriteLine($"{DateTime.UtcNow:o},{s},{h},{m}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    WintapLogger.Log.Append($"Failed to write local diag CSV: {ex.Message}", LogLevel.Debug);
+                                }
+                            }
+                            catch { }
+                        }
+                    }) { IsBackground = true };
+                    _diagReporterThread.Start();
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"Failed to start NetworkSensor diag reporter: {ex.Message}", LogLevel.Debug);
+                }
+            }
+
+            try
+            {
+                // BaseEbpfSensor attaches only the primary program (BpfProgramName).
+                // For network we also need additional tracepoints/kprobes/kretprobes.
+                // Attach by BPF function name for compatibility with libbpf builds
+                // that do not export bpf_object__find_program_by_title.
+                var programs = new[]
+                {
+                    // syscall tracepoints
                     "trace_sendto",
-                    "trace_recvfrom"
+                    "trace_recvfrom",
+                    "trace_recvfrom_exit",
+                    "trace_connect",
+                    "trace_accept",
+
+                    // TCP lifecycle + send/recv
+                    "kprobe__tcp_v4_connect",
+                    "kretprobe__tcp_v4_connect",
+                    "kprobe__tcp_v6_connect",
+                    "kretprobe__tcp_v6_connect",
+                    "kprobe__tcp_connect",
+                    "kretprobe__tcp_connect",
+                    "kprobe__tcp_close",
+                    "kretprobe__inet_csk_accept",
+                    "kprobe__tcp_sendmsg",
+                    "kprobe__tcp_recvmsg",
+
+                    // UDP send/recv (connected + recv peer tuple)
+                    "kprobe__udp_sendmsg",
+                    "kprobe__udp_recvmsg",
+                    "kretprobe__udp_recvmsg",
                 };
 
-                foreach (var progName in programNames)
+                int attached = 0;
+                foreach (var programName in programs)
                 {
-                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, progName);
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, programName);
                     if (prog == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} program '{progName}' not found", LogLevel.Warn);
+                        WintapLogger.Log.Append($"{SensorName} program '{programName}' not found", LogLevel.Debug);
                         continue;
                     }
 
                     IntPtr link = LibBpf.bpf_program__attach(prog);
                     if (link == IntPtr.Zero)
                     {
-                        WintapLogger.Log.Append($"{SensorName} failed to attach '{progName}'", LogLevel.Warn);
+                        WintapLogger.Log.Append($"{SensorName} failed to attach program '{programName}'", LogLevel.Warn);
                         continue;
                     }
 
                     _additionalLinks.Add(link);
-                    WintapLogger.Log.Append($"{SensorName} attached '{progName}'", LogLevel.Info);
+                    attached++;
                 }
 
-                WintapLogger.Log.Append($"{SensorName} attached {_additionalLinks.Count + 1} network programs", LogLevel.Info);
+                WintapLogger.Log.Append($"{SensorName} attached {attached} additional network programs", LogLevel.Info);
                 return true;
             }
             catch (Exception ex)
@@ -82,9 +216,32 @@ namespace gov.llnl.wintap.platform.linux.collect
                 if (evt.Comm == null)
                     return 0;
 
+                // Handle in-band diagnostic events emitted by the tracer
+                if (evt.Protocol == 0xFF)
+                {
+                    // opType is the diag code: 0=STORE,1=HIT,2=MISS
+                    int diag = evt.OpType;
+                    int pid_diag = (int)evt.Pid;
+                    uint sk_lo = evt.Bytes; // low 32 bits of socket ptr
+                    WintapLogger.Log.Append($"BPF diag event code={diag} pid={pid_diag} sk_lo=0x{sk_lo:x8}", LogLevel.Info);
+                    // Maintain local aggregates for quick visibility
+                    switch (diag)
+                    {
+                        case 0: System.Threading.Interlocked.Increment(ref _diagStore); break;
+                        case 1: System.Threading.Interlocked.Increment(ref _diagHit); break;
+                        case 2: System.Threading.Interlocked.Increment(ref _diagMiss); break;
+                    }
+                    return 0;
+                }
+
                 int pid = (int)evt.Pid;
-                bool isTcp = evt.Protocol == 6;
-                bool isUdp = evt.Protocol == 17;
+
+                // Some kernels/backports can result in protocol being unreliable for
+                // certain probe sites. Fall back to op_type classification so TCP
+                // connect/accept/disconnect events still flow into the TCP Esper
+                // stream and parquet outputs.
+                bool isTcp = evt.Protocol == 6 || (evt.OpType >= 1 && evt.OpType <= 5);
+                bool isUdp = evt.Protocol == 17 || (evt.OpType == 6 || evt.OpType == 7);
 
                 // Map operation type to activity
                 WintapMessage.ActivityTypeEnum activityType = evt.OpType switch
@@ -100,8 +257,8 @@ namespace gov.llnl.wintap.platform.linux.collect
                 };
 
                 // Create appropriate message type
-                var messageType = isTcp 
-                    ? WintapMessage.MessageTypeEnum.TcpConnection 
+                var messageType = isTcp
+                    ? WintapMessage.MessageTypeEnum.TcpConnection
                     : WintapMessage.MessageTypeEnum.UdpPacket;
 
                 var message = new WintapMessage(
@@ -160,20 +317,22 @@ namespace gov.llnl.wintap.platform.linux.collect
             if (ipNetworkOrder == 0)
                 return "0.0.0.0";
 
-            // Convert from network byte order to host byte order
-            uint ipHostOrder = (uint)IPAddress.NetworkToHostOrder((int)ipNetworkOrder);
-            
-            // Extract octets
-            byte b1 = (byte)(ipHostOrder & 0xFF);
-            byte b2 = (byte)((ipHostOrder >> 8) & 0xFF);
-            byte b3 = (byte)((ipHostOrder >> 16) & 0xFF);
-            byte b4 = (byte)((ipHostOrder >> 24) & 0xFF);
-            
-            return $"{b1}.{b2}.{b3}.{b4}";
+            // eBPF sends the IPv4 address as the raw 4 bytes used by the
+            // kernel/network stack. Marshal reads those bytes into a native
+            // endian uint, so converting back to bytes preserves the address
+            // order for IPAddress.
+            return new IPAddress(BitConverter.GetBytes(ipNetworkOrder)).ToString();
         }
 
         protected override void OnStopping()
         {
+            try
+            {
+                _diagReporterCancel?.Cancel();
+                _diagReporterThread?.Join(TimeSpan.FromSeconds(2));
+            }
+            catch { }
+
             foreach (var link in _additionalLinks)
             {
                 if (link != IntPtr.Zero)

@@ -425,7 +425,8 @@ namespace gov.llnl.wintap
         {
             int returnCode = 0;
             WintapLogger.Log.Append("Starting ETW file event rundown", core.infrastructure.LogLevel.Info);
-            string etlFilePath = Environment.GetEnvironmentVariable("PROGRAMFILES") + "\\wintap7\\etl\\kernelrundown.etl";
+            string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            string etlFilePath = Path.Combine(programFiles, "wintap7", "etl", "kernelrundown.etl");
             using (var session = new TraceEventSession("NT Kernel Logger", etlFilePath))
             {
                 session.EnableKernelProvider(KernelTraceEventParser.Keywords.DiskIO |

@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace gov.llnl.wintap.platform.linux.collect
@@ -10,6 +11,39 @@ namespace gov.llnl.wintap.platform.linux.collect
     public static class LibBpf
     {
         private const string LibBpfLib = "libbpf.so.1";
+
+        static LibBpf()
+        {
+            // RHEL 8 commonly ships libbpf with SONAME libbpf.so.0, while other
+            // distros may ship libbpf.so.1. Try both at runtime.
+            NativeLibrary.SetDllImportResolver(typeof(LibBpf).Assembly, ResolveLibbpf);
+        }
+
+        private static IntPtr ResolveLibbpf(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            if (!string.Equals(libraryName, LibBpfLib, StringComparison.Ordinal))
+            {
+                return IntPtr.Zero;
+            }
+
+            // Keep the original first, then fall back for older distros.
+            string[] candidates =
+            {
+                "libbpf.so.1",
+                "libbpf.so.0",
+                "libbpf.so",
+            };
+
+            foreach (string candidate in candidates)
+            {
+                if (NativeLibrary.TryLoad(candidate, assembly, searchPath, out IntPtr handle))
+                {
+                    return handle;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
 
         // BPF object management
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
@@ -25,6 +59,12 @@ namespace gov.llnl.wintap.platform.linux.collect
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr bpf_object__find_program_by_name(IntPtr obj, string name);
 
+        // Find a program by its section title (SEC("...") string). This is more
+        // stable than bpf_program__name() on older libbpf versions where program
+        // names are truncated and iteration APIs may not exist.
+        [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr bpf_object__find_program_by_title(IntPtr obj, string title);
+
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr bpf_program__attach(IntPtr prog);
 
@@ -37,6 +77,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern int bpf_map__fd(IntPtr map);
+
+        // libbpf provides a thin wrapper around the bpf() syscall helpers.
+        // We use this to set simple configuration maps (e.g. PID filters).
+        [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int bpf_map_update_elem(int fd, ref uint key, ref uint value, ulong flags);
 
         // Ring buffer
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]

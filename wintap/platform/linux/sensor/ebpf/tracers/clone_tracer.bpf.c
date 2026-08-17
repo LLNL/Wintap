@@ -37,6 +37,21 @@ struct sched_fork_args {
     __s32 child_pid;
 };
 
+// Optional extra coverage: syscall tracepoints for clone/vfork to capture clone flags.
+// This is a best-effort breadcrumb only; sched_process_fork remains the primary source.
+struct sys_enter_clone_args {
+    unsigned long long unused;
+    long syscall_nr;
+    unsigned long clone_flags;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u64);
+    __type(value, __u64);
+    __uint(max_entries, 8192);
+} clone_flags_map SEC(".maps");
+
 // Hook process fork/clone/vfork
 // This tracepoint fires for fork(), vfork(), and clone()
 SEC("tracepoint/sched/sched_process_fork")
@@ -66,13 +81,35 @@ int trace_process_fork(struct sched_fork_args *ctx)
     // Get timestamp
     event->timestamp_ns = bpf_ktime_get_ns();
     
-    // Clone flags not available from this tracepoint
-    // Would need sys_enter_clone for that
-    event->clone_flags = 0;
+    // Best-effort clone flags captured from sys_enter_clone/vfork.
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 *flags = bpf_map_lookup_elem(&clone_flags_map, &pid_tgid);
+    event->clone_flags = flags ? *flags : 0;
+    if (flags)
+        bpf_map_delete_elem(&clone_flags_map, &pid_tgid);
     
     // Submit
     bpf_ringbuf_submit(event, 0);
     
+    return 0;
+}
+
+SEC("tracepoint/syscalls/sys_enter_clone")
+int trace_sys_enter_clone(struct sys_enter_clone_args *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 flags = (__u64)ctx->clone_flags;
+    bpf_map_update_elem(&clone_flags_map, &pid_tgid, &flags, BPF_ANY);
+    return 0;
+}
+
+SEC("tracepoint/syscalls/sys_enter_vfork")
+int trace_sys_enter_vfork(struct sys_enter_clone_args *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    // vfork has implicit flags; store a sentinel so the event isn't ambiguous.
+    __u64 flags = 0xFFFFFFFFFFFFFFFFULL;
+    bpf_map_update_elem(&clone_flags_map, &pid_tgid, &flags, BPF_ANY);
     return 0;
 }
 

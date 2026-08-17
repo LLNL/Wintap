@@ -5,8 +5,10 @@
  */
 
 using System.Collections.Generic;
+using System;
 using gov.llnl.wintap.core.collect;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.linux.collect;
 
 namespace gov.llnl.wintap.platform.linux.infrastructure
@@ -25,25 +27,85 @@ namespace gov.llnl.wintap.platform.linux.infrastructure
 
             List<BaseSensor> baseSensors = new List<BaseSensor>();
 
-            // todo: integrate linux sensors into the wintap configuration system for optional loading
-            //       for now, just load all of them...
-            ExecveSensor execveSensor = new ExecveSensor();
-            CloneSensor cloneSensor = new CloneSensor();
-            ExitSensor exitSensor = new ExitSensor();
-            NetworkSensor networkSensor = new NetworkSensor();
-            FileOpsSensor fileOpsSensor = new FileOpsSensor();
+            bool IsEnabled(string sensorKey)
+            {
+                // Sensor keys are config properties (Execve, Clone, Exit, Network, FileOps, ProcessRundown).
+                // Defaults live in ConfigRoot, so a missing key still yields a sensible behavior.
+                return ConfigManager.GetValue<bool>(sensorKey);
+            }
 
-            execveSensor.Start();
-            cloneSensor.Start();
-            exitSensor.Start();
-            networkSensor.Start();
-            fileOpsSensor.Start();
+            void TryStart(BaseSensor sensor)
+            {
+                if (sensor.Start())
+                {
+                    baseSensors.Add(sensor);
+                    WintapLogger.Log.Append($"{sensor.SensorName} sensor registered", LogLevel.Info);
+                }
+                else
+                {
+                    WintapLogger.Log.Append($"{sensor.SensorName} sensor failed to start and will not be registered", LogLevel.Warn);
+                }
+            }
 
-            baseSensors.Add(execveSensor);
-            baseSensors.Add(cloneSensor);
-            baseSensors.Add(exitSensor);
-            baseSensors.Add(networkSensor);
-            baseSensors.Add(fileOpsSensor);
+            if (IsEnabled("Execve"))
+            {
+                ExecveSensor execveSensor = new ExecveSensor();
+                TryStart(execveSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("ExecveSensor disabled by config (Execve=false)", LogLevel.Warn);
+            }
+
+            if (IsEnabled("Clone"))
+            {
+                CloneSensor cloneSensor = new CloneSensor();
+                TryStart(cloneSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("CloneSensor disabled by config (Clone=false)", LogLevel.Warn);
+            }
+
+            if (IsEnabled("Exit"))
+            {
+                ExitSensor exitSensor = new ExitSensor();
+                TryStart(exitSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("ExitSensor disabled by config (Exit=false)", LogLevel.Warn);
+            }
+
+            if (IsEnabled("Network"))
+            {
+                NetworkSensor networkSensor = new NetworkSensor();
+                TryStart(networkSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("NetworkSensor disabled by config (Network=false)", LogLevel.Warn);
+            }
+
+            if (IsEnabled("FileOps"))
+            {
+                FileOpsSensor fileOpsSensor = new FileOpsSensor();
+                TryStart(fileOpsSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("FileOpsSensor disabled by config (FileOps=false)", LogLevel.Warn);
+            }
+
+            if (IsEnabled("ProcessRundown"))
+            {
+                ProcessRundownSensor processRundownSensor = new ProcessRundownSensor();
+                TryStart(processRundownSensor);
+            }
+            else
+            {
+                WintapLogger.Log.Append("ProcessRundownSensor disabled by config (ProcessRundown=false)", LogLevel.Warn);
+            }
 
             return baseSensors;
         }

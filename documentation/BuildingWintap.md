@@ -1,25 +1,51 @@
-# Initial testing of building on Ubuntu in Multipass
+# Building Wintap
 
-* Removed "reg" commands from Wintap.csproj
+This note summarizes the current build workflow.
 
-## Build
+For Linux bring-up, shared-mount handling, MCP details, and troubleshooting, use the canonical guide: [`../BUILD_AND_TEST.md`](../BUILD_AND_TEST.md).
+
+## Source Layout
+
+- Repo root: `wintap/`
+- Active source tree and Makefile: `wintap/wintap/`
+- Windows project: `wintap/wintap/Wintap.csproj`
+- Linux project: `wintap/wintap/Lintap.csproj`
+- macOS project: `wintap/wintap/Mactap.csproj`
+
+## Recommended Commands
+
+From the repo root:
+
 ```bash
-cd wintap
-dotnet build -p:LinkRuntime=true -p:RuntimeLinkerOptions="-rpath '\$ORIGIN'"
+make -C wintap/wintap all
+make -C wintap/wintap build_dotnet
+make -C wintap/wintap build_ebpf
+make -C wintap/wintap run-env
 ```
 
-or, for cross platform:
+Or from `wintap/wintap`:
 
 ```bash
-dotnet publish -c Release -r linux-arm64 --self-contained -p:PublishSingleFile=true
+make all
+make build_dotnet
+make build_ebpf
+make run-env
 ```
 
-## Run
+## Linux Notes
+
+- Prefer the Makefile for Linux builds.
+- On host-shared mounts, the Makefile automatically redirects .NET outputs to native `/tmp/lintap-build/wintap` paths.
+- Avoid `dotnet run` on shared mounts because it bypasses the Makefile safeguards.
+
+## Direct Project Builds
+
+If you need a direct build for a specific platform project, run it from `wintap/wintap`:
 
 ```bash
-# Writes logs, as ubuntu, to:
-sudo mkdir /usr/share/Wintap
-sudo chown ubuntu /usr/share/Wintap
-cd bin/Release/net8.0
-./Wintap
+dotnet build Wintap.csproj
+dotnet build Lintap.csproj
+dotnet build Mactap.csproj
 ```
+
+For Linux, use this path only when you intentionally want a direct `dotnet build` instead of the Makefile-managed flow.

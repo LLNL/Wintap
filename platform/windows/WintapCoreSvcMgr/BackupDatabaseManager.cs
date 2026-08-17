@@ -40,8 +40,9 @@ namespace WintapCoreSvcMgr.Database
 
         public BackupDatabaseManager(DatabaseTargetEnum target)
         {
-            RECOVERY_DB_PATH = Path.Combine(Environment.GetEnvironmentVariable("PROGRAMDATA"), "Wintap", "ProcessTree", "recovery.duckdb");
-            MAIN_DB_PATH = Path.Combine(Environment.GetEnvironmentVariable("PROGRAMDATA"), "Wintap", "ProcessTree", "main.duckdb");
+            string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            RECOVERY_DB_PATH = Path.Combine(programData, "Wintap", "ProcessTree", "recovery.duckdb");
+            MAIN_DB_PATH = Path.Combine(programData, "Wintap", "ProcessTree", "main.duckdb");
 
 
             DB_PATH = MAIN_DB_PATH;

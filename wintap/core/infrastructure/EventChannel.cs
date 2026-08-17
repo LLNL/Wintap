@@ -10,15 +10,20 @@ using com.espertech.esper.compat;
 using com.espertech.esper.compiler.client;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
+using gov.llnl.wintap.core.etl.load;
 using gov.llnl.wintap.core.infrastructure.helpers;
 using gov.llnl.wintap.core.shared;
+using gov.llnl.wintap.core.shared.helpers;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading;
 //using static gov.llnl.wintap.platform.windows.collect.etw.ProcessSensor;
 
 namespace gov.llnl.wintap.core.infrastructure
@@ -54,12 +59,19 @@ namespace gov.llnl.wintap.core.infrastructure
         private static int droppedEventCount;
         private static IProcessResolver _processResolver;
 
+        // Avoid spamming logs when process attribution is missing.
+        private static readonly ConcurrentDictionary<int, byte> _loggedMissingOwnerPid = new ConcurrentDictionary<int, byte>();
+        private static readonly ConcurrentDictionary<int, byte> _loggedMissingParentPid = new ConcurrentDictionary<int, byte>();
+
+        private static readonly Lazy<string> UnknownPidHash = new Lazy<string>(() => new ProcessHash().GenPidHash(-1, 0));
+
 
         private static Stopwatch stopWatch;
 
         // Esper configuration and runtime
         private static Configuration esperConfig;
         private static EPRuntime esperRuntime;
+        private static readonly object compileDeployLock = new object();
 
         // Public statistics properties
         public static long EventsPerSecond => eventsPerSecond;
@@ -68,6 +80,16 @@ namespace gov.llnl.wintap.core.infrastructure
         public static long TotalEvents => totalEvents;
         public static string Runtime => stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss");
         public static int DroppedEventCount => droppedEventCount;
+
+        internal static void AddDroppedEvents(int count)
+        {
+            if (count <= 0)
+            {
+                return;
+            }
+
+            Interlocked.Add(ref droppedEventCount, count);
+        }
 
         /// <summary>
         /// Esper configuration accessor
@@ -225,8 +247,19 @@ namespace gov.llnl.wintap.core.infrastructure
                 // Tag with AgentId
                 streamedEvent.AgentId = StateManager.AgentId.ToString();
 
+                if (DirectParquetSink.IsEnabled)
+                {
+                    DirectParquetSink.Save(streamedEvent);
+                    return;
+                }
+
+                bool skipProcessResolve = IsEnvEnabled("WINTAP_SKIP_PROCESS_RESOLVE");
+                bool skipParentProcessResolve = IsEnvEnabled("WINTAP_SKIP_PARENT_PROCESS_RESOLVE");
+                bool skipProcessRegister = IsEnvEnabled("WINTAP_SKIP_PROCESS_REGISTER");
+                bool skipEsperSend = IsEnvEnabled("WINTAP_SKIP_ESPER_SEND");
+
                 // Resolve process information using platform-specific resolver
-                if (_processResolver != null)
+                if (_processResolver != null && !skipProcessResolve)
                 {
                     if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
                     {
@@ -240,14 +273,21 @@ namespace gov.llnl.wintap.core.infrastructure
                         }
                         else
                         {
-                            // On Linux or if process not found, generate PidHash without full resolution
-                            WintapLogger.Log.Append($"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})",LogLevel.Warn);
+                            // Generate a best-effort PidHash so events still have an identifier.
+                            // Prefer resolver lookup; fall back to a local hash when resolver has no record.
+                            var fallbackPidHash = _processResolver.GetPidHash(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                            streamedEvent.PidHash = fallbackPidHash ?? new ProcessHash().GenPidHash(streamedEvent.PID, streamedEvent.EventTime);
+                            streamedEvent.ProcessName = "Unknown";
 
-                            // Generate a basic PidHash so events still have an identifier
-                            streamedEvent.PidHash = _processResolver.GetPidHash(streamedEvent.PID,DateTime.FromFileTimeUtc(streamedEvent.EventTime));streamedEvent.ProcessName = "Unknown";
+                            // Log only once per PID to avoid log floods.
+                            if (_loggedMissingOwnerPid.TryAdd(streamedEvent.PID, 0))
+                            {
+                                var level = fallbackPidHash == null ? LogLevel.Warn : LogLevel.Debug;
+                                WintapLogger.Log.Append($"Could not resolve owner process for PID {streamedEvent.PID} ({streamedEvent.MessageType})", level);
+                            }
                         }
                     }
-                    else
+                    else if (!skipParentProcessResolve)
                     {
                         // For Process events: resolve the parent process
                         WintapLogger.Log.Append($"Attempting to resolve parent process for {streamedEvent.PID}", LogLevel.Debug);
@@ -255,8 +295,11 @@ namespace gov.llnl.wintap.core.infrastructure
                         {
                             if (streamedEvent.Process != null && streamedEvent.Process.ParentPID > 0)
                             {
-                                // Special case: process is its own parent (System process, PID 4)
-                                if (streamedEvent.Process.ParentPID == streamedEvent.PID)
+                                if (!string.IsNullOrWhiteSpace(streamedEvent.Process.ParentPidHash))
+                                {
+                                    WintapLogger.Log.Append($"Process {streamedEvent.PID} already has parent process context", LogLevel.Debug);
+                                }
+                                else if (streamedEvent.Process.ParentPID == streamedEvent.PID)
                                 {
                                     WintapLogger.Log.Append(
                                         $"Process {streamedEvent.PID} is self-parenting, using own PidHash as ParentPidHash",
@@ -278,21 +321,45 @@ namespace gov.llnl.wintap.core.infrastructure
                                         streamedEvent.Process.ParentPidHash = parentProcess.PidHash;
                                         streamedEvent.Process.ParentProcessName = parentProcess.ProcessName;
                                     }
-                                    else
-                                    {
-                                        WintapLogger.Log.Append(
-                                            $"Could not resolve parent process for PID {streamedEvent.Process.ParentPID}",
-                                            LogLevel.Warn);
+                                     else
+                                      {
+                                         if (_loggedMissingParentPid.TryAdd(streamedEvent.Process.ParentPID, 0))
+                                         {
+                                             // Best-effort: if the parent wasn't registered (ordering/rundown gaps),
+                                             // try to derive a stable ParentPidHash from /proc start time on Linux.
+                                             // This keeps parent lineage usable even when we missed the parent's
+                                             // process event.
+                                             string? fallbackParentPidHash = null;
+                                             try
+                                             {
+                                                 fallbackParentPidHash = _processResolver?.GetPidHash(
+                                                     streamedEvent.Process.ParentPID,
+                                                     DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                                             }
+                                             catch { }
 
-                                        // Generate basic parent PidHash
-                                        streamedEvent.Process.ParentPidHash = _processResolver.GetPidHash(
-                                            -1,  // the 'unknown' process
-                                            DateTime.FromFileTimeUtc(streamedEvent.EventTime));
-                                        streamedEvent.Process.ParentProcessName = "Unknown";
-                                    }
-                                }
-                            }
-                        }
+                                             var level = string.IsNullOrEmpty(fallbackParentPidHash) ? LogLevel.Warn : LogLevel.Debug;
+                                             WintapLogger.Log.Append(
+                                                 $"Could not resolve parent process (childPid={streamedEvent.PID}, parentPid={streamedEvent.Process.ParentPID})",
+                                                 level);
+
+                                             if (!string.IsNullOrEmpty(fallbackParentPidHash))
+                                             {
+                                                 streamedEvent.Process.ParentPidHash = fallbackParentPidHash;
+                                                 streamedEvent.Process.ParentProcessName = "Unknown";
+                                             }
+                                         }
+
+                                         // Stable sentinel for unknown parent attribution.
+                                         if (string.IsNullOrWhiteSpace(streamedEvent.Process.ParentPidHash))
+                                         {
+                                             streamedEvent.Process.ParentPidHash = UnknownPidHash.Value;
+                                             streamedEvent.Process.ParentProcessName = "Unknown";
+                                         }
+                                      }
+                                 }
+                             }
+                         }
                         catch (Exception ex)
                         {
                             WintapLogger.Log.Append($"Could not resolve parent process for pid {streamedEvent.PID}", LogLevel.Warn);
@@ -307,13 +374,22 @@ namespace gov.llnl.wintap.core.infrastructure
                         LogLevel.Warn);
                 }
 
-                // Send to Esper
-                EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
                 // Send to backing store
                 if (streamedEvent.MessageType == WintapMessage.MessageTypeEnum.Process)
                 {
-                    _processResolver.RegisterProcess(streamedEvent);
+                    if (!skipProcessRegister)
+                    {
+                        _processResolver.RegisterProcess(streamedEvent);
+                    }
                 }
+
+                if (skipEsperSend)
+                {
+                    return;
+                }
+
+                // Send to Esper
+                EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
             }
             catch (Exception ex)
             {
@@ -321,6 +397,12 @@ namespace gov.llnl.wintap.core.infrastructure
                     $"Error sending event for {streamedEvent.MessageType}: {ex.ToString()}",
                     LogLevel.Error);
             }
+        }
+
+        private static bool IsEnvEnabled(string name)
+        {
+            var val = ConfigManager.GetValue<string>(name);
+            return !string.IsNullOrEmpty(val) && (string.Equals(val, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(val, "1", StringComparison.OrdinalIgnoreCase));
         }
 
         // **************************************************************************
@@ -350,49 +432,52 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         public static EPDeployment CompileDeploy(string epl, string name)
         {
-            try
+            lock (compileDeployLock)
             {
-                // Get the Esper configuration
-                Configuration configuration = EsperConfig;
-
-                // Always convert string-based queries to enum-based queries
-                // This ensures consistent behavior regardless of where the query comes from
-                string adaptedEpl = FormatQueryForCompile(epl);
-
-                if (name != "ETWBootTrace")
+                try
                 {
-                    adaptedEpl = $"@name('WB-{name}') {adaptedEpl}";
-                }
+                    // Get the Esper configuration
+                    Configuration configuration = EsperConfig;
 
-                // Log the original and adapted queries for debugging if needed
-                if (epl != adaptedEpl)
+                    // Always convert string-based queries to enum-based queries
+                    // This ensures consistent behavior regardless of where the query comes from
+                    string adaptedEpl = FormatQueryForCompile(epl);
+
+                    if (name != "ETWBootTrace")
+                    {
+                        adaptedEpl = $"@name('WB-{name}') {adaptedEpl}";
+                    }
+
+                    // Log the original and adapted queries for debugging if needed
+                    if (epl != adaptedEpl)
+                    {
+                        WintapLogger.Log.Append($"Original EPL: {epl}", LogLevel.Debug);
+                        WintapLogger.Log.Append($"Adapted EPL: {adaptedEpl}", LogLevel.Debug);
+                    }
+
+                    // Build compiler arguments
+                    CompilerArguments args = new CompilerArguments(configuration);
+
+                    // Make the existing EPL objects available to the compiler
+                    args.GetPath().Add(EsperRuntime.RuntimePath);
+
+                    // Parse the module
+                    var module = EPCompilerProvider.Compiler.ParseModule(adaptedEpl);
+
+                    // Validate syntax only (throws EPCompileException on error)
+                    EPCompilerProvider.Compiler.SyntaxValidate(module, args);
+
+                    // Compile the EPL
+                    EPCompiled compiled = EPCompilerProvider.Compiler.Compile(adaptedEpl, args);
+
+                    // Deploy and return the deployment
+                    return EsperRuntime.DeploymentService.Deploy(compiled);
+                }
+                catch (Exception ex)
                 {
-                    WintapLogger.Log.Append($"Original EPL: {epl}", LogLevel.Debug);
-                    WintapLogger.Log.Append($"Adapted EPL: {adaptedEpl}", LogLevel.Debug);
+                    WintapLogger.Log.Append($"Problem compiling/deploying EPL '{epl}': {ex.Message}", LogLevel.Warn);
+                    throw;
                 }
-
-                // Build compiler arguments
-                CompilerArguments args = new CompilerArguments(configuration);
-
-                // Make the existing EPL objects available to the compiler
-                args.GetPath().Add(EsperRuntime.RuntimePath);
-
-                // Parse the module
-                var module = EPCompilerProvider.Compiler.ParseModule(adaptedEpl);
-
-                // Validate syntax only (throws EPCompileException on error)
-                EPCompilerProvider.Compiler.SyntaxValidate(module, args);
-
-                // Compile the EPL
-                EPCompiled compiled = EPCompilerProvider.Compiler.Compile(adaptedEpl, args);
-
-                // Deploy and return the deployment
-                return EsperRuntime.DeploymentService.Deploy(compiled);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Problem compiling/deploying EPL '{epl}': {ex.Message}", LogLevel.Warn);
-                throw;
             }
         }
 
@@ -603,7 +688,14 @@ namespace gov.llnl.wintap.core.infrastructure
             try
             {
                 // Try to use EnumFormatter if available
-                return EnumFormatter.FormatQueryForCompile(epl);
+                string formattedEpl = EnumFormatter.FormatQueryForCompile(epl);
+                 if (string.Equals(ConfigManager.GetValue<string>("WINTAP_DISABLE_ESPER_ENUM_CAST"), "true", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(ConfigManager.GetValue<string>("WINTAP_DISABLE_ESPER_ENUM_CAST"), "1", StringComparison.OrdinalIgnoreCase))
+                {
+                    formattedEpl = FormatEnumCastsAsEnumLiterals(formattedEpl);
+                }
+
+                return formattedEpl;
             }
             catch (Exception ex)
             {
@@ -611,6 +703,43 @@ namespace gov.llnl.wintap.core.infrastructure
                 WintapLogger.Log.Append($"EnumFormatter not available, using original EPL: {ex.Message}", LogLevel.Debug);
                 return epl;
             }
+        }
+
+        private static string FormatEnumCastsAsEnumLiterals(string epl)
+        {
+            string propertyPattern = @"(?:CAST\s*\(\s*(MessageType|messageType|ActivityType|activityType)\s*,\s*string\s*\)|(MessageType|messageType|ActivityType|activityType))";
+
+            epl = Regex.Replace(epl, propertyPattern + @"\s*(=|<>|!=)\s*(['""“”])([^'""“”]+)\2", match =>
+            {
+                string property = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                string op = match.Groups[3].Value;
+                string value = match.Groups[5].Value;
+                return $"{property} {op} {GetEnumLiteral(property, value)}";
+            }, RegexOptions.IgnoreCase);
+
+            epl = Regex.Replace(epl, propertyPattern + @"\s+(NOT\s+IN|IN)\s*\(([^)]*)\)", match =>
+            {
+                string property = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                string op = match.Groups[3].Value;
+                string[] values = Regex.Matches(match.Groups[4].Value, @"['""“”]([^'""“”]+)['""“”]")
+                    .Cast<Match>()
+                    .Select(valueMatch => GetEnumLiteral(property, valueMatch.Groups[1].Value))
+                    .ToArray();
+
+                return $"{property} {op} ({string.Join(",", values)})";
+            }, RegexOptions.IgnoreCase);
+
+            return Regex.Replace(epl, @"CAST\s*\(\s*(MessageType|messageType|ActivityType|activityType)\s*,\s*string\s*\)", "$1", RegexOptions.IgnoreCase);
+        }
+
+        private static string GetEnumLiteral(string property, string value)
+        {
+            if (property.Equals("MessageType", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"gov.llnl.wintap.collect.models.WintapMessage.MessageTypeEnum.{value}";
+            }
+
+            return $"gov.llnl.wintap.collect.models.WintapMessage.ActivityTypeEnum.{value}";
         }
 
         private static void StatsWorker_DoWork(object sender, DoWorkEventArgs e)

@@ -232,9 +232,16 @@ namespace gov.llnl.wintap
                 }
 
                 // ─── DuckDB UI Server ──────────────────────────────────────────
-                WintapLogger.Log.Append("Starting DuckDB UI server", LogLevel.Info);
-                try
+                 string duckVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_DUCKDB_UI");
+                 bool duckDbUiDisabled = string.Equals(duckVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(duckVal, "1", StringComparison.OrdinalIgnoreCase);
+                if (duckDbUiDisabled)
                 {
+                    WintapLogger.Log.Append("DuckDB UI server disabled by WINTAP_DISABLE_DUCKDB_UI", LogLevel.Warn);
+                }
+                else try
+                {
+                    WintapLogger.Log.Append("Starting DuckDB UI server", LogLevel.Info);
                     var duckDBConnection = new DuckDBConnection("Data Source=:memory:");
                     duckDBConnection.Open();
                     var command = duckDBConnection.CreateCommand();
@@ -256,7 +263,14 @@ namespace gov.llnl.wintap
                 await Task.Delay(5000);
 
                 // ─── Collector Startup ─────────────────────────────────────────
-                try
+                 string sensorsVal = ConfigManager.GetValue<string>("WINTAP_DISABLE_SENSORS");
+                 bool sensorsDisabled = string.Equals(sensorsVal, "true", StringComparison.OrdinalIgnoreCase) ||
+                                       string.Equals(sensorsVal, "1", StringComparison.OrdinalIgnoreCase);
+                if (sensorsDisabled)
+                {
+                    WintapLogger.Log.Append("Sensors disabled by WINTAP_DISABLE_SENSORS", LogLevel.Warn);
+                }
+                else try
                 {
                     WintapLogger.Log.Append($"Starting {Env.AppName} sensors", LogLevel.Info);
                     subscriptionMgr = new SubscriptionManager();

@@ -1,109 +1,59 @@
 <img width="200" src="https://user-images.githubusercontent.com/50601643/218871643-2d3af433-0923-4786-b5e5-24c6a72e803e.png">
 
 # Wintap
-A researcher-first data collection and analytics platform to assist with understanding the behavior of software
-<br> Developed at Lawrence Livermore National Laboratory (LLNL)
 
-## Overview
-Wintap is designed for security research, behavioral analysis, and exploratory investigations. It provides full-fidelity host telemetry with an extensible plugin architecture, enabling researchers to rapidly prototype detection logic and analyze system behavior without the constraints of enterprise tooling.
+Wintap is a researcher-first host telemetry and analytics platform developed at Lawrence Livermore National Laboratory (LLNL).
 
-## Wintap vs. Traditional EDR
-| Feature | Enterprise EDR | Wintap |
-|---------|----------------|--------|
-| **Deployment Scale** | Enterprise-wide (1,000s-100,000s hosts) | Lab/research (1-100s hosts) |
-| **Data Collection** | Optimized for efficiency | Full-fidelity capture |
-| **Data Format** | Proprietary/optimized | Open (Parquet, CSV) |
-| **Source Code** | Closed-source | Open-source |
-| **Feature Maturity** | Production-hardened | Experimental, research-oriented |
-| **Primary Use Case** | Security operations, compliance | Cyber research, data science |
+It is designed for security research, behavioral analysis, and exploratory investigations rather than enterprise-scale endpoint management. The project emphasizes open data formats, direct access to telemetry, and rapid experimentation.
 
-Wintap is not designed to replace enterprise EDR solutions. It serves a different purpose: providing researchers with complete control over data collection, analysis, and experimentation.
+## Platform Layout
 
-## Wintap Architecture Diagram
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                         WINTAP SERVICE                             │
-│                        (WinTapSvc.cs)                              │
-└────────────────────────────────────────────────────────────────────┘
-                                  │
-                ┌─────────────────┼─────────────────┐
-                │                 │                 │
-                ▼                 ▼                 ▼
-    ┌──────────────────┐  ┌─────────────┐ ┌─────────────--─┐
-    │  PluginManager   │  │EventChannel │ │ Subscription   │
-    │                  │  │(Esper CEP)  │ │   Manager      │
-    │ - Load Plugins   │  │             │ │                │
-    │ - MEF Discovery  │  │Route Events │ │ - Windows ETW  │
-    │ - Isolation      │  │Enrich Data  │ │ - Linux        │
-    │ - Scheduler      │  │Statistics   │ │ - macOS        │
-    └──────────────────┘  └─────────────┘ └────────────--──┘
-            │                     │                 │
-            │                     │                 │
-            ▼                     ▼                 ▼
-    ┌─────────────────────────────────────────────────────┐
-    │                   PLUGIN LAYER                      │
-    │  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-    │  │ISubscribe│  │   IRun   │  │ IQuery   │  ...      │
-    │  └──────────┘  └──────────┘  └──────────┘           │
-    └─────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-    ┌──────────────────────────────────────────────────────┐
-    │              ETL / SERIALIZATION LAYER               │
-    │  - DefaultSerializer, ProcessSerializer, etc.        │
-    │  - Parquet/CSV Writers                               │
-    └──────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-    ┌──────────────────────────────────────────────────────┐
-    │              DATA ADAPTER LAYER                      │
-    │  - File System (Parquet, CSV)                        │
-    │  - Upload Adapters (IUpload interface)               │
-    │  - Database Adapters                                 │
-    │  - Network/API Adapters                              │
-    └──────────────────────────────────────────────────────┘
-```
-
-## Key Capabilities
-
-- **Plugin Architecture**  
-  Write small .NET assemblies that subscribe to the events you need (process, network, file, registry). The framework handles infrastructure.
-
-- **Unified Data Model**  
-  All telemetry uses a consistent `WintapMessage` structure, making it straightforward to correlate across different data sources.
-
-- **Real-Time Analysis**  
-  Built-in Esper CEP engine allows live queries against event streams using EPL (Event Processing Language).
-
-- **Platform Support**  
-  Windows (stable), Linux (in development). Core infrastructure is platform-agnostic.
-
-## System Requirements
-.NET 8.0 or later
-Windows 10/11 or Server 2019+ (64-bit)
-Linux Ubuntu 24.04+ (in development)
-4GB RAM minimum
-Administrator/root privileges
-
+- `Wintap.csproj`: Windows build
+- `Lintap.csproj`: Linux build
+- `Mactap.csproj`: macOS build
+- `wintap/wintap/`: active source tree and Makefile
 
 ## Quick Start
-git clone https://github.com/LLNL/wintap.git
-cd wintap
-dotnet build -c Release
 
-Windows deployment:
-powershellsc.exe create Wintap binPath= "C:\Path\To\Wintap.exe" start=auto
-sc.exe start Wintap
+From the repo root:
 
-Linux deployment: 
-See docs/LINUX_DEPLOYMENT.md
+```bash
+make -C wintap/wintap all
+make -C wintap/wintap run
+```
 
-### Documentation
-Developer Guide - see documents folder in repo
+For Linux eBPF validation, run with elevated privileges:
 
-### Technology
-.NET 8.0 | MEF | Esper CEP | DuckDB | TraceEvent | Parquet
+```bash
+sudo make -C wintap/wintap run
+```
 
-### LLNL-CODE-837816
+On macOS host -> Linux VM shared mounts and similar filesystems, the Makefile automatically redirects Linux build outputs to native `/tmp/lintap-build/wintap` paths to avoid .NET apphost mmap failures.
+
+## Documentation
+
+- Build, run, and troubleshooting: [`BUILD_AND_TEST.md`](BUILD_AND_TEST.md)
+- Documentation index: [`documentation/README.md`](documentation/README.md)
+- Developer tools and smoke tests: [`devtools/README.md`](devtools/README.md)
+- NEsper shared-mount repro: [`diagnostics/nesper-repro/README.md`](diagnostics/nesper-repro/README.md)
+
+## Architecture Summary
+
+Wintap is organized into four main layers:
+
+- Platform-specific collectors and sensors
+- Core routing and enrichment through `EventChannel`
+- ETL and serialization to Parquet and related outputs
+- Optional adapters, plugins, and MCP integrations
+
+Linux sensor work currently centers on eBPF tracers under `wintap/wintap/platform/linux/sensor/ebpf/tracers/` plus fallback and isolation paths documented in `BUILD_AND_TEST.md`.
+
+## Technology
+
+`.NET 8` | `Esper CEP` | `DuckDB` | `Parquet` | `eBPF` | `MEF`
+
+## Release
+
+LLNL-CODE-837816
+
 https://github.com/LLNL/wintap

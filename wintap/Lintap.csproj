@@ -6,7 +6,6 @@
 	<PropertyGroup>
 		<AssemblyName>Lintap</AssemblyName>
 		<RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
-		<BaseIntermediateOutputPath>obj\Linux\</BaseIntermediateOutputPath>
 		<DefineConstants>$(DefineConstants);LINUX</DefineConstants>
 		<UseSharedCompilation>false</UseSharedCompilation>
 		<UseCommonOutputDirectory>false</UseCommonOutputDirectory>
@@ -57,36 +56,54 @@
 	<!-- Build and copy MCP server for Linux -->
 	<PropertyGroup>
 		<McpServerProject>$(MSBuildProjectDirectory)\..\shared\ai\wintap_mcp_server\wintap_mcp_server.csproj</McpServerProject>
+		<EnableMcpServer Condition="'$(EnableMcpServer)' == '' and '$(DISABLE_MCP)' == 'true'">false</EnableMcpServer>
+		<EnableMcpServer Condition="'$(EnableMcpServer)' == ''">true</EnableMcpServer>
 		<McpTempDir>$(OutputPath)mcp_temp\</McpTempDir>
 		<McpOutputDir>$(OutputPath)mcp\</McpOutputDir>
+		<!-- 
+		  McpPublishTempDir: where we publish the MCP server before copying into the project's output.
+		  Use MCP_PUBLISH_TMP environment variable to override. If DISABLE_APPHOST is true (set by the
+		  Makefile when building on host-shared filesystems), default to a VM-local temp directory to
+		  avoid filesystem mmap/apphost issues.
+		-->
+		<McpPublishTempDir Condition="'$(MCP_PUBLISH_TMP)' != ''">$(MCP_PUBLISH_TMP)</McpPublishTempDir>
+		<McpPublishTempDir Condition="'$(McpPublishTempDir)' == '' and '$(DISABLE_APPHOST)' == 'true'">/tmp/$(MSBuildProjectName)-mcp_temp/</McpPublishTempDir>
+		<McpPublishTempDir Condition="'$(McpPublishTempDir)' == ''">$(McpTempDir)</McpPublishTempDir>
+		<McpPublishTempDir>$([MSBuild]::EnsureTrailingSlash('$(McpPublishTempDir)'))</McpPublishTempDir>
+		<McpObjDir>$(McpPublishTempDir)obj/</McpObjDir>
+		<McpBinDir>$(McpPublishTempDir)bin/</McpBinDir>
 	</PropertyGroup>
 
-	<Target Name="BuildMcpServer" BeforeTargets="Build;Publish" Condition="Exists('$(McpServerProject)')">
+	<Target Name="BuildMcpServer" BeforeTargets="Build;Publish" Condition="'$(EnableMcpServer)' == 'true' and Exists('$(McpServerProject)')">
 		<Message Text="Building MCP server for Linux..." Importance="high" />
-		<MakeDir Directories="$(McpTempDir)" />
+		<MakeDir Directories="$(McpPublishTempDir)" />
 		
 		<!-- We create a variable that includes '-r ID' only if ID is present -->
 		<PropertyGroup>
-			<RuntimeArg Condition="'$(RuntimeIdentifier)' != ''"> -r $(RuntimeIdentifier)</RuntimeArg>
-			<RuntimeArg Condition="'$(RuntimeIdentifier)' == ''"></RuntimeArg>
+			<McpRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</McpRuntimeIdentifier>
+			<McpRuntimeIdentifier Condition="'$(McpRuntimeIdentifier)' == '' and $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) == 'Arm64'">linux-arm64</McpRuntimeIdentifier>
+			<McpRuntimeIdentifier Condition="'$(McpRuntimeIdentifier)' == '' and $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) == 'X64'">linux-x64</McpRuntimeIdentifier>
+			<McpRuntimeIdentifier Condition="'$(McpRuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</McpRuntimeIdentifier>
+			<RuntimeArg Condition="'$(McpRuntimeIdentifier)' != ''"> -r $(McpRuntimeIdentifier)</RuntimeArg>
+			<RuntimeArg Condition="'$(McpRuntimeIdentifier)' == ''"></RuntimeArg>
 		</PropertyGroup>
 
-		<Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration)$(RuntimeArg) --self-contained false -o &quot;$(McpTempDir)&quot;" 
+		<Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration)$(RuntimeArg) --self-contained true -p:PublishSingleFile=true -p:UseAppHost=true -p:BaseIntermediateOutputPath=&quot;$(McpObjDir)&quot; -p:BaseOutputPath=&quot;$(McpBinDir)&quot; -o &quot;$(McpPublishTempDir)&quot;" 
 			ContinueOnError="false" 
 			IgnoreExitCode="false" />
 	</Target>
 
-	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(McpTempDir)wintap_mcp_server')">
+	<Target Name="CopyMcpServer" AfterTargets="BuildMcpServer" Condition="Exists('$(McpPublishTempDir)wintap_mcp_server')">
 		<MakeDir Directories="$(McpOutputDir)" />
-		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server" DestinationFiles="$(McpOutputDir)wintap_mcp_server" SkipUnchangedFiles="true" />
-		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server.dll" DestinationFiles="$(McpOutputDir)wintap_mcp_server.dll" SkipUnchangedFiles="true" Condition="Exists('$(McpTempDir)wintap_mcp_server.dll')" />
-		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server.deps.json" DestinationFiles="$(McpOutputDir)wintap_mcp_server.deps.json" SkipUnchangedFiles="true" Condition="Exists('$(McpTempDir)wintap_mcp_server.deps.json')" />
-		<Copy SourceFiles="$(McpTempDir)wintap_mcp_server.runtimeconfig.json" DestinationFiles="$(McpOutputDir)wintap_mcp_server.runtimeconfig.json" SkipUnchangedFiles="true" Condition="Exists('$(McpTempDir)wintap_mcp_server.runtimeconfig.json')" />
+		<Copy SourceFiles="$(McpPublishTempDir)wintap_mcp_server" DestinationFiles="$(McpOutputDir)wintap_mcp_server" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(McpPublishTempDir)wintap_mcp_server.dll" DestinationFiles="$(McpOutputDir)wintap_mcp_server.dll" SkipUnchangedFiles="true" Condition="Exists('$(McpPublishTempDir)wintap_mcp_server.dll')" />
+		<Copy SourceFiles="$(McpPublishTempDir)wintap_mcp_server.deps.json" DestinationFiles="$(McpOutputDir)wintap_mcp_server.deps.json" SkipUnchangedFiles="true" Condition="Exists('$(McpPublishTempDir)wintap_mcp_server.deps.json')" />
+		<Copy SourceFiles="$(McpPublishTempDir)wintap_mcp_server.runtimeconfig.json" DestinationFiles="$(McpOutputDir)wintap_mcp_server.runtimeconfig.json" SkipUnchangedFiles="true" Condition="Exists('$(McpPublishTempDir)wintap_mcp_server.runtimeconfig.json')" />
 		<ItemGroup>
-			<McpSupportFiles Include="$(McpTempDir)*.so" />
+			<McpSupportFiles Include="$(McpPublishTempDir)*.so" />
 		</ItemGroup>
 		<Copy SourceFiles="@(McpSupportFiles)" DestinationFolder="$(McpOutputDir)" SkipUnchangedFiles="true" Condition="'@(McpSupportFiles)' != ''" />
-		<RemoveDir Directories="$(McpTempDir)" />
+		<RemoveDir Directories="$(McpPublishTempDir)" />
 		<Message Text="Built and copied wintap_mcp_server to mcp" Importance="high" />
 	</Target>
 

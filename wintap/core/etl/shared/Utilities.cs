@@ -95,22 +95,53 @@ namespace gov.llnl.wintap.core.etl.shared
             config.UploadIntervalSec = 300;
             try
             {
-                string assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                string etlConfig = Path.Combine(assemblyDirectory, "ETLConfig.json");
+                string etlConfig = GetETLConfigPath();
+                LogStartupConfigurationMessage("ETLConfig path: " + etlConfig, LogLevel.Info);
                 if (File.Exists(etlConfig))
                 {
+                    LogStartupConfigurationMessage("Loading ETLConfig from: " + etlConfig, LogLevel.Info);
                     config = JsonConvert.DeserializeObject<ETLConfig>(File.ReadAllText(etlConfig));
                     if (config != null && !string.IsNullOrEmpty(config.DataRootPath))
                     {
                         Env.SetDataRoot(config.DataRootPath);
                     }
                 }
+                else
+                {
+                    LogStartupConfigurationMessage("ETLConfig.json not found at: " + etlConfig + "; using default values", LogLevel.Warn);
+                }
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Could not read ETLConfig from disk, using default values", LogLevel.Warn);
+                LogStartupConfigurationMessage("Could not read ETLConfig from disk, using default values: " + ex.Message, LogLevel.Warn);
             }
+
+            if (int.TryParse(ConfigManager.GetValue<string>("WINTAP_ETL_SERIALIZATION_INTERVAL_SEC"), out int serSec) && serSec > 0)
+            {
+                config.SerializationIntervalSec = serSec;
+                LogStartupConfigurationMessage($"ETLConfig override: SerializationIntervalSec={serSec} (WINTAP_ETL_SERIALIZATION_INTERVAL_SEC)", LogLevel.Info);
+            }
+        
+            if (int.TryParse(ConfigManager.GetValue<string>("WINTAP_ETL_UPLOAD_INTERVAL_SEC"), out int upSec) && upSec > 0)
+            {
+                config.UploadIntervalSec = upSec;
+                LogStartupConfigurationMessage($"ETLConfig override: UploadIntervalSec={upSec} (WINTAP_ETL_UPLOAD_INTERVAL_SEC)", LogLevel.Info);
+            }
+
+
             return config;
+        }
+
+        internal static void LogStartupConfigurationMessage(string message, LogLevel level = LogLevel.Info)
+        {
+            WintapLogger.Log.Append(message, level);
+            Console.WriteLine($"{Env.AppName} startup config [{level}]: {message}");
+        }
+
+        internal static string GetETLConfigPath()
+        {
+            string assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            return Path.GetFullPath(Path.Combine(assemblyDirectory, "ETLConfig.json"));
         }
 
         internal static List<NIC> GetActiveNICs()

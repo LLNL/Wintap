@@ -24,20 +24,55 @@ using System.Reflection;
 using System.Timers;
 using static gov.llnl.wintap.core.etl.shared.Utilities;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 
 namespace gov.llnl.wintap.core.etl.extract
 {
     internal abstract class Serializer
     {
+        // Ensure the shared Esper context is deployed once per process.
+        private static int _esperContextRegistered = 0;
+
         private List<string> esperQueries = new List<string>();  // the query epl files used by this sensor
         private int maxEventsPerSec = 25000;
         private System.Timers.Timer backoffTimer;
         private string esperNameSpacePrefix = "gov.llnl.wintap.core.etl.esper.";
         private ConcurrentQueue<ExpandoObject> sensorData;
+        private long sensorDataDepth;
+
+        // Backlog protection: bound in-memory event queue per serializer to avoid OOM
+        // when downstream aggregation/serialization can’t keep up.
+        private int maxInMemoryEvents;
+        private long droppedDueToBacklog;
+        private DateTime lastBacklogLogUtc = DateTime.MinValue;
+        private DropPolicy backlogDropPolicy = DropPolicy.DropNewest;
+
+        private enum DropPolicy
+        {
+            DropNewest,
+            DropOldest
+        }
+
+        private static DropPolicy ParseDropPolicy(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return DropPolicy.DropNewest;
+            }
+
+            if (string.Equals(value, "oldest", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "drop_oldest", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "dropoldest", StringComparison.OrdinalIgnoreCase))
+            {
+                return DropPolicy.DropOldest;
+            }
+
+            return DropPolicy.DropNewest;
+        }
         private ParquetWriter parquetWriter;
         private bool fileBusy;  // prevents file IO contention when snapshot is being rotated.
-        private Timer flushToDiskTimer;
+        private System.Timers.Timer flushToDiskTimer;
 
         protected Serializer(string[] queries)
         {
@@ -130,7 +165,42 @@ namespace gov.llnl.wintap.core.etl.extract
             dynamic dobj = (dynamic)obj;
             if (!String.IsNullOrWhiteSpace(dobj.PidHash))
             {
+                if (maxInMemoryEvents > 0)
+                {
+                    while (Interlocked.Read(ref sensorDataDepth) >= maxInMemoryEvents && backlogDropPolicy == DropPolicy.DropOldest)
+                    {
+                        // Make room by evicting the oldest queued item.
+                        if (sensorData.TryDequeue(out _))
+                        {
+                            Interlocked.Decrement(ref sensorDataDepth);
+                            Interlocked.Increment(ref droppedDueToBacklog);
+                            gov.llnl.wintap.core.infrastructure.EventChannel.AddDroppedEvents(1);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    if (Interlocked.Read(ref sensorDataDepth) >= maxInMemoryEvents)
+                    {
+                        // Drop the newest event.
+                        Interlocked.Increment(ref droppedDueToBacklog);
+                        gov.llnl.wintap.core.infrastructure.EventChannel.AddDroppedEvents(1);
+
+                        var now = DateTime.UtcNow;
+                        if ((now - lastBacklogLogUtc).TotalSeconds >= 5)
+                        {
+                            lastBacklogLogUtc = now;
+                            WintapLogger.Log.Append($"{SensorName}: in-memory backlog limit reached (max={maxInMemoryEvents}, policy={backlogDropPolicy}). Dropping events. dropped={Interlocked.Read(ref droppedDueToBacklog)} depth={Interlocked.Read(ref sensorDataDepth)}", LogLevel.Warn);
+                        }
+
+                        return;
+                    }
+                }
+
                 this.sensorData.Enqueue(obj);
+                Interlocked.Increment(ref sensorDataDepth);
             }
             else
             {
@@ -195,8 +265,34 @@ namespace gov.llnl.wintap.core.etl.extract
 
             parquetWriter = new ParquetWriter();
             sensorData = new ConcurrentQueue<ExpandoObject>();
+            sensorDataDepth = 0;
 
-            flushToDiskTimer = new Timer();
+            // Optional per-serializer queue bound to prevent unbounded memory growth.
+            // Global: WINTAP_ETL_MAX_QUEUE_EVENTS
+            // Per serializer: WINTAP_ETL_MAX_QUEUE_EVENTS_<SERIALIZERNAME>
+            // (e.g., WINTAP_ETL_MAX_QUEUE_EVENTS_TCPCONNECTIONSERIALIZER)
+            maxInMemoryEvents = 0;
+            if (int.TryParse(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>("WINTAP_ETL_MAX_QUEUE_EVENTS"), out int globalMax) && globalMax > 0)
+            {
+                maxInMemoryEvents = globalMax;
+            }
+
+            string perSensorName = $"WINTAP_ETL_MAX_QUEUE_EVENTS_{this.GetType().Name.ToUpperInvariant()}";
+            if (int.TryParse(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>(perSensorName), out int perMax) && perMax > 0)
+            {
+                maxInMemoryEvents = perMax;
+            }
+
+            // Backlog drop policy (default drop newest).
+            // Global: WINTAP_ETL_QUEUE_DROP_POLICY ("newest"|"oldest")
+            // Per serializer: WINTAP_ETL_QUEUE_DROP_POLICY_<SERIALIZERNAME>
+            backlogDropPolicy = ParseDropPolicy(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>("WINTAP_ETL_QUEUE_DROP_POLICY"));
+            string perPolicyName = $"WINTAP_ETL_QUEUE_DROP_POLICY_{this.GetType().Name.ToUpperInvariant()}";
+            backlogDropPolicy = ParseDropPolicy(gov.llnl.wintap.core.shared.ConfigManager.GetValue<string>(perPolicyName)) == DropPolicy.DropOldest
+                ? DropPolicy.DropOldest
+                : backlogDropPolicy;
+
+            flushToDiskTimer = new System.Timers.Timer();
             flushToDiskTimer.Interval = Utilities.GetETLConfig().SerializationIntervalSec * 1000;
             flushToDiskTimer.AutoReset = true;
             flushToDiskTimer.Elapsed += FlushToDiskTimer_Elapsed;
@@ -216,7 +312,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 return;
             }
 
-            int currentQueueDepth = sensorData.Count;
+            int currentQueueDepth = (int)Math.Min(int.MaxValue, Interlocked.Read(ref sensorDataDepth));
             List<ExpandoObject> tempQueue = new List<ExpandoObject>();
 
             for (int i = 0; i < currentQueueDepth; i++)
@@ -227,6 +323,7 @@ namespace gov.llnl.wintap.core.etl.extract
                     if (sensorData.TryDequeue(out msg))
                     {
                         tempQueue.Add(msg);
+                        Interlocked.Decrement(ref sensorDataDepth);
                     }
                     else
                     {
@@ -303,17 +400,18 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private void regContext()
         {
-            var assembly = Assembly.GetExecutingAssembly();
             try
             {
-                var esper1 = esperNameSpacePrefix + "esper-context.epl";
-
-                using (Stream stream = assembly.GetManifestResourceStream(esper1))
-                using (StreamReader reader = new StreamReader(stream))
+                // All serializers share the same Esper context; registering it per serializer
+                // causes duplicate-context warnings and extra compile/deploy work.
+                if (Interlocked.CompareExchange(ref _esperContextRegistered, 1, 0) != 0)
                 {
-                    string esperQuery = reader.ReadToEnd();
-                    gov.llnl.wintap.core.infrastructure.EventChannel.CompileDeploy(esperQuery, "esper_context");
+                    return;
                 }
+
+                var esper1 = esperNameSpacePrefix + "esper-context.epl";
+                string esperQuery = readQueryFromFile(esper1);
+                gov.llnl.wintap.core.infrastructure.EventChannel.CompileDeploy(esperQuery, "esper_context");
             }
             catch (Exception ex)
             {
@@ -340,14 +438,33 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private string readQueryFromFile(string fileName)
         {
-            string query = "NONE";
+            string eplFileName = fileName;
+            int eplSuffix = fileName.LastIndexOf(".epl", StringComparison.OrdinalIgnoreCase);
+            if (eplSuffix >= 0)
+            {
+                int nameStart = fileName.LastIndexOf('.', eplSuffix - 1) + 1;
+                eplFileName = fileName.Substring(nameStart, eplSuffix - nameStart + 4);
+            }
+
+            string outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "esper", eplFileName);
+            if (File.Exists(outputPath))
+            {
+                return File.ReadAllText(outputPath);
+            }
+
             var assembly = Assembly.GetExecutingAssembly();
             using (Stream stream = assembly.GetManifestResourceStream(fileName))
-            using (StreamReader reader = new StreamReader(stream))
             {
-                query = reader.ReadToEnd();
+                if (stream == null)
+                {
+                    throw new FileNotFoundException($"Could not find EPL query as file or embedded resource: {fileName}", outputPath);
+                }
+
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    return reader.ReadToEnd();
+                }
             }
-            return query;
         }
 
 

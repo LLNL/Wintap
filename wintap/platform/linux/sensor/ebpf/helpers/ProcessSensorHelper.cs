@@ -96,6 +96,41 @@ namespace gov.llnl.wintap.platform.linux.collect
             return processObj;
         }
 
+        public static void EnrichParentProcess(WintapMessage message, ProcessHash pidHashGenerator)
+        {
+            if (message?.Process == null || message.Process.ParentPID <= 0 || pidHashGenerator == null)
+            {
+                return;
+            }
+
+            // Don't clobber an already-attributed parent hash.
+            if (!string.IsNullOrWhiteSpace(message.Process.ParentPidHash))
+            {
+                return;
+            }
+
+            ProcReader.ProcessInfo parentInfo = ProcReader.ReadProcessInfo((uint)message.Process.ParentPID);
+            if (!parentInfo.Exists)
+            {
+                // Leave ParentPidHash unset so EventChannel can still attempt resolver-based parent resolution.
+                message.Process.ParentPidHash = "";
+                message.Process.ParentProcessName = "Unknown";
+                return;
+            }
+
+            DateTime parentStartUtc = parentInfo.StartTimeUtc == default
+                ? DateTime.FromFileTimeUtc(message.EventTime)
+                : parentInfo.StartTimeUtc.ToUniversalTime();
+
+            message.Process.ParentPidHash = pidHashGenerator.GenPidHash(message.Process.ParentPID, parentStartUtc.ToFileTimeUtc());
+            message.Process.ParentProcessName = ExtractProcessName(parentInfo.ExecutablePath, parentInfo.Name);
+
+            // Breadcrumb for downstream debugging.
+            message.Process.Arguments = string.IsNullOrWhiteSpace(message.Process.Arguments)
+                ? "PARENT_HASH_SRC=proc"
+                : message.Process.Arguments + " PARENT_HASH_SRC=proc";
+        }
+
         /// <summary>
         /// Extract process name from command line
         /// Example: "bash -c ls" → "bash"

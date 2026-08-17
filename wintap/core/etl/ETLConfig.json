@@ -3,9 +3,9 @@
     {
       "Properties": {
         "EndPoint": "",
-	      "Port": "",
+        "Port": "",
         "CertificateStore": "",
-	      "DeviceCertificateName": ""
+        "DeviceCertificateName": ""
       },
       "Name": "SignedS3UrlAdapter",
       "Enabled": false
@@ -20,9 +20,21 @@
     {
       "Properties": {
         "Bucket": "",
-        "RegionEndpoint":  ""
+        "RegionEndpoint": "",
+        "ServiceURL": "",
+        "Endpoint": "",
+        "AccessKey": "",
+        "SecretKey": "",
+        "SessionToken": "",
+        "KeyPrefix": "",
+        "ForcePathStyle": "false",
+        "CloudflareAccessClientId": "",
+        "CloudflareAccessClientSecret": "",
+        "RateLimitMaxRetries": "5",
+        "RateLimitInitialDelayMs": "1000",
+        "RateLimitMaxDelayMs": "60000"
       },
-      "Name": "InstanceProfileAdapter",
+      "Name": "S3Adapter",
       "Enabled": false
     }
   ],
@@ -31,5 +43,31 @@
   "SerializationIntervalSec": 60,
   "UploadIntervalSec": 300,
   "WriteToParquet": true,
+  "DataRoot": "/tmp/lintap-data",
+  "DisableMCP": true,
+  "DisableDuckDBUI": true,
+  "DisableETL": false,
+  "DisableSensors": false,
+  "EarlyConsole": true,
+  "DisableSettings": true,
+  "EnableDirectParquet": false,
+  "DirectParquetFlushSeconds": 15,
+  "Execve": true,
+  "Clone": true,
+  "Exit": true,
+  "Network": true,
+  "FileOps": true,
+  "ProcessRundown": true,
+  "EnableBpfDiagMonitor": false,
+  "SkipProcessResolve": false,
+  "SkipParentProcessResolve": false,
+  "SkipProcessRegister": false,
+  "SkipEsperSend": false,
+  "ETLMaxQueueEvents": 10000,
+  "ETLMaxQueueEventsSerializer": 10000,
+  "ETLQueueDropPolicy": "newest",
+  "ParquetMaxBatchBacklog": 1000,
+  "ParquetBacklogDropPolicy": "newest",
+  "DirectParquetMaxQueueEvents": 5000,
+  "DirectParquetQueueDropPolicy": "newest"
 }
-

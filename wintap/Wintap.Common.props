@@ -16,21 +16,8 @@
 		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
 	</PropertyGroup>
 
-	<!-- Platform-specific intermediate output paths to prevent cache contamination -->
-	<PropertyGroup Condition="'$(AssemblyName)' == 'Wintap'">
-		<BaseIntermediateOutputPath>obj\wintap\</BaseIntermediateOutputPath>
-		<IntermediateOutputPath>obj\wintap\$(Configuration)\</IntermediateOutputPath>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(AssemblyName)' == 'Lintap'">
-		<BaseIntermediateOutputPath>obj\lintap\</BaseIntermediateOutputPath>
-		<IntermediateOutputPath>obj\lintap\$(Configuration)\</IntermediateOutputPath>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(AssemblyName)' == 'Mactap'">
-		<BaseIntermediateOutputPath>obj\mactap\</BaseIntermediateOutputPath>
-		<IntermediateOutputPath>obj\mactap\$(Configuration)\</IntermediateOutputPath>
-	</PropertyGroup>
+	<!-- Platform-specific intermediate output paths are set in Directory.Build.props.
+	     They must be defined before Microsoft.Common.props imports NuGet targets. -->
 
 	<!-- File exclusions common to all platforms -->
 	<ItemGroup>
@@ -140,7 +127,14 @@
 		<EmbeddedResource Include="core\etl\esper\registry.epl" />
 		<EmbeddedResource Include="core\etl\esper\tcp.epl" />
 		<EmbeddedResource Include="core\etl\esper\udp.epl" />
-		<None Include="core\etl\ETLConfig.json" />
+		<Content Include="core\etl\esper\*.epl">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>esper\%(Filename)%(Extension)</Link>
+		</Content>
+		<None Include="core\etl\ETLConfig.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>ETLConfig.json</Link>
+		</None>
 	</ItemGroup>
 
 	<!-- Cross-platform package references -->

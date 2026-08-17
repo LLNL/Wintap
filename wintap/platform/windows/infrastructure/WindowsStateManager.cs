@@ -4,6 +4,7 @@ using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Management;
 
@@ -34,11 +35,11 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         internal static List<DiskVolume> RefreshDriveMap()
         {
             List<DiskVolume> driveMap = new List<DiskVolume>();
-            string script = Environment.GetEnvironmentVariable("WINDIR") + @"\Temp\wintap_diskgather.txt";
+            string script = Path.Combine(Path.GetTempPath(), "wintap_diskgather.txt");
             System.IO.File.WriteAllText(script, "list volume");
             Process diskPart = new Process();
             ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = Environment.GetEnvironmentVariable("WINDIR") + "\\System32\\diskpart.exe";
+            psi.FileName = Path.Combine(Environment.SystemDirectory, "diskpart.exe");
             psi.Arguments = "/S " + script;
             psi.UseShellExecute = false;
             psi.RedirectStandardOutput = true;

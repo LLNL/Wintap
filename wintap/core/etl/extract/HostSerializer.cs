@@ -106,7 +106,7 @@ namespace gov.llnl.wintap.core.etl.extract
                 ParquetSchema schema = DetermineSchemaFromExpando(host.ToDynamic());
 
                 ParquetSerializerOptions options = new ParquetSerializerOptions();
-                options.CompressionMethod = CompressionMethod.Snappy;
+                options.CompressionMethod = gov.llnl.wintap.core.etl.load.ParquetWriter.GetCompressionMethod();
                 List<ExpandoObject> data = new List<ExpandoObject>();
                 data.Add(host.ToDynamic());
 
@@ -144,7 +144,7 @@ namespace gov.llnl.wintap.core.etl.extract
                     ParquetSchema schema = DetermineSchemaFromExpando(macIp.ToDynamic());
 
                     ParquetSerializerOptions options = new ParquetSerializerOptions();
-                    options.CompressionMethod = CompressionMethod.Snappy;
+                    options.CompressionMethod = gov.llnl.wintap.core.etl.load.ParquetWriter.GetCompressionMethod();
                     List<ExpandoObject> data = new List<ExpandoObject>();
                     foreach (MacIpV4Record macIpV4Record in macIps)
                     {
@@ -171,12 +171,14 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 try
                 {
-                    Type type = kvp.Value?.GetType();
+                    Type type = kvp.Value?.GetType() ?? typeof(string);
                     DataField field = new DataField(kvp.Key, type);
                     fields.Add(field);
                 }
                 catch (Exception ex)
-                { }
+                {
+                    WintapLogger.Log.Append($"Error on determining parquet schema: {ex}", LogLevel.Error);
+                }
             }
             ParquetSchema schema = new ParquetSchema(fields.ToArray());
             return schema;

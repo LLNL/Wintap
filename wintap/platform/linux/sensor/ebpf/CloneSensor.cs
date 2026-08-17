@@ -16,6 +16,7 @@ namespace gov.llnl.wintap.platform.linux.collect
     internal class CloneSensor : BaseEbpfSensor
     {
         private ProcessHash _pidHashGenerator;
+        private readonly System.Collections.Generic.List<IntPtr> _additionalLinks = new System.Collections.Generic.List<IntPtr>();
         protected override string BpfObjectFileName => "clone_tracer.bpf.o";
         protected override string BpfProgramName => "trace_process_fork";
 
@@ -26,6 +27,60 @@ namespace gov.llnl.wintap.platform.linux.collect
         }
 
         protected override LibBpf.RingBufferCallback GetRingBufferCallback() => HandleEvent;
+
+        protected override bool OnStarting()
+        {
+            // BaseEbpfSensor attaches the primary sched_process_fork tracepoint program.
+            // Attach clone/vfork syscall tracepoints too for best-effort clone_flags.
+            try
+            {
+                var extraPrograms = new[]
+                {
+                    "trace_sys_enter_clone",
+                    "trace_sys_enter_vfork",
+                };
+
+                foreach (var programName in extraPrograms)
+                {
+                    IntPtr prog = LibBpf.bpf_object__find_program_by_name(BpfObject, programName);
+                    if (prog == IntPtr.Zero)
+                    {
+                        WintapLogger.Log.Append($"{SensorName} program '{programName}' not found", LogLevel.Debug);
+                        continue;
+                    }
+
+                    IntPtr link = LibBpf.bpf_program__attach(prog);
+                    if (link == IntPtr.Zero)
+                    {
+                        WintapLogger.Log.Append($"{SensorName} failed to attach program '{programName}'", LogLevel.Warn);
+                        continue;
+                    }
+
+                    _additionalLinks.Add(link);
+                    WintapLogger.Log.Append($"{SensorName} attached '{programName}'", LogLevel.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"{SensorName} error attaching clone/vfork: {ex.Message}", LogLevel.Warn);
+            }
+
+            return true;
+        }
+
+        protected override void OnStopping()
+        {
+            foreach (var link in _additionalLinks)
+            {
+                try
+                {
+                    if (link != IntPtr.Zero)
+                        LibBpf.bpf_link__destroy(link);
+                }
+                catch { }
+            }
+            _additionalLinks.Clear();
+        }
 
         /// <summary>
         /// Resolves /proc symlinks to actual executable paths
@@ -83,8 +138,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 string processName = ProcessSensorHelper.ExtractProcessName(executablePath, evt.GetParentComm());
 
+                // Use child process start time for stable PidHash.
+                DateTime startUtc = childProcData.StartTimeUtc != default ? childProcData.StartTimeUtc.ToUniversalTime() : DateTime.UtcNow;
+
                 var message = new WintapMessage(
-                    DateTime.UtcNow,
+                    startUtc,
                     (int)evt.ChildPid,
                     WintapMessage.MessageTypeEnum.Process
                 );
@@ -104,6 +162,7 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 message.PidHash = _pidHashGenerator?.GenPidHash(message.PID, message.EventTime) ?? "";
                 message.ProcessName = processName;
+                ProcessSensorHelper.EnrichParentProcess(message, _pidHashGenerator);
 
                 EventChannel.Send(message);
                 return 0;
