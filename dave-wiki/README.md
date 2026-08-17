@@ -1,32 +1,21 @@
-# Wintap Wiki — Schema (dave-wiki)
+# dave-wiki Retired
 
-This is **Dave's per-developer wiki** — the persistent, compounding memory for
-this developer, maintained solely by the **Engineer** subagent (see
-`.claude/agents/engineer.md`). The Developer reads it but never writes to it. It
-implements the Karpathy "LLM wiki" idea: knowledge accretes here across sessions
-instead of scattering across chat.
+Retired on 2026-08-17. Wintap ecosystem knowledge now lives in
+`../Wintap-Analytics/wiki/`.
 
-Each developer keeps their own `<name>-wiki/` directory so wiki edits never
-collide in git — a developer only ever writes their own directory.
+Migration destinations:
 
-## Layout
+- `wiki/decisions/2026-06-30-process-identity-attribution-contract.md` →
+  `../Wintap-Analytics/wiki/decision/process-identity-attribution-contract.md`
+- `wiki/decisions/2026-06-30-test-project-structure-and-first-test.md` →
+  `../Wintap-Analytics/wiki/decision/test-project-structure-and-first-test.md`
+- `sources/2026-08-17-wpc-01-sid-helper-notes.md` →
+  `../Wintap-Analytics/wiki/work/improve-windows-process-collection/sid-helper-notes-2026-08-17.md`
+- `wiki/log.md` entries were merged into `../Wintap-Analytics/wiki/log.md`
+  with `[wintap]` provenance in the entry titles.
 
-| Path | Contents |
-|---|---|
-| `sources/` | Raw, informal session scratch notes and ingested source material. Immutable-ish inputs. |
-| `wiki/decisions/` | ADRs — one file per settled architectural decision (`YYYY-MM-DD-kebab-title.md`). |
-| `wiki/entities/` | Entity pages — concrete things in the system (e.g. `wintap-message.md`, `plugin-manager.md`). |
-| `wiki/architecture/` | Concept / architecture pages (e.g. `etl-flow.md`, `esper-cep.md`). |
-| `wiki/log.md` | Append-at-top chronological log of every Engineer session. |
+See the consolidation decision:
+`../Wintap-Analytics/wiki/decision/consolidate-developer-wiki-into-analytics-wiki.md`.
 
-## Workflow
-
-- **Ingest:** drop a source into `sources/`; the Engineer reads it, updates
-  entity/concept pages, notes contradictions, and logs the activity.
-- **Decide:** when the Architect settles a decision, the Engineer writes/updates
-  an ADR and the affected pages.
-- **Reference:** the Developer consults relevant pages (read-only) before
-  implementing an approved instruction.
-
-Formats for ADRs, wiki pages, and log entries are defined in
-`.claude/agents/engineer.md`.
+The remaining files are intentionally left in place for the Architect to remove
+with git.

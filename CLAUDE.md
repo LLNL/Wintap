@@ -78,13 +78,15 @@ grandfathered — do not rename them.
 
 This project uses a role-separated workflow (adapted from the OpenCode
 Architect / Engineer / Developer pattern and the Karpathy "LLM wiki" idea).
-The persistent **per-developer** wiki is the compounding project memory.
+The persistent ecosystem wiki is the compounding project memory.
 
-> **Per-developer wikis.** Each developer keeps their own wiki directory
-> (`<name>-wiki/`, e.g. `dave-wiki/`) so wiki edits never collide in git —
-> a developer only ever writes their own directory. This session's wiki is
-> **`dave-wiki/`**. When the Engineer or Developer references "the wiki"
-> below, it means the active developer's wiki directory.
+> **Wiki location.** The Wintap ecosystem wiki lives in
+> `../Wintap-Analytics/wiki/`. The old per-developer `dave-wiki/` has been
+> retired; see
+> `../Wintap-Analytics/wiki/decision/consolidate-developer-wiki-into-analytics-wiki.md`.
+> Collision avoidance now comes from feature-scoped work folders under
+> `../Wintap-Analytics/wiki/work/<feature-slug>/` plus the low-volume shared
+> `../Wintap-Analytics/wiki/log.md`.
 
 ### Architect — *you, the human, in the main session*
 The decision-maker and the only approval gate. You drive the main Claude Code
@@ -92,7 +94,8 @@ session, decide direction, approve instruction documents, and dispatch the
 Engineer and Developer subagents. You inform the subagents; they execute.
 
 ### Engineer — `.claude/agents/engineer.md`
-Design collaborator and **sole keeper of `dave-wiki/` and `developer_docs/`**.
+Design collaborator and **maintainer of `../Wintap-Analytics/wiki/` for Wintap
+ecosystem knowledge plus `developer_docs/` process artifacts in this repo**.
 Explores options, writes ADRs, maintains wiki pages and `log.md`, and writes
 self-contained instruction documents for the Developer. **Never writes source
 code or tests** (enforced by tool limits: no Bash, plus instruction discipline).
@@ -100,7 +103,7 @@ code or tests** (enforced by tool limits: no Bash, plus instruction discipline).
 ### Developer — `.claude/agents/developer.md`
 Implements **exactly one approved instruction document at a time**. Writes code
 and tests, runs the verification command, and files one audit artifact per unit.
-**Never edits `dave-wiki/` or `developer_docs/instructions/`.**
+**Never edits `../Wintap-Analytics/wiki/` or `developer_docs/instructions/`.**
 
 ### The loop
 1. Architect dispatches the **Engineer** to explore a problem and draft an
@@ -120,7 +123,7 @@ and tests, runs the verification command, and files one audit artifact per unit.
 
 | Path | Engineer | Developer |
 |---|---|---|
-| `dave-wiki/**` | Read / Write | Read only |
+| `../Wintap-Analytics/wiki/**` | Read / Write | Read only |
 | `developer_docs/instructions/**` | Read / Write | Read only |
 | `developer_docs/design/**`, `features/**` | Read / Write | Read only |
 | `developer_docs/audits/**` | Read only | Read / Write |
@@ -138,7 +141,7 @@ When information conflicts, resolve in this order:
 
 1. The codebase as it currently exists
 2. The approved instruction document
-3. Relevant ADRs in `dave-wiki/wiki/decisions/`
+3. Relevant decisions in `../Wintap-Analytics/wiki/decision/`
 4. Prior audit artifacts in `developer_docs/audits/`
 5. General standards in this file
 

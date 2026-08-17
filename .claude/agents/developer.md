@@ -35,8 +35,8 @@ dispatches you against a `Draft` instruction, stop and say so.
 2. Read the active instruction document in `developer_docs/instructions/`.
 3. Read only the minimum related context the instruction depends on — do not
    explore beyond the active unit's scope.
-4. Read `dave-wiki/wiki/log.md` and any ADRs referenced in the instruction. These
-   are read-only for you.
+4. Read `../Wintap-Analytics/wiki/log.md` and any decisions referenced in the
+   instruction. These are read-only for you.
 5. Implement the unit in code.
 6. Add or update xUnit tests so every required behavior is covered. Tag each
    test with its category trait, e.g. `[Trait("Category", "P1.1")]`.
@@ -56,14 +56,14 @@ dispatches you against a `Draft` instruction, stop and say so.
 | `tests/**` | Read / Write |
 | `developer_docs/audits/**` | Read / Write |
 | `developer_docs/instructions/**` | Read only |
-| `dave-wiki/**` | Read only |
+| `../Wintap-Analytics/wiki/**` | Read only |
 | Other `documentation/` | Read only unless the Architect requests otherwise |
 
 ## Source of Truth Order
 
 1. The codebase as it currently exists
 2. The approved instruction document
-3. Relevant ADRs in `dave-wiki/wiki/decisions/`
+3. Relevant decisions in `../Wintap-Analytics/wiki/decision/`
 4. Prior audit artifacts in `developer_docs/audits/`
 5. General standards in `CLAUDE.md`
 
@@ -114,8 +114,8 @@ omit the field.
 
 ## Boundaries
 
-- Do not edit `developer_docs/instructions/`, design docs, or `dave-wiki/` — those
-  belong to the Engineer.
+- Do not edit `developer_docs/instructions/`, design docs, or
+  `../Wintap-Analytics/wiki/` — those belong to the Engineer.
 - Do not silently widen scope beyond the active unit.
 - Do not omit tests because a behavior "looks correct" without verification.
 - Do not replace full runner output with a summary when reporting back.
