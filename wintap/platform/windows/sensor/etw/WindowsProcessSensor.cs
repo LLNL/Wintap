@@ -33,6 +33,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     internal class WindowsProcessSensor : EtwProviderCollector
     {
         private static readonly TimeSpan SnapshotStartMatchTolerance = TimeSpan.FromSeconds(2);
+        internal static readonly TimeSpan BootReplayMatchTolerance = TimeSpan.FromSeconds(2);
         internal static readonly TimeSpan StopMetricCorrelationWindow = TimeSpan.FromSeconds(5);
         internal static readonly TimeSpan QaCounterLogInterval = TimeSpan.FromSeconds(60);
         private const int DefaultSidAccountCacheSize = 1024;
@@ -76,6 +77,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private long cmdlineEmptyCount;
         private long cmdlinePebRecoveredCount;
         private long snapshotCount;
+        private long bootReplayCount;
 
         internal WindowsProcessSensor(
             Func<int, DateTime, ProcessRecord> resolveProcessAtTime = null,
@@ -104,7 +106,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             this.enumerateSnapshot = enumerateSnapshot ?? EnumerateLiveSnapshot;
             this.clearProcessDb = clearProcessDb ?? EventChannel.ClearProcessDB;
             this.machineBootTimeUtc = machineBootTimeUtc ?? (() => StateManager.MachineBootTime.ToUniversalTime());
-            this.log = log ?? ((message, level) => WintapLogger.Log.Append(message, level));
+            this.log = log ?? LogMessage;
             this.lookupAccountSid = lookupAccountSid ?? TryLookupAccountSid;
             this.lookupTokenUserByPid = lookupTokenUserByPid ?? TryGetProcessUserByPid;
             this.lookupPebCommandLineByPid = lookupPebCommandLineByPid ?? TryReadCommandLineByPid;
@@ -116,9 +118,15 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             this.genPidHash = genPidHash ?? processHash.GenPidHash;
         }
 
+        private static void LogMessage(string message, LogLevel level)
+        {
+            WintapLogger.Log.Append(message, level);
+        }
+
         internal long StopWithoutStartCount => Interlocked.Read(ref stopWithoutStartCount);
         internal long SnapshotDedupSuppressedCount => Interlocked.Read(ref snapshotDedupSuppressedCount);
         internal long ManifestMetricMissesCount => Interlocked.Read(ref manifestMetricMissesCount);
+        internal long BootReplayCount => Interlocked.Read(ref bootReplayCount);
         internal int SidAccountCacheCount => sidAccountCache.Count;
 
         public override bool Start()
@@ -216,6 +224,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 StopWithoutStart = StopWithoutStartCount,
                 ManifestMetricMisses = ManifestMetricMissesCount,
                 SnapshotCount = Interlocked.Read(ref snapshotCount),
+                BootReplayCount = BootReplayCount,
                 DedupSuppressed = SnapshotDedupSuppressedCount
             };
         }
@@ -233,6 +242,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 $"stop_without_start={counters.StopWithoutStart} " +
                 $"manifest_metric_misses={counters.ManifestMetricMisses} " +
                 $"snapshot_count={counters.SnapshotCount} " +
+                $"boot_replay_count={counters.BootReplayCount} " +
                 $"dedup_suppressed={counters.DedupSuppressed}";
         }
 
@@ -329,7 +339,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
                 foreach (SnapshotProcessInfo processInfo in snapshot.OrderBy(p => p.CreateTimeUtc).ThenBy(p => p.Pid))
                 {
-                    if (!processInfo.IsSynthetic && IsDuplicateSnapshotRefresh(processInfo))
+                    if (!processInfo.IsSynthetic && IsDuplicateProcessInstance(processInfo.Pid, processInfo.CreateTimeUtc, SnapshotStartMatchTolerance))
                     {
                         Interlocked.Increment(ref snapshotDedupSuppressedCount);
                         continue;
@@ -443,19 +453,93 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return message;
         }
 
-        private bool IsDuplicateSnapshotRefresh(SnapshotProcessInfo processInfo)
+        private bool IsDuplicateProcessInstance(int pid, DateTime createTime, TimeSpan tolerance)
         {
-            DateTime createTimeUtc = processInfo.CreateTimeUtc.ToUniversalTime();
-            DateTime lookupTimeUtc = createTimeUtc + SnapshotStartMatchTolerance;
-            ProcessRecord existing = resolveProcessAtTime(processInfo.Pid, lookupTimeUtc);
+            DateTime createTimeUtc = createTime.ToUniversalTime();
+            DateTime lookupTimeUtc = createTimeUtc + tolerance;
+            ProcessRecord existing = resolveProcessAtTime(pid, lookupTimeUtc);
 
-            if (existing == null || existing.ProcessId != processInfo.Pid)
+            if (existing == null || existing.ProcessId != pid)
             {
                 return false;
             }
 
             TimeSpan skew = existing.CreateTime.ToUniversalTime() - createTimeUtc;
-            return Math.Abs(skew.TotalSeconds) <= SnapshotStartMatchTolerance.TotalSeconds;
+            return Math.Abs(skew.TotalSeconds) <= tolerance.TotalSeconds;
+        }
+
+        internal bool ReplayBootTrace(string etlPath)
+        {
+            if (string.IsNullOrWhiteSpace(etlPath) || !File.Exists(etlPath))
+            {
+                log($"Boot process trace ETL not found or unreadable at '{etlPath}'; skipping boot replay", LogLevel.Warn);
+                return false;
+            }
+
+            try
+            {
+                log($"Windows process boot ETL replay starting from '{etlPath}'", LogLevel.Info);
+                using var source = new ETWTraceEventSource(etlPath, TraceEventSourceType.FileOnly);
+                var parser = new KernelTraceEventParser(source);
+                parser.ProcessStart += data => HandleReplayedProcessTraceData(data);
+                parser.ProcessDCStart += data => HandleReplayedProcessTraceData(data);
+                source.Process();
+                log($"Windows process boot ETL replay complete from '{etlPath}'", LogLevel.Info);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process boot ETL replay failed for '{etlPath}'; continuing live collection: {ex.Message}", LogLevel.Warn);
+                return false;
+            }
+        }
+
+        private void HandleReplayedProcessTraceData(ProcessTraceData data)
+        {
+            try
+            {
+                int pid = TryGetIntPayload(data, "ProcessID", data.ProcessID);
+                int parentPid = TryGetIntPayload(data, "ParentID", 0);
+                string imageFileName = TryGetStringPayload(data, "ImageFileName");
+                string commandLine = TryGetStringPayload(data, "CommandLine");
+                SecurityIdentifier sid = null;
+                SidParseStatus sidStatus;
+
+                try
+                {
+                    sidStatus = data.TryGetUserSid(out sid);
+                }
+                catch
+                {
+                    sidStatus = SidParseStatus.Malformed;
+                }
+
+                HandleReplayedStart(pid, parentPid, data.TimeStamp, imageFileName, commandLine, sid, sidStatus);
+            }
+            catch (Exception ex)
+            {
+                log($"Error handling replayed Windows process Start event: {ex.Message}", LogLevel.Debug);
+            }
+        }
+
+        internal WintapMessage HandleReplayedStart(
+            int pid,
+            int parentPid,
+            DateTime replayedStartTimestamp,
+            string imageFileName,
+            string commandLine,
+            SecurityIdentifier sid = null,
+            SidParseStatus sidStatus = SidParseStatus.NoSid)
+        {
+            DateTime createTimeUtc = replayedStartTimestamp.ToUniversalTime();
+            if (IsDuplicateProcessInstance(pid, createTimeUtc, BootReplayMatchTolerance))
+            {
+                return null;
+            }
+
+            WintapMessage message = EmitStart(pid, parentPid, createTimeUtc, imageFileName, commandLine, sid, sidStatus);
+            Interlocked.Increment(ref bootReplayCount);
+            return message;
         }
 
         private void EtwParser_ProcessStart(ProcessTraceData data)
@@ -1570,6 +1654,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         public long StopWithoutStart { get; init; }
         public long ManifestMetricMisses { get; init; }
         public long SnapshotCount { get; init; }
+        public long BootReplayCount { get; init; }
         public long DedupSuppressed { get; init; }
     }
 }

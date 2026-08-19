@@ -2,6 +2,7 @@
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.platform.windows.collect.etw;
+using gov.llnl.wintap.platform.windows.collect.etw.helpers;
 using gov.llnl.wintap.platform.windows.collect.shared;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
@@ -25,6 +26,12 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
         internal List<BaseWindowsSensor> Start()
         {
             List<BaseWindowsSensor> baseSensors = new List<BaseWindowsSensor>();
+            string bootReplayPath = null;
+
+            bool enableBootProcessTrace = Properties.Settings.Default.EnableBootProcessTrace;
+            bootReplayPath = BootProcessTraceHelper.InspectCleanupArmAndGetReplayPath(
+                enableBootProcessTrace,
+                (message, level) => WintapLogger.Log.Append(message, level));
 
             // start unified process sensor first for process attribution
             WindowsProcessSensor pc = new WindowsProcessSensor();
@@ -32,6 +39,10 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             WintapLogger.Log.Append("Starting Windows process sensor", LogLevel.Info);
             pc.Start();
             WintapLogger.Log.Append("Windows process sensor started", LogLevel.Info);
+            if (bootReplayPath != null)
+            {
+                pc.ReplayBootTrace(bootReplayPath);
+            }
             kernelFlags = KernelTraceEventParser.Keywords.Process;
             baseSensors.Add(pc);
 
@@ -109,6 +120,11 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
         internal void Stop()
         {
+            if (Properties.Settings.Default.EnableBootProcessTrace)
+            {
+                BootProcessTraceHelper.ArmForNextBoot((message, level) => WintapLogger.Log.Append(message, level));
+            }
+
             KernelSession.Instance.EtwSession.Stop();
         }
 

@@ -43,7 +43,6 @@
   "SerializationIntervalSec": 60,
   "UploadIntervalSec": 300,
   "WriteToParquet": true,
-  "DataRoot": "/tmp/lintap-data",
   "DisableMCP": true,
   "DisableDuckDBUI": true,
   "DisableETL": false,

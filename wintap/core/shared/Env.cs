@@ -81,34 +81,48 @@ namespace gov.llnl.wintap.core.shared
         {
             get
             {
-                        if (!string.IsNullOrEmpty(_overriddenDataRoot))
-                        {
-                            return _overriddenDataRoot;
-                        }
-                        
-                        string configDataRoot = ConfigManager.GetValue<string>("DataRoot");
-                        if (!string.IsNullOrEmpty(configDataRoot))
-                        {
-                            return configDataRoot;
-                        }
-                        
-                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                        {
-                            return Path.Combine(
-                                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                                "Wintap"
-                            );
-                        }
-                        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                        {
-                            return "/Library/Application Support/Mactap";
-                        }
-                        else // Linux and other Unix
-                        {
-                            return "/var/lib/lintap";
-                        }
+                string configDataRoot = ConfigManager.GetValue<string>("DataRoot");
+                OSPlatform platform = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? OSPlatform.Windows
+                    : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+                        ? OSPlatform.OSX
+                        : OSPlatform.Linux;
 
+                return ResolveDataRoot(
+                    _overriddenDataRoot,
+                    configDataRoot,
+                    platform,
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
             }
+        }
+
+        internal static string ResolveDataRoot(
+            string overriddenDataRoot,
+            string configuredDataRoot,
+            OSPlatform platform,
+            string commonApplicationData)
+        {
+            if (!string.IsNullOrWhiteSpace(overriddenDataRoot))
+            {
+                return overriddenDataRoot;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuredDataRoot))
+            {
+                return configuredDataRoot;
+            }
+
+            if (platform.Equals(OSPlatform.Windows))
+            {
+                return Path.Combine(commonApplicationData, "Wintap");
+            }
+
+            if (platform.Equals(OSPlatform.OSX))
+            {
+                return "/Library/Application Support/Mactap";
+            }
+
+            return "/var/lib/lintap";
         }
 
         private static string _overriddenDataRoot = null;

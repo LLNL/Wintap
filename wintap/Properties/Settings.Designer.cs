@@ -70,6 +70,18 @@ namespace gov.llnl.wintap.Properties {
                 this["EnableWorkbench"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableBootProcessTrace {
+            get {
+                return ((bool)(this["EnableBootProcessTrace"]));
+            }
+            set {
+                this["EnableBootProcessTrace"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

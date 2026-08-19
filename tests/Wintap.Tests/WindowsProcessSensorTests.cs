@@ -627,7 +627,8 @@ namespace Wintap.Tests
                 StopWithoutStart = 7,
                 ManifestMetricMisses = 8,
                 SnapshotCount = 9,
-                DedupSuppressed = 10
+                BootReplayCount = 10,
+                DedupSuppressed = 11
             };
 
             string formatted = WindowsProcessSensor.FormatQaCounterSnapshot(counters);
@@ -642,7 +643,8 @@ namespace Wintap.Tests
             AssertQaCounterName(formatted, "stop_without_start", "7");
             AssertQaCounterName(formatted, "manifest_metric_misses", "8");
             AssertQaCounterName(formatted, "snapshot_count", "9");
-            AssertQaCounterName(formatted, "dedup_suppressed", "10");
+            AssertQaCounterName(formatted, "boot_replay_count", "10");
+            AssertQaCounterName(formatted, "dedup_suppressed", "11");
         }
 
         [Fact]
@@ -685,6 +687,7 @@ namespace Wintap.Tests
             Assert.Equal(2, snapshot.StopWithoutStart);
             Assert.Equal(1, snapshot.ManifestMetricMisses);
             Assert.Equal(4, snapshot.SnapshotCount);
+            Assert.Equal(0, snapshot.BootReplayCount);
             Assert.Equal(1, snapshot.DedupSuppressed);
         }
 
@@ -702,6 +705,115 @@ namespace Wintap.Tests
             AssertQaCounterName(qaLine, "sid_null", "1");
             AssertQaCounterName(qaLine, "sid_fallback", "1");
             AssertQaCounterName(qaLine, "cmdline_empty", "1");
+        }
+
+        [Theory]
+        [Trait("Category", "wpc-07")]
+        [InlineData(@"c:/programdata/wintap/./boot-process-trace.etl", @"C:\ProgramData\Wintap\boot-process-trace.etl", true)]
+        [InlineData(@"C:\ProgramData\Other\boot-process-trace.etl", @"C:\ProgramData\Wintap\boot-process-trace.etl", false)]
+        [InlineData(null, @"C:\ProgramData\Wintap\boot-process-trace.etl", false)]
+        [InlineData("", @"C:\ProgramData\Wintap\boot-process-trace.etl", false)]
+        [InlineData("   ", @"C:\ProgramData\Wintap\boot-process-trace.etl", false)]
+        [InlineData("\0", @"C:\ProgramData\Wintap\boot-process-trace.etl", false)]
+        public void BootTraceOwnershipPredicate_MatchesOnlyConfiguredNormalizedPath(string sessionPath, string configuredPath, bool expected)
+        {
+            Assert.Equal(expected, BootProcessTraceHelper.IsOwnedBootSession(sessionPath, configuredPath));
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-07")]
+        public void HandleReplayedStart_SuppressesDuplicateWithinToleranceWithoutIncrementingBootReplayCount()
+        {
+            DateTime replayedStart = BootTime().AddMinutes(10);
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) => new ProcessRecord { ProcessId = pid, CreateTime = replayedStart.AddSeconds(1) });
+
+            WintapMessage message = sensor.HandleReplayedStart(1000, 4, replayedStart, "duplicate.exe", "duplicate.exe", null, SidParseStatus.Extracted);
+
+            Assert.Null(message);
+            Assert.Empty(emitted);
+            Assert.Equal(0, sensor.BootReplayCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-07")]
+        public void HandleReplayedStart_EmitsPidReuseOutsideToleranceWithReplayedTimestamp()
+        {
+            DateTime replayedStart = BootTime().AddMinutes(11);
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) => new ProcessRecord { ProcessId = pid, CreateTime = replayedStart.AddSeconds(3) });
+
+            WintapMessage message = sensor.HandleReplayedStart(1001, 4, replayedStart, "outside.exe", "outside.exe --boot", null, SidParseStatus.Extracted);
+
+            Assert.Single(emitted);
+            Assert.Same(message, emitted[0]);
+            Assert.Equal(WintapMessage.ActivityTypeEnum.Start, message.ActivityType);
+            Assert.Equal(replayedStart.ToFileTimeUtc(), message.EventTime);
+            Assert.Equal(TestPidHash(1001, replayedStart.ToFileTimeUtc()), message.PidHash);
+            Assert.Equal("outside.exe --boot", message.Process.CommandLine);
+            Assert.Equal(1, sensor.BootReplayCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-07")]
+        public void HandleReplayedStart_EmitsResolverMissAndIncrementsBootReplayCount()
+        {
+            DateTime replayedStart = BootTime().AddMinutes(12);
+            var sensor = CreateSensor(out List<WintapMessage> emitted, resolver: (pid, time) => null);
+
+            WintapMessage message = sensor.HandleReplayedStart(1002, 1001, replayedStart, "miss.exe", string.Empty, null, SidParseStatus.Extracted);
+
+            Assert.Single(emitted);
+            Assert.Same(message, emitted[0]);
+            Assert.Equal(WintapMessage.ActivityTypeEnum.Start, message.ActivityType);
+            Assert.Equal(1002, message.Process.PID);
+            Assert.Equal(1001, message.Process.ParentPID);
+            Assert.Equal(replayedStart.ToFileTimeUtc(), message.EventTime);
+            Assert.Equal(1, sensor.BootReplayCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-07")]
+        public void QaCounterLineIncludesBootReplayCount()
+        {
+            var counters = new WindowsProcessQaCounters { BootReplayCount = 42 };
+
+            string formatted = WindowsProcessSensor.FormatQaCounterSnapshot(counters);
+
+            AssertQaCounterName(formatted, "boot_replay_count", "42");
+        }
+
+        [Theory]
+        [Trait("Category", "wpc-09")]
+        [InlineData(true, false, false, false, false, false, false, true, false)]
+        [InlineData(true, true, true, true, true, true, true, true, true)]
+        [InlineData(false, true, true, true, true, true, true, false, false)]
+        [InlineData(true, true, false, true, true, false, false, true, false)]
+        [InlineData(false, false, false, true, true, false, true, false, false)]
+        public void BootTraceLifecycleDecision_CoversEnableDisableAndForeignSessionSafety(
+            bool settingEnabled,
+            bool activeSessionPresent,
+            bool ownedActiveSession,
+            bool bootEtlExists,
+            bool registryOwned,
+            bool expectedStop,
+            bool expectedDisarm,
+            bool expectedArm,
+            bool expectedReplay)
+        {
+            BootTraceLifecycleDecision decision = BootProcessTraceHelper.DecideLifecycle(
+                settingEnabled,
+                activeSessionPresent,
+                ownedActiveSession,
+                bootEtlExists,
+                registryOwned);
+
+            Assert.Equal(expectedStop, decision.StopOwnedSession);
+            Assert.Equal(expectedDisarm, decision.DisarmOwnedRegistry);
+            Assert.Equal(expectedArm, decision.ArmForNextBoot);
+            Assert.Equal(expectedReplay, decision.ReplayBootEtl);
         }
 
         private static WindowsProcessSensor CreateSensor(

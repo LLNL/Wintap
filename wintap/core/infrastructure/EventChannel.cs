@@ -337,10 +337,10 @@ namespace gov.llnl.wintap.core.infrastructure
                                              }
                                              catch { }
 
-                                             var level = string.IsNullOrEmpty(fallbackParentPidHash) ? LogLevel.Warn : LogLevel.Debug;
-                                             WintapLogger.Log.Append(
-                                                 $"Could not resolve parent process (childPid={streamedEvent.PID}, parentPid={streamedEvent.Process.ParentPID})",
-                                                 level);
+                                              var level = string.IsNullOrEmpty(fallbackParentPidHash) ? LogLevel.Warn : LogLevel.Debug;
+                                              WintapLogger.Log.Append(
+                                                  $"Best-effort parent attribution unavailable (childPid={streamedEvent.PID}, parentPid={streamedEvent.Process.ParentPID}); parent may have exited before observation or be outside snapshot/boot coverage; using unknown-parent sentinel (logged once per parent PID)",
+                                                  level);
 
                                              if (!string.IsNullOrEmpty(fallbackParentPidHash))
                                              {
