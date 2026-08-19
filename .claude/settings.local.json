@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet sln *)"
+      "Bash(dotnet sln *)",
+      "Bash(git check-ignore *)",
+      "Bash(git -C /c/PUBLIC/wintap log --oneline -3 -- developer_docs)"
     ]
   }
 }

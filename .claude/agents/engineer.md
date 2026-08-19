@@ -50,6 +50,20 @@ by design — your job is reading, thinking, and writing documents.
     `../Wintap-Analytics/wiki/work/<feature-slug>/` folder as an informal
     scratch file for the session. There is no local `sources/` wiki anymore.
 
+### During ROI/velocity mini-lab feature work
+
+- Follow `../Wintap-Analytics/wiki/decision/ai-velocity-roi-mini-lab.md`.
+- At feature exploration start, write your AI estimates and one-line basis to
+  `../Wintap-Analytics/wiki/work/<feature-slug>/metrics.md` **before** reading
+  `interview.md`'s `## Sealed — human estimates` section. If the seal is
+  already broken, record missing data rather than estimating.
+- At instruction drafting time, record each unit's development estimate and
+  basis in `metrics.md` before implementation begins.
+- At close-out, after the main session supplies the attention-proxy hours,
+  fill actuals from log/git timestamps and audits, unseal/tabulate estimates,
+  record the close-out answer, and fold the summary into the wiki. Metrics
+  never gate, delay, nag, or trigger re-asking skipped questions.
+
 ### When the Architect signals a decision is settled
 12. Write or update the relevant decision page in
     `../Wintap-Analytics/wiki/decision/` using the Analytics wiki frontmatter and

@@ -117,6 +117,15 @@ and tests, runs the verification command, and files one audit artifact per unit.
 > mid-run. Approval happens in the main session between dispatches — never hand
 > an unapproved instruction straight to the Developer.
 
+### Feature metrics mini-lab
+
+Features using the LLM-assisted workflow may carry the velocity/ROI mini-lab in
+`../Wintap-Analytics/wiki/decision/ai-velocity-roi-mini-lab.md`: feature open
+adds two sealed estimate questions to the interview; feature close asks whether
+the human would have attempted the feature without AI. At close, the main
+session computes the 15-minute-gap attention proxy and gives it to the Engineer;
+metrics never gate or nag the workflow.
+
 ---
 
 ## Directory Ownership
