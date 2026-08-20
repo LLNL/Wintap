@@ -14,8 +14,8 @@
     <Setting Name="EnableWorkbench" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="ProcessSensor" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+    <Setting Name="EnableBootProcessTrace" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="FileSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
@@ -33,9 +33,6 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="ImageLoadSensor" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
-    </Setting>
-    <Setting Name="ProcessStopSensor" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="UISensor" Type="System.Boolean" Scope="User">

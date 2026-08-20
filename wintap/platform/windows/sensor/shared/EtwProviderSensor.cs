@@ -66,7 +66,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             return true;
         }
 
-        public void Stop()
+        public override void Stop()
         {
             string etwSessionName = "Wintap.Collectors." + EtwProviderId;
             try

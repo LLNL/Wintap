@@ -305,26 +305,48 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
 
                 // Start/Refresh upsert (preserve existing exit_time/exit_code if already set).
-                var query = $@"
+                try
+                {
+                    UpsertProcessStart(connection, message, createTime);
+                    ApplyPendingExit(message.PID, pidHash, createTime);
+
+                    WintapLogger.Log.Append(
+                        $"Registered process PID {message.PID}: {proc.Name} with process resolver",
+                        LogLevel.Debug);
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append(
+                        $"DuckDB registering PID {message.PID} {proc.Name}: {ex.Message}",
+                        LogLevel.Error);
+                }
+            }
+        }
+
+        internal static void UpsertProcessStart(DuckDBConnection connection, WintapMessage message, DateTime createTime)
+        {
+            WintapMessage.ProcessObject proc = message.Process;
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
                     INSERT INTO process (
                             pid_hash, parent_pid_hash, process_id, parent_process_id,
                             process_name, image_path, command_line, create_time,
                             exit_time, exit_code, source, user_name, md5_hash, sha2_hash
                         ) VALUES (
-                            '{pidHash}',
-                            {(string.IsNullOrEmpty(proc.ParentPidHash) ? "NULL" : $"'{EscapeSql(proc.ParentPidHash)}'")},
-                            {message.PID},
-                            {proc.ParentPID},
-                            '{EscapeSql(proc.Name)}',
-                            '{EscapeSql(proc.Path)}',
-                            '{EscapeSql(proc.CommandLine)}',
-                            TIMESTAMP '{createTime:yyyy-MM-dd HH:mm:ss}',
+                            $pid_hash,
+                            $parent_pid_hash,
+                            $process_id,
+                            $parent_process_id,
+                            $process_name,
+                            $image_path,
+                            $command_line,
+                            $create_time,
                             NULL,
                             NULL,
-                            'real_time',
-                            '{EscapeSql(proc.User)}',
-                            {(string.IsNullOrEmpty(proc.MD5) ? "NULL" : $"'{EscapeSql(proc.MD5)}'")},
-                            {(string.IsNullOrEmpty(proc.SHA2) ? "NULL" : $"'{EscapeSql(proc.SHA2)}'")}
+                            $source,
+                            $user_name,
+                            $md5_hash,
+                            $sha2_hash
                         )
                     ON CONFLICT(pid_hash) DO UPDATE SET
                         parent_pid_hash = excluded.parent_pid_hash,
@@ -341,24 +363,19 @@ namespace gov.llnl.wintap.core.infrastructure
                         exit_time = COALESCE(process.exit_time, excluded.exit_time),
                         exit_code = COALESCE(process.exit_code, excluded.exit_code)";
 
-                using var command = connection.CreateCommand();
-                command.CommandText = query;
-                try
-                {
-                    command.ExecuteNonQuery();
-                    ApplyPendingExit(message.PID, pidHash, createTime);
-
-                    WintapLogger.Log.Append(
-                        $"Registered process PID {message.PID}: {proc.Name} with process resolver",
-                        LogLevel.Debug);
-                }
-                catch (Exception ex)
-                {
-                    WintapLogger.Log.Append(
-                        $"DuckDB registering PID {message.PID} {proc.Name}: {ex.Message}",
-                        LogLevel.Error);
-                }
-            }
+            command.Parameters.Add(new DuckDBParameter("pid_hash", message.PidHash ?? string.Empty));
+            command.Parameters.Add(new DuckDBParameter("parent_pid_hash", string.IsNullOrEmpty(proc.ParentPidHash) ? DBNull.Value : proc.ParentPidHash));
+            command.Parameters.Add(new DuckDBParameter("process_id", message.PID));
+            command.Parameters.Add(new DuckDBParameter("parent_process_id", proc.ParentPID));
+            command.Parameters.Add(new DuckDBParameter("process_name", proc.Name ?? string.Empty));
+            command.Parameters.Add(new DuckDBParameter("image_path", proc.Path ?? string.Empty));
+            command.Parameters.Add(new DuckDBParameter("command_line", proc.CommandLine ?? string.Empty));
+            command.Parameters.Add(new DuckDBParameter("create_time", createTime));
+            command.Parameters.Add(new DuckDBParameter("source", "real_time"));
+            command.Parameters.Add(new DuckDBParameter("user_name", proc.User ?? string.Empty));
+            command.Parameters.Add(new DuckDBParameter("md5_hash", string.IsNullOrEmpty(proc.MD5) ? DBNull.Value : proc.MD5));
+            command.Parameters.Add(new DuckDBParameter("sha2_hash", string.IsNullOrEmpty(proc.SHA2) ? DBNull.Value : proc.SHA2));
+            command.ExecuteNonQuery();
         }
 
         /// <summary>

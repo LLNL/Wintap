@@ -70,16 +70,16 @@ namespace gov.llnl.wintap.Properties {
                 this["EnableWorkbench"] = value;
             }
         }
-        
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool ProcessSensor {
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableBootProcessTrace {
             get {
-                return ((bool)(this["ProcessSensor"]));
+                return ((bool)(this["EnableBootProcessTrace"]));
             }
             set {
-                this["ProcessSensor"] = value;
+                this["EnableBootProcessTrace"] = value;
             }
         }
         
@@ -152,18 +152,6 @@ namespace gov.llnl.wintap.Properties {
             }
             set {
                 this["ImageLoadSensor"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool ProcessStopSensor {
-            get {
-                return ((bool)(this["ProcessStopSensor"]));
-            }
-            set {
-                this["ProcessStopSensor"] = value;
             }
         }
         
