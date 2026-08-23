@@ -36,6 +36,12 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             // start unified process sensor first for process attribution
             WindowsProcessSensor pc = new WindowsProcessSensor();
             pc.InitializeSnapshotRefresh();
+            if (enableBootProcessTrace && bootReplayPath == null && pc.LastRefreshRebuiltFromSnapshot)
+            {
+                WintapLogger.Log.Append(
+                    "SENSOR HEALTH: boot process trace was expected but absent; early-boot process lineage may be incomplete",
+                    LogLevel.Warn);
+            }
             WintapLogger.Log.Append("Starting Windows process sensor", LogLevel.Info);
             pc.Start();
             WintapLogger.Log.Append("Windows process sensor started", LogLevel.Info);

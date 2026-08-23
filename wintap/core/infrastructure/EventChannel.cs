@@ -422,6 +422,38 @@ namespace gov.llnl.wintap.core.infrastructure
             _processResolver.ClearDB();
         }
 
+        public static bool IsProcessRowOpen(string pidHash)
+        {
+            return _processResolver?.IsProcessRowOpen(pidHash) ?? false;
+        }
+
+        public static void UpdateCollectionHeartbeat()
+        {
+            _processResolver?.UpdateCollectionHeartbeat();
+        }
+
+        public static bool TryReadCollectionHeartbeat(out DateTime lastWriteUtc, out string sessionId)
+        {
+            if (_processResolver != null)
+            {
+                return _processResolver.TryReadCollectionHeartbeat(out lastWriteUtc, out sessionId);
+            }
+
+            lastWriteUtc = default;
+            sessionId = string.Empty;
+            return false;
+        }
+
+        public static int ReconcileStartupProcesses(IReadOnlyCollection<string> livePidHashes, DateTime gapEndUtc)
+        {
+            return _processResolver?.ReconcileStartupOpenRows(livePidHashes, gapEndUtc) ?? 0;
+        }
+
+        public static void WriteCollectionGap(DateTime gapStartUtc, DateTime gapEndUtc, string priorSessionId, string reason)
+        {
+            _processResolver?.WriteCollectionGap(gapStartUtc, gapEndUtc, priorSessionId, reason);
+        }
+
         // **************************************************************************
         // ***  QUERY COMPILATION & DEPLOYMENT
         // **************************************************************************

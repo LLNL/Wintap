@@ -32,6 +32,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
     /// </summary>
     internal class WindowsProcessSensor : EtwProviderCollector
     {
+        internal delegate bool TryReadHeartbeatDelegate(out DateTime lastWriteUtc, out string sessionId);
+
         private static readonly TimeSpan SnapshotStartMatchTolerance = TimeSpan.FromSeconds(2);
         internal static readonly TimeSpan BootReplayMatchTolerance = TimeSpan.FromSeconds(2);
         internal static readonly TimeSpan StopMetricCorrelationWindow = TimeSpan.FromSeconds(5);
@@ -49,6 +51,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private readonly Func<IReadOnlyList<SnapshotProcessInfo>> enumerateSnapshot;
         private readonly Action clearProcessDb;
         private readonly Func<DateTime> machineBootTimeUtc;
+        private readonly Func<long?> probeSystemStartFileTimeUtc;
+        private readonly Func<string, bool> isProcessRowOpen;
+        private readonly bool bootSessionRecoveryEnabled;
+        private readonly TryReadHeartbeatDelegate readHeartbeat;
+        private readonly Func<IReadOnlyCollection<string>, DateTime, int> reconcileStartupOpenRows;
+        private readonly Action<DateTime, DateTime, string, string> writeCollectionGap;
+        private readonly Action updateHeartbeat;
         private readonly Action<string, LogLevel> log;
         private readonly ProcessHash processHash;
         private readonly Func<SecurityIdentifier, string> lookupAccountSid;
@@ -87,6 +96,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             Func<IReadOnlyList<SnapshotProcessInfo>> enumerateSnapshot = null,
             Action clearProcessDb = null,
             Func<DateTime> machineBootTimeUtc = null,
+            Func<long?> probeSystemStartFileTimeUtc = null,
+            Func<string, bool> isProcessRowOpen = null,
+            bool? bootSessionRecoveryEnabled = null,
+            TryReadHeartbeatDelegate readHeartbeat = null,
+            Func<IReadOnlyCollection<string>, DateTime, int> reconcileStartupOpenRows = null,
+            Action<DateTime, DateTime, string, string> writeCollectionGap = null,
+            Action updateHeartbeat = null,
             Action<string, LogLevel> log = null,
             Func<SecurityIdentifier, string> lookupAccountSid = null,
             Func<int, string> lookupTokenUserByPid = null,
@@ -106,6 +122,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             this.enumerateSnapshot = enumerateSnapshot ?? EnumerateLiveSnapshot;
             this.clearProcessDb = clearProcessDb ?? EventChannel.ClearProcessDB;
             this.machineBootTimeUtc = machineBootTimeUtc ?? (() => StateManager.MachineBootTime.ToUniversalTime());
+            this.probeSystemStartFileTimeUtc = probeSystemStartFileTimeUtc ?? ProcessResolver.TryGetSystemStartFileTimeUtc;
+            this.isProcessRowOpen = isProcessRowOpen ?? EventChannel.IsProcessRowOpen;
+            this.bootSessionRecoveryEnabled = bootSessionRecoveryEnabled ?? GetConfiguredBool("WINTAP_BOOT_SESSION_RECOVERY_ENABLED", true);
+            this.readHeartbeat = readHeartbeat ?? EventChannel.TryReadCollectionHeartbeat;
+            this.reconcileStartupOpenRows = reconcileStartupOpenRows ?? EventChannel.ReconcileStartupProcesses;
+            this.writeCollectionGap = writeCollectionGap ?? EventChannel.WriteCollectionGap;
+            this.updateHeartbeat = updateHeartbeat ?? EventChannel.UpdateCollectionHeartbeat;
             this.log = log ?? LogMessage;
             this.lookupAccountSid = lookupAccountSid ?? TryLookupAccountSid;
             this.lookupTokenUserByPid = lookupTokenUserByPid ?? TryGetProcessUserByPid;
@@ -128,6 +151,28 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         internal long ManifestMetricMissesCount => Interlocked.Read(ref manifestMetricMissesCount);
         internal long BootReplayCount => Interlocked.Read(ref bootReplayCount);
         internal int SidAccountCacheCount => sidAccountCache.Count;
+        internal bool LastRefreshRebuiltFromSnapshot { get; private set; }
+
+        private static bool GetConfiguredBool(string key, bool defaultValue)
+        {
+            string configured = ConfigManager.GetValue<string>(key);
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                return defaultValue;
+            }
+
+            if (string.Equals(configured, "1", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.Equals(configured, "0", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return bool.TryParse(configured, out bool parsed) ? parsed : defaultValue;
+        }
 
         public override bool Start()
         {
@@ -142,6 +187,15 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public override void Stop()
         {
+            try
+            {
+                updateHeartbeat();
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process collection heartbeat update failed during shutdown: {ex.Message}", LogLevel.Debug);
+            }
+
             StopQaCounterTimer();
             LogQaCounterSnapshot();
             StopManifestMetricSubscription();
@@ -331,45 +385,138 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             try
             {
                 log("Windows process snapshot refresh starting", LogLevel.Info);
-                clearProcessDb();
+                bool keepTree = false;
+                string degradeReason;
+                long? liveSystemStart = null;
 
-                List<SnapshotProcessInfo> snapshot = BuildSnapshotBatch();
+                if (!bootSessionRecoveryEnabled)
+                {
+                    degradeReason = "boot session recovery disabled";
+                }
+                else
+                {
+                    try
+                    {
+                        liveSystemStart = probeSystemStartFileTimeUtc();
+                        if (liveSystemStart == null)
+                        {
+                            degradeReason = "System start probe unavailable";
+                        }
+                        else
+                        {
+                            string systemPidHash = genPidHash(4, liveSystemStart.Value);
+                            if (isProcessRowOpen(systemPidHash))
+                            {
+                                keepTree = true;
+                                degradeReason = null;
+                            }
+                            else
+                            {
+                                degradeReason = "no open System row for this boot session";
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        keepTree = false;
+                        degradeReason = $"boot session check failed: {ex.Message}";
+                    }
+                }
+
+                if (keepTree)
+                {
+                    log("Windows process tree retained across restart (boot session match)", LogLevel.Info);
+                }
+                else
+                {
+                    clearProcessDb();
+                    log($"Windows process snapshot refresh rebuilt from snapshot, lineage degraded ({degradeReason})", LogLevel.Info);
+                }
+
+                LastRefreshRebuiltFromSnapshot = !keepTree;
+
+                List<SnapshotProcessInfo> snapshot = BuildSnapshotBatch(liveSystemStart);
                 Dictionary<SnapshotProcessInfo, string> parentPidHashes = BuildParentPidHashes(snapshot);
+                var livePidHashes = new HashSet<string>(StringComparer.Ordinal);
                 int sent = 0;
 
                 foreach (SnapshotProcessInfo processInfo in snapshot.OrderBy(p => p.CreateTimeUtc).ThenBy(p => p.Pid))
                 {
-                    if (!processInfo.IsSynthetic && IsDuplicateProcessInstance(processInfo.Pid, processInfo.CreateTimeUtc, SnapshotStartMatchTolerance))
+                    if (!processInfo.IsSynthetic && TryGetDuplicateProcessInstance(
+                        processInfo.Pid,
+                        processInfo.CreateTimeUtc,
+                        SnapshotStartMatchTolerance,
+                        out ProcessRecord existing))
                     {
+                        livePidHashes.Add(existing.PidHash);
                         Interlocked.Increment(ref snapshotDedupSuppressedCount);
                         continue;
                     }
 
                     WintapMessage message = CreateRefreshMessage(processInfo, parentPidHashes);
                     emit(message);
+                    livePidHashes.Add(message.PidHash);
                     sent++;
                 }
 
                 Interlocked.Exchange(ref snapshotCount, sent);
+                if (keepTree)
+                {
+                    try
+                    {
+                        DateTime restartUtc = utcNow().ToUniversalTime();
+                        bool hasHeartbeat = readHeartbeat(out DateTime gapStartUtc, out string priorSessionId);
+                        if (!hasHeartbeat)
+                        {
+                            gapStartUtc = restartUtc;
+                            priorSessionId = string.Empty;
+                        }
+
+                        string reason = hasHeartbeat ? "restart_same_boot" : "restart_same_boot_no_heartbeat";
+                        writeCollectionGap(gapStartUtc, restartUtc, priorSessionId, reason);
+                        int closed = reconcileStartupOpenRows(livePidHashes, restartUtc);
+                        log(
+                            $"Windows process startup reconcile closed {closed} stale open rows; collection gap [{gapStartUtc:O} .. {restartUtc:O}] recorded",
+                            LogLevel.Info);
+                    }
+                    catch (Exception ex)
+                    {
+                        log(
+                            $"Windows process startup reconcile failed; stale open rows will be closed by the maintenance sweep: {ex.Message}",
+                            LogLevel.Warn);
+                    }
+                }
+
                 log($"Windows process snapshot refresh complete. Refreshed {sent} existing processes", LogLevel.Info);
                 return true;
             }
             catch (Exception ex)
             {
+                LastRefreshRebuiltFromSnapshot = true;
                 log($"Windows process snapshot refresh failed: {ex.Message}", LogLevel.Error);
                 log($"Windows process snapshot refresh stack trace: {ex.StackTrace}", LogLevel.Debug);
                 return false;
             }
         }
 
-        private List<SnapshotProcessInfo> BuildSnapshotBatch()
+        private List<SnapshotProcessInfo> BuildSnapshotBatch(long? systemStartFileTimeUtc)
         {
-            DateTime bootTimeUtc = machineBootTimeUtc().ToUniversalTime();
+            DateTime anchorUtc;
+            if (systemStartFileTimeUtc != null)
+            {
+                anchorUtc = DateTime.FromFileTimeUtc(systemStartFileTimeUtc.Value);
+            }
+            else
+            {
+                anchorUtc = machineBootTimeUtc().ToUniversalTime();
+                log("SENSOR HEALTH: PID 4 start time unavailable; System seed falling back to WMI boot time (pid_hash stability degraded)", LogLevel.Warn);
+            }
+
             var snapshot = new List<SnapshotProcessInfo>
             {
-                CreateSystemSnapshotProcess(4, "System", Path.Combine(Environment.SystemDirectory, "ntoskrnl.exe"), bootTimeUtc),
-                CreateSystemSnapshotProcess(0, "System Idle Process", "idle", bootTimeUtc),
-                CreateSystemSnapshotProcess(-1, "Unknown", "unknown-sys", bootTimeUtc)
+                CreateSystemSnapshotProcess(4, "System", Path.Combine(Environment.SystemDirectory, "ntoskrnl.exe"), anchorUtc),
+                CreateSystemSnapshotProcess(0, "System Idle Process", "idle", anchorUtc),
+                CreateSystemSnapshotProcess(-1, "Unknown", "unknown-sys", anchorUtc)
             };
 
             IReadOnlyList<SnapshotProcessInfo> liveProcesses = enumerateSnapshot() ?? Array.Empty<SnapshotProcessInfo>();
@@ -455,9 +602,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private bool IsDuplicateProcessInstance(int pid, DateTime createTime, TimeSpan tolerance)
         {
+            return TryGetDuplicateProcessInstance(pid, createTime, tolerance, out _);
+        }
+
+        private bool TryGetDuplicateProcessInstance(int pid, DateTime createTime, TimeSpan tolerance, out ProcessRecord existing)
+        {
             DateTime createTimeUtc = createTime.ToUniversalTime();
             DateTime lookupTimeUtc = createTimeUtc + tolerance;
-            ProcessRecord existing = resolveProcessAtTime(pid, lookupTimeUtc);
+            existing = resolveProcessAtTime(pid, lookupTimeUtc);
 
             if (existing == null || existing.ProcessId != pid)
             {
@@ -531,6 +683,11 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             SecurityIdentifier sid = null,
             SidParseStatus sidStatus = SidParseStatus.NoSid)
         {
+            if (pid == 4 || pid <= 0)
+            {
+                return null;
+            }
+
             DateTime createTimeUtc = replayedStartTimestamp.ToUniversalTime();
             if (IsDuplicateProcessInstance(pid, createTimeUtc, BootReplayMatchTolerance))
             {
