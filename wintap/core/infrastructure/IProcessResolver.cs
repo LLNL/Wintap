@@ -28,6 +28,16 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         bool ProcessExistsForPid(int pid, long eventTime);
 
+        bool IsProcessRowOpen(string pidHash);
+
+        void UpdateCollectionHeartbeat();
+
+        bool TryReadCollectionHeartbeat(out DateTime lastWriteUtc, out string sessionId);
+
+        int ReconcileStartupOpenRows(IReadOnlyCollection<string> livePidHashes, DateTime gapEndUtc);
+
+        void WriteCollectionGap(DateTime gapStartUtc, DateTime gapEndUtc, string priorSessionId, string reason);
+
         /// <summary>
         /// Generate a PID hash for the given process ID and creation time
         /// </summary>

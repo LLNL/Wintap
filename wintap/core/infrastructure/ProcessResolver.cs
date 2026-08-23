@@ -43,6 +43,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private const string ProcessRetentionTelemetryTable = "process_retention_telemetry";
         private const string StopClosedMetricName = "stop_closed";
         private const string ReconciledClosedMetricName = "reconciled_closed";
+        private const string StartupReconciledClosedMetricName = "startup_reconciled_closed";
         private const string RetentionDeletedMetricName = "retention_deleted";
         private const string RetentionMissMetricName = "retention_miss";
         private const string LiveHashRepairedMetricName = "live_hash_repaired";
@@ -235,6 +236,102 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
+        public bool IsProcessRowOpen(string pidHash)
+        {
+            try
+            {
+                lock (_dbLock)
+                {
+                    return IsProcessRowOpen(connection, pidHash);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"ProcessResolver open-row lookup failed: {ex.Message}", LogLevel.Warn);
+                return false;
+            }
+        }
+
+        public void UpdateCollectionHeartbeat()
+        {
+            try
+            {
+                lock (_dbLock)
+                {
+                    UpdateHeartbeat(connection, DateTime.UtcNow, StateManager.SessionId.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"ProcessResolver heartbeat update failed: {ex.Message}", LogLevel.Warn);
+            }
+        }
+
+        public bool TryReadCollectionHeartbeat(out DateTime lastWriteUtc, out string sessionId)
+        {
+            try
+            {
+                lock (_dbLock)
+                {
+                    return TryReadHeartbeat(connection, out lastWriteUtc, out sessionId);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"ProcessResolver heartbeat read failed: {ex.Message}", LogLevel.Warn);
+                lastWriteUtc = default;
+                sessionId = string.Empty;
+                return false;
+            }
+        }
+
+        public int ReconcileStartupOpenRows(IReadOnlyCollection<string> livePidHashes, DateTime gapEndUtc)
+        {
+            try
+            {
+                lock (_dbLock)
+                {
+                    List<(string PidHash, int ProcessId, string ProcessName)> closedRows =
+                        ReconcileStartupOpenRows(connection, livePidHashes, gapEndUtc);
+                    foreach (var closedRow in closedRows)
+                    {
+                        RecordTelemetryEvent(StartupReconciledClosedMetricName, closedRow.ProcessName, closedRow.PidHash);
+                    }
+
+                    WintapLogger.Log.Append(
+                        $"ProcessResolver startup reconcile closed {closedRows.Count} stale open rows (restart recovery)",
+                        LogLevel.Info);
+                    return closedRows.Count;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"ProcessResolver startup reconcile failed: {ex.Message}", LogLevel.Warn);
+                return 0;
+            }
+        }
+
+        public void WriteCollectionGap(DateTime gapStartUtc, DateTime gapEndUtc, string priorSessionId, string reason)
+        {
+            try
+            {
+                lock (_dbLock)
+                {
+                    WriteCollectionGap(
+                        connection,
+                        gapStartUtc,
+                        gapEndUtc,
+                        StateManager.SessionId.ToString(),
+                        priorSessionId,
+                        reason);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"ProcessResolver collection gap write failed: {ex.Message}", LogLevel.Warn);
+            }
+        }
+
         /// <summary>
         /// Insert a process from a WintapMessage into the event store
         /// </summary>
@@ -378,10 +475,142 @@ namespace gov.llnl.wintap.core.infrastructure
             command.ExecuteNonQuery();
         }
 
+        internal static bool IsProcessRowOpen(DuckDBConnection connection, string pidHash)
+        {
+            if (string.IsNullOrEmpty(pidHash))
+            {
+                return false;
+            }
+
+            using var command = connection.CreateCommand();
+            command.CommandText = $@"
+                SELECT exit_time IS NULL
+                FROM process
+                WHERE pid_hash = '{EscapeSql(pidHash)}'
+                LIMIT 1";
+
+            var result = command.ExecuteScalar();
+            return result != null && result != DBNull.Value && (bool)result;
+        }
+
+        internal static void UpdateHeartbeat(DuckDBConnection connection, DateTime lastWriteUtc, string sessionId)
+        {
+            using var transaction = connection.BeginTransaction();
+            using (var delete = connection.CreateCommand())
+            {
+                delete.Transaction = transaction;
+                delete.CommandText = "DELETE FROM collection_heartbeat";
+                delete.ExecuteNonQuery();
+            }
+
+            using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = @"
+                    INSERT INTO collection_heartbeat (last_write, session_id)
+                    VALUES ($last_write, $session_id)";
+                insert.Parameters.Add(new DuckDBParameter("last_write", lastWriteUtc.ToUniversalTime()));
+                insert.Parameters.Add(new DuckDBParameter("session_id", sessionId ?? string.Empty));
+                insert.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+
+        internal static bool TryReadHeartbeat(DuckDBConnection connection, out DateTime lastWriteUtc, out string sessionId)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT last_write, session_id FROM collection_heartbeat LIMIT 1";
+            using var reader = command.ExecuteReader();
+            if (!reader.Read())
+            {
+                lastWriteUtc = default;
+                sessionId = string.Empty;
+                return false;
+            }
+
+            lastWriteUtc = DateTime.SpecifyKind(reader.GetDateTime(0), DateTimeKind.Utc);
+            sessionId = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+            return true;
+        }
+
+        internal static void WriteCollectionGap(
+            DuckDBConnection connection,
+            DateTime gapStartUtc,
+            DateTime gapEndUtc,
+            string sessionId,
+            string priorSessionId,
+            string reason)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+                INSERT INTO collection_gap (gap_start, gap_end, session_id, prior_session_id, reason)
+                VALUES ($gap_start, $gap_end, $session_id, $prior_session_id, $reason)";
+            command.Parameters.Add(new DuckDBParameter("gap_start", gapStartUtc.ToUniversalTime()));
+            command.Parameters.Add(new DuckDBParameter("gap_end", gapEndUtc.ToUniversalTime()));
+            command.Parameters.Add(new DuckDBParameter("session_id", sessionId ?? string.Empty));
+            command.Parameters.Add(new DuckDBParameter("prior_session_id", priorSessionId ?? string.Empty));
+            command.Parameters.Add(new DuckDBParameter("reason", reason ?? string.Empty));
+            command.ExecuteNonQuery();
+        }
+
+        internal static List<(string PidHash, int ProcessId, string ProcessName)> ReconcileStartupOpenRows(
+            DuckDBConnection connection,
+            IReadOnlyCollection<string> livePidHashes,
+            DateTime exitTimeUtc)
+        {
+            if (livePidHashes == null)
+            {
+                throw new ArgumentNullException(nameof(livePidHashes));
+            }
+
+            var liveSet = livePidHashes as HashSet<string> ?? new HashSet<string>(livePidHashes, StringComparer.Ordinal);
+            var openRows = new List<(string PidHash, int ProcessId, string ProcessName)>();
+            using (var select = connection.CreateCommand())
+            {
+                select.CommandText = @"
+                    SELECT pid_hash, process_id, process_name
+                    FROM process
+                    WHERE exit_time IS NULL
+                      AND process_id > 0";
+                using var reader = select.ExecuteReader();
+                while (reader.Read())
+                {
+                    openRows.Add((
+                        reader.GetString(0),
+                        reader.GetInt32(1),
+                        reader.IsDBNull(2) ? UnknownProcessName : reader.GetString(2)));
+                }
+            }
+
+            string exitTimeSql = exitTimeUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+            var closedRows = new List<(string PidHash, int ProcessId, string ProcessName)>();
+            foreach (var openRow in openRows)
+            {
+                if (liveSet.Contains(openRow.PidHash))
+                {
+                    continue;
+                }
+
+                using var update = connection.CreateCommand();
+                update.CommandText = $@"
+                    UPDATE process
+                    SET exit_time = TIMESTAMP '{exitTimeSql}'
+                    WHERE pid_hash = '{EscapeSql(openRow.PidHash)}'
+                      AND exit_time IS NULL";
+                if (update.ExecuteNonQuery() > 0)
+                {
+                    closedRows.Add(openRow);
+                }
+            }
+
+            return closedRows;
+        }
+
         /// <summary>
         /// Escape single quotes for SQL string concatenation
         /// </summary>
-        private string EscapeSql(string value)
+        private static string EscapeSql(string value)
         {
             if (string.IsNullOrEmpty(value))
                 return "";
@@ -514,7 +743,19 @@ namespace gov.llnl.wintap.core.infrastructure
                 connection = new DuckDBConnection($"Data Source={MAIN_DB_PATH}");
                 connection.Open();
 
-                var sql = @"
+                EnsureEventStoreTables(connection);
+                WintapLogger.Log.Append("Process database initialized successfully", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"Failed to initialize backup database: {ex.Message}", LogLevel.Error);
+                throw new Exception("DB ERROR");
+            }
+        }
+
+        internal static void EnsureEventStoreTables(DuckDBConnection connection)
+        {
+            var sql = @"
                     CREATE TABLE IF NOT EXISTS process (
                     pid_hash VARCHAR PRIMARY KEY,
                     parent_pid_hash VARCHAR,
@@ -540,17 +781,23 @@ namespace gov.llnl.wintap.core.infrastructure
                     metric_value BIGINT
                 );
 
+                CREATE TABLE IF NOT EXISTS collection_heartbeat (
+                    last_write TIMESTAMP,
+                    session_id VARCHAR
+                );
+
+                CREATE TABLE IF NOT EXISTS collection_gap (
+                    gap_start TIMESTAMP,
+                    gap_end TIMESTAMP,
+                    session_id VARCHAR,
+                    prior_session_id VARCHAR,
+                    reason VARCHAR
+                );
+
                 ALTER TABLE process_retention_telemetry ADD COLUMN IF NOT EXISTS pid_hash VARCHAR;";
 
-                using var cmd = new DuckDBCommand(sql, connection);
-                cmd.ExecuteNonQuery();
-                WintapLogger.Log.Append("Process database initialized successfully", LogLevel.Info);
-            }
-            catch (Exception ex)
-            {
-                WintapLogger.Log.Append($"Failed to initialize backup database: {ex.Message}", LogLevel.Error);
-                throw new Exception("DB ERROR");
-            }
+            using var cmd = new DuckDBCommand(sql, connection);
+            cmd.ExecuteNonQuery();
         }
         /// <summary>
         /// Get the most recent PidHash for a process with the given PID 
@@ -689,7 +936,7 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
-        private static long? TryGetWindowsProcStartFileTimeUtc(int pid)
+        internal static long? TryGetWindowsProcStartFileTimeUtc(int pid)
         {
             try
             {
@@ -703,6 +950,11 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 return null;
             }
+        }
+
+        internal static long? TryGetSystemStartFileTimeUtc()
+        {
+            return OperatingSystem.IsWindows() ? TryGetWindowsProcStartFileTimeUtc(4) : null;
         }
 
         private static long? TryGetLiveProcessStartFileTimeUtc(int pid)
@@ -844,6 +1096,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 DeleteExpiredExitedRowsLocked(nowUtc);
                 PruneRecentlyPrunedProcessesLocked(nowUtc);
                 FlushTelemetryLocked(nowUtc);
+                UpdateHeartbeat(connection, nowUtc, StateManager.SessionId.ToString());
                 _nextMaintenanceUtc = nowUtc + _sweepInterval;
             }
             catch (Exception ex)

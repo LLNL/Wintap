@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Principal;
+using gov.llnl.wintap;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.platform.windows.collect.etw;
@@ -279,6 +280,452 @@ namespace Wintap.Tests
             Assert.Contains(outsideToleranceEmitted, message => message.PID == 600);
             Assert.Equal(0, nullResolverSensor.SnapshotDedupSuppressedCount);
             Assert.Equal(0, outsideToleranceSensor.SnapshotDedupSuppressedCount);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-04")]
+        public void InitializeSnapshotRefresh_SeedsSyntheticProcessesFromRealSystemStart()
+        {
+            DateTime systemStart = new DateTime(2026, 8, 17, 7, 59, 58, DateTimeKind.Utc);
+            long systemStartFileTimeUtc = systemStart.ToFileTimeUtc();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                probeSystemStartFileTimeUtc: () => systemStartFileTimeUtc);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            WintapMessage system = emitted.Single(message => message.PID == 4);
+            WintapMessage idle = emitted.Single(message => message.PID == 0);
+            WintapMessage unknown = emitted.Single(message => message.PID == -1);
+            Assert.All(new[] { system, idle, unknown }, message => Assert.Equal(systemStartFileTimeUtc, message.EventTime));
+            Assert.Equal(TestPidHash(4, systemStartFileTimeUtc), system.PidHash);
+            Assert.Equal(TestPidHash(4, systemStartFileTimeUtc), idle.Process.ParentPidHash);
+            Assert.Equal(TestPidHash(4, systemStartFileTimeUtc), unknown.Process.ParentPidHash);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-04")]
+        public void InitializeSnapshotRefresh_SystemSeedHashMatchesReconcileLiveIdentity()
+        {
+            long liveSystemStartFileTimeUtc = new DateTime(2026, 8, 17, 7, 59, 57, DateTimeKind.Utc).ToFileTimeUtc();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                probeSystemStartFileTimeUtc: () => liveSystemStartFileTimeUtc);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            string reconcileLivePidHash = TestPidHash(4, liveSystemStartFileTimeUtc);
+            Assert.Equal(reconcileLivePidHash, emitted.Single(message => message.PID == 4).PidHash);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-04")]
+        public void InitializeSnapshotRefresh_ProbeMissFallsBackToWmiBootTimeAndWarns()
+        {
+            DateTime bootTime = BootTime();
+            var logEntries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                probeSystemStartFileTimeUtc: () => null,
+                logEntries: logEntries);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            AssertFallbackSeeds(emitted, bootTime);
+            Assert.Contains(logEntries, entry =>
+                entry.Message == "SENSOR HEALTH: PID 4 start time unavailable; System seed falling back to WMI boot time (pid_hash stability degraded)" &&
+                entry.Level == LogLevel.Warn);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-04")]
+        public void InitializeSnapshotRefresh_ProbeExceptionFallsBackWithoutEscaping()
+        {
+            DateTime bootTime = BootTime();
+            var logEntries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                probeSystemStartFileTimeUtc: () => throw new InvalidOperationException("probe failed"),
+                logEntries: logEntries);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            AssertFallbackSeeds(emitted, bootTime);
+            Assert.Contains(logEntries, entry =>
+                entry.Message == "SENSOR HEALTH: PID 4 start time unavailable; System seed falling back to WMI boot time (pid_hash stability degraded)" &&
+                entry.Level == LogLevel.Warn);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-04")]
+        public void InitializeSnapshotRefresh_RealSystemStartSkipsWmiBootTime()
+        {
+            int machineBootTimeCalls = 0;
+            long systemStartFileTimeUtc = BootTime().AddSeconds(-2).ToFileTimeUtc();
+            var sensor = CreateSensor(
+                out _,
+                machineBootTimeUtc: () =>
+                {
+                    machineBootTimeCalls++;
+                    return BootTime();
+                },
+                probeSystemStartFileTimeUtc: () => systemStartFileTimeUtc);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            Assert.Equal(0, machineBootTimeCalls);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-04")]
+        public void HandleReplayedStart_SuppressesSyntheticSeedIdentitiesWithoutCounting()
+        {
+            DateTime replayedStart = BootTime().AddSeconds(5);
+            var sensor = CreateSensor(out List<WintapMessage> emitted, resolver: (pid, time) => null);
+
+            Assert.Null(sensor.HandleReplayedStart(4, 0, replayedStart, "System", string.Empty));
+            Assert.Null(sensor.HandleReplayedStart(0, 0, replayedStart, "Idle", string.Empty));
+            Assert.Null(sensor.HandleReplayedStart(-1, 0, replayedStart, "Unknown", string.Empty));
+            Assert.Empty(emitted);
+            Assert.Equal(0, sensor.BootReplayCount);
+
+            WintapMessage normal = sensor.HandleReplayedStart(100, 4, replayedStart, "normal.exe", string.Empty);
+            Assert.Same(normal, Assert.Single(emitted));
+            Assert.Equal(1, sensor.BootReplayCount);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-02")]
+        public void InitializeSnapshotRefresh_OpenSystemRowKeepsTreeAndEmitsRefreshes()
+        {
+            int clearCalls = 0;
+            var logs = new List<string>();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                enumerateSnapshot: () => new[] { Snapshot(100, 4, BootTime().AddMinutes(1), "kept.exe") },
+                clearProcessDb: () => clearCalls++,
+                logs: logs,
+                isProcessRowOpen: hash => true);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            Assert.Equal(0, clearCalls);
+            Assert.Contains(emitted, message => message.PID == 100 && message.ActivityType == WintapMessage.ActivityTypeEnum.Refresh);
+            Assert.Contains(logs, message => message.Contains("retained across restart (boot session match)"));
+            Assert.False(sensor.LastRefreshRebuiltFromSnapshot);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-02")]
+        public void InitializeSnapshotRefresh_LookupReceivesExactSystemHash()
+        {
+            long systemStart = BootTime().AddSeconds(-2).ToFileTimeUtc();
+            string capturedHash = null;
+            var sensor = CreateSensor(
+                out _,
+                probeSystemStartFileTimeUtc: () => systemStart,
+                isProcessRowOpen: hash =>
+                {
+                    capturedHash = hash;
+                    return true;
+                });
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            Assert.Equal(TestPidHash(4, systemStart), capturedHash);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-02")]
+        public void InitializeSnapshotRefresh_AbsentSystemRowClearsBeforeEmitAndLogsDegradation()
+        {
+            var operations = new List<string>();
+            var logs = new List<string>();
+            var sensor = CreateSensor(
+                out _,
+                clearProcessDb: () => operations.Add("clear"),
+                emitOverride: message => operations.Add($"emit:{message.PID}"),
+                logs: logs,
+                isProcessRowOpen: hash => false);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            Assert.Equal("clear", operations[0]);
+            Assert.Equal(1, operations.Count(operation => operation == "clear"));
+            Assert.StartsWith("emit:", operations[1]);
+            Assert.Contains(logs, message => message.Contains("rebuilt from snapshot, lineage degraded"));
+            Assert.True(sensor.LastRefreshRebuiltFromSnapshot);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-02")]
+        public void InitializeSnapshotRefresh_ProbeUnavailableRebuildsWithoutLookupAndUsesWmiSeeds()
+        {
+            int lookupCalls = 0;
+            int clearCalls = 0;
+            var logs = new List<string>();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                probeSystemStartFileTimeUtc: () => null,
+                clearProcessDb: () => clearCalls++,
+                logs: logs,
+                isProcessRowOpen: hash =>
+                {
+                    lookupCalls++;
+                    return true;
+                });
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            Assert.Equal(0, lookupCalls);
+            Assert.Equal(1, clearCalls);
+            AssertFallbackSeeds(emitted, BootTime());
+            Assert.Contains(logs, message => message.Contains("rebuilt from snapshot, lineage degraded"));
+            Assert.True(sensor.LastRefreshRebuiltFromSnapshot);
+        }
+
+        [Theory]
+        [Trait("Category", "ptr-02")]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void InitializeSnapshotRefresh_ThrowingBootSessionSeamDegradesSafely(bool probeThrows)
+        {
+            int clearCalls = 0;
+            var sensor = CreateSensor(
+                out _,
+                probeSystemStartFileTimeUtc: probeThrows
+                    ? () => throw new InvalidOperationException("probe failed")
+                    : () => BootTime().ToFileTimeUtc(),
+                clearProcessDb: () => clearCalls++,
+                isProcessRowOpen: hash => probeThrows
+                    ? true
+                    : throw new InvalidOperationException("lookup failed"));
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            Assert.Equal(1, clearCalls);
+            Assert.True(sensor.LastRefreshRebuiltFromSnapshot);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-02")]
+        public void InitializeSnapshotRefresh_ReadsProbeOnceAndSharesHashWithSystemSeed()
+        {
+            int probeCalls = 0;
+            long systemStart = BootTime().AddSeconds(-3).ToFileTimeUtc();
+            string lookupHash = null;
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                probeSystemStartFileTimeUtc: () =>
+                {
+                    probeCalls++;
+                    return systemStart;
+                },
+                isProcessRowOpen: hash =>
+                {
+                    lookupHash = hash;
+                    return true;
+                });
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            Assert.Equal(1, probeCalls);
+            Assert.Equal(lookupHash, emitted.Single(message => message.PID == 4).PidHash);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-02")]
+        public void InitializeSnapshotRefresh_KillSwitchSkipsProbeAndLookupAndClears()
+        {
+            int probeCalls = 0;
+            int lookupCalls = 0;
+            int clearCalls = 0;
+            var sensor = CreateSensor(
+                out _,
+                probeSystemStartFileTimeUtc: () =>
+                {
+                    probeCalls++;
+                    return BootTime().ToFileTimeUtc();
+                },
+                clearProcessDb: () => clearCalls++,
+                isProcessRowOpen: hash =>
+                {
+                    lookupCalls++;
+                    return true;
+                },
+                bootSessionRecoveryEnabled: false);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            Assert.Equal(0, probeCalls);
+            Assert.Equal(0, lookupCalls);
+            Assert.Equal(1, clearCalls);
+            Assert.True(sensor.LastRefreshRebuiltFromSnapshot);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-02")]
+        public void InitializeSnapshotRefresh_OuterFailureMarksRefreshAsRebuilt()
+        {
+            var sensor = CreateSensor(
+                out _,
+                enumerateSnapshot: () => throw new InvalidOperationException("snapshot failed"),
+                isProcessRowOpen: hash => true);
+
+            Assert.False(sensor.InitializeSnapshotRefresh());
+            Assert.True(sensor.LastRefreshRebuiltFromSnapshot);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-03")]
+        public void InitializeSnapshotRefresh_KeepPathWritesGapThenReconcilesCompleteLiveSet()
+        {
+            var operations = new List<string>();
+            IReadOnlyCollection<string> capturedLiveSet = null;
+            DateTime restart = new DateTime(2026, 8, 23, 14, 0, 0, DateTimeKind.Utc);
+            DateTime heartbeat = restart.AddMinutes(-3);
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                utcNow: () => restart,
+                enumerateSnapshot: () => new[] { Snapshot(100, 4, BootTime().AddMinutes(1), "live.exe") },
+                isProcessRowOpen: hash => true,
+                readHeartbeat: (out DateTime lastWrite, out string session) =>
+                {
+                    lastWrite = heartbeat;
+                    session = "prior-session";
+                    return true;
+                },
+                writeCollectionGap: (start, end, prior, reason) => operations.Add($"gap:{start:O}:{end:O}:{prior}:{reason}"),
+                reconcileStartupOpenRows: (liveSet, end) =>
+                {
+                    operations.Add("reconcile");
+                    capturedLiveSet = new HashSet<string>(liveSet);
+                    Assert.Equal(restart, end);
+                    return 2;
+                });
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            Assert.StartsWith("gap:", operations[0]);
+            Assert.Equal("reconcile", operations[1]);
+            Assert.Contains($":{heartbeat:O}:{restart:O}:prior-session:restart_same_boot", operations[0]);
+            Assert.Equal(emitted.Select(message => message.PidHash).OrderBy(hash => hash), capturedLiveSet.OrderBy(hash => hash));
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-03")]
+        public void InitializeSnapshotRefresh_SuppressedDuplicateUsesResolverHashInLiveSet()
+        {
+            DateTime createTime = BootTime().AddMinutes(1);
+            string resolverHash = "resolver-registered-hash";
+            IReadOnlyCollection<string> capturedLiveSet = null;
+            var sensor = CreateSensor(
+                out _,
+                resolver: (pid, time) => new ProcessRecord
+                {
+                    ProcessId = pid,
+                    CreateTime = createTime.AddSeconds(1),
+                    PidHash = resolverHash
+                },
+                enumerateSnapshot: () => new[] { Snapshot(500, 4, createTime, "duplicate.exe") },
+                isProcessRowOpen: hash => true,
+                reconcileStartupOpenRows: (liveSet, end) =>
+                {
+                    capturedLiveSet = new HashSet<string>(liveSet);
+                    return 0;
+                });
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+
+            Assert.Contains(resolverHash, capturedLiveSet);
+            Assert.DoesNotContain(TestPidHash(500, createTime.ToFileTimeUtc()), capturedLiveSet);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-03")]
+        public void InitializeSnapshotRefresh_MissingHeartbeatWritesZeroLengthGap()
+        {
+            DateTime restart = new DateTime(2026, 8, 23, 15, 0, 0, DateTimeKind.Utc);
+            DateTime capturedStart = default;
+            DateTime capturedEnd = default;
+            string capturedPrior = null;
+            string capturedReason = null;
+            var sensor = CreateSensor(
+                out _,
+                utcNow: () => restart,
+                isProcessRowOpen: hash => true,
+                readHeartbeat: (out DateTime lastWrite, out string session) =>
+                {
+                    lastWrite = default;
+                    session = null;
+                    return false;
+                },
+                writeCollectionGap: (start, end, prior, reason) =>
+                {
+                    capturedStart = start;
+                    capturedEnd = end;
+                    capturedPrior = prior;
+                    capturedReason = reason;
+                });
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            Assert.Equal(restart, capturedStart);
+            Assert.Equal(restart, capturedEnd);
+            Assert.Equal(string.Empty, capturedPrior);
+            Assert.Equal("restart_same_boot_no_heartbeat", capturedReason);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-03")]
+        public void InitializeSnapshotRefresh_RebuildPathSkipsGapAndReconcile()
+        {
+            int gapCalls = 0;
+            int reconcileCalls = 0;
+            var sensor = CreateSensor(
+                out _,
+                isProcessRowOpen: hash => false,
+                writeCollectionGap: (start, end, prior, reason) => gapCalls++,
+                reconcileStartupOpenRows: (liveSet, end) => ++reconcileCalls);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            Assert.Equal(0, gapCalls);
+            Assert.Equal(0, reconcileCalls);
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-03")]
+        public void InitializeSnapshotRefresh_ReconcileFailureWarnsAndContinues()
+        {
+            var logEntries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out _,
+                isProcessRowOpen: hash => true,
+                reconcileStartupOpenRows: (liveSet, end) => throw new InvalidOperationException("reconcile failed"),
+                logEntries: logEntries);
+
+            Assert.True(sensor.InitializeSnapshotRefresh());
+            Assert.Contains(logEntries, entry =>
+                entry.Level == LogLevel.Warn &&
+                entry.Message.Contains("stale open rows will be closed by the maintenance sweep"));
+        }
+
+        [Fact]
+        [Trait("Category", "ptr-03")]
+        public void Stop_UpdatesHeartbeatAndContainsFailure()
+        {
+            int calls = 0;
+            var logEntries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out _,
+                updateHeartbeat: () =>
+                {
+                    calls++;
+                    throw new InvalidOperationException("heartbeat failed");
+                },
+                logEntries: logEntries);
+
+            Exception exception = Record.Exception(() => sensor.Stop());
+
+            Assert.Null(exception);
+            Assert.Equal(1, calls);
+            Assert.Contains(logEntries, entry =>
+                entry.Level == LogLevel.Debug && entry.Message.Contains("heartbeat update failed during shutdown"));
         }
 
         [Fact]
@@ -829,7 +1276,16 @@ namespace Wintap.Tests
             Func<int, string> lookupFullProcessImagePathByPid = null,
             Func<string, string> translateDevicePath = null,
             int sidAccountCacheMaxSize = 1024,
-            List<string> logs = null)
+            List<string> logs = null,
+            Func<DateTime> machineBootTimeUtc = null,
+            Func<long?> probeSystemStartFileTimeUtc = null,
+            List<(string Message, LogLevel Level)> logEntries = null,
+            Func<string, bool> isProcessRowOpen = null,
+            bool? bootSessionRecoveryEnabled = true,
+            WindowsProcessSensor.TryReadHeartbeatDelegate readHeartbeat = null,
+            Func<IReadOnlyCollection<string>, DateTime, int> reconcileStartupOpenRows = null,
+            Action<DateTime, DateTime, string, string> writeCollectionGap = null,
+            Action updateHeartbeat = null)
         {
             emitted = new List<WintapMessage>();
             List<WintapMessage> captured = emitted;
@@ -840,8 +1296,24 @@ namespace Wintap.Tests
                 genPidHash: TestPidHash,
                 enumerateSnapshot: enumerateSnapshot ?? (() => Array.Empty<SnapshotProcessInfo>()),
                 clearProcessDb: clearProcessDb ?? (() => { }),
-                machineBootTimeUtc: BootTime,
-                log: (message, level) => logs?.Add(message),
+                machineBootTimeUtc: machineBootTimeUtc ?? BootTime,
+                probeSystemStartFileTimeUtc: probeSystemStartFileTimeUtc ?? (() => BootTime().ToFileTimeUtc()),
+                isProcessRowOpen: isProcessRowOpen ?? (hash => false),
+                bootSessionRecoveryEnabled: bootSessionRecoveryEnabled,
+                readHeartbeat: readHeartbeat ?? ((out DateTime lastWrite, out string session) =>
+                {
+                    lastWrite = default;
+                    session = string.Empty;
+                    return false;
+                }),
+                reconcileStartupOpenRows: reconcileStartupOpenRows ?? ((liveSet, end) => 0),
+                writeCollectionGap: writeCollectionGap ?? ((start, end, prior, reason) => { }),
+                updateHeartbeat: updateHeartbeat ?? (() => { }),
+                log: (message, level) =>
+                {
+                    logs?.Add(message);
+                    logEntries?.Add((message, level));
+                },
                 lookupAccountSid: lookupAccountSid ?? (sid => string.Empty),
                 lookupTokenUserByPid: lookupTokenUserByPid ?? (pid => string.Empty),
                 lookupPebCommandLineByPid: lookupPebCommandLineByPid ?? (pid => string.Empty),
@@ -923,6 +1395,17 @@ namespace Wintap.Tests
             Assert.Equal(string.Empty, message.Process.CommandLine);
             Assert.Equal(string.Empty, message.Process.Arguments);
             Assert.Equal("SYSTEM", message.Process.User);
+        }
+
+        private static void AssertFallbackSeeds(IReadOnlyList<WintapMessage> emitted, DateTime bootTime)
+        {
+            foreach (int pid in new[] { 4, 0, -1 })
+            {
+                WintapMessage seed = emitted.Single(message => message.PID == pid);
+                Assert.Equal(bootTime.ToFileTimeUtc(), seed.EventTime);
+                Assert.Equal(TestPidHash(pid, bootTime.ToFileTimeUtc()), seed.PidHash);
+                Assert.Equal(TestPidHash(4, bootTime.ToFileTimeUtc()), seed.Process.ParentPidHash);
+            }
         }
 
         private static void AssertMergedStop(WintapMessage message, ProcessRecord resolved, long exitCode)
