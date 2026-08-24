@@ -16,7 +16,9 @@
       The Lintap build may redirect BaseIntermediateOutputPath/BaseOutputPath to a
       VM-local temp directory when publishing this project from a host-shared mount.
       When that happens, the SDK's default obj/bin excludes no longer cover stale
-      in-repo obj/bin directories, so explicitly exclude them from source globs.
+      in-repo obj/bin directories. The outer Wintap/Lintap projects can also
+      publish into an in-project mcp_temp directory, so explicitly exclude all
+      generated publish/intermediate directories from source globs.
     -->
     <Compile Remove="obj\**\*.cs" />
     <None Remove="obj\**" />
@@ -26,6 +28,10 @@
     <None Remove="bin\**" />
     <EmbeddedResource Remove="bin\**" />
     <Content Remove="bin\**" />
+    <Compile Remove="mcp_temp\**\*.cs" />
+    <None Remove="mcp_temp\**" />
+    <EmbeddedResource Remove="mcp_temp\**" />
+    <Content Remove="mcp_temp\**" />
   </ItemGroup>
 
   <ItemGroup>

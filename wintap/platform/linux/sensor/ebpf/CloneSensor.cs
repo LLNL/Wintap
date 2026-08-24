@@ -17,6 +17,8 @@ namespace gov.llnl.wintap.platform.linux.collect
     {
         private ProcessHash _pidHashGenerator;
         private readonly System.Collections.Generic.List<IntPtr> _additionalLinks = new System.Collections.Generic.List<IntPtr>();
+        private const ulong CloneThreadFlag = 0x00010000UL;
+        private const ulong VforkSentinelFlags = 0xFFFFFFFFFFFFFFFFUL;
         protected override string BpfObjectFileName => "clone_tracer.bpf.o";
         protected override string BpfProgramName => "trace_process_fork";
 
@@ -117,6 +119,13 @@ namespace gov.llnl.wintap.platform.linux.collect
             try
             {
                 var evt = Marshal.PtrToStructure<CloneEvent>(data);
+
+                // sched_process_fork fires for thread creation too. Those task IDs are
+                // not process identities and should not pollute the pidhash cache.
+                if (IsThreadClone(evt.CloneFlags))
+                {
+                    return 0;
+                }
                 
                 // Read parent process info from /proc
                 var parentProcData = ProcReader.ReadProcessInfo(evt.ParentPid);
@@ -173,6 +182,16 @@ namespace gov.llnl.wintap.platform.linux.collect
                 WintapLogger.Log.Append($"{SensorName} stack trace: {ex.StackTrace}", LogLevel.Debug);
                 return -1;
             }
+        }
+
+        private static bool IsThreadClone(ulong cloneFlags)
+        {
+            if (cloneFlags == 0 || cloneFlags == VforkSentinelFlags)
+            {
+                return false;
+            }
+
+            return (cloneFlags & CloneThreadFlag) == CloneThreadFlag;
         }
     }
 

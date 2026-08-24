@@ -38,6 +38,8 @@ namespace gov.llnl.wintap.core.infrastructure
         private readonly TimeSpan _exitRetention;
         private readonly TimeSpan _reconcileMinAge;
         private readonly TimeSpan _recentlyPrunedCacheRetention;
+        private readonly TimeSpan _telemetryRetention;
+        private readonly bool _telemetryDetailEnabled;
         private DateTime _nextMaintenanceUtc = DateTime.MinValue;
 
         private const string ProcessRetentionTelemetryTable = "process_retention_telemetry";
@@ -106,6 +108,8 @@ namespace gov.llnl.wintap.core.infrastructure
             _exitRetention = GetConfiguredTimeSpanSeconds("WINTAP_PROCESS_EXIT_RETENTION_SEC", TimeSpan.FromHours(1));
             _reconcileMinAge = GetConfiguredTimeSpanSeconds("WINTAP_PROCESS_RECONCILE_MIN_AGE_SEC", TimeSpan.FromMinutes(1));
             _recentlyPrunedCacheRetention = TimeSpan.FromTicks(Math.Max(_exitRetention.Ticks, _sweepInterval.Ticks * 2));
+            _telemetryRetention = GetConfiguredTimeSpanSeconds("WINTAP_PROCESS_RETENTION_TELEMETRY_RETENTION_SEC", TimeSpan.FromHours(24));
+            _telemetryDetailEnabled = GetConfiguredBool("WINTAP_PROCESS_RETENTION_TELEMETRY_DETAIL_ENABLED", false);
             InitializeDatabase();
 
             WintapLogger.Log.Append("BackupDatabaseManager initialized for WintapCoreSvcMgr.exe", LogLevel.Info);
@@ -113,7 +117,7 @@ namespace gov.llnl.wintap.core.infrastructure
             WintapLogger.Log.Append("═══════════════════════════════════════════", LogLevel.Info);
             WintapLogger.Log.Append("ProcessResolver initialized", LogLevel.Info);
             WintapLogger.Log.Append(
-                $"ProcessResolver retention: enabled={_retentionEnabled}, sweepIntervalSec={(int)_sweepInterval.TotalSeconds}, exitRetentionSec={(int)_exitRetention.TotalSeconds}, reconcileOpen={_reconcileStaleOpenEnabled}, reconcileMinAgeSec={(int)_reconcileMinAge.TotalSeconds}",
+                $"ProcessResolver retention: enabled={_retentionEnabled}, sweepIntervalSec={(int)_sweepInterval.TotalSeconds}, exitRetentionSec={(int)_exitRetention.TotalSeconds}, reconcileOpen={_reconcileStaleOpenEnabled}, reconcileMinAgeSec={(int)_reconcileMinAge.TotalSeconds}, telemetryRetentionSec={(int)_telemetryRetention.TotalSeconds}, telemetryDetail={_telemetryDetailEnabled}",
                 LogLevel.Info);
             WintapLogger.Log.Append("═══════════════════════════════════════════", LogLevel.Info);
         }
@@ -1096,6 +1100,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 DeleteExpiredExitedRowsLocked(nowUtc);
                 PruneRecentlyPrunedProcessesLocked(nowUtc);
                 FlushTelemetryLocked(nowUtc);
+                DeleteExpiredTelemetryRowsLocked(nowUtc);
                 UpdateHeartbeat(connection, nowUtc, StateManager.SessionId.ToString());
                 _nextMaintenanceUtc = nowUtc + _sweepInterval;
             }
@@ -1395,6 +1400,30 @@ namespace gov.llnl.wintap.core.infrastructure
             }
         }
 
+        private void DeleteExpiredTelemetryRowsLocked(DateTime nowUtc)
+        {
+            if (_telemetryRetention <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            DateTime cutoffUtc = nowUtc - _telemetryRetention;
+            string cutoffSql = cutoffUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+
+            using var delete = connection.CreateCommand();
+            delete.CommandText = $@"
+                DELETE FROM {ProcessRetentionTelemetryTable}
+                WHERE observed_at < TIMESTAMP '{cutoffSql}'";
+
+            long deletedRows = delete.ExecuteNonQuery();
+            if (deletedRows > 0)
+            {
+                WintapLogger.Log.Append(
+                    $"ProcessResolver deleted {deletedRows} old retention telemetry rows older than {cutoffSql}",
+                    LogLevel.Info);
+            }
+        }
+
         private IEnumerable<string> FlushTelemetryEventsLocked(DateTime observedAtUtc)
         {
             if (_pendingTelemetry.Count == 0)
@@ -1403,29 +1432,52 @@ namespace gov.llnl.wintap.core.infrastructure
             }
 
             string observedAtSql = observedAtUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-            foreach (var telemetryEvent in _pendingTelemetry)
+            var summaries = _pendingTelemetry
+                .GroupBy(evt => new { evt.MetricName, evt.ProcessName })
+                .Select(group => new TelemetryEvent
+                {
+                    MetricName = group.Key.MetricName,
+                    ProcessName = group.Key.ProcessName,
+                    PidHash = null,
+                    MetricValue = group.Sum(evt => evt.MetricValue)
+                })
+                .OrderByDescending(summary => summary.MetricValue)
+                .ToList();
+
+            foreach (var summary in summaries)
             {
-                using var insert = connection.CreateCommand();
-                insert.CommandText = $@"
-                    INSERT INTO {ProcessRetentionTelemetryTable} (observed_at, metric_name, process_name, pid_hash, metric_value)
-                    VALUES (
-                        TIMESTAMP '{observedAtSql}',
-                        '{EscapeSql(telemetryEvent.MetricName)}',
-                        '{EscapeSql(telemetryEvent.ProcessName)}',
-                        {(string.IsNullOrWhiteSpace(telemetryEvent.PidHash) ? "NULL" : $"'{EscapeSql(telemetryEvent.PidHash)}'")},
-                        {telemetryEvent.MetricValue}
-                    )";
-                insert.ExecuteNonQuery();
+                InsertTelemetryRowLocked(observedAtSql, summary);
             }
 
-            foreach (var summary in _pendingTelemetry
-                .GroupBy(evt => new { evt.MetricName, evt.ProcessName })
-                .OrderByDescending(group => group.Sum(evt => evt.MetricValue)))
+            if (_telemetryDetailEnabled)
             {
-                yield return $"{summary.Key.MetricName}:{summary.Key.ProcessName}={summary.Sum(evt => evt.MetricValue)}";
+                foreach (var telemetryEvent in _pendingTelemetry)
+                {
+                    InsertTelemetryRowLocked(observedAtSql, telemetryEvent);
+                }
+            }
+
+            foreach (var summary in summaries)
+            {
+                yield return $"{summary.MetricName}:{summary.ProcessName}={summary.MetricValue}";
             }
 
             _pendingTelemetry.Clear();
+        }
+
+        private void InsertTelemetryRowLocked(string observedAtSql, TelemetryEvent telemetryEvent)
+        {
+            using var insert = connection.CreateCommand();
+            insert.CommandText = $@"
+                INSERT INTO {ProcessRetentionTelemetryTable} (observed_at, metric_name, process_name, pid_hash, metric_value)
+                VALUES (
+                    TIMESTAMP '{observedAtSql}',
+                    '{EscapeSql(telemetryEvent.MetricName)}',
+                    '{EscapeSql(telemetryEvent.ProcessName)}',
+                    {(string.IsNullOrWhiteSpace(telemetryEvent.PidHash) ? "NULL" : $"'{EscapeSql(telemetryEvent.PidHash)}'")},
+                    {telemetryEvent.MetricValue}
+                )";
+            insert.ExecuteNonQuery();
         }
     }
 
