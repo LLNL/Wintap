@@ -53,6 +53,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             // hook perfmon here to monitor for session stats:  total subs, total events, total dropped events
             // in addition to publishing the metrics in props, have an event fire on dropped events eventargs holds the name of the session and dropped event count
             traceEventSession.EnableProvider(EtwProviderId, EventLevel, TraceEventFlags);
+            OnEtwSessionStarted(traceEventSession);
             traceEventSource = new ETWTraceEventSource(EtwSessionName, TraceEventSourceType.Session);
             WintapLogger.Log.Append("attempting to enable provider: " + EtwProviderId + " from collector: " + SensorName + ", trace flags: " + TraceEventFlags + ", trace level: " + EventLevel, LogLevel.Info);
             RegisteredTraceEventParser traceEventParser = new RegisteredTraceEventParser(traceEventSource);
@@ -84,6 +85,12 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
                 }
             }
         }
+
+        /// <summary>
+        /// Called with the live session immediately after the provider is enabled,
+        /// before the listener thread starts. Subclasses may attach session-level configuration.
+        /// </summary>
+        protected virtual void OnEtwSessionStarted(TraceEventSession session) { }
 
 
         /// <summary>

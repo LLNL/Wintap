@@ -4,6 +4,8 @@
   registry.dataType as dataType,
   registry.valueName as valueName,
   registry.data as data,
+  registry.previousData as previousData,
+  registry.previousDataType as previousDataType,
   PidHash,
   ProcessName,
   PID,
@@ -14,5 +16,5 @@
   'Registry' as MessageType,
   AgentId
 from WintapMessage(CAST(messageType, string) = 'Registry').win:time_batch(10 sec) as msg
-group by registry.path, registry.dataType, registry.valueName, registry.data, PidHash, PID, activityType, ProcessName
+group by registry.path, registry.dataType, registry.valueName, registry.data, registry.previousData, registry.previousDataType, PidHash, PID, activityType, ProcessName
 having count(*) > 0

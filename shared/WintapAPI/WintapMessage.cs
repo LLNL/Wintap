@@ -68,7 +68,8 @@ namespace gov.llnl.wintap.collect.models
         public enum ActivityTypeEnum { Start, Stop, Refresh, Rundown, Load, Unload, PsSetLoadImageNotifyRoutine, TerminateProcess, CreateSymbolicLink, SetThreadContext, OpenProcess, OpenThread, Read, Write, Open, Close, Delete, DeleteValue, CreateKey, DeleteKey, EventWritten, HighCpuUsage, TcpIpAccept, TcpIpRecv, TcpIpTCPCopy, TcpIpReconnect, TcpIpRetransmit, TcpIpDisconnect, TcpIpARPCopy, TcpIpDupACK, TcpIpFullACK, TcpIpPartACK, TcpIpConnect, TcpIpSend, TcpIpFail, TcpIpRecvIPV6, TcpIpSendIPV6, UdpIpFail, UdpIpSend, UdpIpRecv, Other, MemCommit, MemFree, MemReserve }; 
         public enum DirectionEnum { INBOUND, OUTBOUND };
         public enum StateEnum { ESTABLISHED, SYN_SENT, SYN_RECEIVED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSED, CLOSE_WAIT, LAST_ACK, LISTEN, CLOSING }; 
-        public enum DataTypeEnum { STRING, DWORD, BINARY, MULTI_SZ, EXPAND_SZ };
+        /// <summary>Includes QWORD for REG_QWORD and NONE when no value data is available.</summary>
+        public enum DataTypeEnum { STRING, DWORD, BINARY, MULTI_SZ, EXPAND_SZ, QWORD, NONE };
 
         [Flags]
         public enum PageProtectEnum : uint
@@ -228,6 +229,8 @@ namespace gov.llnl.wintap.collect.models
             public DataTypeEnum DataType { get; set; }
             public string ValueName { get; set; }
             public string Data { get; set; }
+            public string PreviousData { get; set; }
+            public DataTypeEnum PreviousDataType { get; set; }
             public int PID { get; set; }
         }
 

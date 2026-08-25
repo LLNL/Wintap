@@ -32,23 +32,13 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 base.HandleSensorEvent(sensorEvent);
                 IdGenerator idGen = new IdGenerator();
-                DateTime eventTime = DateTime.FromFileTimeUtc((long)sensorEvent["firstSeen"]);
-                dynamic flatMsg = new ExpandoObject();
-                flatMsg.AgentId = StateManager.AgentId.ToString();
-                flatMsg.ActivityType = sensorEvent["activityType"].ToString();
-                flatMsg.ProcessName = sensorEvent["ProcessName"].ToString();
-                flatMsg.Reg_Data = sensorEvent["data"].ToString();
-                flatMsg.EventCount = Int32.Parse(sensorEvent["eventCount"].ToString());
-                flatMsg.FirstSeenMs = (long)sensorEvent["firstSeen"];
-                flatMsg.LastSeenMs = (long)sensorEvent["lastSeen"];
-                flatMsg.PID = Int32.Parse(sensorEvent["PID"].ToString());
-                flatMsg.PidHash = sensorEvent["PidHash"].ToString();
-                flatMsg.HostHame = HostSerializer.Instance.HostId.Hostname;
-                flatMsg.Reg_Path = sensorEvent["path"].ToString().ToLower();
-                flatMsg.Reg_Value = sensorEvent["valueName"].ToString();
-                flatMsg.Reg_Id_Hash = idGen.GenKeyForRegistry_Entry(transform.Transformer.context, HostSerializer.Instance.HostId.Hostname, flatMsg.AgentId, flatMsg.Reg_Path, flatMsg.Reg_Value);
-                flatMsg.MessageType = "PROCESS_REGISTRY";
-                flatMsg.EventTime = eventTime;
+                string hostname = HostSerializer.Instance.HostId.Hostname;
+                string agentId = StateManager.AgentId.ToString();
+                ExpandoObject flatMsg = BuildFlatMessage(
+                    name => sensorEvent[name],
+                    agentId,
+                    hostname,
+                    (regPath, regValue) => idGen.GenKeyForRegistry_Entry(transform.Transformer.context, hostname, agentId, regPath, regValue));
                 this.Save(flatMsg);
                 sensorEvent = null;
                 flatMsg = null;
@@ -57,6 +47,34 @@ namespace gov.llnl.wintap.core.etl.extract
             {
                 WintapLogger.Log.Append("Error creating Registry data object for pid: " + sensorEvent["PID"] + ", exception: " + ex.Message, LogLevel.Info);
             }
+        }
+
+        internal static ExpandoObject BuildFlatMessage(
+            Func<string, object> field,
+            string agentId,
+            string hostname,
+            Func<string, string, string> regIdHash)
+        {
+            dynamic flatMsg = new ExpandoObject();
+            flatMsg.AgentId = agentId;
+            flatMsg.ActivityType = field("activityType").ToString();
+            flatMsg.ProcessName = field("ProcessName").ToString();
+            flatMsg.Reg_Data = field("data").ToString();
+            flatMsg.Reg_DataType = field("dataType")?.ToString() ?? WintapMessage.DataTypeEnum.NONE.ToString();
+            flatMsg.Reg_PreviousData = field("previousData")?.ToString() ?? string.Empty;
+            flatMsg.Reg_PreviousDataType = field("previousDataType")?.ToString() ?? WintapMessage.DataTypeEnum.NONE.ToString();
+            flatMsg.EventCount = Int32.Parse(field("eventCount").ToString());
+            flatMsg.FirstSeenMs = (long)field("firstSeen");
+            flatMsg.LastSeenMs = (long)field("lastSeen");
+            flatMsg.PID = Int32.Parse(field("PID").ToString());
+            flatMsg.PidHash = field("PidHash").ToString();
+            flatMsg.HostHame = hostname;
+            flatMsg.Reg_Path = field("path").ToString().ToLower();
+            flatMsg.Reg_Value = field("valueName").ToString();
+            flatMsg.Reg_Id_Hash = regIdHash(flatMsg.Reg_Path, flatMsg.Reg_Value);
+            flatMsg.MessageType = "PROCESS_REGISTRY";
+            flatMsg.EventTime = DateTime.FromFileTimeUtc((long)field("firstSeen"));
+            return flatMsg;
         }
     }
 }
