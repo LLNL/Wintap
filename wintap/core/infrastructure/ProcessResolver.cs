@@ -9,6 +9,7 @@ using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.core.shared.helpers;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Diagnostics;
@@ -28,6 +29,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private string MAIN_DB_PATH = Path.Combine($@"{Env.FileDataRoot}", "event_store",  "main.duckdb");
         private DuckDBConnection connection;
         private readonly object _dbLock = new object();
+        private readonly ConcurrentDictionary<int, ActiveProcessCacheEntry> _activeProcesses = new ConcurrentDictionary<int, ActiveProcessCacheEntry>();
         private string agentId;
         private readonly Dictionary<int, List<PendingExit>> _pendingExits = new Dictionary<int, List<PendingExit>>();
         private readonly Dictionary<int, List<RecentlyPrunedProcess>> _recentlyPrunedProcesses = new Dictionary<int, List<RecentlyPrunedProcess>>();
@@ -77,6 +79,13 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             public string PidHash;
             public int ProcessId;
+            public string ProcessName;
+            public DateTime CreateTime;
+        }
+
+        private struct ActiveProcessCacheEntry
+        {
+            public string PidHash;
             public string ProcessName;
             public DateTime CreateTime;
         }
@@ -214,6 +223,30 @@ namespace gov.llnl.wintap.core.infrastructure
                     throw;
                 }
             }          
+        }
+
+        public bool TryResolveCurrentProcessAtTime(int pid, DateTime eventTime, out ProcessRecord process)
+        {
+            process = null;
+            if (!_activeProcesses.TryGetValue(pid, out ActiveProcessCacheEntry cached))
+            {
+                return false;
+            }
+
+            DateTime eventTimeUtc = eventTime.ToUniversalTime();
+            if (cached.CreateTime > eventTimeUtc)
+            {
+                return false;
+            }
+
+            process = new ProcessRecord
+            {
+                PidHash = cached.PidHash,
+                ProcessId = pid,
+                ProcessName = cached.ProcessName,
+                CreateTime = cached.CreateTime
+            };
+            return true;
         }
 
 
@@ -355,7 +388,8 @@ namespace gov.llnl.wintap.core.infrastructure
             lock (_dbLock)
             {
                 MaybeRunMaintenanceLocked(DateTime.UtcNow);
-                string pidHash = EscapeSql(message.PidHash);
+                string rawPidHash = message.PidHash ?? string.Empty;
+                string pidHash = EscapeSql(rawPidHash);
 
                 // Stop events should update exit_time/exit_code without clobbering create_time.
                 if (message.ActivityType == WintapMessage.ActivityTypeEnum.Stop)
@@ -366,6 +400,7 @@ namespace gov.llnl.wintap.core.infrastructure
                     if (!TryGetProcessRowStateLocked(pidHash, out bool rowWasOpen, out string existingProcessName))
                     {
                         AddPendingExit(message.PID, exitTime, exitCode, proc.ParentPidHash, proc.ParentPID, proc.Name);
+                        RemoveActiveProcessCacheEntry(message.PID, rawPidHash);
                         WintapLogger.Log.Append(
                             $"Queued unmatched Stop for PID {message.PID} {proc.Name}; no existing process row for PidHash {pidHash}",
                             LogLevel.Debug);
@@ -394,6 +429,8 @@ namespace gov.llnl.wintap.core.infrastructure
                             RecordTelemetryEvent(StopClosedMetricName, existingProcessName ?? proc.Name, pidHash);
                         }
 
+                        RemoveActiveProcessCacheEntry(message.PID, rawPidHash);
+
                         return;
                     }
                     catch (Exception ex)
@@ -409,7 +446,8 @@ namespace gov.llnl.wintap.core.infrastructure
                 try
                 {
                     UpsertProcessStart(connection, message, createTime);
-                    ApplyPendingExit(message.PID, pidHash, createTime);
+                    SetActiveProcessCacheEntry(message.PID, rawPidHash, proc.Name, createTime);
+                    ApplyPendingExit(message.PID, rawPidHash, createTime);
 
                     WintapLogger.Log.Append(
                         $"Registered process PID {message.PID}: {proc.Name} with process resolver",
@@ -668,12 +706,14 @@ namespace gov.llnl.wintap.core.infrastructure
             });
         }
 
-        private void ApplyPendingExit(int pid, string escapedPidHash, DateTime createTime)
+        private void ApplyPendingExit(int pid, string pidHash, DateTime createTime)
         {
             if (!_pendingExits.TryGetValue(pid, out var exits) || exits.Count == 0)
             {
                 return;
             }
+
+            string escapedPidHash = EscapeSql(pidHash);
 
             int bestIndex = -1;
             DateTime bestExit = DateTime.MaxValue;
@@ -716,6 +756,8 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 RecordTelemetryEvent(StopClosedMetricName, existingProcessName ?? pending.ProcessName, escapedPidHash);
             }
+
+            RemoveActiveProcessCacheEntry(pid, pidHash);
 
             WintapLogger.Log.Append(
                 $"Applied pending Stop for PID {pid} to PidHash {escapedPidHash}",
@@ -1078,6 +1120,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 using var deleteCommand = connection.CreateCommand();
                 deleteCommand.CommandText = deleteQuery;
                 deleteCommand.ExecuteNonQuery();
+                _activeProcesses.Clear();
 
                 WintapLogger.Log.Append($"Cleared {recordCount} process records from event store", LogLevel.Info);
             }
@@ -1179,6 +1222,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 if (update.ExecuteNonQuery() > 0)
                 {
                     RecordTelemetryEvent(ReconciledClosedMetricName, openRow.ProcessName, openRow.PidHash);
+                    RemoveActiveProcessCacheEntry(openRow.ProcessId, openRow.PidHash);
                 }
             }
         }
@@ -1220,6 +1264,7 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 AddRecentlyPrunedProcessLocked(expiredRow, nowUtc);
                 RecordTelemetryEvent(RetentionDeletedMetricName, expiredRow.ProcessName, expiredRow.PidHash);
+                RemoveActiveProcessCacheEntry(expiredRow.ProcessId, expiredRow.PidHash);
             }
 
             using var delete = connection.CreateCommand();
@@ -1357,6 +1402,7 @@ namespace gov.llnl.wintap.core.infrastructure
             if (update.ExecuteNonQuery() > 0)
             {
                 RecordTelemetryEvent(LiveHashRepairedMetricName, openRow.ProcessName, livePidHash);
+                UpdateActiveProcessCachePidHash(openRow.ProcessId, openRow.PidHash, livePidHash, liveStartUtc, openRow.ProcessName);
                 WintapLogger.Log.Append(
                     $"ProcessResolver repaired live pid hash for pid={openRow.ProcessId} name={openRow.ProcessName} create={openRow.CreateTime:O} liveStart={liveStartUtc:O} oldPidHash={openRow.PidHash} newPidHash={livePidHash}",
                     LogLevel.Info);
@@ -1388,6 +1434,54 @@ namespace gov.llnl.wintap.core.infrastructure
             liveStartUtc = DateTime.FromFileTimeUtc(startFileTimeUtc.Value).ToUniversalTime();
             pidHash = processHash.GenPidHash(pid, startFileTimeUtc.Value);
             return true;
+        }
+
+        private void SetActiveProcessCacheEntry(int pid, string pidHash, string processName, DateTime createTime)
+        {
+            if (pid <= 0 || string.IsNullOrWhiteSpace(pidHash))
+            {
+                return;
+            }
+
+            _activeProcesses[pid] = new ActiveProcessCacheEntry
+            {
+                PidHash = pidHash,
+                ProcessName = NormalizeProcessName(processName),
+                CreateTime = createTime.ToUniversalTime()
+            };
+        }
+
+        private void RemoveActiveProcessCacheEntry(int pid, string pidHash)
+        {
+            if (pid <= 0 || string.IsNullOrWhiteSpace(pidHash))
+            {
+                return;
+            }
+
+            if (_activeProcesses.TryGetValue(pid, out ActiveProcessCacheEntry cached) &&
+                string.Equals(cached.PidHash, pidHash, StringComparison.Ordinal))
+            {
+                _activeProcesses.TryRemove(pid, out _);
+            }
+        }
+
+        private void UpdateActiveProcessCachePidHash(int pid, string oldPidHash, string newPidHash, DateTime createTime, string processName)
+        {
+            if (pid <= 0 || string.IsNullOrWhiteSpace(oldPidHash) || string.IsNullOrWhiteSpace(newPidHash))
+            {
+                return;
+            }
+
+            if (_activeProcesses.TryGetValue(pid, out ActiveProcessCacheEntry cached) &&
+                string.Equals(cached.PidHash, oldPidHash, StringComparison.Ordinal))
+            {
+                _activeProcesses[pid] = new ActiveProcessCacheEntry
+                {
+                    PidHash = newPidHash,
+                    ProcessName = NormalizeProcessName(processName),
+                    CreateTime = createTime.ToUniversalTime()
+                };
+            }
         }
 
         private void FlushTelemetryLocked(DateTime observedAtUtc)

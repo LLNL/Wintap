@@ -62,6 +62,13 @@ namespace gov.llnl.wintap.core.infrastructure
         // Avoid spamming logs when process attribution is missing.
         private static readonly ConcurrentDictionary<int, byte> _loggedMissingOwnerPid = new ConcurrentDictionary<int, byte>();
         private static readonly ConcurrentDictionary<int, byte> _loggedMissingParentPid = new ConcurrentDictionary<int, byte>();
+        private static readonly bool _directParquetEnabled = IsConfiguredEnabled("WINTAP_ENABLE_DIRECT_PARQUET");
+        private static readonly bool _skipProcessResolve = IsConfiguredEnabled("WINTAP_SKIP_PROCESS_RESOLVE");
+        private static readonly bool _skipParentProcessResolve = IsConfiguredEnabled("WINTAP_SKIP_PARENT_PROCESS_RESOLVE");
+        private static readonly bool _skipProcessRegister = IsConfiguredEnabled("WINTAP_SKIP_PROCESS_REGISTER");
+        private static readonly bool _skipEsperSend = IsConfiguredEnabled("WINTAP_SKIP_ESPER_SEND");
+        private static long _fileProcessCacheHits;
+        private static long _fileProcessCacheMisses;
 
         private static readonly Lazy<string> UnknownPidHash = new Lazy<string>(() => new ProcessHash().GenPidHash(-1, 0));
 
@@ -257,25 +264,53 @@ namespace gov.llnl.wintap.core.infrastructure
                 // Tag with AgentId
                 streamedEvent.AgentId = StateManager.AgentId.ToString();
 
-                if (DirectParquetSink.IsEnabled)
+                if (_directParquetEnabled)
                 {
                     InspectForHealth(streamedEvent);
                     DirectParquetSink.Save(streamedEvent);
                     return;
                 }
-
-                bool skipProcessResolve = IsEnvEnabled("WINTAP_SKIP_PROCESS_RESOLVE");
-                bool skipParentProcessResolve = IsEnvEnabled("WINTAP_SKIP_PARENT_PROCESS_RESOLVE");
-                bool skipProcessRegister = IsEnvEnabled("WINTAP_SKIP_PROCESS_REGISTER");
-                bool skipEsperSend = IsEnvEnabled("WINTAP_SKIP_ESPER_SEND");
+                DateTime eventTimeUtc = DateTime.FromFileTimeUtc(streamedEvent.EventTime);
 
                 // Resolve process information using platform-specific resolver
-                if (_processResolver != null && !skipProcessResolve)
+                if (_processResolver != null && !_skipProcessResolve)
                 {
                     if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.Process)
                     {
                         // For non-Process events: resolve the owning process
-                        ProcessRecord ownerProcess = _processResolver.ResolveProcessAtTime(streamedEvent.PID,DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                        ProcessRecord ownerProcess = null;
+                        bool usedCurrentProcessCache = false;
+                        bool hasPrepopulatedFileIdentity = streamedEvent.MessageType == WintapMessage.MessageTypeEnum.File &&
+                            !string.IsNullOrWhiteSpace(streamedEvent.PidHash) &&
+                            !string.IsNullOrWhiteSpace(streamedEvent.ProcessName);
+
+                        if (streamedEvent.MessageType == WintapMessage.MessageTypeEnum.File && !hasPrepopulatedFileIdentity)
+                        {
+                            usedCurrentProcessCache = _processResolver.TryResolveCurrentProcessAtTime(streamedEvent.PID, eventTimeUtc, out ownerProcess);
+                            if (usedCurrentProcessCache)
+                            {
+                                Interlocked.Increment(ref _fileProcessCacheHits);
+                            }
+                            else
+                            {
+                                Interlocked.Increment(ref _fileProcessCacheMisses);
+                            }
+                        }
+
+                        if (hasPrepopulatedFileIdentity)
+                        {
+                            ownerProcess = new ProcessRecord
+                            {
+                                PidHash = streamedEvent.PidHash,
+                                ProcessId = streamedEvent.PID,
+                                ProcessName = streamedEvent.ProcessName,
+                                CreateTime = eventTimeUtc
+                            };
+                        }
+                        else if (!usedCurrentProcessCache)
+                        {
+                            ownerProcess = _processResolver.ResolveProcessAtTime(streamedEvent.PID, eventTimeUtc);
+                        }
 
                         if (ownerProcess != null)
                         {
@@ -286,7 +321,7 @@ namespace gov.llnl.wintap.core.infrastructure
                         {
                             // Generate a best-effort PidHash so events still have an identifier.
                             // Prefer resolver lookup; fall back to a local hash when resolver has no record.
-                            var fallbackPidHash = _processResolver.GetPidHash(streamedEvent.PID, DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                            var fallbackPidHash = _processResolver.GetPidHash(streamedEvent.PID, eventTimeUtc);
                             streamedEvent.PidHash = fallbackPidHash ?? new ProcessHash().GenPidHash(streamedEvent.PID, streamedEvent.EventTime);
                             streamedEvent.ProcessName = "Unknown";
 
@@ -298,7 +333,7 @@ namespace gov.llnl.wintap.core.infrastructure
                             }
                         }
                     }
-                    else if (!skipParentProcessResolve)
+                    else if (!_skipParentProcessResolve)
                     {
                         // For Process events: resolve the parent process
                         WintapLogger.Log.Append($"Attempting to resolve parent process for {streamedEvent.PID}", LogLevel.Debug);
@@ -325,7 +360,7 @@ namespace gov.llnl.wintap.core.infrastructure
                                     WintapLogger.Log.Append($"Attempting to retrieve parent process from process resolver pid: {streamedEvent.PID}, parentPid: {streamedEvent.Process.ParentPID}", LogLevel.Debug);
                                     ProcessRecord parentProcess = EventChannel.GetProcessHistory(
                                         streamedEvent.Process.ParentPID,
-                                        DateTime.FromFileTimeUtc(streamedEvent.EventTime));
+                                        eventTimeUtc);
 
                                     if (parentProcess != null)
                                     {
@@ -345,9 +380,9 @@ namespace gov.llnl.wintap.core.infrastructure
                                              {
                                                  fallbackParentPidHash = _processResolver?.GetPidHash(
                                                      streamedEvent.Process.ParentPID,
-                                                     DateTime.FromFileTimeUtc(streamedEvent.EventTime));
-                                             }
-                                             catch { }
+                                                     eventTimeUtc);
+                                              }
+                                              catch { }
 
                                               var level = string.IsNullOrEmpty(fallbackParentPidHash) ? LogLevel.Warn : LogLevel.Debug;
                                               WintapLogger.Log.Append(
@@ -377,7 +412,7 @@ namespace gov.llnl.wintap.core.infrastructure
                         }
                     }
                 }
-                else
+                else if (_processResolver == null)
                 {
                     // No process resolver available (shouldn't happen, but handle gracefully)
                     WintapLogger.Log.Append(
@@ -388,7 +423,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 // Send to backing store
                 if (streamedEvent.MessageType == WintapMessage.MessageTypeEnum.Process)
                 {
-                    if (!skipProcessRegister)
+                    if (!_skipProcessRegister)
                     {
                         _processResolver.RegisterProcess(streamedEvent);
                     }
@@ -396,7 +431,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
                 InspectForHealth(streamedEvent);
 
-                if (skipEsperSend)
+                if (_skipEsperSend)
                 {
                     return;
                 }
@@ -416,6 +451,44 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             var val = ConfigManager.GetValue<string>(name);
             return !string.IsNullOrEmpty(val) && (string.Equals(val, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(val, "1", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsConfiguredEnabled(string name)
+        {
+            return IsEnvEnabled(name);
+        }
+
+        internal static void TakeFileProcessCacheCounters(out long hits, out long misses)
+        {
+            hits = Interlocked.Exchange(ref _fileProcessCacheHits, 0);
+            misses = Interlocked.Exchange(ref _fileProcessCacheMisses, 0);
+        }
+
+        internal static bool TryPopulateCurrentProcessIdentity(WintapMessage streamedEvent)
+        {
+            if (streamedEvent == null || _processResolver == null || _skipProcessResolve)
+            {
+                return false;
+            }
+
+            if (streamedEvent.MessageType != WintapMessage.MessageTypeEnum.File)
+            {
+                return false;
+            }
+
+            if (_processResolver.TryResolveCurrentProcessAtTime(
+                streamedEvent.PID,
+                DateTime.FromFileTimeUtc(streamedEvent.EventTime),
+                out ProcessRecord ownerProcess) &&
+                ownerProcess != null)
+            {
+                streamedEvent.PidHash = ownerProcess.PidHash;
+                streamedEvent.ProcessName = ownerProcess.ProcessName;
+                Interlocked.Increment(ref _fileProcessCacheHits);
+                return true;
+            }
+
+            return false;
         }
 
         // **************************************************************************

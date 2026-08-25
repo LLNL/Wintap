@@ -23,6 +23,9 @@ namespace gov.llnl.wintap.platform.linux.collect
         private List<IntPtr> _additionalLinks;
         private readonly string? _dataRoot;
         private readonly string? _dataRootLower;
+        private readonly int _sendQueueCapacity;
+        private BlockingCollection<QueuedFileEvent> _sendQueue;
+        private Thread? _sendWorker;
         private int _statsMapFd = -1;
 
         private const uint FileOpOpen = 1;
@@ -62,7 +65,21 @@ namespace gov.llnl.wintap.platform.linux.collect
         private long _droppedSys;
         private long _droppedProc;
         private long _droppedDev;
+        private long _queueDrops;
+        private long _queueHighWatermark;
         private long _nextCounterLogTickMs;
+        private readonly object _measurementLock = new object();
+        private readonly Dictionary<string, MeasurementAggregate> _emitByComm = new Dictionary<string, MeasurementAggregate>(StringComparer.Ordinal);
+        private readonly Dictionary<string, MeasurementAggregate> _emitByPrefix = new Dictionary<string, MeasurementAggregate>(StringComparer.Ordinal);
+        private readonly Dictionary<(int Pid, string Path), long> _recentOpenSeenMs = new Dictionary<(int Pid, string Path), long>();
+        private long _openDuplicateWindowTotal;
+        private long _openDuplicateWindowHits;
+        private int _duplicatePruneCountdown = 1024;
+
+        private const int MeasurementTopN = 5;
+        private const int MaxMeasurementBuckets = 128;
+        private const int MaxDuplicateKeys = 16384;
+        private const long DuplicateOpenWindowMs = 1000;
 
         protected override string BpfObjectFileName => "file_ops_tracer.bpf.o";
         protected override string[] FallbackBpfObjectFileNames => new[] { "file_ops_tracepoint.bpf.o" };
@@ -73,6 +90,8 @@ namespace gov.llnl.wintap.platform.linux.collect
             SensorName = "FileOps";
             _fdToPath = new ConcurrentDictionary<int, ConcurrentDictionary<uint, string>>();
             _additionalLinks = new List<IntPtr>();
+            _sendQueueCapacity = GetConfiguredQueueCapacity();
+            _sendQueue = new BlockingCollection<QueuedFileEvent>(new ConcurrentQueue<QueuedFileEvent>(), _sendQueueCapacity);
 
             try
             {
@@ -93,6 +112,8 @@ namespace gov.llnl.wintap.platform.linux.collect
             // Call base to attach first program (trace_openat)
             if (!base.Start())
                 return false;
+
+            StartSendWorker();
 
             InitializeStatsMap();
             InitializeSelfPidFilter();
@@ -142,6 +163,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"{SensorName} error attaching additional programs: {ex.Message}", LogLevel.Error);
+                Stop();
                 return false;
             }
         }
@@ -269,8 +291,16 @@ namespace gov.llnl.wintap.platform.linux.collect
                 message.PidHash = "";
                 message.ProcessName = ReadNullTerminatedString(data, CommonCommOffset, 16) ?? "unknown";
 
-                EventChannel.Send(message);
-                CountByOp(_userEmittedByOp, opIndex);
+                // Stamp current-process identity while the producer is still live,
+                // so deep sender backlog does not turn short-lived processes into
+                // resolver misses later.
+                EventChannel.TryPopulateCurrentProcessIdentity(message);
+
+                if (TryEnqueueMessage(message, opIndex))
+                {
+                    RecordMeasurement(opIndex, opType, pid, message.ProcessName, filePath, Environment.TickCount64);
+                }
+
                 MaybeLogCounters();
                 return 0;
             }
@@ -352,17 +382,22 @@ namespace gov.llnl.wintap.platform.linux.collect
             long sys = Interlocked.Exchange(ref _droppedSys, 0);
             long proc = Interlocked.Exchange(ref _droppedProc, 0);
             long dev = Interlocked.Exchange(ref _droppedDev, 0);
+            long queueDrops = Interlocked.Exchange(ref _queueDrops, 0);
+            long queueHighWatermark = Interlocked.Exchange(ref _queueHighWatermark, 0);
+            int queueDepth = _sendQueue.Count;
             long total = sys + proc + dev;
             string userSummary = BuildAndResetUserCounterSummary();
             string kernelSummary = BuildKernelCounterSummary();
+            string measurementSummary = BuildAndResetMeasurementSummary();
+            string queueSummary = $"depth={queueDepth},high_water={queueHighWatermark},drops={queueDrops},capacity={_sendQueueCapacity},policy=drop_newest";
 
-            if (total <= 0 && string.IsNullOrEmpty(userSummary) && string.IsNullOrEmpty(kernelSummary))
+            if (total <= 0 && queueDrops <= 0 && queueDepth <= 0 && queueHighWatermark <= 0 && string.IsNullOrEmpty(userSummary) && string.IsNullOrEmpty(kernelSummary) && string.IsNullOrEmpty(measurementSummary))
             {
                 return;
             }
 
             WintapLogger.Log.Append(
-                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} user=[{userSummary}] kernel=[{kernelSummary}]",
+                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} queue=[{queueSummary}] user=[{userSummary}] measure=[{measurementSummary}] kernel=[{kernelSummary}]",
                 LogLevel.Info);
         }
 
@@ -431,7 +466,275 @@ namespace gov.llnl.wintap.platform.linux.collect
                     parts.Add($"{OpName(i)}:consumed={consumed},emitted={emitted},no_path={noPath},data_root={dataRoot},etl={etl},parquet={parquet},fallback_hit={fallbackHit},fallback_miss={fallbackMiss}");
                 }
             }
+
+            EventChannel.TakeFileProcessCacheCounters(out long cacheHits, out long cacheMisses);
+            if (cacheHits > 0 || cacheMisses > 0)
+            {
+                parts.Add($"process_cache:hit={cacheHits},miss={cacheMisses}");
+            }
+
             return string.Join("; ", parts);
+        }
+
+        private void RecordMeasurement(int opIndex, uint opType, int pid, string processName, string filePath, long observedAtMs)
+        {
+            lock (_measurementLock)
+            {
+                IncrementAggregate(_emitByComm, NormalizeCommBucket(processName), opIndex, "(other)");
+                IncrementAggregate(_emitByPrefix, GetPathPrefixBucket(filePath), opIndex, "(other)");
+
+                if (opType == FileOpOpen)
+                {
+                    _openDuplicateWindowTotal++;
+                    var key = (pid, filePath);
+                    if (_recentOpenSeenMs.TryGetValue(key, out long lastSeenMs) && observedAtMs - lastSeenMs <= DuplicateOpenWindowMs)
+                    {
+                        _openDuplicateWindowHits++;
+                    }
+
+                    _recentOpenSeenMs[key] = observedAtMs;
+                    if (--_duplicatePruneCountdown <= 0)
+                    {
+                        PruneDuplicateState(observedAtMs);
+                        _duplicatePruneCountdown = 1024;
+                    }
+                }
+            }
+        }
+
+        private string BuildAndResetMeasurementSummary()
+        {
+            lock (_measurementLock)
+            {
+                PruneDuplicateState(Environment.TickCount64);
+
+                string commSummary = FormatTopMeasurement("comm_top", _emitByComm);
+                string prefixSummary = FormatTopMeasurement("prefix_top", _emitByPrefix);
+                long duplicateTotal = _openDuplicateWindowTotal;
+                long duplicateHits = _openDuplicateWindowHits;
+                string duplicateSummary = duplicateTotal > 0
+                    ? $"open_dup:total={duplicateTotal},repeat={duplicateHits},repeat_pct={(duplicateHits * 100.0) / duplicateTotal:0.0},window_ms={DuplicateOpenWindowMs}"
+                    : string.Empty;
+
+                _emitByComm.Clear();
+                _emitByPrefix.Clear();
+                _openDuplicateWindowTotal = 0;
+                _openDuplicateWindowHits = 0;
+
+                var parts = new List<string>();
+                if (!string.IsNullOrEmpty(commSummary))
+                {
+                    parts.Add(commSummary);
+                }
+
+                if (!string.IsNullOrEmpty(prefixSummary))
+                {
+                    parts.Add(prefixSummary);
+                }
+
+                if (!string.IsNullOrEmpty(duplicateSummary))
+                {
+                    parts.Add(duplicateSummary);
+                }
+
+                return string.Join("; ", parts);
+            }
+        }
+
+        private static string NormalizeCommBucket(string processName)
+        {
+            return string.IsNullOrWhiteSpace(processName) ? "unknown" : processName.Trim().ToLowerInvariant();
+        }
+
+        private static string GetPathPrefixBucket(string normalizedPath)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                return "(empty)";
+            }
+
+            if (!normalizedPath.StartsWith("/", StringComparison.Ordinal))
+            {
+                return "(relative)";
+            }
+
+            if (normalizedPath.StartsWith("/home/", StringComparison.Ordinal))
+            {
+                return "/home/*";
+            }
+
+            int nextSlash = normalizedPath.IndexOf('/', 1);
+            return nextSlash > 0 ? normalizedPath.Substring(0, nextSlash) : normalizedPath;
+        }
+
+        private void IncrementAggregate(Dictionary<string, MeasurementAggregate> aggregates, string key, int opIndex, string overflowBucket)
+        {
+            if (!aggregates.TryGetValue(key, out MeasurementAggregate aggregate))
+            {
+                if (aggregates.Count >= MaxMeasurementBuckets)
+                {
+                    key = overflowBucket;
+                    if (!aggregates.TryGetValue(key, out aggregate))
+                    {
+                        aggregate = new MeasurementAggregate();
+                        aggregates[key] = aggregate;
+                    }
+                }
+                else
+                {
+                    aggregate = new MeasurementAggregate();
+                    aggregates[key] = aggregate;
+                }
+            }
+
+            aggregate.Add(opIndex);
+        }
+
+        private void PruneDuplicateState(long nowMs)
+        {
+            long cutoffMs = nowMs - DuplicateOpenWindowMs;
+            var staleKeys = new List<(int Pid, string Path)>();
+            foreach (KeyValuePair<(int Pid, string Path), long> entry in _recentOpenSeenMs)
+            {
+                if (entry.Value < cutoffMs)
+                {
+                    staleKeys.Add(entry.Key);
+                }
+            }
+
+            for (int i = 0; i < staleKeys.Count; i++)
+            {
+                _recentOpenSeenMs.Remove(staleKeys[i]);
+            }
+
+            if (_recentOpenSeenMs.Count <= MaxDuplicateKeys)
+            {
+                return;
+            }
+
+            staleKeys.Clear();
+            foreach (KeyValuePair<(int Pid, string Path), long> entry in _recentOpenSeenMs)
+            {
+                staleKeys.Add(entry.Key);
+                if (_recentOpenSeenMs.Count - staleKeys.Count <= MaxDuplicateKeys)
+                {
+                    break;
+                }
+            }
+
+            for (int i = 0; i < staleKeys.Count; i++)
+            {
+                _recentOpenSeenMs.Remove(staleKeys[i]);
+            }
+        }
+
+        private static string FormatTopMeasurement(string label, Dictionary<string, MeasurementAggregate> aggregates)
+        {
+            if (aggregates.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var ranked = new List<KeyValuePair<string, MeasurementAggregate>>(aggregates);
+            ranked.Sort((left, right) =>
+            {
+                int totalCompare = right.Value.Total.CompareTo(left.Value.Total);
+                return totalCompare != 0 ? totalCompare : string.CompareOrdinal(left.Key, right.Key);
+            });
+
+            var parts = new List<string>();
+            int count = Math.Min(MeasurementTopN, ranked.Count);
+            for (int i = 0; i < count; i++)
+            {
+                KeyValuePair<string, MeasurementAggregate> entry = ranked[i];
+                parts.Add($"{entry.Key}:total={entry.Value.Total},open={entry.Value.Get(FileOpOpen)},read={entry.Value.Get(FileOpRead)},write={entry.Value.Get(FileOpWrite)},close={entry.Value.Get(FileOpClose)},mmap={entry.Value.Get(FileOpMmap)},unlink={entry.Value.Get(FileOpUnlink)}");
+            }
+
+            return parts.Count == 0 ? string.Empty : $"{label}={string.Join(" | ", parts)}";
+        }
+
+        private void StartSendWorker()
+        {
+            _sendWorker = new Thread(ProcessSendQueue)
+            {
+                IsBackground = true,
+                Name = $"{SensorName}-Sender"
+            };
+            _sendWorker.Start();
+        }
+
+        private void ProcessSendQueue()
+        {
+            while (true)
+            {
+                try
+                {
+                    if (!_sendQueue.TryTake(out QueuedFileEvent queued, 100))
+                    {
+                        if (_sendQueue.IsCompleted)
+                        {
+                            return;
+                        }
+
+                        continue;
+                    }
+
+                    EventChannel.Send(queued.Message);
+                    CountByOp(_userEmittedByOp, queued.OpIndex);
+                    MaybeLogCounters();
+                }
+                catch (InvalidOperationException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    WintapLogger.Log.Append($"{SensorName} send worker error: {ex.Message}", LogLevel.Error);
+                    Thread.Sleep(100);
+                }
+            }
+        }
+
+        private bool TryEnqueueMessage(WintapMessage message, int opIndex)
+        {
+            if (_sendQueue.IsAddingCompleted)
+            {
+                return false;
+            }
+
+            if (_sendQueue.TryAdd(new QueuedFileEvent(message, opIndex)))
+            {
+                UpdateQueueHighWatermark(_sendQueue.Count);
+                return true;
+            }
+
+            Interlocked.Increment(ref _queueDrops);
+            EventChannel.AddDroppedEvents(1);
+            return false;
+        }
+
+        private void UpdateQueueHighWatermark(int currentDepth)
+        {
+            long observed = currentDepth;
+            while (true)
+            {
+                long current = Interlocked.Read(ref _queueHighWatermark);
+                if (observed <= current)
+                {
+                    return;
+                }
+
+                if (Interlocked.CompareExchange(ref _queueHighWatermark, observed, current) == current)
+                {
+                    return;
+                }
+            }
+        }
+
+        private static int GetConfiguredQueueCapacity()
+        {
+            int configured = ConfigManager.GetValue<int>("WINTAP_FILEOPS_MAX_QUEUE_EVENTS");
+            return configured > 0 ? configured : 131072;
         }
 
         private void InitializeStatsMap()
@@ -606,6 +909,13 @@ namespace gov.llnl.wintap.platform.linux.collect
 
         protected override void OnStopping()
         {
+            try
+            {
+                _sendQueue.CompleteAdding();
+                _sendWorker?.Join(TimeSpan.FromSeconds(2));
+            }
+            catch { }
+
             // Cleanup additional program links
             foreach (var link in _additionalLinks)
             {
@@ -616,6 +926,42 @@ namespace gov.llnl.wintap.platform.linux.collect
 
             // Cleanup FD mappings
             _fdToPath.Clear();
+        }
+
+        private readonly struct QueuedFileEvent
+        {
+            public QueuedFileEvent(WintapMessage message, int opIndex)
+            {
+                Message = message;
+                OpIndex = opIndex;
+            }
+
+            public WintapMessage Message { get; }
+
+            public int OpIndex { get; }
+        }
+
+        private sealed class MeasurementAggregate
+        {
+            private readonly long[] _counts = new long[OpSlots];
+
+            public long Total { get; private set; }
+
+            public void Add(int opIndex)
+            {
+                if (opIndex >= 0 && opIndex < _counts.Length)
+                {
+                    _counts[opIndex]++;
+                }
+
+                Total++;
+            }
+
+            public long Get(uint opType)
+            {
+                int index = GetOpIndex(opType);
+                return index >= 0 && index < _counts.Length ? _counts[index] : 0;
+            }
         }
     }
 
