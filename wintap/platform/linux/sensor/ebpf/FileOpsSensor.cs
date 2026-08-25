@@ -22,11 +22,13 @@ namespace gov.llnl.wintap.platform.linux.collect
         private ConcurrentDictionary<int, ConcurrentDictionary<uint, string>> _fdToPath;
         private List<IntPtr> _additionalLinks;
         private readonly string? _dataRoot;
-        private readonly string? _dataRootLower;
+        private readonly string? _normalizedDataRoot;
         private readonly int _sendQueueCapacity;
         private BlockingCollection<QueuedFileEvent> _sendQueue;
         private Thread? _sendWorker;
         private int _statsMapFd = -1;
+        private readonly bool _lowercasePaths;
+        private readonly long _monotonicToRealtimeOffsetNs;
 
         private const uint FileOpOpen = 1;
         private const uint FileOpRead = 2;
@@ -50,6 +52,8 @@ namespace gov.llnl.wintap.platform.linux.collect
         private const int PathRecordFdOffset = 288;
         private const int PathRecordBytesOffset = 292;
         private const int PathRecordOpTypeOffset = 296;
+        private const int PathRecordDirFdOffset = 300;
+        private const int AtFdcwd = -100;
 
         [DllImport("libc", SetLastError = true)]
         private static extern long readlink(string path, byte[] buffer, UIntPtr bufferSize);
@@ -67,6 +71,15 @@ namespace gov.llnl.wintap.platform.linux.collect
         private long _droppedDev;
         private long _queueDrops;
         private long _queueHighWatermark;
+        private long _relativeOpenResolves;
+        private long _relativeOpenResolveMisses;
+        private long _relativeOpenResolvedViaFd;
+        private long _relativeOpenResolvedViaDirFd;
+        private long _relativeOpenResolvedViaCwd;
+        private long _relativeOpenOpenedFdLookupMisses;
+        private long _relativeOpenDirFdLookupMisses;
+        private long _relativeOpenCwdLookupMisses;
+        private long _relativeOpenUnsupportedDirFd;
         private long _nextCounterLogTickMs;
         private readonly object _measurementLock = new object();
         private readonly Dictionary<string, MeasurementAggregate> _emitByComm = new Dictionary<string, MeasurementAggregate>(StringComparer.Ordinal);
@@ -92,16 +105,18 @@ namespace gov.llnl.wintap.platform.linux.collect
             _additionalLinks = new List<IntPtr>();
             _sendQueueCapacity = GetConfiguredQueueCapacity();
             _sendQueue = new BlockingCollection<QueuedFileEvent>(new ConcurrentQueue<QueuedFileEvent>(), _sendQueueCapacity);
+            _lowercasePaths = OperatingSystem.IsWindows();
+            _monotonicToRealtimeOffsetNs = ComputeMonotonicToRealtimeOffsetNs();
 
             try
             {
                 _dataRoot = ConfigManager.GetValue<string>("WINTAP_DATA_ROOT");
-                _dataRootLower = string.IsNullOrWhiteSpace(_dataRoot) ? null : _dataRoot.Trim().ToLowerInvariant();
+                _normalizedDataRoot = NormalizeConfiguredPath(_dataRoot);
             }
             catch
             {
                 _dataRoot = null;
-                _dataRootLower = null;
+                _normalizedDataRoot = null;
             }
 
             _nextCounterLogTickMs = Environment.TickCount64 + 60_000;
@@ -189,10 +204,18 @@ namespace gov.llnl.wintap.platform.linux.collect
                 int pid = (int)ReadUInt32(data, CommonPidOffset);
                 uint fd = ReadUInt32(data, isPathRecord ? PathRecordFdOffset : FdRecordFdOffset);
                 uint bytes = ReadUInt32(data, isPathRecord ? PathRecordBytesOffset : FdRecordBytesOffset);
-                string filePath = isPathRecord ? ReadNullTerminatedString(data, PathRecordFilenameOffset, 256) : "";
+                int dirfd = isPathRecord ? ReadInt32(data, PathRecordDirFdOffset) : 0;
+                ulong timestampNs = ReadUInt64(data, isPathRecord ? PathRecordTimestampOffset : FdRecordTimestampOffset);
+                string rawFilePath = isPathRecord ? ReadNullTerminatedString(data, PathRecordFilenameOffset, 256) : "";
+                string filePath = rawFilePath;
+
+                if (isPathRecord && opType == FileOpOpen)
+                {
+                    filePath = ResolveOpenPath(pid, fd, dirfd, filePath);
+                }
                 
                 // Resolve file path for FD-based operations (read/write/close/mmap)
-                if (string.IsNullOrEmpty(filePath) && fd > 0)
+                if (string.IsNullOrEmpty(filePath))
                 {
                     filePath = opType == FileOpClose
                         ? GetCachedPathFromFd(pid, fd)
@@ -225,10 +248,9 @@ namespace gov.llnl.wintap.platform.linux.collect
 
                 // Avoid self-feedback and noise from our own data root. This can
                 // overwhelm the serializer and destroy signal quality.
-                if (!string.IsNullOrEmpty(_dataRootLower))
+                if (!string.IsNullOrEmpty(_normalizedDataRoot))
                 {
-                    // Compare on the normalized lowercase path.
-                    if (filePath.StartsWith(_dataRootLower, StringComparison.Ordinal))
+                    if (filePath.StartsWith(_normalizedDataRoot, StringComparison.Ordinal))
                     {
                         CountByOp(_userDataRootDropsByOp, opIndex);
                         MaybeLogCounters();
@@ -266,13 +288,13 @@ namespace gov.llnl.wintap.platform.linux.collect
                 };
 
                 // Store FD -> Path mapping for open operations
-                if (opType == FileOpOpen && fd > 0)
+                if (opType == FileOpOpen)
                 {
                     StoreFdPath(pid, fd, filePath);
                 }
                 
                 var message = new WintapMessage(
-                    DateTime.UtcNow,
+                    ConvertKernelTimestampToUtcDateTime(timestampNs),
                     pid,
                     WintapMessage.MessageTypeEnum.File
                 );
@@ -384,11 +406,21 @@ namespace gov.llnl.wintap.platform.linux.collect
             long dev = Interlocked.Exchange(ref _droppedDev, 0);
             long queueDrops = Interlocked.Exchange(ref _queueDrops, 0);
             long queueHighWatermark = Interlocked.Exchange(ref _queueHighWatermark, 0);
+            long relativeOpenResolves = Interlocked.Exchange(ref _relativeOpenResolves, 0);
+            long relativeOpenResolveMisses = Interlocked.Exchange(ref _relativeOpenResolveMisses, 0);
+            long relativeOpenResolvedViaFd = Interlocked.Exchange(ref _relativeOpenResolvedViaFd, 0);
+            long relativeOpenResolvedViaDirFd = Interlocked.Exchange(ref _relativeOpenResolvedViaDirFd, 0);
+            long relativeOpenResolvedViaCwd = Interlocked.Exchange(ref _relativeOpenResolvedViaCwd, 0);
+            long relativeOpenOpenedFdLookupMisses = Interlocked.Exchange(ref _relativeOpenOpenedFdLookupMisses, 0);
+            long relativeOpenDirFdLookupMisses = Interlocked.Exchange(ref _relativeOpenDirFdLookupMisses, 0);
+            long relativeOpenCwdLookupMisses = Interlocked.Exchange(ref _relativeOpenCwdLookupMisses, 0);
+            long relativeOpenUnsupportedDirFd = Interlocked.Exchange(ref _relativeOpenUnsupportedDirFd, 0);
             int queueDepth = _sendQueue.Count;
             long total = sys + proc + dev;
             string userSummary = BuildAndResetUserCounterSummary();
             string kernelSummary = BuildKernelCounterSummary();
             string measurementSummary = BuildAndResetMeasurementSummary();
+            string resolutionSummary = $"relative_open_resolved={relativeOpenResolves},relative_open_resolve_miss={relativeOpenResolveMisses},resolved_fd={relativeOpenResolvedViaFd},resolved_dirfd={relativeOpenResolvedViaDirFd},resolved_cwd={relativeOpenResolvedViaCwd},opened_fd_lookup_miss={relativeOpenOpenedFdLookupMisses},dirfd_lookup_miss={relativeOpenDirFdLookupMisses},cwd_lookup_miss={relativeOpenCwdLookupMisses},unsupported_dirfd={relativeOpenUnsupportedDirFd}";
             string queueSummary = $"depth={queueDepth},high_water={queueHighWatermark},drops={queueDrops},capacity={_sendQueueCapacity},policy=drop_newest";
 
             if (total <= 0 && queueDrops <= 0 && queueDepth <= 0 && queueHighWatermark <= 0 && string.IsNullOrEmpty(userSummary) && string.IsNullOrEmpty(kernelSummary) && string.IsNullOrEmpty(measurementSummary))
@@ -397,13 +429,23 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
 
             WintapLogger.Log.Append(
-                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} queue=[{queueSummary}] user=[{userSummary}] measure=[{measurementSummary}] kernel=[{kernelSummary}]",
+                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} queue=[{queueSummary}] user=[{userSummary}] resolve=[{resolutionSummary}] measure=[{measurementSummary}] kernel=[{kernelSummary}]",
                 LogLevel.Info);
         }
 
         private static uint ReadUInt32(IntPtr data, int offset)
         {
             return unchecked((uint)Marshal.ReadInt32(data, offset));
+        }
+
+        private static ulong ReadUInt64(IntPtr data, int offset)
+        {
+            return unchecked((ulong)Marshal.ReadInt64(data, offset));
+        }
+
+        private static int ReadInt32(IntPtr data, int offset)
+        {
+            return Marshal.ReadInt32(data, offset);
         }
 
         private static string ReadNullTerminatedString(IntPtr data, int offset, int maxBytes)
@@ -737,6 +779,115 @@ namespace gov.llnl.wintap.platform.linux.collect
             return configured > 0 ? configured : 131072;
         }
 
+        private string ResolveOpenPath(int pid, uint fd, int dirfd, string rawPath)
+        {
+            if (string.IsNullOrWhiteSpace(rawPath) || IsAbsolutePath(rawPath))
+            {
+                return rawPath;
+            }
+
+            try
+            {
+                string resolved = ReadLinkTarget($"/proc/{pid}/fd/{fd}");
+                if (!string.IsNullOrEmpty(resolved) && IsAbsolutePath(resolved))
+                {
+                    Interlocked.Increment(ref _relativeOpenResolves);
+                    Interlocked.Increment(ref _relativeOpenResolvedViaFd);
+                    return resolved;
+                }
+            }
+            catch { }
+
+            Interlocked.Increment(ref _relativeOpenOpenedFdLookupMisses);
+
+            if (dirfd == AtFdcwd)
+            {
+                if (TryResolveRelativePathAgainstBase($"/proc/{pid}/cwd", rawPath, out string resolvedFromCwd))
+                {
+                    Interlocked.Increment(ref _relativeOpenResolves);
+                    Interlocked.Increment(ref _relativeOpenResolvedViaCwd);
+                    return resolvedFromCwd;
+                }
+
+                Interlocked.Increment(ref _relativeOpenCwdLookupMisses);
+            }
+            else if (dirfd >= 0)
+            {
+                if (TryResolveRelativePathAgainstBase($"/proc/{pid}/fd/{dirfd}", rawPath, out string resolvedFromDirFd))
+                {
+                    Interlocked.Increment(ref _relativeOpenResolves);
+                    Interlocked.Increment(ref _relativeOpenResolvedViaDirFd);
+                    return resolvedFromDirFd;
+                }
+
+                Interlocked.Increment(ref _relativeOpenDirFdLookupMisses);
+            }
+            else
+            {
+                Interlocked.Increment(ref _relativeOpenUnsupportedDirFd);
+            }
+
+            Interlocked.Increment(ref _relativeOpenResolveMisses);
+            return rawPath;
+        }
+
+        private bool TryResolveRelativePathAgainstBase(string procLinkPath, string rawRelativePath, out string resolvedPath)
+        {
+            resolvedPath = string.Empty;
+            try
+            {
+                string basePath = ReadLinkTarget(procLinkPath);
+                if (string.IsNullOrEmpty(basePath) || !IsAbsolutePath(basePath))
+                {
+                    return false;
+                }
+
+                resolvedPath = Path.GetFullPath(rawRelativePath, basePath);
+                return IsAbsolutePath(resolvedPath);
+            }
+            catch
+            {
+                resolvedPath = string.Empty;
+                return false;
+            }
+        }
+
+        private string NormalizeConfiguredPath(string? path)
+        {
+            return string.IsNullOrWhiteSpace(path) ? null : NormalizeFilePath(path);
+        }
+
+        private static bool IsAbsolutePath(string path)
+        {
+            return !string.IsNullOrEmpty(path) && path[0] == '/';
+        }
+
+        private DateTime ConvertKernelTimestampToUtcDateTime(ulong timestampNs)
+        {
+            try
+            {
+                long realtimeNs = checked((long)timestampNs + _monotonicToRealtimeOffsetNs);
+                if (realtimeNs > 0)
+                {
+                    return DateTime.UnixEpoch.AddTicks(realtimeNs / 100).ToUniversalTime();
+                }
+            }
+            catch { }
+
+            return DateTime.UtcNow;
+        }
+
+        private static long ComputeMonotonicToRealtimeOffsetNs()
+        {
+            if (clock_gettime(CLOCK_REALTIME, out Timespec realtime) != 0 ||
+                clock_gettime(CLOCK_MONOTONIC, out Timespec monotonic) != 0)
+            {
+                return 0;
+            }
+
+            return realtime.ToNanoseconds() - monotonic.ToNanoseconds();
+        }
+
         private void InitializeStatsMap()
         {
             try
@@ -892,7 +1043,17 @@ namespace gov.llnl.wintap.platform.linux.collect
                 p = p.Substring(0, p.Length - deletedSuffix.Length);
             }
 
-            return p.ToLowerInvariant();
+            return _NormalizePathCase(p);
+        }
+
+        private string NormalizePathCaseInstance(string path)
+        {
+            return _lowercasePaths ? path.ToLowerInvariant() : path;
+        }
+
+        private static string _NormalizePathCase(string path)
+        {
+            return OperatingSystem.IsWindows() ? path.ToLowerInvariant() : path;
         }
 
         private void RemoveFdPath(int pid, uint fd)
@@ -961,6 +1122,24 @@ namespace gov.llnl.wintap.platform.linux.collect
             {
                 int index = GetOpIndex(opType);
                 return index >= 0 && index < _counts.Length ? _counts[index] : 0;
+            }
+        }
+
+        private const int CLOCK_REALTIME = 0;
+        private const int CLOCK_MONOTONIC = 1;
+
+        [DllImport("libc", SetLastError = true)]
+        private static extern int clock_gettime(int clkId, out Timespec tp);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Timespec
+        {
+            public long TvSec;
+            public long TvNsec;
+
+            public long ToNanoseconds()
+            {
+                return checked(TvSec * 1_000_000_000L + TvNsec);
             }
         }
     }

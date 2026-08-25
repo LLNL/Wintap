@@ -11,6 +11,7 @@
 #define FILEOPS_FORCE_WAKEUP_BYTES (2 * 1024 * 1024)
 
 #define O_DIRECTORY 00200000
+#define AT_FDCWD (-100)
 
 enum file_op_type {
     FILE_OP_OPEN = 1,
@@ -54,6 +55,7 @@ struct file_path_event {
     __u32 fd;
     __u32 bytes;
     __u32 op_type;
+    __s32 dirfd;
 };
 
 struct file_fd_event {
@@ -69,6 +71,7 @@ struct file_fd_event {
 struct openat_state {
     char filename[MAX_FILENAME_LEN];
     __u32 flags;
+    __s32 dirfd;
 };
 
 struct {
@@ -205,7 +208,7 @@ static __always_inline void emit_file_fd_event(__u32 pid, __u32 fd, __u32 bytes,
     increment_stat(emitted_key_for_op(op_type));
 }
 
-static __always_inline void emit_file_event_saved(__u32 pid, const char *filename_buf, __u32 fd, __u32 bytes, __u32 op_type)
+static __always_inline void emit_file_event_saved(__u32 pid, const char *filename_buf, __u32 fd, __u32 bytes, __u32 op_type, __s32 dirfd)
 {
     struct file_path_event *event;
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
@@ -225,11 +228,12 @@ static __always_inline void emit_file_event_saved(__u32 pid, const char *filenam
     event->fd = fd;
     event->bytes = bytes;
     event->op_type = op_type;
+    event->dirfd = dirfd;
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }
 
-static __always_inline void emit_file_event_user(__u32 pid, const char *filename, __u32 fd, __u32 bytes, __u32 op_type)
+static __always_inline void emit_file_event_user(__u32 pid, const char *filename, __u32 fd, __u32 bytes, __u32 op_type, __s32 dirfd)
 {
     struct file_path_event *event;
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
@@ -249,6 +253,7 @@ static __always_inline void emit_file_event_user(__u32 pid, const char *filename
     event->fd = fd;
     event->bytes = bytes;
     event->op_type = op_type;
+    event->dirfd = dirfd;
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }
@@ -279,6 +284,7 @@ int t_openat_ent(struct openat_args *ctx)
 
     struct openat_state st = {};
     st.flags = (__u32)ctx->flags;
+    st.dirfd = (__s32)ctx->dfd;
     if (ctx->filename)
         bpf_probe_read_user_str(st.filename, sizeof(st.filename), ctx->filename);
     else
@@ -312,6 +318,7 @@ int t_open_ent(struct open_args *ctx)
 
     struct openat_state st = {};
     st.flags = (__u32)ctx->flags;
+    st.dirfd = AT_FDCWD;
     if (ctx->filename)
         bpf_probe_read_user_str(st.filename, sizeof(st.filename), ctx->filename);
     else
@@ -350,7 +357,7 @@ int t_open_exit(struct sys_exit_args *ctx)
     if (st.flags & O_DIRECTORY)
         return 0;
 
-    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN);
+    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN, st.dirfd);
     return 0;
 }
 
@@ -378,7 +385,7 @@ int trace_openat(struct sys_exit_args *ctx)
     if (st.flags & O_DIRECTORY)
         return 0;
 
-    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN);
+    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN, st.dirfd);
     return 0;
 }
 
@@ -477,7 +484,7 @@ int t_unlinkat(struct unlinkat_args *ctx)
         return 0;
     if (should_drop_user_pseudo_path(ctx->pathname, FILE_OP_UNLINK))
         return 0;
-    emit_file_event_user(pid, ctx->pathname, 0, 0, FILE_OP_UNLINK);
+    emit_file_event_user(pid, ctx->pathname, 0, 0, FILE_OP_UNLINK, 0);
     return 0;
 }
 
@@ -496,7 +503,7 @@ int t_unlink(struct unlink_args *ctx)
         return 0;
     if (should_drop_user_pseudo_path(ctx->pathname, FILE_OP_UNLINK))
         return 0;
-    emit_file_event_user(pid, ctx->pathname, 0, 0, FILE_OP_UNLINK);
+    emit_file_event_user(pid, ctx->pathname, 0, 0, FILE_OP_UNLINK, 0);
     return 0;
 }
 
