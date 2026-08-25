@@ -305,6 +305,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
                     baseAddress = new nint(memInfo.BaseAddress.ToInt64() + memInfo.RegionSize.ToInt64());
                     wm.AgentId = StateManager.AgentId.ToString();
+                    EventChannel.InspectForHealth(wm);
                     EventChannel.EsperRuntime.EventService.SendEventBean(wm, "WintapMessage");  // call esper direct since we do not require pidhash lookup.
                 }
                 catch

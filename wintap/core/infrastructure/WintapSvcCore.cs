@@ -1,6 +1,7 @@
 ﻿using DuckDB.NET.Data;
 using gov.llnl.wintap.core.api;
 using gov.llnl.wintap.core.infrastructure;
+using gov.llnl.wintap.core.infrastructure.health;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.Properties;
 using Microsoft.Extensions.Hosting;
@@ -117,6 +118,10 @@ namespace gov.llnl.wintap
 
             try
             {
+                // Stop health monitoring first: suppresses liveness stall alarms while
+                // components shut down and flushes the final window while the log is open.
+                SensorHealthMonitor.Default.Stop();
+
                 // Record shutdown metadata in registry
                 using (var wintapKey = Registry.LocalMachine.CreateSubKey(Env.RegistryRootPath))
                 {
@@ -275,6 +280,8 @@ namespace gov.llnl.wintap
                     WintapLogger.Log.Append($"Starting {Env.AppName} sensors", LogLevel.Info);
                     subscriptionMgr = new SubscriptionManager();
                     subscriptionMgr.Start();
+                    SensorHealthMonitor.Default.Start();
+                    WintapLogger.Log.Append("Sensor health monitor started", LogLevel.Info);
                 }
                 catch (Exception ex)
                 {
