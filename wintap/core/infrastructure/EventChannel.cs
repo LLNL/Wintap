@@ -11,6 +11,7 @@ using com.espertech.esper.compiler.client;
 using com.espertech.esper.runtime.client;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.etl.load;
+using gov.llnl.wintap.core.infrastructure.health;
 using gov.llnl.wintap.core.infrastructure.helpers;
 using gov.llnl.wintap.core.shared;
 using gov.llnl.wintap.core.shared.helpers;
@@ -63,6 +64,16 @@ namespace gov.llnl.wintap.core.infrastructure
         private static readonly ConcurrentDictionary<int, byte> _loggedMissingParentPid = new ConcurrentDictionary<int, byte>();
 
         private static readonly Lazy<string> UnknownPidHash = new Lazy<string>(() => new ProcessHash().GenPidHash(-1, 0));
+
+        // Health-check egress hook (shc-02). The override is a test seam
+        // (InternalsVisibleTo "Wintap.Tests"); production always resolves to
+        // SensorHealthMonitor.Default.
+        internal static SensorHealthMonitor HealthMonitorOverride;
+
+        internal static void InspectForHealth(WintapMessage message)
+        {
+            (HealthMonitorOverride ?? SensorHealthMonitor.Default).Inspect(message);
+        }
 
 
         private static Stopwatch stopWatch;
@@ -248,6 +259,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
                 if (DirectParquetSink.IsEnabled)
                 {
+                    InspectForHealth(streamedEvent);
                     DirectParquetSink.Save(streamedEvent);
                     return;
                 }
@@ -381,6 +393,8 @@ namespace gov.llnl.wintap.core.infrastructure
                         _processResolver.RegisterProcess(streamedEvent);
                     }
                 }
+
+                InspectForHealth(streamedEvent);
 
                 if (skipEsperSend)
                 {
