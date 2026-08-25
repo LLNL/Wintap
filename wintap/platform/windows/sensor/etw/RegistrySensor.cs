@@ -5,78 +5,104 @@
  */
 
 using System;
-using System.Linq;
-using Microsoft.Diagnostics.Tracing;
 using gov.llnl.wintap.collect.models;
 using gov.llnl.wintap.core.infrastructure;
 using gov.llnl.wintap.core.shared;
-using gov.llnl.wintap.platform.windows.collect.shared;
 using gov.llnl.wintap.platform.windows.collect.etw.helpers;
-using gov.llnl.wintap.platform.windows.collect.shared.models;
+using gov.llnl.wintap.platform.windows.collect.shared;
+using Microsoft.Diagnostics.Tracing;
+using Microsoft.Diagnostics.Tracing.Session;
 
 namespace gov.llnl.wintap.platform.windows.collect.etw
 {
     /// <summary>
-    /// Registry events from user mode logger
+    /// Registry events from the manifest Microsoft-Windows-Kernel-Registry provider.
     /// </summary>
     internal class RegistrySensor : EtwProviderCollector
     {
-        private enum LastActionEnum { Create, Read, Write, Delete }
-        private LastActionEnum lastRegAction;
-        private long lastRegPath;
-        private RegistryManager regMan;
+        private const string ManifestRegistryProviderId = "70EB4F03-C1DE-4F73-A051-33D13D5413BD";
+        private static readonly Guid ManifestRegistryProviderGuid = new Guid(ManifestRegistryProviderId);
 
-        public RegistrySensor() : base()
+        private readonly Action<WintapMessage> emit;
+        private readonly Func<bool> collectRegistryRead;
+        private readonly ulong keywordMask;
+        private RegistryCaptureEnabler captureEnabler;
+        private RegistryCaptureCanary captureCanary;
+        private long canarySequence;
+
+        internal static readonly TimeSpan ReassertInterval = TimeSpan.FromMinutes(5);
+
+        public RegistrySensor() : this(null, null)
+        {
+        }
+
+        /// <summary>
+        /// Test seams for emission and the CollectRegistryRead setting.
+        /// </summary>
+        internal RegistrySensor(Action<WintapMessage> emit, Func<bool> collectRegistryRead)
         {
             SensorName = "Registry";
-            EtwProviderId = "70EB4F03-C1DE-4F73-A051-33D13D5413BD";
-            regMan = new RegistryManager();
+            EtwProviderId = ManifestRegistryProviderId;
+            this.emit = emit ?? EventChannel.Send;
+            this.collectRegistryRead = collectRegistryRead
+                ?? (() => Properties.Settings.Default.CollectRegistryRead);
+            keywordMask = SelectKeywordMask(this.collectRegistryRead());
+            TraceEventFlags = keywordMask;
+            EventLevel = TraceEventLevel.Verbose;
         }
 
         public override void Process_Event(TraceEvent obj)
         {
             base.Process_Event(obj);
+            if (obj == null || obj.ProviderGuid != ManifestRegistryProviderGuid)
+            {
+                return;
+            }
+
+            Counter++;
             try
             {
-                switch (obj.ProviderName)
+                switch (RegistryPayloadDecoder.KindFromEventId((int)obj.ID))
                 {
-                    case "Microsoft-Windows-Kernel-Registry":
-                        if (obj.OpcodeName == "OpenKey")
-                        {
-                            parseRegOpenKey(obj);
-                        }
-                        else if (obj.OpcodeName == "CreateKey")
-                        {
-                            parseRegCreateKey(obj);
-                        }
-                        else if (obj.OpcodeName == "DeleteKey")
-                        {
-                            parseRegDeleteKey(obj);
-                        }
-                        else if (obj.OpcodeName == "SetValueKey")
-                        {
-                            parseRegSetValue(obj);
-                        }
-                        else if (obj.OpcodeName == "QueryValueKey")
-                        {
-                            if (Properties.Settings.Default.CollectRegistryRead)
-                            {
-                                parseReadValue(obj);
-                            }
-                        }
-                        else if (obj.OpcodeName == "DeleteValueKey")
-                        {
-                            parseRegDeleteValueKey(obj);
-                        }
-                        else if (obj.OpcodeName == "CloseKey")
-                        {
-                            parseRegClose(obj);
-                        }
+                    case RegistryEventKind.CreateKey:
+                        HandleCreateKey(
+                            obj.TimeStamp,
+                            obj.ProcessID,
+                            PayloadString(obj, "BaseName"),
+                            PayloadString(obj, "RelativeName"));
                         break;
-                    default:
+                    case RegistryEventKind.DeleteKey:
+                        HandleDeleteKey(obj.TimeStamp, obj.ProcessID, PayloadString(obj, "KeyName"));
+                        break;
+                    case RegistryEventKind.SetValueKey:
+                        HandleSetValue(
+                            obj.TimeStamp,
+                            obj.ProcessID,
+                            PayloadString(obj, "KeyName"),
+                            PayloadString(obj, "ValueName"),
+                            PayloadInt32(obj, "Type"),
+                            PayloadBytes(obj, "CapturedData"),
+                            PayloadInt32(obj, "PreviousDataType"),
+                            PayloadBytes(obj, "PreviousData"));
+                        break;
+                    case RegistryEventKind.DeleteValueKey:
+                        HandleDeleteValue(
+                            obj.TimeStamp,
+                            obj.ProcessID,
+                            PayloadString(obj, "KeyName"),
+                            PayloadString(obj, "ValueName"));
+                        break;
+                    case RegistryEventKind.QueryValueKey:
+                        if (collectRegistryRead())
+                        {
+                            HandleQueryValue(
+                                obj.TimeStamp,
+                                obj.ProcessID,
+                                PayloadString(obj, "KeyName"),
+                                PayloadString(obj, "ValueName"));
+                        }
                         break;
                 }
-                obj = null;
             }
             catch (Exception ex)
             {
@@ -84,205 +110,259 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
 
-        private void parseRegCreateKey(TraceEvent obj)
+        protected override void OnEtwSessionStarted(TraceEventSession session)
         {
-            RegKeyEvent createKeyEvent = new RegKeyEvent(obj);
-            // if a partial path, attempt to get its basepath and restamp with the full path.
-            if (!createKeyEvent.Path.ToString().StartsWith(@"registry"))
-            {
-                if (regMan.RegParents.Keys.Contains(createKeyEvent.BaseObject))
-                {
-                    createKeyEvent.FixPath(obj, regMan.RegParents);
-                }
-            }
-            // register this path lineage with the parent list
-            if (regMan.RegParents.Keys.Contains(createKeyEvent.KeyObject))
-            {
-                regMan.RegParents[createKeyEvent.KeyObject] = createKeyEvent.Path.ToString();
-            }
-            else
-            {
-                regMan.RegParents.Add(createKeyEvent.KeyObject, createKeyEvent.Path.ToString());
-            }
-            sendRegEventToEsper("CreateKey", createKeyEvent.Path.ToString(), "", "", "", createKeyEvent.PID, obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp);
-            createKeyEvent = null;
+            captureEnabler = new RegistryCaptureEnabler(
+                session,
+                ManifestRegistryProviderGuid,
+                keywordMask);
+            captureEnabler.EnableCapture();
+            captureEnabler.StartReassertTimer(ReassertInterval);
+
+            captureCanary = new RegistryCaptureCanary(
+                WriteCaptureCanary,
+                StateManager.WintapPID,
+                captureEnabler.NotifyCaptureLossSuspected);
+            captureCanary.Start();
         }
 
-        private void parseRegOpenKey(TraceEvent obj)
+        public override void Stop()
         {
-            string dted = obj.ToString();
-            if (dted.ToString().Contains("KeyObject=\"0\""))
+            captureCanary?.Stop();
+            captureCanary?.Dispose();
+            captureCanary = null;
+            captureEnabler?.StopReassertTimer();
+            captureEnabler?.Dispose();
+            captureEnabler = null;
+            base.Stop();
+        }
+
+        internal void HandleCreateKey(DateTime timestamp, int pid, string baseName, string relativeName)
+        {
+            EmitNoData(timestamp, pid, WintapMessage.ActivityTypeEnum.CreateKey,
+                AssembleCreateKeyPath(baseName, relativeName), string.Empty);
+        }
+
+        internal void HandleDeleteKey(DateTime timestamp, int pid, string keyName)
+        {
+            EmitNoData(timestamp, pid, WintapMessage.ActivityTypeEnum.DeleteKey,
+                NormalizeKeyPath(keyName), string.Empty);
+        }
+
+        internal void HandleDeleteValue(
+            DateTime timestamp,
+            int pid,
+            string keyName,
+            string valueName)
+        {
+            EmitNoData(timestamp, pid, WintapMessage.ActivityTypeEnum.DeleteValue,
+                NormalizeKeyPath(keyName), valueName ?? string.Empty);
+        }
+
+        internal void HandleSetValue(
+            DateTime timestamp,
+            int pid,
+            string keyName,
+            string valueName,
+            int type,
+            byte[] capturedData,
+            int previousDataType,
+            byte[] previousData)
+        {
+            if (captureCanary?.Observe(pid, valueName, keyName) == true)
             {
                 return;
             }
-            RegKeyEvent createKeyEvent = new RegKeyEvent(obj);
-            // if a partial path, attempt to get its basepath and restamp with the full path.
-            if (!createKeyEvent.Path.ToString().StartsWith("registry"))
+
+            string path = NormalizeKeyPath(keyName);
+            if (!IsQualifiedRegistry(path))
             {
-                if (regMan.RegParents.Keys.Contains(createKeyEvent.BaseObject))
-                {
-                    createKeyEvent.FixPath(obj, regMan.RegParents);
-                }
+                return;
             }
-            // register this path lineage with the parent list
-            if (regMan.RegParents.Keys.Contains(createKeyEvent.KeyObject))
+
+            var message = CreateMessage(
+                timestamp,
+                pid,
+                WintapMessage.ActivityTypeEnum.Write,
+                path,
+                valueName ?? string.Empty);
+            message.Registry.Data = RegistryPayloadDecoder.DecodeRegValue(type, capturedData ?? Array.Empty<byte>());
+            message.Registry.DataType = MapDataType(type);
+            message.Registry.PreviousData = RegistryPayloadDecoder.DecodeRegValue(
+                previousDataType,
+                previousData ?? Array.Empty<byte>());
+            message.Registry.PreviousDataType = MapDataType(previousDataType);
+            emit(message);
+        }
+
+        internal void HandleQueryValue(DateTime timestamp, int pid, string keyName, string valueName)
+        {
+            EmitNoData(timestamp, pid, WintapMessage.ActivityTypeEnum.Read,
+                NormalizeKeyPath(keyName), valueName ?? string.Empty);
+        }
+
+        internal bool ShouldCollectRegistryRead()
+        {
+            return collectRegistryRead();
+        }
+
+        // FINAL (Architect 2026-08-25; probe8 PASS — see the ADR addendum).
+        internal static ulong SelectKeywordMask(bool collectRegistryRead)
+        {
+            return collectRegistryRead
+                ? RegistryCaptureEnabler.ReadKeywordMask
+                : RegistryCaptureEnabler.DefaultKeywordMask;
+        }
+
+        internal static string NormalizeKeyPath(string kernelPath)
+        {
+            if (string.IsNullOrWhiteSpace(kernelPath))
             {
-                regMan.RegParents[createKeyEvent.KeyObject] = createKeyEvent.Path.ToString();
+                return string.Empty;
+            }
+
+            return kernelPath.TrimStart('\\').ToLowerInvariant();
+        }
+
+        internal static string AssembleCreateKeyPath(string baseName, string relativeName)
+        {
+            string candidate;
+            if (!string.IsNullOrEmpty(relativeName) && relativeName.StartsWith("\\", StringComparison.Ordinal))
+            {
+                candidate = relativeName;
+            }
+            else if (!string.IsNullOrEmpty(baseName))
+            {
+                string normalizedBase = baseName.TrimEnd('\\');
+                string normalizedRelative = (relativeName ?? string.Empty).TrimStart('\\');
+                candidate = normalizedRelative.Length == 0
+                    ? normalizedBase
+                    : normalizedBase + "\\" + normalizedRelative;
             }
             else
             {
-                regMan.RegParents.Add(createKeyEvent.KeyObject, createKeyEvent.Path.ToString());
+                return string.Empty;
             }
-            createKeyEvent = null;
+
+            return NormalizeKeyPath(candidate);
         }
 
-        private void parseRegDeleteKey(TraceEvent obj)
+        internal static WintapMessage.DataTypeEnum MapDataType(int nativeType)
         {
-            RegDeleteKeyEvent regDelete = new RegDeleteKeyEvent(obj);
-            string regKey = regMan.RegParents[regDelete.BaseObject];
-            sendRegEventToEsper("DeleteKey", regKey, "", "", "", regDelete.PID, obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp);
+            switch (nativeType)
+            {
+                case 1:
+                    return WintapMessage.DataTypeEnum.STRING;
+                case 2:
+                    return WintapMessage.DataTypeEnum.EXPAND_SZ;
+                case 3:
+                    return WintapMessage.DataTypeEnum.BINARY;
+                case 4:
+                    return WintapMessage.DataTypeEnum.DWORD;
+                case 7:
+                    return WintapMessage.DataTypeEnum.MULTI_SZ;
+                case 11:
+                    return WintapMessage.DataTypeEnum.QWORD;
+                default:
+                    return WintapMessage.DataTypeEnum.NONE;
+            }
         }
 
-        private void parseRegDeleteValueKey(TraceEvent obj)
+        private void EmitNoData(
+            DateTime timestamp,
+            int pid,
+            WintapMessage.ActivityTypeEnum activityType,
+            string path,
+            string valueName)
         {
-            RegDeleteValueEvent regDeleteVal = new RegDeleteValueEvent(obj);
-            string regKey = regMan.RegParents[regDeleteVal.BaseObject];
-            sendRegEventToEsper("DeleteValue", regKey, regDeleteVal.ValueName, "", "", regDeleteVal.PID, obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp);
+            if (!IsQualifiedRegistry(path))
+            {
+                return;
+            }
+
+            WintapMessage message = CreateMessage(timestamp, pid, activityType, path, valueName);
+            message.Registry.Data = string.Empty;
+            message.Registry.DataType = WintapMessage.DataTypeEnum.NONE;
+            message.Registry.PreviousData = string.Empty;
+            message.Registry.PreviousDataType = WintapMessage.DataTypeEnum.NONE;
+            emit(message);
         }
 
-        private void parseRegSetValue(TraceEvent obj)
+        private static WintapMessage CreateMessage(
+            DateTime timestamp,
+            int pid,
+            WintapMessage.ActivityTypeEnum activityType,
+            string path,
+            string valueName)
+        {
+            return new WintapMessage(timestamp, pid, WintapMessage.MessageTypeEnum.Registry)
+            {
+                ActivityType = activityType,
+                Registry = new WintapMessage.RegActivityObject
+                {
+                    Path = path,
+                    ValueName = valueName,
+                    Data = string.Empty,
+                    DataType = WintapMessage.DataTypeEnum.NONE,
+                    PreviousData = string.Empty,
+                    PreviousDataType = WintapMessage.DataTypeEnum.NONE
+                }
+            };
+        }
+
+        private static bool IsQualifiedRegistry(string path)
+        {
+            return path == "registry"
+                || (path != null && path.StartsWith("registry\\", StringComparison.Ordinal));
+        }
+
+        private static string PayloadString(TraceEvent obj, string name)
         {
             try
             {
-                RegSetValueEvent setVal = new RegSetValueEvent(obj);
-                if (regMan.RegParents.Keys.Contains(setVal.Handle))
-                {
-                    RegistryEvent reg = new RegistryEvent(obj);
-                    string regPath = regMan.RegParents[setVal.Handle];
-                    reg.Path = regMan.RegParents[setVal.Handle];
-                    if (reg.Path.StartsWith("registry"))
-                    {
-                        reg.PID = setVal.PID;
-                        reg.ValueName = setVal.Name;
-                        reg = reg.GetData();
-                        if (regMan.RegValueCache.ContainsKey(reg.Path + "-" + reg.ValueName))
-                        {
-                            regMan.RegValueCache[reg.Path + "-" + reg.ValueName] = reg.Data;
-                        }
-                        else
-                        {
-                            regMan.RegValueCache.Add(reg.Path + "-" + reg.ValueName, reg.Data);
-                        }
-                        sendRegEventToEsper("Write", reg.Path.ToString(), reg.ValueName, reg.Data, reg.DataType.ToString(), reg.PID, obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp);
-                    }
-                }
-                else
-                {
-                    WintapLogger.Log.Append("reg path not found for value name: " + setVal.Name, LogLevel.Debug);
-                }
+                return obj.PayloadByName(name) as string ?? string.Empty;
             }
-            catch (Exception ex)
+            catch
             {
-                WintapLogger.Log.Append("error in SetValueKey: " + ex.Message, LogLevel.Debug);
+                return string.Empty;
             }
         }
 
-        private void parseReadValue(TraceEvent obj)
+        private static byte[] PayloadBytes(TraceEvent obj, string name)
         {
-            ulong keyObject = (ulong)obj.PayloadByName("KeyObject");
-            if (regMan.RegParents.Keys.Contains(keyObject))
+            try
             {
-                RegistryEvent reg = new RegistryEvent(obj);
-                reg.Path = regMan.RegParents[keyObject];
-                if (reg.Path.StartsWith("registry"))
-                {
-                    reg.ValueName = obj.PayloadByName("ValueName").ToString();
-                    if (regMan.RegValueCache.ContainsKey(reg.Path + "-" + reg.ValueName))
-                    {
-                        reg.Data = regMan.RegValueCache[reg.Path + "-" + reg.ValueName];
-                    }
-                    else
-                    {
-                        reg = reg.GetData();
-                        regMan.RegValueCache.Add(reg.Path + "-" + reg.ValueName, reg.Data);
-                    }
-                    reg.EventTime = obj.TimeStamp;
-                    sendRegEventToEsper("Read", reg.Path.ToString(), reg.ValueName, reg.Data, reg.DataType.ToString(), reg.PID, reg.EventTime.ToFileTimeUtc(), obj.TimeStamp.ToFileTimeUtc(), obj.TimeStamp);
-                }
+                return obj.PayloadByName(name) as byte[] ?? Array.Empty<byte>();
             }
-            else
+            catch
             {
-                WintapLogger.Log.Append("reg path not found for value name: " + obj.PayloadByName("ValueName").ToString(), LogLevel.Debug);
+                return Array.Empty<byte>();
             }
         }
 
-        private void parseRegClose(TraceEvent obj)
+        private static int PayloadInt32(TraceEvent obj, string name)
         {
-            RegCloseEvent regClose = new RegCloseEvent(obj);
-            regMan.RegParents.Remove(regClose.BaseObject);
+            try
+            {
+                object value = obj.PayloadByName(name);
+                return value == null ? 0 : Convert.ToInt32(value);
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
-        // 
-        //bool duplicateReg(string regPath, DateTime eventTime, LastActionEnum lastAction)
-        //{
-        //    bool isDup = false;
-        //    try
-        //    {
-        //        if (lastRegPath == 0)
-        //        {
-        //            lastRegPath = regPath.Length;
-        //            lastRegAction = lastAction;
-        //        }
-        //        else if (lastRegPath.ToString() == regPath && lastRegAction == lastAction && DateTime.Now.Subtract(eventTime) < new TimeSpan(0, 0, 0, 0, 500))
-        //        {
-        //            isDup = true;
-        //        }
-        //        else
-        //        {
-        //            lastRegPath = regPath.Length;
-        //            lastRegAction = lastAction;
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //    }
-        //    return isDup;
-        //}
-
-        private void sendRegEventToEsper(string activityType, string path, string value, string data, string dataType, int pid, long eventTime, long eventTimeMS, DateTime eventTimeDT)
+        private void WriteCaptureCanary()
         {
-
-            WintapMessage msg = new WintapMessage(eventTimeDT, pid, WintapMessage.MessageTypeEnum.Registry);
-            msg.Registry = new WintapMessage.RegActivityObject();
-            msg.Registry.Path = path;
-            msg.Registry.ValueName = value;
-            msg.Registry.Data = data;
-
-            if (Enum.TryParse(activityType, true, out WintapMessage.ActivityTypeEnum parsedActivityType))
-            {
-                msg.ActivityType = parsedActivityType;
-            }
-            else
-            {
-                // Handle the case where the dataType string does not match any enum value
-                // You can set a default value or throw an exception
-                throw new ArgumentException($"Invalid registry activity type: {dataType}");
-            }
-
-            // Parse the dataType string to the DataTypeEnum
-            if (Enum.TryParse(dataType, true, out WintapMessage.DataTypeEnum parsedDataType))
-            {
-                msg.Registry.DataType = parsedDataType;
-            }
-            else
-            {
-                // Handle the case where the dataType string does not match any enum value
-                // You can set a default value or throw an exception
-                throw new ArgumentException($"Invalid registry data type: {dataType}");
-            }
-
-
-            EventChannel.Send(msg);
+            long sequence = System.Threading.Interlocked.Increment(ref canarySequence);
+            string keyPath = @"HKEY_LOCAL_MACHINE\" + Env.RegistryCollectorPath + "\\" + SensorName;
+            string payload = sequence + "|" + DateTime.UtcNow.Ticks;
+            Microsoft.Win32.Registry.SetValue(
+                keyPath,
+                RegistryCaptureCanary.CanaryValueName,
+                payload,
+                Microsoft.Win32.RegistryValueKind.String);
         }
     }
 }
