@@ -385,7 +385,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             return args.Trim();
         }
 
-        private string fromNative(string originalPath, List<DiskVolume> diskVolumes)
+        internal string fromNative(string originalPath, List<DiskVolume> diskVolumes)
         {
             string newPath = "";
             originalPath = originalPath.Replace("\"", "");
@@ -393,27 +393,15 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
             try
             {
 
-                if (volumeNumber <= diskVolumes.Count)
+                var diskInfo = from disk in diskVolumes where disk.VolumeNumber == volumeNumber select disk;
+                DiskVolume dv = diskInfo.FirstOrDefault();
+                if (dv != null)
                 {
-                    var diskInfo = from disk in diskVolumes where disk.VolumeNumber == volumeNumber select disk;
-                    DiskVolume dv = diskInfo.FirstOrDefault();
-                    if (dv != null)
-                    {
-                        if (diskVolumes.Count() == 1 && originalPath.StartsWith("\\device\\harddiskvolume1"))
-                        {
-                            dv.VolumeNumber = 1;
-                        }
-                        newPath = originalPath.Replace(nativePrefix + dv.VolumeNumber, dv.VolumeLetter + ":");
-                    }
-                    else
-                    {
-                        WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}, hardcoding drive assignment to C:", LogLevel.Always);
-                        newPath = originalPath.Replace(nativePrefix + volumeNumber, "c:");
-                    }
+                    newPath = originalPath.Replace(nativePrefix + dv.VolumeNumber, dv.VolumeLetter + ":");
                 }
                 else
                 {
-                    // is a volume number outside the range of DiskVolume always c: ?  -  we assume so here
+                    WintapLogger.Log.Append($"Got null DiskVolume on fromNative path conversion, original path: {originalPath}, hardcoding drive assignment to C:", LogLevel.Always);
                     newPath = originalPath.Replace(nativePrefix + volumeNumber, "c:");
                 }
             }

@@ -3,15 +3,19 @@ using gov.llnl.wintap.core.shared;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace gov.llnl.wintap.platform.windows.infrastructure
 {
     internal static class WindowsStateManager
     {
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool QueryDosDevice(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
+
         internal static DateTime GetLastBootTime()
         {
             DateTime lastBoot = DateTime.MinValue;
@@ -32,42 +36,80 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             return lastBoot;
         }
 
+        /// <summary>
+        /// Maps logical drive letters to NT HarddiskVolume numbers using
+        /// QueryDosDevice (no elevation, no child process). Never throws.
+        /// </summary>
         internal static List<DiskVolume> RefreshDriveMap()
         {
             List<DiskVolume> driveMap = new List<DiskVolume>();
-            string script = Path.Combine(Path.GetTempPath(), "wintap_diskgather.txt");
-            System.IO.File.WriteAllText(script, "list volume");
-            Process diskPart = new Process();
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = Path.Combine(Environment.SystemDirectory, "diskpart.exe");
-            psi.Arguments = "/S " + script;
-            psi.UseShellExecute = false;
-            psi.RedirectStandardOutput = true;
-            diskPart.StartInfo = psi;
-            //WintapLogger.Log.Append("getting disk volumes with command: " + diskPart.StartInfo.FileName + " " + diskPart.StartInfo.Arguments, LogLevel.Info);
-            diskPart.Start();
-            string diskConfig = diskPart.StandardOutput.ReadToEnd();
-            //WintapLogger.Log.Append("drive volumes: " + diskConfig, LogLevel.Info);
-            string[] configLines = diskConfig.Split(new char[] { '\r' });
-            diskPart.WaitForExit();
-            foreach (string line in configLines)
+            try
             {
-                string[] lineArray = line.Split(new char[] { ' ' });
+                driveMap = BuildDriveMap(QueryDosDeviceTarget);
+                WintapLogger.Log.Append("drive map refreshed via QueryDosDevice, mappings found: " + driveMap.Count, LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
                 try
                 {
-                    DiskVolume dv = new DiskVolume();
-                    dv.VolumeNumber = Convert.ToInt32(lineArray[3].ToString());
-                    dv.VolumeLetter = Convert.ToChar(lineArray[8].ToString().ToLower());
-                    driveMap.Add(dv);
-                    //WintapLogger.Log.Append("drive mapping: " + dv.VolumeNumber + ": " + dv.VolumeLetter, LogLevel.Info);
+                    WintapLogger.Log.Append("WARN: error refreshing drive map via QueryDosDevice: " + ex.Message, LogLevel.Info);
                 }
-                catch (Exception ex) { }
-            }
-            if (driveMap.Count == 0)
-            {
-                //WintapLogger.Log.Append("ERROR:  No drive map found! ", LogLevel.Info);
+                catch { }
             }
             return driveMap;
+        }
+
+        /// <summary>
+        /// Pure mapping logic. The delegate receives uppercase drive letters.
+        /// Failures are isolated per letter.
+        /// </summary>
+        internal static List<DiskVolume> BuildDriveMap(Func<char, string> deviceNameForDrive)
+        {
+            List<DiskVolume> driveMap = new List<DiskVolume>();
+            for (char letter = 'A'; letter <= 'Z'; letter++)
+            {
+                try
+                {
+                    string deviceName = deviceNameForDrive(letter);
+                    if (TryParseHarddiskVolumeNumber(deviceName, out int volumeNumber))
+                    {
+                        DiskVolume dv = new DiskVolume();
+                        dv.VolumeNumber = volumeNumber;
+                        dv.VolumeLetter = char.ToLowerInvariant(letter);
+                        driveMap.Add(dv);
+                    }
+                }
+                catch (Exception) { }
+            }
+            return driveMap;
+        }
+
+        /// <summary>
+        /// Parses an exact NT device name of the form \Device\HarddiskVolumeN.
+        /// </summary>
+        internal static bool TryParseHarddiskVolumeNumber(string deviceName, out int volumeNumber)
+        {
+            const string prefix = @"\Device\HarddiskVolume";
+            volumeNumber = 0;
+            if (string.IsNullOrWhiteSpace(deviceName) || !deviceName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string remainder = deviceName.Substring(prefix.Length);
+            return remainder.Length > 0
+                && int.TryParse(remainder, NumberStyles.None, CultureInfo.InvariantCulture, out volumeNumber)
+                && volumeNumber >= 0;
+        }
+
+        private static string QueryDosDeviceTarget(char driveLetter)
+        {
+            StringBuilder target = new StringBuilder(1024);
+            if (!QueryDosDevice(driveLetter + ":", target, target.Capacity))
+            {
+                return null;
+            }
+            return target.ToString();
         }
 
         internal static bool RefreshBatteryState()
