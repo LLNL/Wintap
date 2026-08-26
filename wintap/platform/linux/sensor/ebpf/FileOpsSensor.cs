@@ -36,7 +36,10 @@ namespace gov.llnl.wintap.platform.linux.collect
         private const uint FileOpClose = 4;
         private const uint FileOpMmap = 5;
         private const uint FileOpUnlink = 6;
-        private const int OpSlots = 7;
+        // Directory-handle open: internal record that feeds the dir-identity
+        // index; never becomes a WintapMessage.
+        private const uint FileOpDirOpen = 7;
+        private const int OpSlots = 8;
 
         private const uint FileRecordPath = 1;
         private const uint FileRecordFd = 2;
@@ -53,6 +56,12 @@ namespace gov.llnl.wintap.platform.linux.collect
         private const int PathRecordBytesOffset = 292;
         private const int PathRecordOpTypeOffset = 296;
         private const int PathRecordDirFdOffset = 300;
+        private const int PathRecordFileInoOffset = 304;
+        private const int PathRecordDirInoOffset = 312;
+        private const int PathRecordFileDevOffset = 320;
+        private const int PathRecordDirDevOffset = 324;
+        private const int FdRecordFileInoOffset = 48;
+        private const int FdRecordFileDevOffset = 56;
         private const int AtFdcwd = -100;
 
         [DllImport("libc", SetLastError = true)]
@@ -80,6 +89,22 @@ namespace gov.llnl.wintap.platform.linux.collect
         private long _relativeOpenDirFdLookupMisses;
         private long _relativeOpenCwdLookupMisses;
         private long _relativeOpenUnsupportedDirFd;
+        private long _relativeOpenResolvedViaDirIndex;
+        private long _relativeOpenDirIndexMisses;
+        private long _relativeOpenMissProducerDead;
+        private long _relativeOpenMissProducerAlive;
+        private long _dirOpenConsumed;
+        private long _dirOpenIndexed;
+        private long _dirOpenUnresolved;
+        private long _dirIndexEvictions;
+
+        // Global directory-identity index: (s_dev, i_ino) -> absolute dir path,
+        // learned from DIR_OPEN records. Identity-keyed (never (pid, fd)) so it
+        // survives fd close and producer exit, and is shared across processes.
+        // FIFO-bounded; directory cardinality is small relative to file events.
+        private const int MaxDirIndexEntries = 16384;
+        private readonly ConcurrentDictionary<(uint Dev, ulong Ino), string> _dirIdentityIndex = new();
+        private readonly ConcurrentQueue<(uint Dev, ulong Ino)> _dirIndexInsertOrder = new();
         private long _nextCounterLogTickMs;
         private readonly object _measurementLock = new object();
         private readonly Dictionary<string, MeasurementAggregate> _emitByComm = new Dictionary<string, MeasurementAggregate>(StringComparer.Ordinal);
@@ -206,12 +231,25 @@ namespace gov.llnl.wintap.platform.linux.collect
                 uint bytes = ReadUInt32(data, isPathRecord ? PathRecordBytesOffset : FdRecordBytesOffset);
                 int dirfd = isPathRecord ? ReadInt32(data, PathRecordDirFdOffset) : 0;
                 ulong timestampNs = ReadUInt64(data, isPathRecord ? PathRecordTimestampOffset : FdRecordTimestampOffset);
+                uint fileDev = ReadUInt32(data, isPathRecord ? PathRecordFileDevOffset : FdRecordFileDevOffset);
+                ulong fileIno = ReadUInt64(data, isPathRecord ? PathRecordFileInoOffset : FdRecordFileInoOffset);
+                uint dirDev = isPathRecord ? ReadUInt32(data, PathRecordDirDevOffset) : 0;
+                ulong dirIno = isPathRecord ? ReadUInt64(data, PathRecordDirInoOffset) : 0;
                 string rawFilePath = isPathRecord ? ReadNullTerminatedString(data, PathRecordFilenameOffset, 256) : "";
                 string filePath = rawFilePath;
 
+                // Directory-handle opens are internal: they teach the
+                // dir-identity index and never become WintapMessages.
+                if (isPathRecord && opType == FileOpDirOpen)
+                {
+                    HandleDirOpenRecord(pid, fd, dirfd, rawFilePath, fileDev, fileIno, dirDev, dirIno);
+                    MaybeLogCounters();
+                    return 0;
+                }
+
                 if (isPathRecord && opType == FileOpOpen)
                 {
-                    filePath = ResolveOpenPath(pid, fd, dirfd, filePath);
+                    filePath = ResolveOpenPath(pid, fd, dirfd, dirDev, dirIno, filePath);
                 }
                 
                 // Resolve file path for FD-based operations (read/write/close/mmap)
@@ -420,7 +458,15 @@ namespace gov.llnl.wintap.platform.linux.collect
             string userSummary = BuildAndResetUserCounterSummary();
             string kernelSummary = BuildKernelCounterSummary();
             string measurementSummary = BuildAndResetMeasurementSummary();
-            string resolutionSummary = $"relative_open_resolved={relativeOpenResolves},relative_open_resolve_miss={relativeOpenResolveMisses},resolved_fd={relativeOpenResolvedViaFd},resolved_dirfd={relativeOpenResolvedViaDirFd},resolved_cwd={relativeOpenResolvedViaCwd},opened_fd_lookup_miss={relativeOpenOpenedFdLookupMisses},dirfd_lookup_miss={relativeOpenDirFdLookupMisses},cwd_lookup_miss={relativeOpenCwdLookupMisses},unsupported_dirfd={relativeOpenUnsupportedDirFd}";
+            long relativeOpenResolvedViaDirIndex = Interlocked.Exchange(ref _relativeOpenResolvedViaDirIndex, 0);
+            long relativeOpenDirIndexMisses = Interlocked.Exchange(ref _relativeOpenDirIndexMisses, 0);
+            long relativeOpenMissProducerDead = Interlocked.Exchange(ref _relativeOpenMissProducerDead, 0);
+            long relativeOpenMissProducerAlive = Interlocked.Exchange(ref _relativeOpenMissProducerAlive, 0);
+            long dirOpenConsumed = Interlocked.Exchange(ref _dirOpenConsumed, 0);
+            long dirOpenIndexed = Interlocked.Exchange(ref _dirOpenIndexed, 0);
+            long dirOpenUnresolved = Interlocked.Exchange(ref _dirOpenUnresolved, 0);
+            long dirIndexEvictions = Interlocked.Exchange(ref _dirIndexEvictions, 0);
+            string resolutionSummary = $"relative_open_resolved={relativeOpenResolves},relative_open_resolve_miss={relativeOpenResolveMisses},resolved_fd={relativeOpenResolvedViaFd},resolved_dir_index={relativeOpenResolvedViaDirIndex},resolved_dirfd={relativeOpenResolvedViaDirFd},resolved_cwd={relativeOpenResolvedViaCwd},opened_fd_lookup_miss={relativeOpenOpenedFdLookupMisses},dir_index_miss={relativeOpenDirIndexMisses},dirfd_lookup_miss={relativeOpenDirFdLookupMisses},cwd_lookup_miss={relativeOpenCwdLookupMisses},unsupported_dirfd={relativeOpenUnsupportedDirFd},miss_producer_dead={relativeOpenMissProducerDead},miss_producer_alive={relativeOpenMissProducerAlive},dir_open_consumed={dirOpenConsumed},dir_open_indexed={dirOpenIndexed},dir_open_unresolved={dirOpenUnresolved},dir_index_size={_dirIdentityIndex.Count},dir_index_evictions={dirIndexEvictions}";
             string queueSummary = $"depth={queueDepth},high_water={queueHighWatermark},drops={queueDrops},capacity={_sendQueueCapacity},policy=drop_newest";
 
             if (total <= 0 && queueDrops <= 0 && queueDepth <= 0 && queueHighWatermark <= 0 && string.IsNullOrEmpty(userSummary) && string.IsNullOrEmpty(kernelSummary) && string.IsNullOrEmpty(measurementSummary))
@@ -475,6 +521,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                 4 => "close",
                 5 => "mmap",
                 6 => "unlink",
+                7 => "dir_open",
                 _ => "other",
             };
         }
@@ -779,7 +826,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             return configured > 0 ? configured : 131072;
         }
 
-        private string ResolveOpenPath(int pid, uint fd, int dirfd, string rawPath)
+        private string ResolveOpenPath(int pid, uint fd, int dirfd, uint dirDev, ulong dirIno, string rawPath)
         {
             if (string.IsNullOrWhiteSpace(rawPath) || IsAbsolutePath(rawPath))
             {
@@ -799,6 +846,31 @@ namespace gov.llnl.wintap.platform.linux.collect
             catch { }
 
             Interlocked.Increment(ref _relativeOpenOpenedFdLookupMisses);
+
+            // Race-free step: base-directory identity captured in-kernel at
+            // event time, resolved against the learned dir index. Works even
+            // after the producer has exited.
+            if (dirDev != 0 || dirIno != 0)
+            {
+                if (_dirIdentityIndex.TryGetValue((dirDev, dirIno), out string dirBasePath))
+                {
+                    try
+                    {
+                        string joined = Path.GetFullPath(rawPath, dirBasePath);
+                        if (IsAbsolutePath(joined))
+                        {
+                            Interlocked.Increment(ref _relativeOpenResolves);
+                            Interlocked.Increment(ref _relativeOpenResolvedViaDirIndex);
+                            return joined;
+                        }
+                    }
+                    catch { }
+                }
+                else
+                {
+                    Interlocked.Increment(ref _relativeOpenDirIndexMisses);
+                }
+            }
 
             if (dirfd == AtFdcwd)
             {
@@ -828,7 +900,106 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
 
             Interlocked.Increment(ref _relativeOpenResolveMisses);
+
+            // fop-13a miss-cause split: distinguish producer-dead (nothing in
+            // /proc can ever work) from producer-alive (fds closed early).
+            try
+            {
+                if (Directory.Exists($"/proc/{pid}"))
+                {
+                    Interlocked.Increment(ref _relativeOpenMissProducerAlive);
+                }
+                else
+                {
+                    Interlocked.Increment(ref _relativeOpenMissProducerDead);
+                }
+            }
+            catch { }
+
             return rawPath;
+        }
+
+        private void HandleDirOpenRecord(int pid, uint fd, int dirfd, string rawPath, uint dev, ulong ino, uint baseDev, ulong baseIno)
+        {
+            Interlocked.Increment(ref _dirOpenConsumed);
+
+            // The directory's own identity arrives in the file id fields; the
+            // identity of the base dirfd it was opened relative to arrives in
+            // the dir id fields.
+            if (dev == 0 && ino == 0)
+            {
+                // Fallback tier emits zeros; nothing to index.
+                return;
+            }
+
+            string path = rawPath?.Trim() ?? "";
+            if (!IsAbsolutePath(path))
+            {
+                // Resolve a relative directory open through the same chain:
+                // its own fd first (directory handles typically outlive the
+                // decode window), then the base-directory index.
+                string resolved = "";
+                try
+                {
+                    resolved = ReadLinkTarget($"/proc/{pid}/fd/{fd}");
+                }
+                catch { }
+
+                if (string.IsNullOrEmpty(resolved) || !IsAbsolutePath(resolved))
+                {
+                    resolved = "";
+                    if ((baseDev != 0 || baseIno != 0) &&
+                        _dirIdentityIndex.TryGetValue((baseDev, baseIno), out string basePath))
+                    {
+                        try
+                        {
+                            string joined = Path.GetFullPath(path, basePath);
+                            if (IsAbsolutePath(joined))
+                            {
+                                resolved = joined;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(resolved))
+                {
+                    Interlocked.Increment(ref _dirOpenUnresolved);
+                    return;
+                }
+
+                path = resolved;
+            }
+
+            path = NormalizeFilePath(path);
+            if (string.IsNullOrEmpty(path))
+            {
+                Interlocked.Increment(ref _dirOpenUnresolved);
+                return;
+            }
+
+            StoreDirIdentity(dev, ino, path);
+            Interlocked.Increment(ref _dirOpenIndexed);
+        }
+
+        private void StoreDirIdentity(uint dev, ulong ino, string absolutePath)
+        {
+            var key = (dev, ino);
+            bool added = !_dirIdentityIndex.ContainsKey(key);
+            _dirIdentityIndex[key] = absolutePath;
+            if (added)
+            {
+                _dirIndexInsertOrder.Enqueue(key);
+                while (_dirIdentityIndex.Count > MaxDirIndexEntries &&
+                       _dirIndexInsertOrder.TryDequeue(out var oldest))
+                {
+                    if (_dirIdentityIndex.TryRemove(oldest, out _))
+                    {
+                        Interlocked.Increment(ref _dirIndexEvictions);
+                    }
+                }
+            }
         }
 
         private bool TryResolveRelativePathAgainstBase(string procLinkPath, string rawRelativePath, out string resolvedPath)

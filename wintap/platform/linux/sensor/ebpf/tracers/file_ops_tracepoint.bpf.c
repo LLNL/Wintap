@@ -56,6 +56,12 @@ struct file_path_event {
     __u32 bytes;
     __u32 op_type;
     __s32 dirfd;
+    // Identity fields exist to keep the wire format identical to the CO-RE
+    // tier; this fallback tier cannot read inodes and always emits zeros.
+    __u64 file_ino;
+    __u64 dir_ino;
+    __u32 file_dev;
+    __u32 dir_dev;
 };
 
 struct file_fd_event {
@@ -66,6 +72,10 @@ struct file_fd_event {
     __u32 fd;
     __u32 bytes;
     __u32 op_type;
+    __u32 _pad0;
+    __u64 file_ino;
+    __u32 file_dev;
+    __u32 _pad1;
 };
 
 struct openat_state {
@@ -204,6 +214,10 @@ static __always_inline void emit_file_fd_event(__u32 pid, __u32 fd, __u32 bytes,
     event->fd = fd;
     event->bytes = bytes;
     event->op_type = op_type;
+    event->_pad0 = 0;
+    event->file_ino = 0;
+    event->file_dev = 0;
+    event->_pad1 = 0;
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }
@@ -229,6 +243,10 @@ static __always_inline void emit_file_event_saved(__u32 pid, const char *filenam
     event->bytes = bytes;
     event->op_type = op_type;
     event->dirfd = dirfd;
+    event->file_ino = 0;
+    event->dir_ino = 0;
+    event->file_dev = 0;
+    event->dir_dev = 0;
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }
@@ -254,6 +272,10 @@ static __always_inline void emit_file_event_user(__u32 pid, const char *filename
     event->bytes = bytes;
     event->op_type = op_type;
     event->dirfd = dirfd;
+    event->file_ino = 0;
+    event->dir_ino = 0;
+    event->file_dev = 0;
+    event->dir_dev = 0;
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }

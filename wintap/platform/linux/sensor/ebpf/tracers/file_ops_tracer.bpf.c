@@ -13,6 +13,7 @@
 
 #define S_IFMT 00170000
 #define S_IFREG 0100000
+#define S_IFDIR 0040000
 
 // Common pseudo filesystems that should not enter the File stream when we can
 // inspect the fd target in the CO-RE tier.
@@ -34,7 +35,11 @@ enum file_op_type {
     FILE_OP_WRITE = 3,
     FILE_OP_CLOSE = 4,
     FILE_OP_MMAP = 5,
-    FILE_OP_UNLINK = 6
+    FILE_OP_UNLINK = 6,
+    // Directory-handle open. Emitted so userspace can learn
+    // (s_dev, i_ino) -> absolute dir path for race-free relative-open
+    // resolution. Never becomes a WintapMessage.
+    FILE_OP_DIR_OPEN = 7
 };
 
 enum fileops_stat_key {
@@ -76,6 +81,10 @@ struct file_path_event {
     __u32 bytes;           // Bytes read/written (for read/write)
     __u32 op_type;         // Which operation (open/read/write/etc)
     __s32 dirfd;           // Open-time dirfd for resolving relative/openat paths
+    __u64 file_ino;        // Opened object's inode (0 when unavailable)
+    __u64 dir_ino;         // dirfd base inode for relative opens (0 when unavailable)
+    __u32 file_dev;        // Opened object's superblock s_dev (0 when unavailable)
+    __u32 dir_dev;         // dirfd base s_dev (0 when unavailable)
 };
 
 struct file_fd_event {
@@ -86,6 +95,10 @@ struct file_fd_event {
     __u32 fd;
     __u32 bytes;
     __u32 op_type;
+    __u32 _pad0;
+    __u64 file_ino;        // fd target inode (0 when unavailable)
+    __u32 file_dev;        // fd target superblock s_dev (0 when unavailable)
+    __u32 _pad1;
 };
 
 // Track openat pathname across sys_enter/sys_exit so we can emit the returned fd.
@@ -215,32 +228,66 @@ static __always_inline void submit_file_event(void *event)
     bpf_ringbuf_submit(event, flags);
 }
 
-// Helper to emit event
-static __always_inline int is_regular_fd(__u32 fd)
+// Resolve an fd in the current task to its struct inode (NULL on any miss).
+// Same traversal previously proven in is_regular_fd on the RHEL8 verifier.
+static __always_inline struct inode *fd_to_inode(__u32 fd)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     struct files_struct *files = BPF_CORE_READ(task, files);
     if (!files)
-        return 0;
+        return NULL;
 
     struct fdtable *fdt = BPF_CORE_READ(files, fdt);
     if (!fdt)
-        return 0;
+        return NULL;
 
     unsigned int max_fds = BPF_CORE_READ(fdt, max_fds);
     if (fd >= max_fds)
-        return 0;
+        return NULL;
 
     struct file **fd_array = BPF_CORE_READ(fdt, fd);
     if (!fd_array)
-        return 0;
+        return NULL;
 
     struct file *file = NULL;
     bpf_probe_read_kernel(&file, sizeof(file), &fd_array[fd]);
     if (!file)
+        return NULL;
+
+    return BPF_CORE_READ(file, f_inode);
+}
+
+// Read (i_mode, s_dev, i_ino) for an fd. Returns 1 when the inode was
+// reachable; outputs are zeroed otherwise.
+static __always_inline int read_fd_inode_info(__u32 fd, umode_t *mode,
+                                              __u32 *dev, __u64 *ino)
+{
+    *mode = 0;
+    *dev = 0;
+    *ino = 0;
+
+    struct inode *inode = fd_to_inode(fd);
+    if (!inode)
         return 0;
 
-    struct inode *inode = BPF_CORE_READ(file, f_inode);
+    *mode = BPF_CORE_READ(inode, i_mode);
+    *ino = BPF_CORE_READ(inode, i_ino);
+
+    struct super_block *sb = BPF_CORE_READ(inode, i_sb);
+    if (sb)
+        *dev = BPF_CORE_READ(sb, s_dev);
+
+    return 1;
+}
+
+// Helper to emit event. Fills (dev, ino) identity for regular fds so the
+// emit path does not walk the fd table twice.
+static __always_inline int is_regular_fd_info(__u32 fd, __u32 *dev, __u64 *ino)
+{
+    *dev = 0;
+    *ino = 0;
+
+    struct inode *inode = fd_to_inode(fd);
     if (!inode)
         return 0;
 
@@ -254,38 +301,47 @@ static __always_inline int is_regular_fd(__u32 fd)
         if (magic == PROC_SUPER_MAGIC || magic == SYSFS_MAGIC ||
             magic == DEVPTS_SUPER_MAGIC || magic == DEVTMPFS_MAGIC)
             return 0;
+        *dev = BPF_CORE_READ(sb, s_dev);
     }
 
+    *ino = BPF_CORE_READ(inode, i_ino);
     return 1;
 }
 
 static __always_inline void emit_file_fd_event(__u32 pid, __u32 fd,
-                                               __u32 bytes, __u32 op_type)
+                                               __u32 bytes, __u32 op_type,
+                                               __u32 file_dev, __u64 file_ino)
 {
     struct file_fd_event *event;
-    
+
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
     if (!event) {
         increment_stat(ring_fail_key_for_op(op_type));
         return;
     }
-    
+
     event->record_type = FILEOPS_RECORD_FD;
     event->pid = pid;
     bpf_get_current_comm(&event->comm, sizeof(event->comm));
-    
+
     event->timestamp_ns = bpf_ktime_get_ns();
     event->fd = fd;
     event->bytes = bytes;
     event->op_type = op_type;
-    
+    event->_pad0 = 0;
+    event->file_ino = file_ino;
+    event->file_dev = file_dev;
+    event->_pad1 = 0;
+
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }
 
 static __always_inline void emit_file_event_saved(__u32 pid, const char *filename_buf,
                                                    __u32 fd, __u32 bytes, __u32 op_type,
-                                                   __s32 dirfd)
+                                                   __s32 dirfd,
+                                                   __u32 file_dev, __u64 file_ino,
+                                                   __u32 dir_dev, __u64 dir_ino)
 {
     struct file_path_event *event;
 
@@ -309,6 +365,10 @@ static __always_inline void emit_file_event_saved(__u32 pid, const char *filenam
     event->bytes = bytes;
     event->op_type = op_type;
     event->dirfd = dirfd;
+    event->file_ino = file_ino;
+    event->dir_ino = dir_ino;
+    event->file_dev = file_dev;
+    event->dir_dev = dir_dev;
 
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
@@ -340,6 +400,10 @@ static __always_inline void emit_file_event_user(__u32 pid, const char *filename
     event->bytes = bytes;
     event->op_type = op_type;
     event->dirfd = dirfd;
+    event->file_ino = 0;
+    event->dir_ino = 0;
+    event->file_dev = 0;
+    event->dir_dev = 0;
 
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
@@ -436,18 +500,43 @@ int t_open_exit(struct sys_exit_args *ctx)
     if (!stp)
         return 0;
 
-    struct openat_state st = {};
-    __builtin_memcpy(&st, stp, sizeof(st));
-
+    // Read from the map value directly (no 264-byte stack copy; BPF stack
+    // budget) and delete the entry only after emission — this thread is the
+    // only writer for its own pid_tgid key.
     long fd = ctx->ret;
+    if (fd < 0) {
+        bpf_map_delete_elem(&openat_state_map, &pid_tgid);
+        return 0;
+    }
+
+    __u32 flags = stp->flags;
+    __s32 dirfd = stp->dirfd;
+    char first_byte = stp->filename[0];
+
+    umode_t mode = 0;
+    __u32 file_dev = 0;
+    __u64 file_ino = 0;
+    int have_info = read_fd_inode_info((__u32)fd, &mode, &file_dev, &file_ino);
+
+    // Base-directory identity for relative opens: resolvable later against
+    // the userspace (s_dev, i_ino) -> dir-path index even after this
+    // process exits.
+    __u32 dir_dev = 0;
+    __u64 dir_ino = 0;
+    umode_t dir_mode = 0;
+    if (dirfd >= 0 && first_byte != '/')
+        read_fd_inode_info((__u32)dirfd, &dir_mode, &dir_dev, &dir_ino);
+
+    // Directory handles become internal DIR_OPEN records (previously
+    // discarded) so userspace can learn dirfd identities; catch both the
+    // O_DIRECTORY flag and un-flagged opens of directories.
+    __u32 op = ((flags & O_DIRECTORY) || (have_info && (mode & S_IFMT) == S_IFDIR))
+                   ? FILE_OP_DIR_OPEN
+                   : FILE_OP_OPEN;
+
+    emit_file_event_saved(pid, stp->filename, (__u32)fd, 0, op,
+                          dirfd, file_dev, file_ino, dir_dev, dir_ino);
     bpf_map_delete_elem(&openat_state_map, &pid_tgid);
-
-    if (fd < 0)
-        return 0;
-    if (st.flags & O_DIRECTORY)
-        return 0;
-
-    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN, st.dirfd);
     return 0;
 }
 
@@ -464,20 +553,36 @@ int trace_openat(struct sys_exit_args *ctx)
     if (!stp)
         return 0;
 
-    // Copy out of the map value before deleting it.
-    struct openat_state st = {};
-    __builtin_memcpy(&st, stp, sizeof(st));
-
+    // Read from the map value directly (no stack copy) and delete only
+    // after emission — this thread owns its pid_tgid key.
     long fd = ctx->ret;
-    // Always cleanup the map entry.
+    if (fd < 0) {
+        bpf_map_delete_elem(&openat_state_map, &pid_tgid);
+        return 0;
+    }
+
+    __u32 flags = stp->flags;
+    __s32 dirfd = stp->dirfd;
+    char first_byte = stp->filename[0];
+
+    umode_t mode = 0;
+    __u32 file_dev = 0;
+    __u64 file_ino = 0;
+    int have_info = read_fd_inode_info((__u32)fd, &mode, &file_dev, &file_ino);
+
+    __u32 dir_dev = 0;
+    __u64 dir_ino = 0;
+    umode_t dir_mode = 0;
+    if (dirfd >= 0 && first_byte != '/')
+        read_fd_inode_info((__u32)dirfd, &dir_mode, &dir_dev, &dir_ino);
+
+    __u32 op = ((flags & O_DIRECTORY) || (have_info && (mode & S_IFMT) == S_IFDIR))
+                   ? FILE_OP_DIR_OPEN
+                   : FILE_OP_OPEN;
+
+    emit_file_event_saved(pid, stp->filename, (__u32)fd, 0, op,
+                          dirfd, file_dev, file_ino, dir_dev, dir_ino);
     bpf_map_delete_elem(&openat_state_map, &pid_tgid);
-
-    if (fd < 0)
-        return 0;
-    if (st.flags & O_DIRECTORY)
-        return 0;
-
-    emit_file_event_saved(pid, st.filename, (__u32)fd, 0, FILE_OP_OPEN, st.dirfd);
     return 0;
 }
 
@@ -497,12 +602,14 @@ int t_read_ent(struct read_enter_args *ctx)
     __u32 pid = pid_tgid >> 32;
     if (should_drop_self_pid(pid, FILE_OP_READ))
         return 0;
-    if (!is_regular_fd(ctx->fd)) {
+    __u32 file_dev = 0;
+    __u64 file_ino = 0;
+    if (!is_regular_fd_info(ctx->fd, &file_dev, &file_ino)) {
         increment_stat(nonregular_drop_key_for_op(FILE_OP_READ));
         return 0;
     }
-    
-    emit_file_fd_event(pid, ctx->fd, (__u32)ctx->count, FILE_OP_READ);
+
+    emit_file_fd_event(pid, ctx->fd, (__u32)ctx->count, FILE_OP_READ, file_dev, file_ino);
     return 0;
 }
 
@@ -522,12 +629,14 @@ int t_write_ent(struct write_enter_args *ctx)
     __u32 pid = pid_tgid >> 32;
     if (should_drop_self_pid(pid, FILE_OP_WRITE))
         return 0;
-    if (!is_regular_fd(ctx->fd)) {
+    __u32 file_dev = 0;
+    __u64 file_ino = 0;
+    if (!is_regular_fd_info(ctx->fd, &file_dev, &file_ino)) {
         increment_stat(nonregular_drop_key_for_op(FILE_OP_WRITE));
         return 0;
     }
-    
-    emit_file_fd_event(pid, ctx->fd, (__u32)ctx->count, FILE_OP_WRITE);
+
+    emit_file_fd_event(pid, ctx->fd, (__u32)ctx->count, FILE_OP_WRITE, file_dev, file_ino);
     return 0;
 }
 
@@ -545,12 +654,14 @@ int t_close(struct close_args *ctx)
     __u32 pid = pid_tgid >> 32;
     if (should_drop_self_pid(pid, FILE_OP_CLOSE))
         return 0;
-    if (!is_regular_fd(ctx->fd)) {
+    __u32 file_dev = 0;
+    __u64 file_ino = 0;
+    if (!is_regular_fd_info(ctx->fd, &file_dev, &file_ino)) {
         increment_stat(nonregular_drop_key_for_op(FILE_OP_CLOSE));
         return 0;
     }
-    
-    emit_file_fd_event(pid, ctx->fd, 0, FILE_OP_CLOSE);
+
+    emit_file_fd_event(pid, ctx->fd, 0, FILE_OP_CLOSE, file_dev, file_ino);
     return 0;
 }
 
@@ -576,11 +687,13 @@ int t_mmap(struct mmap_args *ctx)
     
     // Only track file-backed mmaps (fd != -1)
     if (ctx->fd != -1) {
-        if (!is_regular_fd((__u32)ctx->fd)) {
+        __u32 file_dev = 0;
+        __u64 file_ino = 0;
+        if (!is_regular_fd_info((__u32)ctx->fd, &file_dev, &file_ino)) {
             increment_stat(nonregular_drop_key_for_op(FILE_OP_MMAP));
             return 0;
         }
-        emit_file_fd_event(pid, (__u32)ctx->fd, ctx->len, FILE_OP_MMAP);
+        emit_file_fd_event(pid, (__u32)ctx->fd, ctx->len, FILE_OP_MMAP, file_dev, file_ino);
     }
     
     return 0;
