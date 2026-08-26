@@ -60,6 +60,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         private const int PathRecordDirInoOffset = 312;
         private const int PathRecordFileDevOffset = 320;
         private const int PathRecordDirDevOffset = 324;
+        private const int PathRecordMntNsOffset = 328;
         private const int FdRecordFileInoOffset = 48;
         private const int FdRecordFileDevOffset = 56;
         private const int AtFdcwd = -100;
@@ -96,15 +97,13 @@ namespace gov.llnl.wintap.platform.linux.collect
         private long _dirOpenConsumed;
         private long _dirOpenIndexed;
         private long _dirOpenUnresolved;
-        private long _dirIndexEvictions;
 
-        // Global directory-identity index: (s_dev, i_ino) -> absolute dir path,
-        // learned from DIR_OPEN records. Identity-keyed (never (pid, fd)) so it
-        // survives fd close and producer exit, and is shared across processes.
-        // FIFO-bounded; directory cardinality is small relative to file events.
-        private const int MaxDirIndexEntries = 16384;
-        private readonly ConcurrentDictionary<(uint Dev, ulong Ino), string> _dirIdentityIndex = new();
-        private readonly ConcurrentQueue<(uint Dev, ulong Ino)> _dirIndexInsertOrder = new();
+        // Global directory-identity index: (mnt_ns, s_dev, i_ino) -> absolute
+        // dir path, learned from DIR_OPEN records. Identity-keyed (never
+        // (pid, fd)) so it survives fd close and producer exit, and is shared
+        // across processes. LRU-bounded (fop-13d) and namespace-qualified
+        // (fop-13c); capacity via WINTAP_FILEOPS_DIR_INDEX_MAX.
+        private readonly DirIdentityIndex _dirIdentityIndex;
 
         // fop-11: short-interval emit-first aggregation (pid, path, op).
         private readonly FileOpsAggregator _aggregator;
@@ -161,6 +160,7 @@ namespace gov.llnl.wintap.platform.linux.collect
 
             _nextCounterLogTickMs = Environment.TickCount64 + 60_000;
 
+            _dirIdentityIndex = new DirIdentityIndex(GetConfiguredDirIndexMaxEntries());
             _aggregationEnabled = GetConfiguredAggregationEnabled();
             _aggregationWindowMs = GetConfiguredAggregationWindowMs();
             if (_aggregationEnabled)
@@ -170,6 +170,22 @@ namespace gov.llnl.wintap.platform.linux.collect
                     GetConfiguredAggregationMaxKeys(),
                     EmitAggregateSummary);
             }
+        }
+
+        private static int GetConfiguredDirIndexMaxEntries()
+        {
+            try
+            {
+                int configured = ConfigManager.GetValue<int>("WINTAP_FILEOPS_DIR_INDEX_MAX");
+                if (configured > 0)
+                {
+                    return configured;
+                }
+            }
+            catch { }
+            // Raised from 16384 after field bundle 041718 showed filesystem
+            // walks pinning the cap; ~10 MB worst case at 65536 entries.
+            return 65536;
         }
 
         private static bool GetConfiguredAggregationEnabled()
@@ -303,6 +319,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                 ulong fileIno = ReadUInt64(data, isPathRecord ? PathRecordFileInoOffset : FdRecordFileInoOffset);
                 uint dirDev = isPathRecord ? ReadUInt32(data, PathRecordDirDevOffset) : 0;
                 ulong dirIno = isPathRecord ? ReadUInt64(data, PathRecordDirInoOffset) : 0;
+                uint mntNs = isPathRecord ? ReadUInt32(data, PathRecordMntNsOffset) : 0;
                 string rawFilePath = isPathRecord ? ReadNullTerminatedString(data, PathRecordFilenameOffset, 256) : "";
                 string filePath = rawFilePath;
 
@@ -310,14 +327,14 @@ namespace gov.llnl.wintap.platform.linux.collect
                 // dir-identity index and never become WintapMessages.
                 if (isPathRecord && opType == FileOpDirOpen)
                 {
-                    HandleDirOpenRecord(pid, fd, dirfd, rawFilePath, fileDev, fileIno, dirDev, dirIno);
+                    HandleDirOpenRecord(pid, fd, dirfd, rawFilePath, mntNs, fileDev, fileIno, dirDev, dirIno);
                     MaybeLogCounters();
                     return 0;
                 }
 
                 if (isPathRecord && opType == FileOpOpen)
                 {
-                    filePath = ResolveOpenPath(pid, fd, dirfd, dirDev, dirIno, filePath);
+                    filePath = ResolveOpenPath(pid, fd, dirfd, mntNs, dirDev, dirIno, filePath);
                 }
                 
                 // Resolve file path for FD-based operations (read/write/close/mmap)
@@ -551,7 +568,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             long dirOpenConsumed = Interlocked.Exchange(ref _dirOpenConsumed, 0);
             long dirOpenIndexed = Interlocked.Exchange(ref _dirOpenIndexed, 0);
             long dirOpenUnresolved = Interlocked.Exchange(ref _dirOpenUnresolved, 0);
-            long dirIndexEvictions = Interlocked.Exchange(ref _dirIndexEvictions, 0);
+            long dirIndexEvictions = _dirIdentityIndex.TakeEvictions();
             string resolutionSummary = $"relative_open_resolved={relativeOpenResolves},relative_open_resolve_miss={relativeOpenResolveMisses},resolved_fd={relativeOpenResolvedViaFd},resolved_dir_index={relativeOpenResolvedViaDirIndex},resolved_dirfd={relativeOpenResolvedViaDirFd},resolved_cwd={relativeOpenResolvedViaCwd},opened_fd_lookup_miss={relativeOpenOpenedFdLookupMisses},dir_index_miss={relativeOpenDirIndexMisses},dirfd_lookup_miss={relativeOpenDirFdLookupMisses},cwd_lookup_miss={relativeOpenCwdLookupMisses},unsupported_dirfd={relativeOpenUnsupportedDirFd},miss_producer_dead={relativeOpenMissProducerDead},miss_producer_alive={relativeOpenMissProducerAlive},dir_open_consumed={dirOpenConsumed},dir_open_indexed={dirOpenIndexed},dir_open_unresolved={dirOpenUnresolved},dir_index_size={_dirIdentityIndex.Count},dir_index_evictions={dirIndexEvictions}";
             string queueSummary = $"depth={queueDepth},high_water={queueHighWatermark},drops={queueDrops},capacity={_sendQueueCapacity},policy=drop_newest";
             long aggFirstEmits = Interlocked.Exchange(ref _aggFirstEmits, 0);
@@ -1012,7 +1029,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             return configured > 0 ? configured : 524288;
         }
 
-        private string ResolveOpenPath(int pid, uint fd, int dirfd, uint dirDev, ulong dirIno, string rawPath)
+        private string ResolveOpenPath(int pid, uint fd, int dirfd, uint mntNs, uint dirDev, ulong dirIno, string rawPath)
         {
             if (string.IsNullOrWhiteSpace(rawPath) || IsAbsolutePath(rawPath))
             {
@@ -1038,7 +1055,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             // after the producer has exited.
             if (dirDev != 0 || dirIno != 0)
             {
-                if (_dirIdentityIndex.TryGetValue((dirDev, dirIno), out string dirBasePath))
+                if (_dirIdentityIndex.TryGet(mntNs, dirDev, dirIno, out string dirBasePath))
                 {
                     try
                     {
@@ -1105,7 +1122,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             return rawPath;
         }
 
-        private void HandleDirOpenRecord(int pid, uint fd, int dirfd, string rawPath, uint dev, ulong ino, uint baseDev, ulong baseIno)
+        private void HandleDirOpenRecord(int pid, uint fd, int dirfd, string rawPath, uint mntNs, uint dev, ulong ino, uint baseDev, ulong baseIno)
         {
             Interlocked.Increment(ref _dirOpenConsumed);
 
@@ -1135,7 +1152,7 @@ namespace gov.llnl.wintap.platform.linux.collect
                 {
                     resolved = "";
                     if ((baseDev != 0 || baseIno != 0) &&
-                        _dirIdentityIndex.TryGetValue((baseDev, baseIno), out string basePath))
+                        _dirIdentityIndex.TryGet(mntNs, baseDev, baseIno, out string basePath))
                     {
                         try
                         {
@@ -1165,27 +1182,8 @@ namespace gov.llnl.wintap.platform.linux.collect
                 return;
             }
 
-            StoreDirIdentity(dev, ino, path);
+            _dirIdentityIndex.Put(mntNs, dev, ino, path);
             Interlocked.Increment(ref _dirOpenIndexed);
-        }
-
-        private void StoreDirIdentity(uint dev, ulong ino, string absolutePath)
-        {
-            var key = (dev, ino);
-            bool added = !_dirIdentityIndex.ContainsKey(key);
-            _dirIdentityIndex[key] = absolutePath;
-            if (added)
-            {
-                _dirIndexInsertOrder.Enqueue(key);
-                while (_dirIdentityIndex.Count > MaxDirIndexEntries &&
-                       _dirIndexInsertOrder.TryDequeue(out var oldest))
-                {
-                    if (_dirIdentityIndex.TryRemove(oldest, out _))
-                    {
-                        Interlocked.Increment(ref _dirIndexEvictions);
-                    }
-                }
-            }
         }
 
         private bool TryResolveRelativePathAgainstBase(string procLinkPath, string rawRelativePath, out string resolvedPath)

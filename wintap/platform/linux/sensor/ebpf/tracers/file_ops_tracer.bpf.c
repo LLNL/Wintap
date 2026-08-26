@@ -85,6 +85,8 @@ struct file_path_event {
     __u64 dir_ino;         // dirfd base inode for relative opens (0 when unavailable)
     __u32 file_dev;        // Opened object's superblock s_dev (0 when unavailable)
     __u32 dir_dev;         // dirfd base s_dev (0 when unavailable)
+    __u32 mnt_ns;          // Opener's mount-namespace inum (0 when unavailable)
+    __u32 _pad0;
 };
 
 struct file_fd_event {
@@ -228,6 +230,21 @@ static __always_inline void submit_file_event(void *event)
     bpf_ringbuf_submit(event, flags);
 }
 
+// Current task's mount-namespace inum; 0 when unreadable. Keys the
+// userspace dir-identity index per namespace (fop-13c) so bind-mount /
+// container path aliases cannot resolve through another namespace's view.
+static __always_inline __u32 current_mnt_ns(void)
+{
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    struct nsproxy *nsp = BPF_CORE_READ(task, nsproxy);
+    if (!nsp)
+        return 0;
+    struct mnt_namespace *mns = BPF_CORE_READ(nsp, mnt_ns);
+    if (!mns)
+        return 0;
+    return BPF_CORE_READ(mns, ns.inum);
+}
+
 // Resolve an fd in the current task to its struct inode (NULL on any miss).
 // Same traversal previously proven in is_regular_fd on the RHEL8 verifier.
 static __always_inline struct inode *fd_to_inode(__u32 fd)
@@ -341,7 +358,8 @@ static __always_inline void emit_file_event_saved(__u32 pid, const char *filenam
                                                    __u32 fd, __u32 bytes, __u32 op_type,
                                                    __s32 dirfd,
                                                    __u32 file_dev, __u64 file_ino,
-                                                   __u32 dir_dev, __u64 dir_ino)
+                                                   __u32 dir_dev, __u64 dir_ino,
+                                                   __u32 mnt_ns)
 {
     struct file_path_event *event;
 
@@ -369,6 +387,8 @@ static __always_inline void emit_file_event_saved(__u32 pid, const char *filenam
     event->dir_ino = dir_ino;
     event->file_dev = file_dev;
     event->dir_dev = dir_dev;
+    event->mnt_ns = mnt_ns;
+    event->_pad0 = 0;
 
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
@@ -404,6 +424,8 @@ static __always_inline void emit_file_event_user(__u32 pid, const char *filename
     event->dir_ino = 0;
     event->file_dev = 0;
     event->dir_dev = 0;
+    event->mnt_ns = 0;
+    event->_pad0 = 0;
 
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
@@ -535,7 +557,8 @@ int t_open_exit(struct sys_exit_args *ctx)
                    : FILE_OP_OPEN;
 
     emit_file_event_saved(pid, stp->filename, (__u32)fd, 0, op,
-                          dirfd, file_dev, file_ino, dir_dev, dir_ino);
+                          dirfd, file_dev, file_ino, dir_dev, dir_ino,
+                          current_mnt_ns());
     bpf_map_delete_elem(&openat_state_map, &pid_tgid);
     return 0;
 }
@@ -581,7 +604,8 @@ int trace_openat(struct sys_exit_args *ctx)
                    : FILE_OP_OPEN;
 
     emit_file_event_saved(pid, stp->filename, (__u32)fd, 0, op,
-                          dirfd, file_dev, file_ino, dir_dev, dir_ino);
+                          dirfd, file_dev, file_ino, dir_dev, dir_ino,
+                          current_mnt_ns());
     bpf_map_delete_elem(&openat_state_map, &pid_tgid);
     return 0;
 }

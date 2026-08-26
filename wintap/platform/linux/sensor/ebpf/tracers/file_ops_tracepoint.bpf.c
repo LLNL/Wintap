@@ -62,6 +62,8 @@ struct file_path_event {
     __u64 dir_ino;
     __u32 file_dev;
     __u32 dir_dev;
+    __u32 mnt_ns;
+    __u32 _pad0;
 };
 
 struct file_fd_event {
@@ -247,6 +249,8 @@ static __always_inline void emit_file_event_saved(__u32 pid, const char *filenam
     event->dir_ino = 0;
     event->file_dev = 0;
     event->dir_dev = 0;
+    event->mnt_ns = 0;
+    event->_pad0 = 0;
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }
@@ -276,6 +280,8 @@ static __always_inline void emit_file_event_user(__u32 pid, const char *filename
     event->dir_ino = 0;
     event->file_dev = 0;
     event->dir_dev = 0;
+    event->mnt_ns = 0;
+    event->_pad0 = 0;
     submit_file_event(event);
     increment_stat(emitted_key_for_op(op_type));
 }
