@@ -17,6 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\shared\WintapAPI\WintapAPI.csproj" />
+    <!-- Linux platform sources are excluded from Wintap.csproj; compile the
+         dependency-free aggregator directly so its unit tests can run. -->
+    <Compile Include="..\..\wintap\platform\linux\sensor\ebpf\FileOpsAggregator.cs" Link="FileOpsAggregator.cs" />
     <ProjectReference Include="..\..\wintap\Wintap.csproj" />
   </ItemGroup>
 

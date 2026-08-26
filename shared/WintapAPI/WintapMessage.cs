@@ -221,6 +221,28 @@ namespace gov.llnl.wintap.collect.models
             public string Path { get; set; }
             public int BytesRequested { get; set; }
             public int PID { get; set; }
+
+            /// <summary>
+            /// Number of raw file events this row represents. 1 for ordinary
+            /// per-event rows (the default, including senders that never set
+            /// it); N for short-interval aggregation summary rows that fold N
+            /// repeats of the same (pid, path, op). Downstream aggregations
+            /// must SUM this field rather than COUNT rows.
+            /// </summary>
+            public int EventCount { get; set; } = 1;
+
+            /// <summary>
+            /// FileTime UTC of the earliest raw event in this row's interval.
+            /// 0 means unset (sender predates aggregation); consumers fall
+            /// back to the message EventTime.
+            /// </summary>
+            public long FirstSeenEventTime { get; set; }
+
+            /// <summary>
+            /// FileTime UTC of the latest raw event in this row's interval.
+            /// 0 means unset; consumers fall back to the message EventTime.
+            /// </summary>
+            public long LastSeenEventTime { get; set; }
         }
 
         public class RegActivityObject : WintapBase

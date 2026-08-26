@@ -105,6 +105,21 @@ namespace gov.llnl.wintap.platform.linux.collect
         private const int MaxDirIndexEntries = 16384;
         private readonly ConcurrentDictionary<(uint Dev, ulong Ino), string> _dirIdentityIndex = new();
         private readonly ConcurrentQueue<(uint Dev, ulong Ino)> _dirIndexInsertOrder = new();
+
+        // fop-11: short-interval emit-first aggregation (pid, path, op).
+        private readonly FileOpsAggregator _aggregator;
+        private readonly bool _aggregationEnabled;
+        private readonly int _aggregationWindowMs;
+        private System.Threading.Timer _aggregationFlushTimer;
+        private long _aggFirstEmits;
+        private long _aggSummaryEnqueueFailures;
+        private long _aggBytesClamped;
+
+        // P3: sampled sender-path cost (every Nth EventChannel.Send).
+        private const int SendSampleInterval = 64;
+        private long _sendSampleCounter;
+        private long _sendSampleTicks;
+        private long _sendSampleCount;
         private long _nextCounterLogTickMs;
         private readonly object _measurementLock = new object();
         private readonly Dictionary<string, MeasurementAggregate> _emitByComm = new Dictionary<string, MeasurementAggregate>(StringComparer.Ordinal);
@@ -145,6 +160,59 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
 
             _nextCounterLogTickMs = Environment.TickCount64 + 60_000;
+
+            _aggregationEnabled = GetConfiguredAggregationEnabled();
+            _aggregationWindowMs = GetConfiguredAggregationWindowMs();
+            if (_aggregationEnabled)
+            {
+                _aggregator = new FileOpsAggregator(
+                    _aggregationWindowMs,
+                    GetConfiguredAggregationMaxKeys(),
+                    EmitAggregateSummary);
+            }
+        }
+
+        private static bool GetConfiguredAggregationEnabled()
+        {
+            try
+            {
+                string value = ConfigManager.GetValue<string>("WINTAP_FILEOPS_AGG_ENABLED");
+                if (!string.IsNullOrEmpty(value) &&
+                    (string.Equals(value, "false", StringComparison.OrdinalIgnoreCase) || value == "0"))
+                {
+                    return false;
+                }
+            }
+            catch { }
+            return true;
+        }
+
+        private static int GetConfiguredAggregationWindowMs()
+        {
+            try
+            {
+                int configured = ConfigManager.GetValue<int>("WINTAP_FILEOPS_AGG_WINDOW_MS");
+                if (configured > 0)
+                {
+                    return configured;
+                }
+            }
+            catch { }
+            return 1000;
+        }
+
+        private static int GetConfiguredAggregationMaxKeys()
+        {
+            try
+            {
+                int configured = ConfigManager.GetValue<int>("WINTAP_FILEOPS_AGG_MAX_KEYS");
+                if (configured > 0)
+                {
+                    return configured;
+                }
+            }
+            catch { }
+            return 32768;
         }
 
         public override bool Start()
@@ -356,8 +424,26 @@ namespace gov.llnl.wintap.platform.linux.collect
                 // resolver misses later.
                 EventChannel.TryPopulateCurrentProcessIdentity(message);
 
+                // fop-11: emit-first aggregation. The first occurrence of a
+                // (pid, path, op) key in a window flows through unchanged;
+                // repeats inside the window fold into a summary row emitted at
+                // window expiry, carrying the identity stamped above.
+                if (_aggregator != null &&
+                    _aggregator.TryAbsorb(pid, filePath, opType, bytes, timestampNs,
+                                          message.ProcessName, message.PidHash,
+                                          Environment.TickCount64))
+                {
+                    MaybeLogCounters();
+                    return 0;
+                }
+
+                message.File.EventCount = 1;
+                message.File.FirstSeenEventTime = message.EventTime;
+                message.File.LastSeenEventTime = message.EventTime;
+
                 if (TryEnqueueMessage(message, opIndex))
                 {
+                    Interlocked.Increment(ref _aggFirstEmits);
                     RecordMeasurement(opIndex, opType, pid, message.ProcessName, filePath, Environment.TickCount64);
                 }
 
@@ -468,6 +554,18 @@ namespace gov.llnl.wintap.platform.linux.collect
             long dirIndexEvictions = Interlocked.Exchange(ref _dirIndexEvictions, 0);
             string resolutionSummary = $"relative_open_resolved={relativeOpenResolves},relative_open_resolve_miss={relativeOpenResolveMisses},resolved_fd={relativeOpenResolvedViaFd},resolved_dir_index={relativeOpenResolvedViaDirIndex},resolved_dirfd={relativeOpenResolvedViaDirFd},resolved_cwd={relativeOpenResolvedViaCwd},opened_fd_lookup_miss={relativeOpenOpenedFdLookupMisses},dir_index_miss={relativeOpenDirIndexMisses},dirfd_lookup_miss={relativeOpenDirFdLookupMisses},cwd_lookup_miss={relativeOpenCwdLookupMisses},unsupported_dirfd={relativeOpenUnsupportedDirFd},miss_producer_dead={relativeOpenMissProducerDead},miss_producer_alive={relativeOpenMissProducerAlive},dir_open_consumed={dirOpenConsumed},dir_open_indexed={dirOpenIndexed},dir_open_unresolved={dirOpenUnresolved},dir_index_size={_dirIdentityIndex.Count},dir_index_evictions={dirIndexEvictions}";
             string queueSummary = $"depth={queueDepth},high_water={queueHighWatermark},drops={queueDrops},capacity={_sendQueueCapacity},policy=drop_newest";
+            long aggFirstEmits = Interlocked.Exchange(ref _aggFirstEmits, 0);
+            long aggSummaryFailures = Interlocked.Exchange(ref _aggSummaryEnqueueFailures, 0);
+            long aggBytesClamped = Interlocked.Exchange(ref _aggBytesClamped, 0);
+            string aggSummary = _aggregator == null
+                ? "enabled=false"
+                : $"enabled=true,window_ms={_aggregationWindowMs},first_emits={aggFirstEmits},repeats_folded={_aggregator.TakeRepeatsFolded()},summaries={_aggregator.TakeSummariesEmitted()},cap_bypass={_aggregator.TakeCapBypass()},entries={_aggregator.EntryCount},summary_enqueue_fail={aggSummaryFailures},bytes_clamped={aggBytesClamped}";
+            long sendSampleTicks = Interlocked.Exchange(ref _sendSampleTicks, 0);
+            long sendSampleCount = Interlocked.Exchange(ref _sendSampleCount, 0);
+            long sendSampleAvgUs = sendSampleCount > 0
+                ? (sendSampleTicks * 1_000_000L) / (System.Diagnostics.Stopwatch.Frequency * sendSampleCount)
+                : 0;
+            string senderSummary = $"send_sample_avg_us={sendSampleAvgUs},samples={sendSampleCount},interval={SendSampleInterval}";
 
             if (total <= 0 && queueDrops <= 0 && queueDepth <= 0 && queueHighWatermark <= 0 && string.IsNullOrEmpty(userSummary) && string.IsNullOrEmpty(kernelSummary) && string.IsNullOrEmpty(measurementSummary))
             {
@@ -475,7 +573,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
 
             WintapLogger.Log.Append(
-                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} queue=[{queueSummary}] user=[{userSummary}] resolve=[{resolutionSummary}] measure=[{measurementSummary}] kernel=[{kernelSummary}]",
+                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} queue=[{queueSummary}] agg=[{aggSummary}] sender=[{senderSummary}] user=[{userSummary}] resolve=[{resolutionSummary}] measure=[{measurementSummary}] kernel=[{kernelSummary}]",
                 LogLevel.Info);
         }
 
@@ -750,6 +848,14 @@ namespace gov.llnl.wintap.platform.linux.collect
                 Name = $"{SensorName}-Sender"
             };
             _sendWorker.Start();
+
+            if (_aggregator != null)
+            {
+                int flushPeriodMs = Math.Max(250, _aggregationWindowMs / 2);
+                _aggregationFlushTimer = new System.Threading.Timer(
+                    _ => { try { _aggregator.FlushExpired(Environment.TickCount64); } catch { } },
+                    null, flushPeriodMs, flushPeriodMs);
+            }
         }
 
         private void ProcessSendQueue()
@@ -768,7 +874,17 @@ namespace gov.llnl.wintap.platform.linux.collect
                         continue;
                     }
 
-                    EventChannel.Send(queued.Message);
+                    if ((Interlocked.Increment(ref _sendSampleCounter) & (SendSampleInterval - 1)) == 0)
+                    {
+                        long startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+                        EventChannel.Send(queued.Message);
+                        Interlocked.Add(ref _sendSampleTicks, System.Diagnostics.Stopwatch.GetTimestamp() - startTicks);
+                        Interlocked.Increment(ref _sendSampleCount);
+                    }
+                    else
+                    {
+                        EventChannel.Send(queued.Message);
+                    }
                     CountByOp(_userEmittedByOp, queued.OpIndex);
                     MaybeLogCounters();
                 }
@@ -781,6 +897,74 @@ namespace gov.llnl.wintap.platform.linux.collect
                     WintapLogger.Log.Append($"{SensorName} send worker error: {ex.Message}", LogLevel.Error);
                     Thread.Sleep(100);
                 }
+            }
+        }
+
+        private static WintapMessage.ActivityTypeEnum MapOpToActivityType(uint opType)
+        {
+            return opType switch
+            {
+                1 => WintapMessage.ActivityTypeEnum.Open,
+                2 => WintapMessage.ActivityTypeEnum.Read,
+                3 => WintapMessage.ActivityTypeEnum.Write,
+                4 => WintapMessage.ActivityTypeEnum.Close,
+                5 => WintapMessage.ActivityTypeEnum.Read,   // mmap is like read (A4 deferred)
+                6 => WintapMessage.ActivityTypeEnum.Delete,
+                _ => WintapMessage.ActivityTypeEnum.Other
+            };
+        }
+
+        // fop-11 summary rows: repeats only (the first occurrence was emitted
+        // per-event with EventCount=1, so SUM(EventCount) downstream equals
+        // the raw event count). Identity comes from the first occurrence,
+        // never from flush-time resolution.
+        private void EmitAggregateSummary(FileOpsAggregator.AggregateEntry entry)
+        {
+            try
+            {
+                DateTime firstUtc = ConvertKernelTimestampToUtcDateTime(entry.FirstRepeatNs);
+                DateTime lastUtc = entry.LastRepeatNs >= entry.FirstRepeatNs
+                    ? ConvertKernelTimestampToUtcDateTime(entry.LastRepeatNs)
+                    : firstUtc;
+
+                int bytesClamped;
+                if (entry.BytesSum > int.MaxValue)
+                {
+                    bytesClamped = int.MaxValue;
+                    Interlocked.Increment(ref _aggBytesClamped);
+                }
+                else
+                {
+                    bytesClamped = (int)Math.Max(entry.BytesSum, 0);
+                }
+
+                var message = new WintapMessage(firstUtc, entry.Pid, WintapMessage.MessageTypeEnum.File)
+                {
+                    ActivityType = MapOpToActivityType(entry.OpType),
+                    ActivityId = "",
+                    CorrelationId = "",
+                    PidHash = entry.PidHash ?? "",
+                    ProcessName = entry.ProcessName ?? "unknown",
+                };
+                message.File = new WintapMessage.FileActivityObject
+                {
+                    Path = entry.Path,
+                    BytesRequested = bytesClamped,
+                    PID = entry.Pid,
+                    EventCount = entry.RepeatCount,
+                    FirstSeenEventTime = firstUtc.ToFileTimeUtc(),
+                    LastSeenEventTime = lastUtc.ToFileTimeUtc(),
+                };
+
+                if (!TryEnqueueMessage(message, GetOpIndex(entry.OpType)))
+                {
+                    Interlocked.Increment(ref _aggSummaryEnqueueFailures);
+                }
+            }
+            catch (Exception ex)
+            {
+                Interlocked.Increment(ref _aggSummaryEnqueueFailures);
+                WintapLogger.Log.Append($"{SensorName} aggregate summary emit error: {ex.Message}", LogLevel.Error);
             }
         }
 
@@ -823,7 +1007,9 @@ namespace gov.llnl.wintap.platform.linux.collect
         private static int GetConfiguredQueueCapacity()
         {
             int configured = ConfigManager.GetValue<int>("WINTAP_FILEOPS_MAX_QUEUE_EVENTS");
-            return configured > 0 ? configured : 131072;
+            // Default raised from 131072 after the 2026-08-25 field experiment:
+            // burst backlog reached ~437k with zero drops at 4x capacity.
+            return configured > 0 ? configured : 524288;
         }
 
         private string ResolveOpenPath(int pid, uint fd, int dirfd, uint dirDev, ulong dirIno, string rawPath)
@@ -1241,6 +1427,16 @@ namespace gov.llnl.wintap.platform.linux.collect
 
         protected override void OnStopping()
         {
+            try
+            {
+                _aggregationFlushTimer?.Dispose();
+                _aggregationFlushTimer = null;
+                // Drain pending summaries into the queue before it stops
+                // accepting, so shutdown loses no folded repeats.
+                _aggregator?.FlushAll();
+            }
+            catch { }
+
             try
             {
                 _sendQueue.CompleteAdding();
