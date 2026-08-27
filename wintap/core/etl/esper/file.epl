@@ -12,5 +12,5 @@ select istream
   'File' as MessageType,
   AgentId
 from WintapMessage(CAST(messageType, string) = 'File').win:time_batch(10 sec) as msg
-group by file.path, PidHash, PID, activityType, ProcessName
+group by file.path, PidHash, PID, activityType, ProcessName, AgentId
 having count(*) > 0
