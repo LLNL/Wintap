@@ -93,6 +93,7 @@ namespace gov.llnl.wintap.core.etl.shared
             config.WriteToParquet = true;
             config.SerializationIntervalSec = 60;
             config.UploadIntervalSec = 300;
+            config.RawSensorMaxCacheSizeBytes = 256000000;
             try
             {
                 string etlConfig = GetETLConfigPath();
@@ -128,6 +129,16 @@ namespace gov.llnl.wintap.core.etl.shared
                 LogStartupConfigurationMessage($"ETLConfig override: UploadIntervalSec={upSec} (WINTAP_ETL_UPLOAD_INTERVAL_SEC)", LogLevel.Info);
             }
 
+            if (long.TryParse(ConfigManager.GetValue<string>("WINTAP_ETL_RAW_SENSOR_MAX_CACHE_BYTES"), out long rawSensorMaxCacheBytes) && rawSensorMaxCacheBytes > 0)
+            {
+                config.RawSensorMaxCacheSizeBytes = rawSensorMaxCacheBytes;
+                LogStartupConfigurationMessage($"ETLConfig override: RawSensorMaxCacheSizeBytes={rawSensorMaxCacheBytes} (WINTAP_ETL_RAW_SENSOR_MAX_CACHE_BYTES)", LogLevel.Info);
+            }
+
+            if (config.RawSensorMaxCacheSizeBytes <= 0)
+            {
+                config.RawSensorMaxCacheSizeBytes = 256000000;
+            }
 
             return config;
         }

@@ -16,8 +16,6 @@ namespace gov.llnl.wintap.core.etl.load.adapters
     {
         private Uri uncPath;
 
-        public event EventHandler<string> UploadCompleted;
-
         public bool PostUpload()
         {
             this.stopSessionStats();
@@ -64,7 +62,7 @@ namespace gov.llnl.wintap.core.etl.load.adapters
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("Error uploading file: " + ex.Message, LogLevel.Info);
+                WintapLogger.Log.Append("Error uploading file: " + ex.Message, LogLevel.Warn);
                 uploadSuccess = false;
             }
             return uploadSuccess;

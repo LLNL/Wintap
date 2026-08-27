@@ -21,6 +21,12 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </summary>
         ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime);
 
+        /// <summary>
+        /// Resolve the currently active process for a PID from the in-memory cache.
+        /// Returns false when the PID is not active or the event predates the cached process start.
+        /// </summary>
+        bool TryResolveCurrentProcessAtTime(int pid, DateTime eventTime, out ProcessRecord process);
+
         void RegisterProcess(WintapMessage processEvent);
 
         /// <summary>

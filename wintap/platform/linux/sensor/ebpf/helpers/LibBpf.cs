@@ -83,6 +83,9 @@ namespace gov.llnl.wintap.platform.linux.collect
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern int bpf_map_update_elem(int fd, ref uint key, ref uint value, ulong flags);
 
+        [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int bpf_map_lookup_elem(int fd, ref uint key, out ulong value);
+
         // Ring buffer
         [DllImport(LibBpfLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr ring_buffer__new(int map_fd, RingBufferCallback cb, IntPtr ctx, IntPtr opts);

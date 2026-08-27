@@ -42,6 +42,7 @@
   "SensorProfile": "Quality",
   "SerializationIntervalSec": 60,
   "UploadIntervalSec": 300,
+  "RawSensorMaxCacheSizeBytes": 256000000,
   "WriteToParquet": true,
   "DisableMCP": true,
   "DisableDuckDBUI": true,

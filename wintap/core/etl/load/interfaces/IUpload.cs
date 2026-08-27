@@ -8,9 +8,6 @@ namespace gov.llnl.wintap.core.etl.load.interfaces
 {
     public interface IUpload
     {
-        // string value of the event holds the path to the uploaded file.
-        event EventHandler<string> UploadCompleted;
-
         string Name { get; set; }
 
         /// <summary>
