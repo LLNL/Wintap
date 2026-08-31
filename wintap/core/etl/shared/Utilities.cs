@@ -92,6 +92,8 @@ namespace gov.llnl.wintap.core.etl.shared
             config.SensorProfile = "Quality";
             config.WriteToParquet = true;
             config.SerializationIntervalSec = 60;
+            config.FileSerializationIntervalSec = 5;
+            config.FileSerializationHighWaterEvents = 5000;
             config.UploadIntervalSec = 300;
             config.RawSensorMaxCacheSizeBytes = 256000000;
             try
@@ -138,6 +140,16 @@ namespace gov.llnl.wintap.core.etl.shared
             if (config.RawSensorMaxCacheSizeBytes <= 0)
             {
                 config.RawSensorMaxCacheSizeBytes = 256000000;
+            }
+
+            if (!config.FileSerializationIntervalSec.HasValue)
+            {
+                config.FileSerializationIntervalSec = 5;
+            }
+
+            if (!config.FileSerializationHighWaterEvents.HasValue)
+            {
+                config.FileSerializationHighWaterEvents = 5000;
             }
 
             return config;

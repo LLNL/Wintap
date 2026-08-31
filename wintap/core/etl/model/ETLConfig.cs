@@ -12,6 +12,8 @@ namespace gov.llnl.wintap.core.etl.model
         public string LogLevel { get; set; }
         public string SensorProfile { get; set; }
         public int SerializationIntervalSec { get; set; }
+        public int? FileSerializationIntervalSec { get; set; }
+        public int? FileSerializationHighWaterEvents { get; set; }
         public int UploadIntervalSec { get; set; }
         public long RawSensorMaxCacheSizeBytes { get; set; }
         public bool WriteToParquet { get; set; }

@@ -73,6 +73,10 @@ namespace gov.llnl.wintap.core.etl.extract
         private ParquetWriter parquetWriter;
         private bool fileBusy;  // prevents file IO contention when snapshot is being rotated.
         private System.Timers.Timer flushToDiskTimer;
+        private int flushInProgress;
+        private long skippedOverlappingFlushes;
+        private int fileFlushHighWaterEvents;
+        private int highWaterFlushRequested;
 
         protected Serializer(string[] queries)
         {
@@ -200,7 +204,8 @@ namespace gov.llnl.wintap.core.etl.extract
                 }
 
                 this.sensorData.Enqueue(obj);
-                Interlocked.Increment(ref sensorDataDepth);
+                long queueDepth = Interlocked.Increment(ref sensorDataDepth);
+                RequestHighWaterFlush(queueDepth);
             }
             else
             {
@@ -292,11 +297,23 @@ namespace gov.llnl.wintap.core.etl.extract
                 ? DropPolicy.DropOldest
                 : backlogDropPolicy;
 
+            ETLConfig etlConfig = Utilities.GetETLConfig();
+            int flushIntervalSeconds = SerializerSchedule.ResolveIntervalSeconds(
+                SensorName,
+                etlConfig.SerializationIntervalSec,
+                etlConfig.FileSerializationIntervalSec ?? 5);
+            fileFlushHighWaterEvents = etlConfig.FileSerializationHighWaterEvents ?? 5000;
             flushToDiskTimer = new System.Timers.Timer();
-            flushToDiskTimer.Interval = Utilities.GetETLConfig().SerializationIntervalSec * 1000;
+            flushToDiskTimer.Interval = flushIntervalSeconds * 1000;
             flushToDiskTimer.AutoReset = true;
             flushToDiskTimer.Elapsed += FlushToDiskTimer_Elapsed;
             flushToDiskTimer.Start();
+
+            WintapLogger.Log.Append($"{SensorName}: serializer flush interval={flushIntervalSeconds}s", LogLevel.Info);
+            if (fileFlushHighWaterEvents > 0 && SensorName == "fileserializer")
+            {
+                WintapLogger.Log.Append($"{SensorName}: serializer high-water flush threshold={fileFlushHighWaterEvents}", LogLevel.Info);
+            }
 
             regContext();
 
@@ -307,88 +324,144 @@ namespace gov.llnl.wintap.core.etl.extract
 
         private void FlushToDiskTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if (this.SensorName == "Host" || this.SensorName == "MacIp")
+            FlushToDisk("timer");
+        }
+
+        private void RequestHighWaterFlush(long queueDepth)
+        {
+            if (!SerializerSchedule.ShouldRequestHighWaterFlush(SensorName, queueDepth, fileFlushHighWaterEvents) ||
+                Interlocked.CompareExchange(ref highWaterFlushRequested, 1, 0) != 0)
             {
                 return;
             }
 
-            int currentQueueDepth = (int)Math.Min(int.MaxValue, Interlocked.Read(ref sensorDataDepth));
-            List<ExpandoObject> tempQueue = new List<ExpandoObject>();
-
-            for (int i = 0; i < currentQueueDepth; i++)
+            WintapLogger.Log.Append($"{SensorName}: serializer high-water flush requested depth={queueDepth}", LogLevel.Info);
+            ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
                 {
-                    ExpandoObject msg;
-                    if (sensorData.TryDequeue(out msg))
+                    while (Interlocked.Read(ref sensorDataDepth) >= fileFlushHighWaterEvents)
                     {
-                        tempQueue.Add(msg);
-                        Interlocked.Decrement(ref sensorDataDepth);
-                    }
-                    else
-                    {
-                        WintapLogger.Log.Append($"{this.SensorName}: WARNING - Failed to dequeue message at index {i}", LogLevel.Info);
+                        if (FlushToDisk("high_water"))
+                        {
+                            break;
+                        }
+
+                        Thread.Sleep(1);
                     }
                 }
-                catch (Exception ex)
+                finally
                 {
-                    WintapLogger.Log.Append($"{this.SensorName}: ERROR getting message from SendQueue at index {i}: {ex.Message}", LogLevel.Info);
+                    Interlocked.Exchange(ref highWaterFlushRequested, 0);
+                    RequestHighWaterFlush(Interlocked.Read(ref sensorDataDepth));
                 }
+            });
+        }
+
+        private bool FlushToDisk(string trigger)
+        {
+            if (this.SensorName == "Host" || this.SensorName == "MacIp")
+            {
+                return false;
             }
 
-            if (tempQueue.Count > 0)
+            // A slow disk write must not start a second drain over the same queue.
+            if (Interlocked.CompareExchange(ref flushInProgress, 1, 0) != 0)
             {
-                try
+                Interlocked.Increment(ref skippedOverlappingFlushes);
+                return false;
+            }
+
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
+            int drained = 0;
+
+            try
+            {
+                int currentQueueDepth = (int)Math.Min(int.MaxValue, Interlocked.Read(ref sensorDataDepth));
+                List<ExpandoObject> tempQueue = new List<ExpandoObject>(currentQueueDepth);
+
+                for (int i = 0; i < currentQueueDepth; i++)
                 {
-                    if (serialize(tempQueue).Count == 0)
+                    try
                     {
-                        tempQueue.Clear();
+                        ExpandoObject msg;
+                        if (sensorData.TryDequeue(out msg))
+                        {
+                            tempQueue.Add(msg);
+                            Interlocked.Decrement(ref sensorDataDepth);
+                            drained++;
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"{this.SensorName}: WARNING - Failed to dequeue message at index {i}", LogLevel.Info);
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        WintapLogger.Log.Append($"{this.SensorName}: ERROR - temp queue not empty after serialize. Dropped event count: {tempQueue.Count}", LogLevel.Info);
+                        WintapLogger.Log.Append($"{this.SensorName}: ERROR getting message from SendQueue at index {i}: {ex.Message}", LogLevel.Info);
                     }
                 }
-                catch (Exception ex)
+
+                if (tempQueue.Count > 0)
                 {
-                    WintapLogger.Log.Append($"{this.SensorName}: ERROR writing event data to disk: {ex.Message}", LogLevel.Info);
+                    try
+                    {
+                        if (serialize(tempQueue).Count == 0)
+                        {
+                            tempQueue.Clear();
+                        }
+                        else
+                        {
+                            WintapLogger.Log.Append($"{this.SensorName}: ERROR - temp queue not empty after serialize. Dropped event count: {tempQueue.Count}", LogLevel.Info);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        WintapLogger.Log.Append($"{this.SensorName}: ERROR writing event data to disk: {ex.Message}", LogLevel.Info);
+                    }
                 }
             }
+            finally
+            {
+                long elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - started) * 1000L / System.Diagnostics.Stopwatch.Frequency;
+                long skipped = Interlocked.Exchange(ref skippedOverlappingFlushes, 0);
+                if (drained > 0 || skipped > 0)
+                {
+                    WintapLogger.Log.Append(
+                        $"{this.SensorName}: serializer_flush trigger={trigger},drained={drained},remaining={Interlocked.Read(ref sensorDataDepth)},elapsed_ms={elapsedMs},skipped_overlap={skipped},parquet_backlog={parquetWriter.Backlog}",
+                        LogLevel.Info);
+                }
+                Interlocked.Exchange(ref flushInProgress, 0);
+            }
+
+            return true;
         }
 
         private List<ExpandoObject> serialize(List<ExpandoObject> tempQueue)
         {
-            int totalObjectsProcessed = 0;
-            //  in the Default case, we need to create MessageType specific sub queues so that parquet writer has a single schema
-            //  Since the Default sensor can contain mixed MessageTypes, enumerate/remove tempQueue by messageType until it's empty
-            //  A Batch is a set of Serializer data.   A Set is the sensor data.  Default can have multiple Sets.
-            ConcurrentQueue<ExpandoObject> tempQOfType = new ConcurrentQueue<ExpandoObject>();
             ParquetWriter.Batch batch = new ParquetWriter.Batch(this.SensorName);
             try
             {
-                while (tempQueue.Count > 0)
+                // Preserve each message type's arrival order while grouping in one pass.
+                var dataByMessageType = new Dictionary<string, ConcurrentQueue<ExpandoObject>>();
+                foreach (ExpandoObject message in tempQueue)
                 {
-                    dynamic firstMessage = tempQueue[0];
-                    string firstMsgType = firstMessage.MessageType;
-                    for (int i = 0; i < tempQueue.Count; i++)
+                    dynamic typedMessage = message;
+                    string messageType = typedMessage.MessageType;
+                    if (!dataByMessageType.TryGetValue(messageType, out ConcurrentQueue<ExpandoObject> messages))
                     {
-                        dynamic tempObj = tempQueue[i];
-                        if (tempObj.MessageType == firstMsgType)
-                        {
-                            tempQOfType.Enqueue(tempObj);
-                            totalObjectsProcessed++;
-                        }
+                        messages = new ConcurrentQueue<ExpandoObject>();
+                        dataByMessageType[messageType] = messages;
                     }
-                    for (int j = 0; j < tempQOfType.Count; j++)
-                    {
-                        dynamic tempObj = tempQOfType.ElementAt(j);
-                        tempQueue.Remove(tempObj);
-                    }
-
-                    ParquetWriter.Batch.SensorData set = new ParquetWriter.Batch.SensorData(this.SensorName, firstMsgType, tempQOfType);
-                    batch.Add(set);
-                    tempQOfType = new ConcurrentQueue<ExpandoObject>();
+                    messages.Enqueue(message);
                 }
+
+                foreach (KeyValuePair<string, ConcurrentQueue<ExpandoObject>> entry in dataByMessageType)
+                {
+                    ParquetWriter.Batch.SensorData set = new ParquetWriter.Batch.SensorData(this.SensorName, entry.Key, entry.Value);
+                    batch.Add(set);
+                }
+                tempQueue.Clear();
             }
             catch (Exception ex)
             {
