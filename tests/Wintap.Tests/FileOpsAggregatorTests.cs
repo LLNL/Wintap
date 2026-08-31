@@ -149,5 +149,23 @@ namespace Wintap.Tests
             Assert.Equal("first-name", summary.ProcessName);
             Assert.Equal("first-hash", summary.PidHash);
         }
+
+        [Fact]
+        public void FlushExpired_RecordsTimingForCounterReporting()
+        {
+            var (agg, _) = Create();
+            agg.FlushExpired(nowMs: 1);
+
+            agg.TakeFlushTiming(out long flushCount, out long flushTicks, out long maxFlushTicks);
+
+            Assert.Equal(1, flushCount);
+            Assert.True(flushTicks >= 0);
+            Assert.True(maxFlushTicks >= 0);
+
+            agg.TakeFlushTiming(out flushCount, out flushTicks, out maxFlushTicks);
+            Assert.Equal(0, flushCount);
+            Assert.Equal(0, flushTicks);
+            Assert.Equal(0, maxFlushTicks);
+        }
     }
 }

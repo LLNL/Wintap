@@ -277,8 +277,12 @@ namespace gov.llnl.wintap.core.etl.load
             {
                 if (uploadTimer.Elapsed.TotalSeconds > etlConfig.UploadIntervalSec)
                 {
+                    var cycleTimer = Stopwatch.StartNew();
                     doMerge();
+                    long mergeElapsedMs = cycleTimer.ElapsedMilliseconds;
                     List<FileInfo> rawSensorFiles = getRawSensorParquetFiles();
+                    int rawSensorFileCount = rawSensorFiles.Count;
+                    long rawSensorBytes = rawSensorFiles.Where(file => file.Exists).Sum(file => file.Length);
                     if (rawSensorFiles.Count > 0)
                     {
                         WintapLogger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Info);
@@ -315,6 +319,9 @@ namespace gov.llnl.wintap.core.etl.load
                             }
                         }
                     }
+                    WintapLogger.Log.Append(
+                        $"CacheManager cycle metrics: files={rawSensorFileCount},bytes={rawSensorBytes},merge_ms={mergeElapsedMs},total_ms={cycleTimer.ElapsedMilliseconds}",
+                        LogLevel.Info);
                     uploadTimer.Restart();
                 }
                 if (DateTime.Now.Minute == 0 && DateTime.Now.Second < 2)  // only once at the top of the hour

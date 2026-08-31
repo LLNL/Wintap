@@ -98,6 +98,13 @@ namespace gov.llnl.wintap.core.infrastructure
         public static string Runtime => stopWatch.Elapsed.ToString(@"dd\.hh\:mm\:ss");
         public static int DroppedEventCount => droppedEventCount;
 
+        internal struct EventSendTiming
+        {
+            internal long ProcessResolveTicks;
+            internal long HealthTicks;
+            internal long EsperTicks;
+        }
+
         internal static void AddDroppedEvents(int count)
         {
             if (count <= 0)
@@ -238,6 +245,17 @@ namespace gov.llnl.wintap.core.infrastructure
         /// </remarks>
         public static void Send(WintapMessage streamedEvent)
         {
+            SendCore(streamedEvent, false, out _);
+        }
+
+        internal static void SendMeasured(WintapMessage streamedEvent, out EventSendTiming timing)
+        {
+            SendCore(streamedEvent, true, out timing);
+        }
+
+        private static void SendCore(WintapMessage streamedEvent, bool measure, out EventSendTiming timing)
+        {
+            timing = default;
             // Update events per second calculation
             totalEvents++;
             var now = DateTime.Now;
@@ -266,10 +284,16 @@ namespace gov.llnl.wintap.core.infrastructure
 
                 if (_directParquetEnabled)
                 {
+                    long directHealthStarted = measure ? Stopwatch.GetTimestamp() : 0;
                     InspectForHealth(streamedEvent);
+                    if (measure)
+                    {
+                        timing.HealthTicks = Stopwatch.GetTimestamp() - directHealthStarted;
+                    }
                     DirectParquetSink.Save(streamedEvent);
                     return;
                 }
+                long processResolveStarted = measure ? Stopwatch.GetTimestamp() : 0;
                 DateTime eventTimeUtc = DateTime.FromFileTimeUtc(streamedEvent.EventTime);
 
                 // Resolve process information using platform-specific resolver
@@ -309,7 +333,9 @@ namespace gov.llnl.wintap.core.infrastructure
                         }
                         else if (!usedCurrentProcessCache)
                         {
-                            ownerProcess = _processResolver.ResolveProcessAtTime(streamedEvent.PID, eventTimeUtc);
+                            ownerProcess = streamedEvent.MessageType == WintapMessage.MessageTypeEnum.File
+                                ? _processResolver.ResolveProcessIdentityAtTime(streamedEvent.PID, eventTimeUtc)
+                                : _processResolver.ResolveProcessAtTime(streamedEvent.PID, eventTimeUtc);
                         }
 
                         if (ownerProcess != null)
@@ -429,7 +455,17 @@ namespace gov.llnl.wintap.core.infrastructure
                     }
                 }
 
+                if (measure)
+                {
+                    timing.ProcessResolveTicks = Stopwatch.GetTimestamp() - processResolveStarted;
+                }
+
+                long healthStarted = measure ? Stopwatch.GetTimestamp() : 0;
                 InspectForHealth(streamedEvent);
+                if (measure)
+                {
+                    timing.HealthTicks = Stopwatch.GetTimestamp() - healthStarted;
+                }
 
                 if (_skipEsperSend)
                 {
@@ -437,7 +473,12 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
 
                 // Send to Esper
+                long esperStarted = measure ? Stopwatch.GetTimestamp() : 0;
                 EsperRuntime.EventService.SendEventBean(streamedEvent, "WintapMessage");
+                if (measure)
+                {
+                    timing.EsperTicks = Stopwatch.GetTimestamp() - esperStarted;
+                }
             }
             catch (Exception ex)
             {
@@ -462,6 +503,20 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             hits = Interlocked.Exchange(ref _fileProcessCacheHits, 0);
             misses = Interlocked.Exchange(ref _fileProcessCacheMisses, 0);
+        }
+
+        internal static void TakeHistoricalProcessCacheCounters(out long hits, out long misses, out long evictions, out int entries)
+        {
+            if (_processResolver != null)
+            {
+                _processResolver.TakeHistoricalIdentityCacheCounters(out hits, out misses, out evictions, out entries);
+                return;
+            }
+
+            hits = 0;
+            misses = 0;
+            evictions = 0;
+            entries = 0;
         }
 
         internal static bool TryPopulateCurrentProcessIdentity(WintapMessage streamedEvent)
@@ -854,10 +909,10 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             if (property.Equals("MessageType", StringComparison.OrdinalIgnoreCase))
             {
-                return $"gov.llnl.wintap.collect.models.WintapMessage.MessageTypeEnum.{value}";
+                return $"gov.llnl.wintap.collect.models.WintapMessage$MessageTypeEnum.{value}";
             }
 
-            return $"gov.llnl.wintap.collect.models.WintapMessage.ActivityTypeEnum.{value}";
+            return $"gov.llnl.wintap.collect.models.WintapMessage$ActivityTypeEnum.{value}";
         }
 
         private static void StatsWorker_DoWork(object sender, DoWorkEventArgs e)

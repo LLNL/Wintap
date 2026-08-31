@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 import os
 import platform
 import signal
@@ -38,6 +39,8 @@ from typing import Iterable
 class FileStimulus:
     pid: int
     path: Path
+    path_prefix: str
+    unique_file_count: int
     start_epoch: float
 
 
@@ -165,62 +168,85 @@ SELECT * FROM data LIMIT 1;
 def build_query(files: Iterable[Path], stimulus: FileStimulus, cols: dict[str, str]) -> str:
     file_list = ", ".join(sql_string(str(path)) for path in files)
     want_path = str(stimulus.path).lower()
+    want_prefix = stimulus.path_prefix.lower()
     return f"""
 WITH data AS (
     SELECT * FROM read_parquet([{file_list}], union_by_name=true)
 )
 SELECT
     TRY_CAST({cols['pid']} AS INTEGER) AS pid,
+    {stimulus.unique_file_count} AS expected_paths,
     lower(CAST({cols['message_type']} AS VARCHAR)) AS message_type,
     lower(CAST({cols['activity_type']} AS VARCHAR)) AS activity_type,
     lower(CAST({cols['file_path']} AS VARCHAR)) AS file_path,
+    lower(CAST({cols['file_path']} AS VARCHAR)) = {sql_string(want_path)} AS is_first_path,
     TRY_CAST({cols['captured_ts']} AS TIMESTAMP) AS captured_utc
 FROM data
 WHERE TRY_CAST({cols['pid']} AS INTEGER) = {stimulus.pid}
   AND lower(CAST({cols['message_type']} AS VARCHAR)) LIKE '%file%'
-  AND lower(CAST({cols['file_path']} AS VARCHAR)) = {sql_string(want_path)}
+  AND starts_with(lower(CAST({cols['file_path']} AS VARCHAR)), {sql_string(want_prefix)})
 ORDER BY captured_utc DESC NULLS LAST;
 """
 
 
-def generate_file_activity(base_dir: Path | None = None) -> FileStimulus:
+def generate_file_activity(base_dir: Path | None = None, unique_file_count: int = 1) -> FileStimulus:
     start_epoch = time.time()
     pid = os.getpid()
 
     base = base_dir or (Path("/tmp") / "lintap-file-smoke")
     base.mkdir(parents=True, exist_ok=True)
-    path = base / (f"wintap-file-smoke-{pid}-{int(start_epoch)}.txt")
-
     payload = ("lintap-file-smoke " + str(start_epoch)).encode("utf-8")
+    first_path: Path | None = None
 
-    # Write
-    with open(path, "wb") as f:
-        f.write(payload)
-        f.flush()
-        os.fsync(f.fileno())
+    for index in range(max(1, unique_file_count)):
+        path = base / (f"wintap-file-smoke-{pid}-{int(start_epoch)}-{index}.txt")
+        if first_path is None:
+            first_path = path
 
-    # Read
-    with open(path, "rb") as f:
-        _ = f.read(64)
+        # Write
+        with open(path, "wb") as f:
+            f.write(payload)
+            if unique_file_count == 1:
+                f.flush()
+                os.fsync(f.fileno())
 
-    # Append
-    with open(path, "ab") as f:
-        f.write(b"\nmore")
+        # Read
+        with open(path, "rb") as f:
+            _ = f.read(64)
 
-    # Delete
-    try:
-        os.unlink(path)
-    except FileNotFoundError:
-        pass
+        # Append
+        with open(path, "ab") as f:
+            f.write(b"\nmore")
 
-    return FileStimulus(pid=pid, path=path, start_epoch=start_epoch)
+        # Delete
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+
+    assert first_path is not None
+    return FileStimulus(
+        pid=pid,
+        path=first_path,
+        path_prefix=str(base / f"wintap-file-smoke-{pid}-{int(start_epoch)}-"),
+        unique_file_count=max(1, unique_file_count),
+        start_epoch=start_epoch,
+    )
 
 
 def validate(rows: list[dict]) -> tuple[bool, str]:
     if not rows:
         return False, "no matching file rows"
 
-    activities = {str(r.get("activity_type") or "").lower() for r in rows}
+    distinct_paths = {str(r.get("file_path") or "").lower() for r in rows}
+    distinct_paths.discard("")
+    expected_paths = max(1, int(rows[0].get("expected_paths") or 1)) if rows else 1
+    minimum_paths = max(1, math.ceil(expected_paths * 0.95))
+    if len(distinct_paths) < minimum_paths:
+        return False, f"insufficient distinct path coverage ({len(distinct_paths)}/{expected_paths}, minimum={minimum_paths})"
+
+    first_path_rows = [row for row in rows if row.get("is_first_path")]
+    activities = {str(r.get("activity_type") or "").lower() for r in first_path_rows}
     activities.discard("")
 
     # Be tolerant across tracer variants/kernels: some paths may only reliably
@@ -231,6 +257,15 @@ def validate(rows: list[dict]) -> tuple[bool, str]:
         return False, f"insufficient activity diversity (have={sorted(activities)})"
 
     return True, "ok"
+
+
+def serializer_drops_since(log_path: Path, start_offset: int) -> list[str]:
+    try:
+        with log_path.open("r", encoding="utf-8", errors="replace") as log_file:
+            log_file.seek(start_offset)
+            return [line.rstrip() for line in log_file if "fileserializer: in-memory backlog limit reached" in line]
+    except OSError as exc:
+        return [f"could not read {log_path}: {exc}"]
 
 
 def start_lintap_direct_parquet(lintap_dll: Path, data_root: Path) -> subprocess.Popen:
@@ -343,6 +378,29 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=240)
     parser.add_argument("--poll-interval", type=int, default=10)
     parser.add_argument("--file-dir", type=Path, default=None, help="Directory to create the test file under")
+    parser.add_argument(
+        "--unique-file-count",
+        type=int,
+        default=1,
+        help="number of distinct files to create for a high-cardinality FileOps burst",
+    )
+    parser.add_argument(
+        "--require-no-serializer-drops",
+        action="store_true",
+        help="fail if FileSerializer reports a backlog drop after this smoke starts",
+    )
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        default=None,
+        help="Lintap log path for --require-no-serializer-drops (defaults to <data-root>/Logs/Lintap.log)",
+    )
+    parser.add_argument(
+        "--serializer-observation-seconds",
+        type=int,
+        default=0,
+        help="additional time to observe the serializer log after capture validation",
+    )
     args = parser.parse_args()
 
     data_root: Path
@@ -379,11 +437,19 @@ def main() -> int:
                 return 2
 
         parquet_root = args.parquet_root or (data_root / "parquet")
+        log_path = args.log_file or (data_root / "Logs" / "Lintap.log")
+        log_start_offset = 0
+        if args.require_no_serializer_drops:
+            try:
+                log_start_offset = log_path.stat().st_size
+            except OSError as exc:
+                print(f"FAIL: cannot mark serializer log start: {exc}")
+                return 2
         print(f"data root: {data_root}")
         print(f"parquet root: {parquet_root}")
 
-        stimulus = generate_file_activity(args.file_dir)
-        print(f"generated file activity: pid={stimulus.pid} path={stimulus.path}")
+        stimulus = generate_file_activity(args.file_dir, args.unique_file_count)
+        print(f"generated file activity: pid={stimulus.pid} path={stimulus.path} unique_files={max(1, args.unique_file_count)}")
 
         deadline = time.time() + args.timeout
         last_error = None
@@ -414,9 +480,20 @@ def main() -> int:
 
             ok, msg = validate(rows)
             if ok:
+                if args.require_no_serializer_drops:
+                    if args.serializer_observation_seconds > 0:
+                        print(f"observing serializer log for {args.serializer_observation_seconds}s")
+                        time.sleep(args.serializer_observation_seconds)
+                    drops = serializer_drops_since(log_path, log_start_offset)
+                    if drops:
+                        print("FAIL: FileSerializer dropped events after smoke start")
+                        for line in drops[:10]:
+                            print("  " + line)
+                        return 2
                 activities = sorted({str(r.get("activity_type") or "").lower() for r in rows if r.get("activity_type")})
+                distinct_paths = len({str(r.get("file_path") or "").lower() for r in rows if r.get("file_path")})
                 print("PASS: captured recent file activity")
-                print(f"  rows={len(rows)} activities={activities}")
+                print(f"  rows={len(rows)} distinct_paths={distinct_paths} activities={activities}")
                 return 0
 
             last_error = msg

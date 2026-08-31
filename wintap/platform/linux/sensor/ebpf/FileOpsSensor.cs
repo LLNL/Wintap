@@ -27,6 +27,9 @@ namespace gov.llnl.wintap.platform.linux.collect
         private BlockingCollection<QueuedFileEvent> _sendQueue;
         private Thread? _sendWorker;
         private int _statsMapFd = -1;
+        private int _policyStatsMapFd = -1;
+        private readonly List<string> _denyCommRules = new List<string>();
+        private readonly ulong[] _policyStatsLast = new ulong[128];
         private readonly bool _lowercasePaths;
         private readonly long _monotonicToRealtimeOffsetNs;
 
@@ -110,6 +113,7 @@ namespace gov.llnl.wintap.platform.linux.collect
         private readonly bool _aggregationEnabled;
         private readonly int _aggregationWindowMs;
         private System.Threading.Timer _aggregationFlushTimer;
+        private System.Threading.Timer _counterLogTimer;
         private long _aggFirstEmits;
         private long _aggSummaryEnqueueFailures;
         private long _aggBytesClamped;
@@ -118,7 +122,15 @@ namespace gov.llnl.wintap.platform.linux.collect
         private const int SendSampleInterval = 64;
         private long _sendSampleCounter;
         private long _sendSampleTicks;
+        private long _sendProcessResolveSampleTicks;
+        private long _sendHealthSampleTicks;
+        private long _sendEsperSampleTicks;
         private long _sendSampleCount;
+        private long _sendSampleMaxTicks;
+        private long _sendProcessResolveSampleMaxTicks;
+        private long _sendHealthSampleMaxTicks;
+        private long _sendEsperSampleMaxTicks;
+        private readonly object _sendTimingLock = new object();
         private long _nextCounterLogTickMs;
         private readonly object _measurementLock = new object();
         private readonly Dictionary<string, MeasurementAggregate> _emitByComm = new Dictionary<string, MeasurementAggregate>(StringComparer.Ordinal);
@@ -241,6 +253,11 @@ namespace gov.llnl.wintap.platform.linux.collect
 
             InitializeStatsMap();
             InitializeSelfPidFilter();
+            if (!InitializeDenyCommPolicy())
+            {
+                Stop();
+                return false;
+            }
 
             // Attach additional programs from the same .bpf.o file
             try
@@ -560,6 +577,7 @@ namespace gov.llnl.wintap.platform.linux.collect
             long total = sys + proc + dev;
             string userSummary = BuildAndResetUserCounterSummary();
             string kernelSummary = BuildKernelCounterSummary();
+            string policySummary = BuildPolicyCounterSummary();
             string measurementSummary = BuildAndResetMeasurementSummary();
             long relativeOpenResolvedViaDirIndex = Interlocked.Exchange(ref _relativeOpenResolvedViaDirIndex, 0);
             long relativeOpenDirIndexMisses = Interlocked.Exchange(ref _relativeOpenDirIndexMisses, 0);
@@ -574,29 +592,86 @@ namespace gov.llnl.wintap.platform.linux.collect
             long aggFirstEmits = Interlocked.Exchange(ref _aggFirstEmits, 0);
             long aggSummaryFailures = Interlocked.Exchange(ref _aggSummaryEnqueueFailures, 0);
             long aggBytesClamped = Interlocked.Exchange(ref _aggBytesClamped, 0);
+            long aggFlushCount = 0;
+            long aggFlushTicks = 0;
+            long aggMaxFlushTicks = 0;
+            _aggregator?.TakeFlushTiming(out aggFlushCount, out aggFlushTicks, out aggMaxFlushTicks);
+            long aggFlushAverageUs = aggFlushCount > 0
+                ? (aggFlushTicks * 1_000_000L) / (System.Diagnostics.Stopwatch.Frequency * aggFlushCount)
+                : 0;
+            long aggFlushMaxUs = aggMaxFlushTicks * 1_000_000L / System.Diagnostics.Stopwatch.Frequency;
+            int fdCachePidCount = _fdToPath.Count;
+            int fdCacheEntryCount = 0;
+            foreach (ConcurrentDictionary<uint, string> fdMap in _fdToPath.Values)
+            {
+                fdCacheEntryCount += fdMap.Count;
+            }
             string aggSummary = _aggregator == null
                 ? "enabled=false"
-                : $"enabled=true,window_ms={_aggregationWindowMs},first_emits={aggFirstEmits},repeats_folded={_aggregator.TakeRepeatsFolded()},summaries={_aggregator.TakeSummariesEmitted()},cap_bypass={_aggregator.TakeCapBypass()},entries={_aggregator.EntryCount},summary_enqueue_fail={aggSummaryFailures},bytes_clamped={aggBytesClamped}";
-            long sendSampleTicks = Interlocked.Exchange(ref _sendSampleTicks, 0);
-            long sendSampleCount = Interlocked.Exchange(ref _sendSampleCount, 0);
+                : $"enabled=true,window_ms={_aggregationWindowMs},first_emits={aggFirstEmits},repeats_folded={_aggregator.TakeRepeatsFolded()},summaries={_aggregator.TakeSummariesEmitted()},cap_bypass={_aggregator.TakeCapBypass()},entries={_aggregator.EntryCount},flushes={aggFlushCount},flush_avg_us={aggFlushAverageUs},flush_max_us={aggFlushMaxUs},summary_enqueue_fail={aggSummaryFailures},bytes_clamped={aggBytesClamped}";
+            long sendSampleTicks;
+            long sendProcessResolveSampleTicks;
+            long sendHealthSampleTicks;
+            long sendEsperSampleTicks;
+            long sendSampleCount;
+            long sendSampleMaxTicks;
+            long sendProcessResolveSampleMaxTicks;
+            long sendHealthSampleMaxTicks;
+            long sendEsperSampleMaxTicks;
+            lock (_sendTimingLock)
+            {
+                sendSampleTicks = _sendSampleTicks;
+                sendProcessResolveSampleTicks = _sendProcessResolveSampleTicks;
+                sendHealthSampleTicks = _sendHealthSampleTicks;
+                sendEsperSampleTicks = _sendEsperSampleTicks;
+                sendSampleCount = _sendSampleCount;
+                sendSampleMaxTicks = _sendSampleMaxTicks;
+                sendProcessResolveSampleMaxTicks = _sendProcessResolveSampleMaxTicks;
+                sendHealthSampleMaxTicks = _sendHealthSampleMaxTicks;
+                sendEsperSampleMaxTicks = _sendEsperSampleMaxTicks;
+                _sendSampleTicks = 0;
+                _sendProcessResolveSampleTicks = 0;
+                _sendHealthSampleTicks = 0;
+                _sendEsperSampleTicks = 0;
+                _sendSampleCount = 0;
+                _sendSampleMaxTicks = 0;
+                _sendProcessResolveSampleMaxTicks = 0;
+                _sendHealthSampleMaxTicks = 0;
+                _sendEsperSampleMaxTicks = 0;
+            }
             long sendSampleAvgUs = sendSampleCount > 0
                 ? (sendSampleTicks * 1_000_000L) / (System.Diagnostics.Stopwatch.Frequency * sendSampleCount)
                 : 0;
-            string senderSummary = $"send_sample_avg_us={sendSampleAvgUs},samples={sendSampleCount},interval={SendSampleInterval}";
+            long sendProcessResolveAvgUs = AverageSampleMicroseconds(sendProcessResolveSampleTicks, sendSampleCount);
+            long sendHealthAvgUs = AverageSampleMicroseconds(sendHealthSampleTicks, sendSampleCount);
+            long sendEsperAvgUs = AverageSampleMicroseconds(sendEsperSampleTicks, sendSampleCount);
+            string senderSummary = $"send_sample_avg_us={sendSampleAvgUs},send_sample_max_us={TicksToMicroseconds(sendSampleMaxTicks)},resolve_avg_us={sendProcessResolveAvgUs},resolve_max_us={TicksToMicroseconds(sendProcessResolveSampleMaxTicks)},health_avg_us={sendHealthAvgUs},health_max_us={TicksToMicroseconds(sendHealthSampleMaxTicks)},esper_avg_us={sendEsperAvgUs},esper_max_us={TicksToMicroseconds(sendEsperSampleMaxTicks)},samples={sendSampleCount},interval={SendSampleInterval}";
 
-            if (total <= 0 && queueDrops <= 0 && queueDepth <= 0 && queueHighWatermark <= 0 && string.IsNullOrEmpty(userSummary) && string.IsNullOrEmpty(kernelSummary) && string.IsNullOrEmpty(measurementSummary))
+            if (total <= 0 && queueDrops <= 0 && queueDepth <= 0 && queueHighWatermark <= 0 && fdCacheEntryCount <= 0 && string.IsNullOrEmpty(userSummary) && string.IsNullOrEmpty(kernelSummary) && string.IsNullOrEmpty(measurementSummary))
             {
                 return;
             }
 
             WintapLogger.Log.Append(
-                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} queue=[{queueSummary}] agg=[{aggSummary}] sender=[{senderSummary}] user=[{userSummary}] resolve=[{resolutionSummary}] measure=[{measurementSummary}] kernel=[{kernelSummary}]",
+                $"{SensorName} counters (last ~60s): pseudo=/sys:{sys},/proc:{proc},/dev:{dev},total:{total} queue=[{queueSummary}] fd_cache=[pids={fdCachePidCount},entries={fdCacheEntryCount}] policy=[{policySummary}] agg=[{aggSummary}] sender=[{senderSummary}] user=[{userSummary}] resolve=[{resolutionSummary}] measure=[{measurementSummary}] kernel=[{kernelSummary}]",
                 LogLevel.Info);
         }
 
         private static uint ReadUInt32(IntPtr data, int offset)
         {
             return unchecked((uint)Marshal.ReadInt32(data, offset));
+        }
+
+        private static long AverageSampleMicroseconds(long ticks, long count)
+        {
+            return count > 0
+                ? (ticks * 1_000_000L) / (System.Diagnostics.Stopwatch.Frequency * count)
+                : 0;
+        }
+
+        private static long TicksToMicroseconds(long ticks)
+        {
+            return ticks * 1_000_000L / System.Diagnostics.Stopwatch.Frequency;
         }
 
         private static ulong ReadUInt64(IntPtr data, int offset)
@@ -675,6 +750,16 @@ namespace gov.llnl.wintap.platform.linux.collect
             if (cacheHits > 0 || cacheMisses > 0)
             {
                 parts.Add($"process_cache:hit={cacheHits},miss={cacheMisses}");
+            }
+
+            EventChannel.TakeHistoricalProcessCacheCounters(
+                out long historicalHits,
+                out long historicalMisses,
+                out long historicalEvictions,
+                out int historicalEntries);
+            if (historicalHits > 0 || historicalMisses > 0 || historicalEntries > 0)
+            {
+                parts.Add($"process_history_cache:hit={historicalHits},miss={historicalMisses},entries={historicalEntries},evictions={historicalEvictions}");
             }
 
             return string.Join("; ", parts);
@@ -866,6 +951,12 @@ namespace gov.llnl.wintap.platform.linux.collect
             };
             _sendWorker.Start();
 
+            // Policy counters must remain observable even when every matching
+            // event is suppressed before reaching the userspace callback.
+            _counterLogTimer = new System.Threading.Timer(
+                _ => { try { MaybeLogCounters(); } catch { } },
+                null, 1000, 1000);
+
             if (_aggregator != null)
             {
                 int flushPeriodMs = Math.Max(250, _aggregationWindowMs / 2);
@@ -894,9 +985,20 @@ namespace gov.llnl.wintap.platform.linux.collect
                     if ((Interlocked.Increment(ref _sendSampleCounter) & (SendSampleInterval - 1)) == 0)
                     {
                         long startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
-                        EventChannel.Send(queued.Message);
-                        Interlocked.Add(ref _sendSampleTicks, System.Diagnostics.Stopwatch.GetTimestamp() - startTicks);
-                        Interlocked.Increment(ref _sendSampleCount);
+                        EventChannel.SendMeasured(queued.Message, out EventChannel.EventSendTiming timing);
+                        long totalTicks = System.Diagnostics.Stopwatch.GetTimestamp() - startTicks;
+                        lock (_sendTimingLock)
+                        {
+                            _sendSampleTicks += totalTicks;
+                            _sendProcessResolveSampleTicks += timing.ProcessResolveTicks;
+                            _sendHealthSampleTicks += timing.HealthTicks;
+                            _sendEsperSampleTicks += timing.EsperTicks;
+                            _sendSampleCount++;
+                            _sendSampleMaxTicks = Math.Max(_sendSampleMaxTicks, totalTicks);
+                            _sendProcessResolveSampleMaxTicks = Math.Max(_sendProcessResolveSampleMaxTicks, timing.ProcessResolveTicks);
+                            _sendHealthSampleMaxTicks = Math.Max(_sendHealthSampleMaxTicks, timing.HealthTicks);
+                            _sendEsperSampleMaxTicks = Math.Max(_sendEsperSampleMaxTicks, timing.EsperTicks);
+                        }
                     }
                     else
                     {
@@ -1263,6 +1365,110 @@ namespace gov.llnl.wintap.platform.linux.collect
             }
         }
 
+        private bool InitializeDenyCommPolicy()
+        {
+            IReadOnlyList<string> configuredRules;
+            try
+            {
+                configuredRules = FileOpsDenyPolicy.Parse(ConfigManager.GetValue<string>("WINTAP_FILEOPS_DENY_COMMS"));
+            }
+            catch (ArgumentException ex)
+            {
+                WintapLogger.Log.Append($"{SensorName} deny policy rejected: {ex.Message}", LogLevel.Error);
+                return false;
+            }
+
+            if (configuredRules.Count == 0)
+            {
+                WintapLogger.Log.Append($"{SensorName} deny policy disabled", LogLevel.Info);
+                return true;
+            }
+
+            try
+            {
+                IntPtr policyMap = LibBpf.bpf_object__find_map_by_name(BpfObject, "fileops_deny_comms");
+                IntPtr policyStatsMap = LibBpf.bpf_object__find_map_by_name(BpfObject, "fileops_policy_stats");
+                if (policyMap == IntPtr.Zero || policyStatsMap == IntPtr.Zero)
+                {
+                    WintapLogger.Log.Append($"{SensorName} deny policy maps are unavailable in the loaded BPF object", LogLevel.Error);
+                    return false;
+                }
+
+                int policyMapFd = LibBpf.bpf_map__fd(policyMap);
+                _policyStatsMapFd = LibBpf.bpf_map__fd(policyStatsMap);
+                if (policyMapFd < 0 || _policyStatsMapFd < 0)
+                {
+                    WintapLogger.Log.Append($"{SensorName} deny policy map descriptors are invalid", LogLevel.Error);
+                    return false;
+                }
+
+                for (int index = 0; index < configuredRules.Count; index++)
+                {
+                    byte[] key = new byte[16];
+                    System.Text.Encoding.UTF8.GetBytes(configuredRules[index], 0, configuredRules[index].Length, key, 0);
+                    uint ruleId = (uint)(index + 1);
+                    GCHandle handle = GCHandle.Alloc(key, GCHandleType.Pinned);
+                    try
+                    {
+                        if (LibBpf.bpf_map_update_elem(policyMapFd, handle.AddrOfPinnedObject(), ref ruleId, 0) != 0)
+                        {
+                            WintapLogger.Log.Append($"{SensorName} could not install deny policy rule {ruleId} ({configuredRules[index]})", LogLevel.Error);
+                            return false;
+                        }
+                    }
+                    finally
+                    {
+                        handle.Free();
+                    }
+
+                    _denyCommRules.Add(configuredRules[index]);
+                }
+
+                WintapLogger.Log.Append($"{SensorName} deny policy enabled rules=[{string.Join(",", _denyCommRules)}]", LogLevel.Warn);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"{SensorName} deny policy initialization failed: {ex.Message}", LogLevel.Error);
+                return false;
+            }
+        }
+
+        private string BuildPolicyCounterSummary()
+        {
+            if (_denyCommRules.Count == 0)
+            {
+                return "enabled=false";
+            }
+
+            var rules = new List<string>();
+            for (int ruleIndex = 0; ruleIndex < _denyCommRules.Count; ruleIndex++)
+            {
+                var operations = new List<string>();
+                for (int opIndex = 1; opIndex < OpSlots; opIndex++)
+                {
+                    uint statKey = (uint)(((ruleIndex + 1) * 8) + opIndex);
+                    ulong current = LookupCounter(_policyStatsMapFd, statKey);
+                    ulong previous = _policyStatsLast[statKey];
+                    ulong delta = current >= previous ? current - previous : current;
+                    _policyStatsLast[statKey] = current;
+                    if (delta > 0)
+                    {
+                        operations.Add($"{OpName(opIndex)}={delta}");
+                    }
+                }
+
+                if (operations.Count > 0)
+                {
+                    rules.Add($"rule{ruleIndex + 1}:{_denyCommRules[ruleIndex]}({string.Join(",", operations)})");
+                }
+            }
+
+            return rules.Count == 0
+                ? $"enabled=true,rules={_denyCommRules.Count},suppressed_attempts=0"
+                : $"enabled=true,rules={_denyCommRules.Count},suppressed_attempts={string.Join(";", rules)}";
+        }
+
         private string BuildKernelCounterSummary()
         {
             if (_statsMapFd < 0)
@@ -1322,9 +1528,14 @@ namespace gov.llnl.wintap.platform.linux.collect
 
         private ulong LookupKernelCounter(uint key)
         {
+            return LookupCounter(_statsMapFd, key);
+        }
+
+        private static ulong LookupCounter(int mapFd, uint key)
+        {
             try
             {
-                return LibBpf.bpf_map_lookup_elem(_statsMapFd, ref key, out ulong value) == 0 ? value : 0;
+                return mapFd >= 0 && LibBpf.bpf_map_lookup_elem(mapFd, ref key, out ulong value) == 0 ? value : 0;
             }
             catch
             {
@@ -1427,6 +1638,8 @@ namespace gov.llnl.wintap.platform.linux.collect
         {
             try
             {
+                _counterLogTimer?.Dispose();
+                _counterLogTimer = null;
                 _aggregationFlushTimer?.Dispose();
                 _aggregationFlushTimer = null;
                 // Drain pending summaries into the queue before it stops

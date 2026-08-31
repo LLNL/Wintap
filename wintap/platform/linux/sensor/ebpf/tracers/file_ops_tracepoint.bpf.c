@@ -9,6 +9,8 @@
 #define FILEOPS_RECORD_FD 2
 #define FILEOPS_RINGBUF_SIZE (16 * 1024 * 1024)
 #define FILEOPS_FORCE_WAKEUP_BYTES (2 * 1024 * 1024)
+#define FILEOPS_POLICY_MAX_RULES 15
+#define FILEOPS_POLICY_STAT_SLOTS 128
 
 #define O_DIRECTORY 00200000
 #define AT_FDCWD (-100)
@@ -86,6 +88,10 @@ struct openat_state {
     __s32 dirfd;
 };
 
+struct fileops_comm_key {
+    char comm[TASK_COMM_LEN];
+};
+
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 8192);
@@ -111,6 +117,20 @@ struct {
     __type(key, __u32);
     __type(value, __u32);
 } fileops_filter_pids SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, FILEOPS_POLICY_MAX_RULES);
+    __type(key, struct fileops_comm_key);
+    __type(value, __u32);
+} fileops_deny_comms SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, FILEOPS_POLICY_STAT_SLOTS);
+    __type(key, __u32);
+    __type(value, __u64);
+} fileops_policy_stats SEC(".maps");
 
 static __always_inline void increment_stat(__u32 key)
 {
@@ -188,6 +208,21 @@ static __always_inline int should_drop_self_pid(__u32 pid, __u32 op_type)
     return 0;
 }
 
+static __always_inline int should_drop_policy(__u32 op_type)
+{
+    struct fileops_comm_key key = {};
+    bpf_get_current_comm(&key.comm, sizeof(key.comm));
+    __u32 *rule_id = bpf_map_lookup_elem(&fileops_deny_comms, &key);
+    if (!rule_id || *rule_id == 0 || *rule_id > FILEOPS_POLICY_MAX_RULES)
+        return 0;
+
+    __u32 stat_key = (*rule_id * 8) + op_type;
+    __u64 *value = bpf_map_lookup_elem(&fileops_policy_stats, &stat_key);
+    if (value)
+        __sync_fetch_and_add(value, 1);
+    return 1;
+}
+
 static __always_inline void submit_file_event(void *event)
 {
     __u64 flags = BPF_RB_NO_WAKEUP;
@@ -203,6 +238,8 @@ static __always_inline void submit_file_event(void *event)
 static __always_inline void emit_file_fd_event(__u32 pid, __u32 fd, __u32 bytes, __u32 op_type)
 {
     struct file_fd_event *event;
+    if (should_drop_policy(op_type))
+        return;
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
     if (!event) {
         increment_stat(ring_fail_key_for_op(op_type));
@@ -227,6 +264,8 @@ static __always_inline void emit_file_fd_event(__u32 pid, __u32 fd, __u32 bytes,
 static __always_inline void emit_file_event_saved(__u32 pid, const char *filename_buf, __u32 fd, __u32 bytes, __u32 op_type, __s32 dirfd)
 {
     struct file_path_event *event;
+    if (should_drop_policy(op_type))
+        return;
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
     if (!event) {
         increment_stat(ring_fail_key_for_op(op_type));
@@ -258,6 +297,8 @@ static __always_inline void emit_file_event_saved(__u32 pid, const char *filenam
 static __always_inline void emit_file_event_user(__u32 pid, const char *filename, __u32 fd, __u32 bytes, __u32 op_type, __s32 dirfd)
 {
     struct file_path_event *event;
+    if (should_drop_policy(op_type))
+        return;
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
     if (!event) {
         increment_stat(ring_fail_key_for_op(op_type));
