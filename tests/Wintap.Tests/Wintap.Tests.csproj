@@ -21,6 +21,7 @@
          dependency-free aggregator directly so its unit tests can run. -->
     <Compile Include="..\..\wintap\platform\linux\sensor\ebpf\FileOpsAggregator.cs" Link="FileOpsAggregator.cs" />
     <Compile Include="..\..\wintap\platform\linux\sensor\ebpf\DirIdentityIndex.cs" Link="DirIdentityIndex.cs" />
+    <Compile Include="..\..\wintap\platform\linux\sensor\ebpf\FileOpsDenyPolicy.cs" Link="FileOpsDenyPolicy.cs" />
     <ProjectReference Include="..\..\wintap\Wintap.csproj" />
   </ItemGroup>
 

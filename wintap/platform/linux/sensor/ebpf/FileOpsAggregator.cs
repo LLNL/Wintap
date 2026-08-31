@@ -45,6 +45,9 @@ namespace gov.llnl.wintap.platform.linux.collect
         private long _repeatsFolded;
         private long _summariesEmitted;
         private long _capBypass;
+        private long _flushCount;
+        private long _flushTicks;
+        private long _maxFlushTicks;
 
         public FileOpsAggregator(int windowMs, int maxKeys, Action<AggregateEntry> emitSummary)
         {
@@ -68,6 +71,13 @@ namespace gov.llnl.wintap.platform.linux.collect
         public long TakeRepeatsFolded() => Interlocked.Exchange(ref _repeatsFolded, 0);
         public long TakeSummariesEmitted() => Interlocked.Exchange(ref _summariesEmitted, 0);
         public long TakeCapBypass() => Interlocked.Exchange(ref _capBypass, 0);
+
+        public void TakeFlushTiming(out long flushCount, out long flushTicks, out long maxFlushTicks)
+        {
+            flushCount = Interlocked.Exchange(ref _flushCount, 0);
+            flushTicks = Interlocked.Exchange(ref _flushTicks, 0);
+            maxFlushTicks = Interlocked.Exchange(ref _maxFlushTicks, 0);
+        }
 
         /// <summary>
         /// Returns true when the event was absorbed as a repeat (caller must
@@ -136,37 +146,48 @@ namespace gov.llnl.wintap.platform.linux.collect
 
         public void FlushExpired(long nowMs)
         {
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
             List<AggregateEntry> due = null;
-            lock (_gate)
+            try
             {
-                List<(int, string, uint)> remove = null;
-                foreach (var pair in _entries)
+                lock (_gate)
                 {
-                    if (nowMs - pair.Value.WindowStartMs > _windowMs)
+                    List<(int, string, uint)> remove = null;
+                    foreach (var pair in _entries)
                     {
-                        (remove ??= new List<(int, string, uint)>()).Add(pair.Key);
-                        if (pair.Value.RepeatCount > 0)
+                        if (nowMs - pair.Value.WindowStartMs > _windowMs)
                         {
-                            (due ??= new List<AggregateEntry>()).Add(pair.Value);
+                            (remove ??= new List<(int, string, uint)>()).Add(pair.Key);
+                            if (pair.Value.RepeatCount > 0)
+                            {
+                                (due ??= new List<AggregateEntry>()).Add(pair.Value);
+                            }
+                        }
+                    }
+
+                    if (remove != null)
+                    {
+                        foreach (var key in remove)
+                        {
+                            _entries.Remove(key);
                         }
                     }
                 }
 
-                if (remove != null)
+                if (due != null)
                 {
-                    foreach (var key in remove)
+                    foreach (AggregateEntry entry in due)
                     {
-                        _entries.Remove(key);
+                        EmitSummary(entry);
                     }
                 }
             }
-
-            if (due != null)
+            finally
             {
-                foreach (AggregateEntry entry in due)
-                {
-                    EmitSummary(entry);
-                }
+                long elapsed = System.Diagnostics.Stopwatch.GetTimestamp() - started;
+                Interlocked.Increment(ref _flushCount);
+                Interlocked.Add(ref _flushTicks, elapsed);
+                UpdateMax(ref _maxFlushTicks, elapsed);
             }
         }
 
@@ -224,6 +245,18 @@ namespace gov.llnl.wintap.platform.linux.collect
             {
                 // The emit callback owns its own error accounting; the
                 // aggregator must never throw into the poller or timer thread.
+            }
+        }
+
+        private static void UpdateMax(ref long target, long observed)
+        {
+            while (true)
+            {
+                long current = Interlocked.Read(ref target);
+                if (observed <= current || Interlocked.CompareExchange(ref target, observed, current) == current)
+                {
+                    return;
+                }
             }
         }
     }
