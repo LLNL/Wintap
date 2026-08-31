@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../shared/WintapAPI/WintapAPI.csproj" />
+    <Compile Include="../../wintap/core/infrastructure/BoundedEventTimeCache.cs" Link="BoundedEventTimeCache.cs" />
   </ItemGroup>
 
 </Project>

@@ -30,7 +30,9 @@ namespace gov.llnl.wintap.core.infrastructure
         private DuckDBConnection connection;
         private readonly object _dbLock = new object();
         private readonly ConcurrentDictionary<int, ActiveProcessCacheEntry> _activeProcesses = new ConcurrentDictionary<int, ActiveProcessCacheEntry>();
+        private readonly BoundedEventTimeCache<ProcessRecord> _historicalIdentityCache;
         private string agentId;
+        private readonly string sessionId;
         private readonly Dictionary<int, List<PendingExit>> _pendingExits = new Dictionary<int, List<PendingExit>>();
         private readonly Dictionary<int, List<RecentlyPrunedProcess>> _recentlyPrunedProcesses = new Dictionary<int, List<RecentlyPrunedProcess>>();
         private readonly List<TelemetryEvent> _pendingTelemetry = new List<TelemetryEvent>();
@@ -42,6 +44,8 @@ namespace gov.llnl.wintap.core.infrastructure
         private readonly TimeSpan _recentlyPrunedCacheRetention;
         private readonly TimeSpan _telemetryRetention;
         private readonly bool _telemetryDetailEnabled;
+        private readonly int _historicalIdentityCacheCapacity;
+        private readonly bool _maintenanceLoggingEnabled;
         private DateTime _nextMaintenanceUtc = DateTime.MinValue;
 
         private const string ProcessRetentionTelemetryTable = "process_retention_telemetry";
@@ -111,6 +115,8 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             processHash = new ProcessHash();
             agentId = StateManager.AgentId.ToString(); // This triggers StateManager initialization
+            sessionId = StateManager.SessionId.ToString();
+            _maintenanceLoggingEnabled = true;
             _retentionEnabled = GetConfiguredBool("WINTAP_PROCESS_RETENTION_ENABLED", true);
             _reconcileStaleOpenEnabled = GetConfiguredBool("WINTAP_PROCESS_RECONCILE_STALE_OPEN_ENABLED", true);
             _sweepInterval = GetConfiguredTimeSpanSeconds("WINTAP_PROCESS_SWEEP_INTERVAL_SEC", TimeSpan.FromMinutes(5));
@@ -119,6 +125,9 @@ namespace gov.llnl.wintap.core.infrastructure
             _recentlyPrunedCacheRetention = TimeSpan.FromTicks(Math.Max(_exitRetention.Ticks, _sweepInterval.Ticks * 2));
             _telemetryRetention = GetConfiguredTimeSpanSeconds("WINTAP_PROCESS_RETENTION_TELEMETRY_RETENTION_SEC", TimeSpan.FromHours(24));
             _telemetryDetailEnabled = GetConfiguredBool("WINTAP_PROCESS_RETENTION_TELEMETRY_DETAIL_ENABLED", false);
+            _historicalIdentityCacheCapacity = GetConfiguredInt(
+                "WINTAP_PROCESS_HISTORICAL_IDENTITY_CACHE_ENTRIES", 32768, 0, 262144);
+            _historicalIdentityCache = new BoundedEventTimeCache<ProcessRecord>(_historicalIdentityCacheCapacity);
             InitializeDatabase();
 
             WintapLogger.Log.Append("BackupDatabaseManager initialized for WintapCoreSvcMgr.exe", LogLevel.Info);
@@ -128,7 +137,33 @@ namespace gov.llnl.wintap.core.infrastructure
             WintapLogger.Log.Append(
                 $"ProcessResolver retention: enabled={_retentionEnabled}, sweepIntervalSec={(int)_sweepInterval.TotalSeconds}, exitRetentionSec={(int)_exitRetention.TotalSeconds}, reconcileOpen={_reconcileStaleOpenEnabled}, reconcileMinAgeSec={(int)_reconcileMinAge.TotalSeconds}, telemetryRetentionSec={(int)_telemetryRetention.TotalSeconds}, telemetryDetail={_telemetryDetailEnabled}",
                 LogLevel.Info);
+            WintapLogger.Log.Append(
+                $"ProcessResolver historical identity cache: capacity={_historicalIdentityCacheCapacity}",
+                LogLevel.Info);
             WintapLogger.Log.Append("═══════════════════════════════════════════", LogLevel.Info);
+        }
+
+        internal ProcessResolver(
+            DuckDBConnection testConnection,
+            int historicalIdentityCacheCapacity,
+            bool enableMaintenance = false)
+        {
+            processHash = new ProcessHash();
+            agentId = "test";
+            sessionId = "test";
+            _maintenanceLoggingEnabled = false;
+            connection = testConnection ?? throw new ArgumentNullException(nameof(testConnection));
+            _retentionEnabled = true;
+            _reconcileStaleOpenEnabled = false;
+            _sweepInterval = TimeSpan.FromMinutes(5);
+            _exitRetention = TimeSpan.FromHours(1);
+            _reconcileMinAge = TimeSpan.FromMinutes(1);
+            _recentlyPrunedCacheRetention = TimeSpan.FromHours(1);
+            _telemetryRetention = TimeSpan.FromHours(24);
+            _telemetryDetailEnabled = false;
+            _historicalIdentityCacheCapacity = historicalIdentityCacheCapacity;
+            _historicalIdentityCache = new BoundedEventTimeCache<ProcessRecord>(historicalIdentityCacheCapacity);
+            _nextMaintenanceUtc = enableMaintenance ? DateTime.MinValue : DateTime.MaxValue;
         }
 
         /// <summary>
@@ -142,29 +177,26 @@ namespace gov.llnl.wintap.core.infrastructure
                 string query = null;
                 try
                 {
-                    var eventTimeStr = eventTime.ToString("yyyy-MM-dd HH:mm:ss");
-
                      query = $@"
                          SELECT pid_hash, parent_pid_hash, process_id, parent_process_id,
                          process_name, image_path, command_line, create_time,
                          exit_time, exit_code, source, user_name, md5_hash, sha2_hash
                          FROM process
-                         WHERE process_id = {pid}
-                         AND create_time <= '{eventTimeStr}'
-                         AND (exit_time IS NULL OR exit_time >= '{eventTimeStr}')
+                         WHERE process_id = $process_id
+                         AND create_time <= $event_time
+                         AND (exit_time IS NULL OR exit_time >= $event_time)
                          ORDER BY create_time DESC
                          LIMIT 1";
 
                     using var command = connection.CreateCommand();
                     command.CommandText = query;
+                    command.Parameters.Add(new DuckDBParameter("process_id", pid));
+                    command.Parameters.Add(new DuckDBParameter("event_time", eventTime.ToUniversalTime()));
 
                     using var reader = command.ExecuteReader();
 
                     if (!reader.Read())
                     {
-                        WintapLogger.Log.Append(
-                            $"No process found with PID {pid} created before {eventTime:yyyy-MM-dd HH:mm:ss}",
-                            LogLevel.Debug);
                         return null;  // CRITICAL: Return null instead of continuing
                     }
 
@@ -185,10 +217,6 @@ namespace gov.llnl.wintap.core.infrastructure
                         MD5Hash = reader.IsDBNull(12) ? "" : reader.GetString(12),
                         SHA2Hash = reader.IsDBNull(13) ? "" : reader.GetString(13)
                     };
-
-                    WintapLogger.Log.Append(
-                        $"Process resolver found process: {owningProcess.ProcessName} with PID: {owningProcess.ProcessId} at {eventTime:yyyy-MM-dd HH:mm:ss}",
-                        LogLevel.Debug);
 
                     return owningProcess;
                 }
@@ -223,6 +251,37 @@ namespace gov.llnl.wintap.core.infrastructure
                     throw;
                 }
             }          
+        }
+
+        public ProcessRecord ResolveProcessIdentityAtTime(int pid, DateTime eventTime)
+        {
+            if (_historicalIdentityCache.TryGet(pid, eventTime, out ProcessRecord cached))
+            {
+                return cached;
+            }
+
+            ProcessRecord resolved = ResolveProcessAtTime(pid, eventTime);
+            if (resolved == null && _historicalIdentityCache.TryGetWithoutCounting(pid, eventTime, out cached))
+            {
+                // Maintenance may have moved the matching row into the cache
+                // immediately before the durable lookup.
+                return cached;
+            }
+            if (resolved?.ExitTime != null)
+            {
+                CacheHistoricalIdentity(
+                    resolved.ProcessId,
+                    resolved.PidHash,
+                    resolved.ProcessName,
+                    resolved.CreateTime,
+                    resolved.ExitTime.Value);
+            }
+            return resolved;
+        }
+
+        public void TakeHistoricalIdentityCacheCounters(out long hits, out long misses, out long evictions, out int entries)
+        {
+            _historicalIdentityCache.TakeCounters(out hits, out misses, out evictions, out entries);
         }
 
         public bool TryResolveCurrentProcessAtTime(int pid, DateTime eventTime, out ProcessRecord process)
@@ -409,7 +468,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
                     var update = $@"
                         UPDATE process
-                        SET exit_time = TIMESTAMP '{exitTime:yyyy-MM-dd HH:mm:ss}',
+                        SET exit_time = $exit_time,
                             exit_code = {exitCode},
                             parent_pid_hash = {(string.IsNullOrEmpty(proc.ParentPidHash) ? "parent_pid_hash" : $"'{EscapeSql(proc.ParentPidHash)}'")},
                             parent_process_id = {proc.ParentPID}
@@ -417,6 +476,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
                     using var updateCmd = connection.CreateCommand();
                     updateCmd.CommandText = update;
+                    updateCmd.Parameters.Add(new DuckDBParameter("exit_time", exitTime));
                     try
                     {
                         var rows = updateCmd.ExecuteNonQuery();
@@ -625,7 +685,6 @@ namespace gov.llnl.wintap.core.infrastructure
                 }
             }
 
-            string exitTimeSql = exitTimeUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
             var closedRows = new List<(string PidHash, int ProcessId, string ProcessName)>();
             foreach (var openRow in openRows)
             {
@@ -637,9 +696,10 @@ namespace gov.llnl.wintap.core.infrastructure
                 using var update = connection.CreateCommand();
                 update.CommandText = $@"
                     UPDATE process
-                    SET exit_time = TIMESTAMP '{exitTimeSql}'
+                    SET exit_time = $exit_time
                     WHERE pid_hash = '{EscapeSql(openRow.PidHash)}'
                       AND exit_time IS NULL";
+                update.Parameters.Add(new DuckDBParameter("exit_time", exitTimeUtc.ToUniversalTime()));
                 if (update.ExecuteNonQuery() > 0)
                 {
                     closedRows.Add(openRow);
@@ -678,6 +738,16 @@ namespace gov.llnl.wintap.core.infrastructure
             }
 
             return bool.TryParse(configured, out bool parsed) ? parsed : defaultValue;
+        }
+
+        private static int GetConfiguredInt(string key, int defaultValue, int minValue, int maxValue)
+        {
+            string value = ConfigManager.GetValue<string>(key);
+            if (!int.TryParse(value, out int configured) || configured < minValue || configured > maxValue)
+            {
+                return defaultValue;
+            }
+            return configured;
         }
 
         private static TimeSpan GetConfiguredTimeSpanSeconds(string key, TimeSpan defaultValue)
@@ -742,7 +812,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
             var update = $@"
                 UPDATE process
-                SET exit_time = COALESCE(exit_time, TIMESTAMP '{pending.ExitTime:yyyy-MM-dd HH:mm:ss}'),
+                SET exit_time = COALESCE(exit_time, $exit_time),
                     exit_code = COALESCE(exit_code, {pending.ExitCode}),
                     parent_pid_hash = {(string.IsNullOrEmpty(pending.ParentPidHash) ? "parent_pid_hash" : $"'{EscapeSql(pending.ParentPidHash)}'")},
                     parent_process_id = CASE WHEN {pending.ParentPid} > 0 THEN {pending.ParentPid} ELSE parent_process_id END
@@ -750,6 +820,7 @@ namespace gov.llnl.wintap.core.infrastructure
 
             using var updateCmd = connection.CreateCommand();
             updateCmd.CommandText = update;
+            updateCmd.Parameters.Add(new DuckDBParameter("exit_time", pending.ExitTime));
             updateCmd.ExecuteNonQuery();
 
             if (rowWasOpen)
@@ -1121,6 +1192,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 deleteCommand.CommandText = deleteQuery;
                 deleteCommand.ExecuteNonQuery();
                 _activeProcesses.Clear();
+                _historicalIdentityCache.Clear();
 
                 WintapLogger.Log.Append($"Cleared {recordCount} process records from event store", LogLevel.Info);
             }
@@ -1133,6 +1205,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 return;
             }
 
+            var maintenanceTimer = Stopwatch.StartNew();
             try
             {
                 if (_reconcileStaleOpenEnabled)
@@ -1144,11 +1217,21 @@ namespace gov.llnl.wintap.core.infrastructure
                 PruneRecentlyPrunedProcessesLocked(nowUtc);
                 FlushTelemetryLocked(nowUtc);
                 DeleteExpiredTelemetryRowsLocked(nowUtc);
-                UpdateHeartbeat(connection, nowUtc, StateManager.SessionId.ToString());
+                UpdateHeartbeat(connection, nowUtc, sessionId);
                 _nextMaintenanceUtc = nowUtc + _sweepInterval;
+                if (_maintenanceLoggingEnabled)
+                {
+                    WintapLogger.Log.Append(
+                        $"ProcessResolver maintenance timing: elapsed_ms={maintenanceTimer.ElapsedMilliseconds},active_cache={_activeProcesses.Count},pending_exit_pids={_pendingExits.Count},recently_pruned_pids={_recentlyPrunedProcesses.Count}",
+                        LogLevel.Info);
+                }
             }
             catch (Exception ex)
             {
+                if (!_maintenanceLoggingEnabled)
+                {
+                    throw;
+                }
                 _nextMaintenanceUtc = nowUtc + TimeSpan.FromMinutes(1);
                 WintapLogger.Log.Append($"ProcessResolver maintenance sweep failed: {ex.Message}", LogLevel.Warn);
             }
@@ -1158,7 +1241,6 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             DateTime minCreateTimeUtc = nowUtc - _reconcileMinAge;
             string minCreateTimeSql = minCreateTimeUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-            string exitTimeSql = nowUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
             using var command = connection.CreateCommand();
             command.CommandText = $@"
@@ -1215,9 +1297,10 @@ namespace gov.llnl.wintap.core.infrastructure
                 using var update = connection.CreateCommand();
                 update.CommandText = $@"
                     UPDATE process
-                    SET exit_time = TIMESTAMP '{exitTimeSql}'
+                    SET exit_time = $exit_time
                     WHERE pid_hash = '{EscapeSql(openRow.PidHash)}'
                       AND exit_time IS NULL";
+                update.Parameters.Add(new DuckDBParameter("exit_time", nowUtc));
 
                 if (update.ExecuteNonQuery() > 0)
                 {
@@ -1237,7 +1320,8 @@ namespace gov.llnl.wintap.core.infrastructure
                 SELECT pid_hash, process_id, process_name, create_time, exit_time
                 FROM process
                 WHERE exit_time IS NOT NULL
-                  AND exit_time < TIMESTAMP '{cutoffSql}'";
+                  AND exit_time < TIMESTAMP '{cutoffSql}'
+                ORDER BY exit_time ASC";
 
             var expiredRows = new List<ExitedProcessRow>();
             using (var reader = select.ExecuteReader())
@@ -1262,6 +1346,12 @@ namespace gov.llnl.wintap.core.infrastructure
 
             foreach (var expiredRow in expiredRows)
             {
+                CacheHistoricalIdentity(
+                    expiredRow.ProcessId,
+                    expiredRow.PidHash,
+                    expiredRow.ProcessName,
+                    expiredRow.CreateTime,
+                    expiredRow.ExitTime);
                 AddRecentlyPrunedProcessLocked(expiredRow, nowUtc);
                 RecordTelemetryEvent(RetentionDeletedMetricName, expiredRow.ProcessName, expiredRow.PidHash);
                 RemoveActiveProcessCacheEntry(expiredRow.ProcessId, expiredRow.PidHash);
@@ -1292,6 +1382,19 @@ namespace gov.llnl.wintap.core.infrastructure
                 ExitTime = expiredRow.ExitTime,
                 PrunedAtUtc = prunedAtUtc
             });
+        }
+
+        private void CacheHistoricalIdentity(int pid, string pidHash, string processName, DateTime createTime, DateTime exitTime)
+        {
+            var identity = new ProcessRecord
+            {
+                PidHash = pidHash,
+                ProcessId = pid,
+                ProcessName = NormalizeProcessName(processName),
+                CreateTime = createTime,
+                ExitTime = exitTime
+            };
+            _historicalIdentityCache.Set(pid, pidHash, createTime, exitTime, identity);
         }
 
         private void PruneRecentlyPrunedProcessesLocked(DateTime nowUtc)
@@ -1488,7 +1591,7 @@ namespace gov.llnl.wintap.core.infrastructure
         {
             var flushedRows = FlushTelemetryEventsLocked(observedAtUtc).ToList();
 
-            if (flushedRows.Count > 0)
+            if (_maintenanceLoggingEnabled && flushedRows.Count > 0)
             {
                 WintapLogger.Log.Append($"ProcessResolver maintenance metrics: {string.Join(", ", flushedRows)}", LogLevel.Info);
             }

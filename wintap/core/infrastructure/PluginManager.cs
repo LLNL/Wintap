@@ -665,7 +665,9 @@ namespace gov.llnl.wintap.core.infrastructure
 
         private void ConfigureEsperEventRouting()
         {
-            if (subscribers.Any() || doETL)
+            // ETL serializers deploy their own EPL statements. The broad
+            // all-event route is only needed when subscriber plugins exist.
+            if (subscribers.Any())
             {
                 try
                 {

@@ -22,10 +22,18 @@ namespace gov.llnl.wintap.core.infrastructure
         ProcessRecord ResolveProcessAtTime(int pid, DateTime eventTime);
 
         /// <summary>
+        /// Resolve only process identity, using bounded event-time-valid history
+        /// for exited process instances before consulting durable storage.
+        /// </summary>
+        ProcessRecord ResolveProcessIdentityAtTime(int pid, DateTime eventTime);
+
+        /// <summary>
         /// Resolve the currently active process for a PID from the in-memory cache.
         /// Returns false when the PID is not active or the event predates the cached process start.
         /// </summary>
         bool TryResolveCurrentProcessAtTime(int pid, DateTime eventTime, out ProcessRecord process);
+
+        void TakeHistoricalIdentityCacheCounters(out long hits, out long misses, out long evictions, out int entries);
 
         void RegisterProcess(WintapMessage processEvent);
 
