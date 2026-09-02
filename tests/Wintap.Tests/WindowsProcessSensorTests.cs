@@ -435,7 +435,8 @@ namespace Wintap.Tests
 
         [Fact]
         [Trait("Category", "ptr-02")]
-        public void InitializeSnapshotRefresh_AbsentSystemRowClearsBeforeEmitAndLogsDegradation()
+        [Trait("Category", "wpc-12")]
+        public void InitializeSnapshotRefresh_AbsentSystemRowLogsNewBootRebuild()
         {
             var operations = new List<string>();
             var logs = new List<string>();
@@ -451,7 +452,10 @@ namespace Wintap.Tests
             Assert.Equal("clear", operations[0]);
             Assert.Equal(1, operations.Count(operation => operation == "clear"));
             Assert.StartsWith("emit:", operations[1]);
-            Assert.Contains(logs, message => message.Contains("rebuilt from snapshot, lineage degraded"));
+            Assert.Contains(
+                "Windows process snapshot refresh rebuilt from snapshot: new boot session; early-boot lineage restored by boot ETL replay when armed",
+                logs);
+            Assert.DoesNotContain(logs, message => message.Contains("lineage degraded"));
             Assert.True(sensor.LastRefreshRebuiltFromSnapshot);
         }
 
@@ -1222,6 +1226,179 @@ namespace Wintap.Tests
         }
 
         [Fact]
+        [Trait("Category", "wpc-12")]
+        public void LogBootReplayComplete_ReportsReplayPassOutcomes()
+        {
+            var entries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(out _, logEntries: entries);
+
+            sensor.LogBootReplayComplete(@"C:\ProgramData\Wintap\boot.etl", 7, 11, 3);
+
+            (string message, LogLevel level) = Assert.Single(entries);
+            Assert.Equal(
+                @"Windows process boot ETL replay complete from 'C:\ProgramData\Wintap\boot.etl': starts_emitted=7 duplicates_suppressed=11 parent_links_repaired=3",
+                message);
+            Assert.Equal(LogLevel.Info, level);
+        }
+
+        [Theory]
+        [Trait("Category", "wpc-11")]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void HandleReplayedStart_DuplicateRepairsOnlyUnknownParent(bool unknownParent)
+        {
+            DateTime replayedStart = BootTime().AddMinutes(13);
+            string storedParentHash = unknownParent ? TestPidHash(-1, 0) : "healthy-parent";
+            var repairs = new List<(string PidHash, int ParentPid, string ParentPidHash)>();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) => pid == 1100
+                    ? new ProcessRecord
+                    {
+                        PidHash = "child-hash",
+                        ParentPidHash = storedParentHash,
+                        ProcessId = pid,
+                        CreateTime = replayedStart
+                    }
+                    : new ProcessRecord { PidHash = "resolved-parent", ProcessId = pid },
+                repairParentLinkage: (pidHash, parentPid, parentPidHash) =>
+                {
+                    repairs.Add((pidHash, parentPid, parentPidHash));
+                    return true;
+                });
+
+            WintapMessage message = sensor.HandleReplayedStart(
+                1100, 1099, replayedStart, "child.exe", string.Empty);
+
+            Assert.Null(message);
+            Assert.Empty(emitted);
+            Assert.Equal(1, sensor.DedupSuppressedCount);
+            Assert.Equal(0, sensor.BootReplayCount);
+            if (unknownParent)
+            {
+                Assert.Equal(("child-hash", 1099, "resolved-parent"), Assert.Single(repairs));
+            }
+            else
+            {
+                Assert.Empty(repairs);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-11")]
+        public void HandleLiveStart_DuplicateRepairsUnknownParentAtChildCreateTime()
+        {
+            DateTime liveStart = BootTime().AddMinutes(14);
+            DateTime parentLookupTime = default;
+            var repairs = new List<(string PidHash, int ParentPid, string ParentPidHash)>();
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) =>
+                {
+                    if (pid == 1200)
+                    {
+                        return new ProcessRecord
+                        {
+                            PidHash = "live-child",
+                            ParentPidHash = string.Empty,
+                            ProcessId = pid,
+                            CreateTime = liveStart
+                        };
+                    }
+
+                    parentLookupTime = time;
+                    return new ProcessRecord { PidHash = "live-parent", ProcessId = pid };
+                },
+                repairParentLinkage: (pidHash, parentPid, parentPidHash) =>
+                {
+                    repairs.Add((pidHash, parentPid, parentPidHash));
+                    return true;
+                });
+
+            WintapMessage message = sensor.HandleLiveStart(
+                1200, 1199, liveStart, "live-child.exe", string.Empty);
+
+            Assert.Null(message);
+            Assert.Empty(emitted);
+            Assert.Equal(liveStart, parentLookupTime);
+            Assert.Equal(("live-child", 1199, "live-parent"), Assert.Single(repairs));
+            Assert.Equal(1, sensor.DedupSuppressedCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-12")]
+        public void HandleReplayedStart_UnspecifiedUtcDuplicateIsSuppressedAndRepairsParentOnce()
+        {
+            DateTime replayedStartUtc = BootTime().AddMinutes(15);
+            DateTime storedCreateTime = DateTime.SpecifyKind(replayedStartUtc, DateTimeKind.Unspecified);
+            int repairCalls = 0;
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) => pid == 1300
+                    ? new ProcessRecord
+                    {
+                        PidHash = "replay-child",
+                        ParentPidHash = TestPidHash(-1, 0),
+                        ProcessId = pid,
+                        CreateTime = storedCreateTime
+                    }
+                    : new ProcessRecord { PidHash = "replay-parent", ProcessId = pid },
+                repairParentLinkage: (pidHash, parentPid, parentPidHash) =>
+                {
+                    repairCalls++;
+                    Assert.Equal("replay-child", pidHash);
+                    Assert.Equal(1299, parentPid);
+                    Assert.Equal("replay-parent", parentPidHash);
+                    return true;
+                });
+
+            WintapMessage message = sensor.HandleReplayedStart(
+                1300, 1299, replayedStartUtc, "replay-child.exe", string.Empty);
+
+            Assert.Null(message);
+            Assert.Empty(emitted);
+            Assert.Equal(1, sensor.DedupSuppressedCount);
+            Assert.Equal(0, sensor.BootReplayCount);
+            Assert.Equal(1, repairCalls);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-12")]
+        public void HandleLiveStart_UnspecifiedUtcDuplicateIsSuppressedAndRepairsParentOnce()
+        {
+            DateTime liveStartUtc = BootTime().AddMinutes(16);
+            DateTime storedCreateTime = DateTime.SpecifyKind(liveStartUtc, DateTimeKind.Unspecified);
+            int repairCalls = 0;
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) => pid == 1400
+                    ? new ProcessRecord
+                    {
+                        PidHash = "live-child",
+                        ParentPidHash = string.Empty,
+                        ProcessId = pid,
+                        CreateTime = storedCreateTime
+                    }
+                    : new ProcessRecord { PidHash = "live-parent", ProcessId = pid },
+                repairParentLinkage: (pidHash, parentPid, parentPidHash) =>
+                {
+                    repairCalls++;
+                    Assert.Equal("live-child", pidHash);
+                    Assert.Equal(1399, parentPid);
+                    Assert.Equal("live-parent", parentPidHash);
+                    return true;
+                });
+
+            WintapMessage message = sensor.HandleLiveStart(
+                1400, 1399, liveStartUtc, "live-child.exe", string.Empty);
+
+            Assert.Null(message);
+            Assert.Empty(emitted);
+            Assert.Equal(1, sensor.DedupSuppressedCount);
+            Assert.Equal(1, repairCalls);
+        }
+
+        [Fact]
         [Trait("Category", "wpc-07")]
         public void QaCounterLineIncludesBootReplayCount()
         {
@@ -1230,6 +1407,336 @@ namespace Wintap.Tests
             string formatted = WindowsProcessSensor.FormatQaCounterSnapshot(counters);
 
             AssertQaCounterName(formatted, "boot_replay_count", "42");
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10")]
+        public void HandleLiveStart_SuppressesSnapshotOverlapAndOnlyIncrementsDedupCounter()
+        {
+            DateTime liveStart = BootTime().AddMinutes(20);
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) => new ProcessRecord
+                {
+                    ProcessId = pid,
+                    CreateTime = liveStart.AddSeconds(1)
+                });
+
+            WintapMessage message = sensor.HandleLiveStart(
+                2000, 4, liveStart, "overlap.exe", "overlap.exe", null, SidParseStatus.Extracted);
+
+            Assert.Null(message);
+            Assert.Empty(emitted);
+            Assert.Equal(1, sensor.DedupSuppressedCount);
+            Assert.Equal(0, sensor.BootReplayCount);
+            Assert.Equal(0, sensor.StopWithoutStartCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10")]
+        public void HandleLiveStart_ResolverMissEmitsStart()
+        {
+            DateTime liveStart = BootTime().AddMinutes(21);
+            var sensor = CreateSensor(out List<WintapMessage> emitted, resolver: (pid, time) => null);
+
+            WintapMessage message = sensor.HandleLiveStart(
+                2001, 2000, liveStart, "miss.exe", "miss.exe --live", null, SidParseStatus.Extracted);
+
+            Assert.Same(message, Assert.Single(emitted));
+            Assert.Equal(WintapMessage.ActivityTypeEnum.Start, message.ActivityType);
+            Assert.Equal(liveStart.ToFileTimeUtc(), message.EventTime);
+            Assert.Equal(TestPidHash(2001, liveStart.ToFileTimeUtc()), message.PidHash);
+            Assert.Equal(0, sensor.DedupSuppressedCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10")]
+        public void HandleLiveStart_SamePidOutsideToleranceEmitsAsPidReuse()
+        {
+            DateTime liveStart = BootTime().AddMinutes(22);
+            var sensor = CreateSensor(
+                out List<WintapMessage> emitted,
+                resolver: (pid, time) => new ProcessRecord
+                {
+                    ProcessId = pid,
+                    CreateTime = liveStart.AddSeconds(3)
+                });
+
+            WintapMessage message = sensor.HandleLiveStart(
+                2002, 4, liveStart, "reused.exe", "reused.exe", null, SidParseStatus.Extracted);
+
+            Assert.Same(message, Assert.Single(emitted));
+            Assert.Equal(TestPidHash(2002, liveStart.ToFileTimeUtc()), message.PidHash);
+            Assert.Equal(0, sensor.DedupSuppressedCount);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10")]
+        public void QaCounterNames_RemainExactAfterLiveOverlapDedup()
+        {
+            string formatted = WindowsProcessSensor.FormatQaCounterSnapshot(new WindowsProcessQaCounters());
+            string[] names = formatted
+                .Substring("Windows process QA counters: ".Length)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(pair => pair.Split('=')[0])
+                .ToArray();
+
+            Assert.Equal(new[]
+            {
+                "sid_extracted",
+                "sid_null",
+                "sid_malformed",
+                "sid_fallback",
+                "cmdline_empty",
+                "cmdline_peb_recovered",
+                "stop_without_start",
+                "manifest_metric_misses",
+                "snapshot_count",
+                "boot_replay_count",
+                "dedup_suppressed"
+            }, names);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10a")]
+        public void ValidateProcessLineage_MultiHopChainReachesSystemKernelSeed()
+        {
+            var records = new[]
+            {
+                new ProcessRecord { PidHash = "wintap", ParentPidHash = "service", ProcessId = 300 },
+                new ProcessRecord { PidHash = "service", ParentPidHash = "system", ProcessId = 200 },
+                new ProcessRecord { PidHash = "system", ParentPidHash = "system", ProcessId = 4, ProcessPath = @"C:\Windows\System32\NTOSKRNL.EXE" }
+            };
+
+            bool valid = WindowsProcessSensor.ValidateProcessLineage(records, "wintap", TestPidHash, out int hops, out string reason);
+
+            Assert.True(valid, reason);
+            Assert.Equal(2, hops);
+            Assert.Null(reason);
+        }
+
+        [Theory]
+        [Trait("Category", "wpc-10a")]
+        [InlineData("missing")]
+        [InlineData("empty")]
+        [InlineData("cycle")]
+        [InlineData("unknown")]
+        [InlineData("bounded")]
+        public void ValidateProcessLineage_MalformedChainsTerminate(string scenario)
+        {
+            IReadOnlyList<ProcessRecord> records;
+            if (scenario == "missing")
+            {
+                records = new[] { new ProcessRecord { PidHash = "start", ParentPidHash = "absent", ProcessId = 10 } };
+            }
+            else if (scenario == "empty")
+            {
+                records = new[] { new ProcessRecord { PidHash = "start", ParentPidHash = string.Empty, ProcessId = 10 } };
+            }
+            else if (scenario == "cycle")
+            {
+                records = new[]
+                {
+                    new ProcessRecord { PidHash = "start", ParentPidHash = "parent", ProcessId = 10 },
+                    new ProcessRecord { PidHash = "parent", ParentPidHash = "start", ProcessId = 11 }
+                };
+            }
+            else if (scenario == "unknown")
+            {
+                records = new[]
+                {
+                    new ProcessRecord { PidHash = "start", ParentPidHash = "unknown", ProcessId = 10 },
+                    new ProcessRecord { PidHash = "unknown", ParentPidHash = "unknown", ProcessId = -1 }
+                };
+            }
+            else
+            {
+                records = Enumerable.Range(0, 34)
+                    .Select(index => new ProcessRecord
+                    {
+                        PidHash = "hash-" + index,
+                        ParentPidHash = "hash-" + (index + 1),
+                        ProcessId = 100 + index
+                    })
+                    .ToArray();
+            }
+
+            bool valid = WindowsProcessSensor.ValidateProcessLineage(
+                records,
+                scenario == "bounded" ? "hash-0" : "start",
+                TestPidHash,
+                out _,
+                out string reason);
+
+            Assert.False(valid);
+            Assert.False(string.IsNullOrWhiteSpace(reason));
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-11")]
+        public void ValidateProcessLineage_SentinelDeadEndReportsUnknownParentHash()
+        {
+            var records = new[]
+            {
+                new ProcessRecord
+                {
+                    PidHash = "explorer",
+                    ParentPidHash = TestPidHash(-1, 0),
+                    ProcessId = 1300
+                }
+            };
+
+            bool valid = WindowsProcessSensor.ValidateProcessLineage(
+                records,
+                "explorer",
+                TestPidHash,
+                out int hops,
+                out string reason);
+
+            Assert.False(valid);
+            Assert.Equal(0, hops);
+            Assert.Equal("unknown parent hash", reason);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-11")]
+        public void ValidateProcessLineage_RepairedBootChainReachesSystemKernelSeed()
+        {
+            var records = new[]
+            {
+                new ProcessRecord { PidHash = "explorer", ParentPidHash = "userinit", ProcessId = 1400, ProcessName = "explorer.exe" },
+                new ProcessRecord { PidHash = "userinit", ParentPidHash = "winlogon", ProcessId = 1300, ProcessName = "userinit.exe" },
+                new ProcessRecord { PidHash = "winlogon", ParentPidHash = "smss", ProcessId = 1200, ProcessName = "winlogon.exe" },
+                new ProcessRecord { PidHash = "smss", ParentPidHash = "system", ProcessId = 1100, ProcessName = "smss.exe" },
+                new ProcessRecord { PidHash = "system", ParentPidHash = "system", ProcessId = 4, ProcessPath = @"C:\Windows\System32\ntoskrnl.exe" }
+            };
+
+            bool valid = WindowsProcessSensor.ValidateProcessLineage(
+                records,
+                "explorer",
+                TestPidHash,
+                out int hops,
+                out string reason);
+
+            Assert.True(valid, reason);
+            Assert.Equal(4, hops);
+            Assert.Null(reason);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10a")]
+        public void LogExplorerProcessLineageValidation_UsesActiveExplorerAndEmitsOnePassLine()
+        {
+            var records = new[]
+            {
+                new ProcessRecord
+                {
+                    PidHash = "old-explorer",
+                    ParentPidHash = "missing",
+                    ProcessId = 299,
+                    ProcessName = "explorer.exe",
+                    CreateTime = BootTime().AddHours(2),
+                    ExitTime = BootTime().AddHours(3)
+                },
+                new ProcessRecord
+                {
+                    PidHash = "explorer",
+                    ParentPidHash = "userinit",
+                    ProcessId = 300,
+                    ProcessPath = @"C:\Windows\explorer.exe",
+                    CreateTime = BootTime().AddHours(1)
+                },
+                new ProcessRecord { PidHash = "userinit", ParentPidHash = "system", ProcessId = 200, ProcessName = "userinit.exe" },
+                new ProcessRecord { PidHash = "system", ParentPidHash = "system", ProcessId = 4, ProcessPath = "ntoskrnl.exe" }
+            };
+            var entries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out _,
+                logEntries: entries,
+                getProcessHistory: () => records);
+
+            bool logged = sensor.TryLogExplorerProcessLineageValidation();
+
+            (string message, LogLevel level) = Assert.Single(entries);
+            Assert.True(logged);
+            Assert.Equal("Process lineage validation PASS: pid=300 root=ntoskrnl.exe hops=2", message);
+            Assert.Equal(LogLevel.Info, level);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10a")]
+        [Trait("Category", "wpc-12")]
+        public void LogExplorerProcessLineageValidation_MalformedExplorerEmitsOneWarningAndDoesNotThrow()
+        {
+            var entries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out _,
+                logEntries: entries,
+                getProcessHistory: () => new[]
+                {
+                    new ProcessRecord { PidHash = "explorer", ParentPidHash = "missing", ProcessId = 301, ProcessName = "explorer.exe" }
+                });
+
+            bool logged = sensor.TryLogExplorerProcessLineageValidation();
+
+            (string message, LogLevel level) = Assert.Single(entries);
+            Assert.True(logged);
+            Assert.Equal("Process lineage validation FAIL: pid=301 reason=parent record missing hops=1 stopped_at=explorer.exe pid=301", message);
+            Assert.Equal(LogLevel.Warn, level);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-12")]
+        public void LogExplorerProcessLineageValidation_WhenExplorerMissingLogsDeferredOnce()
+        {
+            var entries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out _,
+                logEntries: entries,
+                getProcessHistory: () => Array.Empty<ProcessRecord>());
+
+            Assert.False(sensor.TryLogExplorerProcessLineageValidation());
+            Assert.False(sensor.TryLogExplorerProcessLineageValidation());
+
+            (string message, LogLevel level) = Assert.Single(entries);
+            Assert.Equal(
+                "Process lineage validation deferred: no explorer record found; will retry on first live explorer Start",
+                message);
+            Assert.Equal(LogLevel.Info, level);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-10a")]
+        public void HandleLiveStart_WhenExplorerAppearsLogsLineageOnce()
+        {
+            DateTime startTime = BootTime().AddHours(1);
+            var history = new List<ProcessRecord>
+            {
+                new ProcessRecord { PidHash = "userinit", ParentPidHash = "system", ProcessId = 200, ProcessName = "userinit.exe" },
+                new ProcessRecord { PidHash = "system", ParentPidHash = "system", ProcessId = 4, ProcessPath = "ntoskrnl.exe" }
+            };
+            var entries = new List<(string Message, LogLevel Level)>();
+            var sensor = CreateSensor(
+                out _,
+                resolver: (pid, time) => null,
+                emitOverride: message => history.Add(new ProcessRecord
+                {
+                    PidHash = message.PidHash,
+                    ParentPidHash = "userinit",
+                    ProcessId = message.PID,
+                    ProcessName = message.ProcessName,
+                    ProcessPath = message.ProcessPath,
+                    CreateTime = DateTime.FromFileTimeUtc(message.EventTime)
+                }),
+                logEntries: entries,
+                getProcessHistory: () => history);
+
+            sensor.HandleLiveStart(302, 200, startTime, "explorer.exe", string.Empty);
+            sensor.TryLogExplorerProcessLineageValidation();
+
+            (string message, LogLevel level) = Assert.Single(entries);
+            Assert.Equal("Process lineage validation PASS: pid=302 root=ntoskrnl.exe hops=2", message);
+            Assert.Equal(LogLevel.Info, level);
         }
 
         [Theory]
@@ -1285,7 +1792,9 @@ namespace Wintap.Tests
             WindowsProcessSensor.TryReadHeartbeatDelegate readHeartbeat = null,
             Func<IReadOnlyCollection<string>, DateTime, int> reconcileStartupOpenRows = null,
             Action<DateTime, DateTime, string, string> writeCollectionGap = null,
-            Action updateHeartbeat = null)
+            Action updateHeartbeat = null,
+            Func<IReadOnlyList<ProcessRecord>> getProcessHistory = null,
+            Func<string, int, string, bool> repairParentLinkage = null)
         {
             emitted = new List<WintapMessage>();
             List<WintapMessage> captured = emitted;
@@ -1319,6 +1828,8 @@ namespace Wintap.Tests
                 lookupPebCommandLineByPid: lookupPebCommandLineByPid ?? (pid => string.Empty),
                 lookupFullProcessImagePathByPid: lookupFullProcessImagePathByPid ?? (pid => string.Empty),
                 translateDevicePath: translateDevicePath ?? (path => string.Empty),
+                getProcessHistory: getProcessHistory ?? (() => Array.Empty<ProcessRecord>()),
+                repairParentLinkage: repairParentLinkage ?? ((pidHash, parentPid, parentPidHash) => false),
                 sidAccountCacheMaxSize: sidAccountCacheMaxSize,
                 enableQaCounterTimer: false);
         }

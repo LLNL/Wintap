@@ -11,6 +11,7 @@ using gov.llnl.wintap.core.shared.helpers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Globalization;
 using System.Diagnostics;
 using System.IO;
@@ -55,6 +56,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private const string RetentionDeletedMetricName = "retention_deleted";
         private const string RetentionMissMetricName = "retention_miss";
         private const string LiveHashRepairedMetricName = "live_hash_repaired";
+        private const string ParentLinkageRepairedMetricName = "parent_linkage_repaired";
         private const string UnknownProcessName = "(unknown)";
         private static DateTime? _cachedLinuxBootTimeUtc;
         private static long? _cachedLinuxClockTicksPerSecond;
@@ -94,7 +96,7 @@ namespace gov.llnl.wintap.core.infrastructure
             public DateTime CreateTime;
         }
 
-        private struct ExitedProcessRow
+        internal struct ExitedProcessRow
         {
             public string PidHash;
             public int ProcessId;
@@ -177,16 +179,7 @@ namespace gov.llnl.wintap.core.infrastructure
                 string query = null;
                 try
                 {
-                     query = $@"
-                         SELECT pid_hash, parent_pid_hash, process_id, parent_process_id,
-                         process_name, image_path, command_line, create_time,
-                         exit_time, exit_code, source, user_name, md5_hash, sha2_hash
-                         FROM process
-                         WHERE process_id = $process_id
-                         AND create_time <= $event_time
-                         AND (exit_time IS NULL OR exit_time >= $event_time)
-                         ORDER BY create_time DESC
-                         LIMIT 1";
+                    query = BuildResolveProcessAtTimeQuery(pid, eventTime);
 
                     using var command = connection.CreateCommand();
                     command.CommandText = query;
@@ -209,8 +202,8 @@ namespace gov.llnl.wintap.core.infrastructure
                         ProcessName = reader.GetString(4),
                         ProcessPath = reader.IsDBNull(5) ? null : reader.GetString(5),
                         CommandLine = reader.IsDBNull(6) ? null : reader.GetString(6),
-                        CreateTime = reader.GetDateTime(7),
-                        ExitTime = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
+                        CreateTime = ReadUtcDateTime(reader, 7),
+                        ExitTime = ReadNullableUtcDateTime(reader, 8),
                         ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
                         Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
                         UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
@@ -251,6 +244,21 @@ namespace gov.llnl.wintap.core.infrastructure
                     throw;
                 }
             }          
+        }
+
+        internal static string BuildResolveProcessAtTimeQuery(int pid, DateTime eventTime)
+        {
+            string eventTimeStr = eventTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+            return $@"
+                SELECT pid_hash, parent_pid_hash, process_id, parent_process_id,
+                process_name, image_path, command_line, create_time,
+                exit_time, exit_code, source, user_name, md5_hash, sha2_hash
+                FROM process
+                WHERE process_id = {pid}
+                AND create_time <= '{eventTimeStr}'
+                AND (exit_time IS NULL OR exit_time >= '{eventTimeStr}')
+                ORDER BY create_time DESC
+                LIMIT 1";
         }
 
         public ProcessRecord ResolveProcessIdentityAtTime(int pid, DateTime eventTime)
@@ -404,6 +412,34 @@ namespace gov.llnl.wintap.core.infrastructure
             {
                 WintapLogger.Log.Append($"ProcessResolver startup reconcile failed: {ex.Message}", LogLevel.Warn);
                 return 0;
+            }
+        }
+
+        public bool TryRepairParentLinkage(string pidHash, int parentPid, string parentPidHash)
+        {
+            try
+            {
+                lock (_dbLock)
+                {
+                    TryGetProcessRowStateLocked(EscapeSql(pidHash), out _, out string processName);
+                    bool repaired = TryRepairParentLinkage(
+                        connection,
+                        pidHash,
+                        parentPid,
+                        parentPidHash,
+                        processHash.GenPidHash(-1, 0));
+                    if (repaired)
+                    {
+                        RecordTelemetryEvent(ParentLinkageRepairedMetricName, processName, pidHash);
+                    }
+
+                    return repaired;
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append($"ProcessResolver parent-linkage repair failed for PidHash {pidHash}: {ex.Message}", LogLevel.Warn);
+                return false;
             }
         }
 
@@ -575,6 +611,39 @@ namespace gov.llnl.wintap.core.infrastructure
             command.Parameters.Add(new DuckDBParameter("md5_hash", string.IsNullOrEmpty(proc.MD5) ? DBNull.Value : proc.MD5));
             command.Parameters.Add(new DuckDBParameter("sha2_hash", string.IsNullOrEmpty(proc.SHA2) ? DBNull.Value : proc.SHA2));
             command.ExecuteNonQuery();
+        }
+
+        internal static bool TryRepairParentLinkage(
+            DuckDBConnection connection,
+            string pidHash,
+            int parentPid,
+            string parentPidHash,
+            string unknownParentPidHash)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+                UPDATE process
+                SET parent_pid_hash = $parent_pid_hash,
+                    parent_process_id = $parent_process_id
+                WHERE pid_hash = $pid_hash
+                  AND (parent_pid_hash IS NULL
+                       OR parent_pid_hash = ''
+                       OR parent_pid_hash = $unknown_parent_pid_hash)";
+            command.Parameters.Add(new DuckDBParameter("parent_pid_hash", parentPidHash));
+            command.Parameters.Add(new DuckDBParameter("parent_process_id", parentPid));
+            command.Parameters.Add(new DuckDBParameter("pid_hash", pidHash));
+            command.Parameters.Add(new DuckDBParameter("unknown_parent_pid_hash", unknownParentPidHash));
+            return command.ExecuteNonQuery() > 0;
+        }
+
+        internal static DateTime ReadUtcDateTime(DbDataReader reader, int ordinal)
+        {
+            return DateTime.SpecifyKind(reader.GetDateTime(ordinal), DateTimeKind.Utc);
+        }
+
+        internal static DateTime? ReadNullableUtcDateTime(DbDataReader reader, int ordinal)
+        {
+            return reader.IsDBNull(ordinal) ? null : ReadUtcDateTime(reader, ordinal);
         }
 
         internal static bool IsProcessRowOpen(DuckDBConnection connection, string pidHash)
@@ -1150,8 +1219,8 @@ namespace gov.llnl.wintap.core.infrastructure
                         ProcessName = reader.GetString(4),
                         ProcessPath = reader.IsDBNull(5) ? null : reader.GetString(5),
                         CommandLine = reader.IsDBNull(6) ? null : reader.GetString(6),
-                        CreateTime = reader.GetDateTime(7),
-                        ExitTime = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
+                        CreateTime = ReadUtcDateTime(reader, 7),
+                        ExitTime = ReadNullableUtcDateTime(reader, 8),
                         ExitCode = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
                         Source = Enum.Parse<ProcessRecord.ProcessSourceEnum>(reader.GetString(10)),
                         UserName = reader.IsDBNull(11) ? "" : reader.GetString(11),
@@ -1179,19 +1248,9 @@ namespace gov.llnl.wintap.core.infrastructure
             WintapLogger.Log.Append("Starting ClearDB...", LogLevel.Info);
             lock (_dbLock)
             {
-                MaybeRunMaintenanceLocked(DateTime.UtcNow);
-                var countQuery = "SELECT COUNT(*) FROM process";
-
-                using var countCommand = connection.CreateCommand();
-                countCommand.CommandText = countQuery;
-                var recordCount = (long)countCommand.ExecuteScalar();
-
-                var deleteQuery = "DELETE FROM process";
-
-                using var deleteCommand = connection.CreateCommand();
-                deleteCommand.CommandText = deleteQuery;
-                deleteCommand.ExecuteNonQuery();
+                long recordCount = ClearProcessRows(connection);
                 _activeProcesses.Clear();
+                _nextMaintenanceUtc = DateTime.MinValue;
                 _historicalIdentityCache.Clear();
 
                 WintapLogger.Log.Append($"Cleared {recordCount} process records from event store", LogLevel.Info);
@@ -1261,7 +1320,7 @@ namespace gov.llnl.wintap.core.infrastructure
                         PidHash = reader.GetString(0),
                         ProcessId = reader.GetInt32(1),
                         ProcessName = reader.IsDBNull(2) ? UnknownProcessName : reader.GetString(2),
-                        CreateTime = reader.GetDateTime(3)
+                        CreateTime = ReadUtcDateTime(reader, 3)
                     });
                 }
             }
@@ -1313,31 +1372,7 @@ namespace gov.llnl.wintap.core.infrastructure
         private void DeleteExpiredExitedRowsLocked(DateTime nowUtc)
         {
             DateTime cutoffUtc = nowUtc - _exitRetention;
-            string cutoffSql = cutoffUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-
-            using var select = connection.CreateCommand();
-            select.CommandText = $@"
-                SELECT pid_hash, process_id, process_name, create_time, exit_time
-                FROM process
-                WHERE exit_time IS NOT NULL
-                  AND exit_time < TIMESTAMP '{cutoffSql}'
-                ORDER BY exit_time ASC";
-
-            var expiredRows = new List<ExitedProcessRow>();
-            using (var reader = select.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    expiredRows.Add(new ExitedProcessRow
-                    {
-                        PidHash = reader.GetString(0),
-                        ProcessId = reader.GetInt32(1),
-                        ProcessName = reader.IsDBNull(2) ? UnknownProcessName : reader.GetString(2),
-                        CreateTime = reader.GetDateTime(3),
-                        ExitTime = reader.GetDateTime(4)
-                    });
-                }
-            }
+            List<ExitedProcessRow> expiredRows = DeleteExpiredExitedRows(connection, cutoffUtc);
 
             if (expiredRows.Count == 0)
             {
@@ -1356,13 +1391,87 @@ namespace gov.llnl.wintap.core.infrastructure
                 RecordTelemetryEvent(RetentionDeletedMetricName, expiredRow.ProcessName, expiredRow.PidHash);
                 RemoveActiveProcessCacheEntry(expiredRow.ProcessId, expiredRow.PidHash);
             }
+        }
 
-            using var delete = connection.CreateCommand();
-            delete.CommandText = $@"
+        internal static long ClearProcessRows(DuckDBConnection databaseConnection)
+        {
+            using var countCommand = databaseConnection.CreateCommand();
+            countCommand.CommandText = "SELECT COUNT(*) FROM process";
+            long recordCount = (long)countCommand.ExecuteScalar();
+
+            using var deleteCommand = databaseConnection.CreateCommand();
+            deleteCommand.CommandText = "DELETE FROM process";
+            deleteCommand.ExecuteNonQuery();
+            return recordCount;
+        }
+
+        internal static List<ExitedProcessRow> DeleteExpiredExitedRows(
+            DuckDBConnection databaseConnection,
+            DateTime cutoffUtc)
+        {
+            const string protectedAncestorCte = @"
+                WITH RECURSIVE protected(pid_hash) AS (
+                    SELECT pid_hash
+                    FROM process
+                    WHERE exit_time IS NULL
+
+                    UNION
+
+                    SELECT parent.pid_hash
+                    FROM protected AS protected_child
+                    JOIN process AS child
+                      ON child.pid_hash = protected_child.pid_hash
+                    JOIN process AS parent
+                      ON parent.pid_hash = child.parent_pid_hash
+                )";
+
+            var expiredRows = new List<ExitedProcessRow>();
+            using var transaction = databaseConnection.BeginTransaction();
+            using (var select = databaseConnection.CreateCommand())
+            {
+                select.Transaction = transaction;
+                select.CommandText = protectedAncestorCte + @"
+                    SELECT candidate.pid_hash, candidate.process_id, candidate.process_name,
+                           candidate.create_time, candidate.exit_time
+                    FROM process AS candidate
+                    WHERE candidate.exit_time IS NOT NULL
+                      AND candidate.exit_time < $cutoff
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM protected
+                          WHERE protected.pid_hash = candidate.pid_hash)
+                    ORDER BY candidate.pid_hash";
+                select.Parameters.Add(new DuckDBParameter("cutoff", cutoffUtc));
+
+                using var reader = select.ExecuteReader();
+                while (reader.Read())
+                {
+                    expiredRows.Add(new ExitedProcessRow
+                    {
+                        PidHash = reader.GetString(0),
+                        ProcessId = reader.GetInt32(1),
+                        ProcessName = reader.IsDBNull(2) ? UnknownProcessName : reader.GetString(2),
+                        CreateTime = ReadUtcDateTime(reader, 3),
+                        ExitTime = ReadUtcDateTime(reader, 4)
+                    });
+                }
+            }
+
+            using var delete = databaseConnection.CreateCommand();
+            delete.Transaction = transaction;
+            delete.CommandText = protectedAncestorCte + @"
                 DELETE FROM process
                 WHERE exit_time IS NOT NULL
-                  AND exit_time < TIMESTAMP '{cutoffSql}'";
+                  AND exit_time < $cutoff
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM protected
+                      WHERE protected.pid_hash = process.pid_hash)";
+            delete.Parameters.Add(new DuckDBParameter("cutoff", cutoffUtc));
             delete.ExecuteNonQuery();
+            transaction.Commit();
+
+            return expiredRows;
         }
 
         private void AddRecentlyPrunedProcessLocked(ExitedProcessRow expiredRow, DateTime prunedAtUtc)

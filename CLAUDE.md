@@ -88,34 +88,44 @@ The persistent ecosystem wiki is the compounding project memory.
 > `../Wintap-Analytics/wiki/work/<feature-slug>/` plus the low-volume shared
 > `../Wintap-Analytics/wiki/log.md`.
 
-### Architect — *you, the human, in the main session*
-The decision-maker and the only approval gate. You drive the main Claude Code
-session, decide direction, approve instruction documents, and dispatch the
-Engineer and Developer subagents. You inform the subagents; they execute.
+### Architect — *the human*
+The decision-maker, the only approval gate, and the **sole liaison between
+Engineer and Developer**. The Architect decides direction, approves instruction
+documents, dispatches the Developer, and manually relays any Developer output
+(audits, test results, logs) the Engineer needs to see.
 
-### Engineer — `.claude/agents/engineer.md`
+### Engineer — *Claude, in the main session*
 Design collaborator and **maintainer of `../Wintap-Analytics/wiki/` for Wintap
 ecosystem knowledge plus `developer_docs/` process artifacts in this repo**.
 Explores options, writes ADRs, maintains wiki pages and `log.md`, and writes
 self-contained instruction documents for the Developer. **Never writes source
-code or tests** (enforced by tool limits: no Bash, plus instruction discipline).
+code or tests.** Interfaces only with the Architect — never dispatches or
+communicates with the Developer directly.
 
 ### Developer — `.claude/agents/developer.md`
-Implements **exactly one approved instruction document at a time**. Writes code
-and tests, runs the verification command, and files one audit artifact per unit.
-**Never edits `../Wintap-Analytics/wiki/` or `developer_docs/instructions/`.**
+Implements **exactly one approved instruction document at a time**, dispatched
+by the Architect. Writes code and tests, runs the verification command, and
+files one audit artifact per unit. **Never edits `../Wintap-Analytics/wiki/`
+or `developer_docs/instructions/`.**
 
 ### The loop
-1. Architect dispatches the **Engineer** to explore a problem and draft an
-   instruction document.
+1. Architect works with the **Engineer** in the main session to explore a
+   problem and draft an instruction document.
 2. Architect reviews and **approves** the instruction (the gate).
 3. Architect dispatches the **Developer** to implement that one approved unit.
 4. Developer reports full test/build output and files an audit artifact.
-5. Architect dispatches the Engineer to fold results back into the wiki.
+5. Architect relays results to the Engineer, who folds them back into the wiki.
 
-> Subagents run in isolated context windows and cannot pause for your approval
-> mid-run. Approval happens in the main session between dispatches — never hand
-> an unapproved instruction straight to the Developer.
+> The Developer runs in an isolated context and cannot pause for approval
+> mid-run. Approval happens in the main session before dispatch — never hand
+> an unapproved instruction to the Developer.
+
+### Engineer access boundary
+
+The Engineer can only access content under `C:\PUBLIC`. Anything outside —
+logs, test results, machine or environmental details — is opaque to the
+Engineer. The Architect manually shares such data when relevant; the Engineer
+may ask to see it but must never attempt to access it directly.
 
 ### Feature metrics mini-lab
 
@@ -159,6 +169,29 @@ raise it to the Architect.** Do not resolve architectural ambiguity unilaterally
 
 ---
 
+## Design Brevity Standard (Engineer)
+
+Design the smallest solution that fully meets the stated requirements.
+
+- **Scope:** One instruction unit covers one change. Do not design for
+  requirements that have not been stated. If you see a plausible future
+  need, note it in one sentence and move on — do not design for it.
+- **Options:** When exploring alternatives, present at most 2–3, each in a
+  few sentences, with a recommendation. No exhaustive surveys.
+- **Instruction documents:** State requirements, files to touch, the
+  verification command, and acceptance criteria. Omit background the
+  Developer can get from the code. Specify *what* and *why*; leave *how*
+  to the Developer unless a constraint is real. Target one page.
+- **New anything is a cost:** New layers, interfaces, config keys,
+  dependencies, or files require a stated justification tied to a current
+  requirement, observed behavior, or material correctness/security risk.
+  Default to existing project patterns and localized change.
+- **Writing style:** Wiki pages, ADRs, and reports are short and factual.
+  Lead with the decision or finding. Cut hedging, restatement, and
+  boilerplate sections that have nothing to say.
+
+---
+
 ## Coding Standards
 
 - Target .NET 8.0; match the style of surrounding code.
@@ -167,3 +200,6 @@ raise it to the Architect.** Do not resolve architectural ambiguity unilaterally
   environment variables or gitignored local config.
 - Do not introduce abstractions, error handling, or features beyond what the
   active instruction requires.
+- Implement the smallest clear solution that fully meets the instruction.
+  Justify any remaining non-obvious complexity in the audit artifact, not in
+  code comments.

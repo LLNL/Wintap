@@ -11,6 +11,45 @@ namespace Wintap.Tests
         private static readonly DateTime BaseTime = new DateTime(2026, 8, 30, 12, 0, 0, DateTimeKind.Utc);
 
         [Theory]
+        [Trait("Category", "wpc-11")]
+        [InlineData(null, 10, true)]
+        [InlineData("", 20, true)]
+        [InlineData("unknown-parent", 30, true)]
+        [InlineData("healthy-parent", 40, false)]
+        public void TryRepairParentLinkage_OnlyReplacesMissingOrSentinelParent(
+            string storedParentHash,
+            int storedParentPid,
+            bool expectedRepair)
+        {
+            using var connection = CreateProcessTable();
+            using (var insert = connection.CreateCommand())
+            {
+                insert.CommandText = @"
+                    INSERT INTO process (pid_hash, parent_pid_hash, process_id, parent_process_id)
+                    VALUES ($pid_hash, $parent_pid_hash, 100, $parent_process_id)";
+                insert.Parameters.Add(new DuckDBParameter("pid_hash", "child"));
+                insert.Parameters.Add(new DuckDBParameter("parent_pid_hash", storedParentHash == null ? DBNull.Value : storedParentHash));
+                insert.Parameters.Add(new DuckDBParameter("parent_process_id", storedParentPid));
+                insert.ExecuteNonQuery();
+            }
+
+            bool repaired = ProcessResolver.TryRepairParentLinkage(
+                connection,
+                "child",
+                50,
+                "resolved-parent",
+                "unknown-parent");
+
+            Assert.Equal(expectedRepair, repaired);
+            using var select = connection.CreateCommand();
+            select.CommandText = "SELECT parent_pid_hash, parent_process_id FROM process WHERE pid_hash = 'child'";
+            using var reader = select.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal(expectedRepair ? "resolved-parent" : storedParentHash, reader.GetString(0));
+            Assert.Equal(expectedRepair ? 50 : storedParentPid, reader.GetInt32(1));
+        }
+
+        [Theory]
         [Trait("Category", "wpc-09")]
         [InlineData("cmd.exe /c \"unterminated")]
         [InlineData("powershell.exe -Command \"Write-Output 'quoted value'\"")]
@@ -65,6 +104,148 @@ namespace Wintap.Tests
             using var select = connection.CreateCommand();
             select.CommandText = "SELECT command_line FROM process WHERE pid_hash = 'hostile-command-line-hash'";
             Assert.Equal(commandLine, select.ExecuteScalar()?.ToString());
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-12")]
+        public void DuckDbProcessTimestampReader_AttachesUtcKindWithoutChangingValues()
+        {
+            using var connection = CreateEventStore();
+            DateTime createTimeUtc = new DateTime(2026, 8, 31, 14, 20, 30, DateTimeKind.Utc);
+            DateTime exitTimeUtc = createTimeUtc.AddMinutes(2);
+            var message = new WintapMessage(createTimeUtc, 7000, WintapMessage.MessageTypeEnum.Process)
+            {
+                ActivityType = WintapMessage.ActivityTypeEnum.Start,
+                PidHash = "utc-kind-process",
+                Process = new WintapMessage.ProcessObject
+                {
+                    PID = 7000,
+                    ParentPID = 4,
+                    ParentPidHash = "system",
+                    Name = "utc-kind.exe"
+                }
+            };
+
+            ProcessResolver.UpsertProcessStart(connection, message, createTimeUtc);
+            using (var update = connection.CreateCommand())
+            {
+                update.CommandText = "UPDATE process SET exit_time = $exit_time WHERE pid_hash = $pid_hash";
+                update.Parameters.Add(new DuckDBParameter("exit_time", exitTimeUtc));
+                update.Parameters.Add(new DuckDBParameter("pid_hash", message.PidHash));
+                Assert.Equal(1, update.ExecuteNonQuery());
+            }
+
+            using var select = connection.CreateCommand();
+            select.CommandText = "SELECT create_time, exit_time FROM process WHERE pid_hash = $pid_hash";
+            select.Parameters.Add(new DuckDBParameter("pid_hash", message.PidHash));
+            using var reader = select.ExecuteReader();
+            Assert.True(reader.Read());
+
+            DateTime createTime = ProcessResolver.ReadUtcDateTime(reader, 0);
+            DateTime? exitTime = ProcessResolver.ReadNullableUtcDateTime(reader, 1);
+            Assert.Equal(createTimeUtc, createTime);
+            Assert.Equal(DateTimeKind.Utc, createTime.Kind);
+            Assert.Equal(exitTimeUtc, exitTime);
+            Assert.Equal(DateTimeKind.Utc, exitTime.Value.Kind);
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-12")]
+        public void ClearProcessRows_DeletesWithoutReconcileTelemetry()
+        {
+            using var connection = CreateEventStore();
+            using (var insert = connection.CreateCommand())
+            {
+                insert.CommandText = @"
+                    INSERT INTO process (pid_hash, process_id, process_name, create_time, source)
+                    VALUES ('stale-open', 7001, 'stale.exe', TIMESTAMP '2026-08-31 14:00:00', 'real_time')";
+                insert.ExecuteNonQuery();
+            }
+
+            long deleted = ProcessResolver.ClearProcessRows(connection);
+
+            Assert.Equal(1, deleted);
+            using var processCount = connection.CreateCommand();
+            processCount.CommandText = "SELECT COUNT(*) FROM process";
+            Assert.Equal(0L, Convert.ToInt64(processCount.ExecuteScalar()));
+            using var reconcileCount = connection.CreateCommand();
+            reconcileCount.CommandText = "SELECT COUNT(*) FROM process_retention_telemetry WHERE metric_name = 'reconciled_closed'";
+            Assert.Equal(0L, Convert.ToInt64(reconcileCount.ExecuteScalar()));
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-13")]
+        public void ResolveProcessAtTimeQuery_ResolvesParentCreatedEarlierInSameSecond()
+        {
+            using var connection = CreateEventStore();
+            DateTime second = new DateTime(2026, 8, 31, 15, 31, 55, DateTimeKind.Utc);
+            InsertProcess(connection, "parent", 8100, second.AddMilliseconds(800));
+
+            object result = ExecuteResolveProcessAtTimeQuery(connection, 8100, second.AddMilliseconds(900));
+
+            Assert.Equal("parent", result?.ToString());
+        }
+
+        [Fact]
+        [Trait("Category", "wpc-13")]
+        public void ResolveProcessAtTimeQuery_DoesNotResolveParentCreatedLaterInSameSecond()
+        {
+            using var connection = CreateEventStore();
+            DateTime second = new DateTime(2026, 8, 31, 15, 31, 55, DateTimeKind.Utc);
+            InsertProcess(connection, "parent", 8100, second.AddMilliseconds(800));
+
+            object result = ExecuteResolveProcessAtTimeQuery(connection, 8100, second.AddMilliseconds(700));
+
+            Assert.Null(result);
+        }
+
+        private static object ExecuteResolveProcessAtTimeQuery(
+            DuckDBConnection connection,
+            int pid,
+            DateTime eventTime)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = ProcessResolver.BuildResolveProcessAtTimeQuery(pid, eventTime);
+            return command.ExecuteScalar();
+        }
+
+        private static void InsertProcess(
+            DuckDBConnection connection,
+            string pidHash,
+            int pid,
+            DateTime createTime)
+        {
+            using var insert = connection.CreateCommand();
+            insert.CommandText = @"
+                INSERT INTO process (pid_hash, process_id, create_time)
+                VALUES ($pid_hash, $process_id, $create_time)";
+            insert.Parameters.Add(new DuckDBParameter("pid_hash", pidHash));
+            insert.Parameters.Add(new DuckDBParameter("process_id", pid));
+            insert.Parameters.Add(new DuckDBParameter("create_time", createTime));
+            insert.ExecuteNonQuery();
+        }
+
+        private static DuckDBConnection CreateProcessTable()
+        {
+            var connection = new DuckDBConnection("Data Source=:memory:");
+            connection.Open();
+            using var create = connection.CreateCommand();
+            create.CommandText = @"
+                CREATE TABLE process (
+                    pid_hash VARCHAR PRIMARY KEY,
+                    parent_pid_hash VARCHAR,
+                    process_id INTEGER,
+                    parent_process_id INTEGER);";
+            create.ExecuteNonQuery();
+            return connection;
+        }
+
+        private static DuckDBConnection CreateEventStore()
+        {
+            var connection = new DuckDBConnection("Data Source=:memory:");
+            connection.Open();
+            ProcessResolver.EnsureEventStoreTables(connection);
+            return connection;
         }
 
         [Fact]
