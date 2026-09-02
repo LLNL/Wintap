@@ -42,10 +42,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// Starts the file sensor and processes the ETW rundown trace.
         /// </summary>
         /// <returns>True if the sensor started successfully.</returns>
-        public bool Start()
+        public override bool Start()
         {
-            base.Start();
-
             KernelParser.Instance.EtwParser.FileIOWrite += Kernel_FileIoWrite;
             KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
             KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
@@ -57,7 +55,10 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
 
             ProcessRundownTrace();
-            ExecuteEtwRundown();
+            WintapLogger.Log.Append(
+                "Skipping ETW file rundown execution while shared kernel session is active; relying on live FileIOName/FileIOCreate events for path mapping.",
+                LogLevel.Warn);
+            enabled = true;
 
             return true;
         }

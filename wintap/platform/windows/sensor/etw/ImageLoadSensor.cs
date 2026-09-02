@@ -32,9 +32,9 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         public override bool Start()
         {
-            base.Start();
             KernelParser.Instance.EtwParser.ImageLoad += Kernel_ImageLoad;
             KernelParser.Instance.EtwParser.ImageUnload += Kernel_ImageUnload;
+            enabled = true;
             return true;
         }
 
