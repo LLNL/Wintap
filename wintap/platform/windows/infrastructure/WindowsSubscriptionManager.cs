@@ -14,24 +14,52 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace gov.llnl.wintap.platform.windows.infrastructure
 {
+    internal enum KernelEnableDecision
+    {
+        FinalFlagsAlreadyEnabled,
+        EnableFinalFlags,
+        FailMissingFlags
+    }
+
     internal class WindowsSubscriptionManager
     {
         private Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords kernelFlags;
+        private readonly ManualResetEventSlim kernelConsumerReady = new ManualResetEventSlim(false);
+        private readonly ManualResetEventSlim kernelConsumerFailed = new ManualResetEventSlim(false);
+        private KernelSession kernelSession;
+        private ETWTraceEventSource kernelSource;
+        private string kernelConsumerFailure;
 
         internal WindowsSubscriptionManager() { }
 
         internal List<BaseWindowsSensor> Start()
         {
             List<BaseWindowsSensor> baseSensors = new List<BaseWindowsSensor>();
-            string bootReplayPath = null;
-
             bool enableBootProcessTrace = Properties.Settings.Default.EnableBootProcessTrace;
-            bootReplayPath = BootProcessTraceHelper.InspectCleanupArmAndGetReplayPath(
+            string bootReplayPath = BootProcessTraceHelper.InspectCleanupArmAndGetReplayPath(
                 enableBootProcessTrace,
                 (message, level) => WintapLogger.Log.Append(message, level));
+            kernelFlags = KernelTraceEventParser.Keywords.Process;
+            KernelTraceEventParser.Keywords enabledKernelFlags = KernelTraceEventParser.Keywords.None;
+            bool kernelEnableSucceeded = false;
+            try
+            {
+                kernelSession = KernelSession.Instance;
+                kernelSession.EtwSession.EnableKernelProvider(KernelTraceEventParser.Keywords.Process);
+                enabledKernelFlags = KernelTraceEventParser.Keywords.Process;
+                kernelEnableSucceeded = true;
+                WintapLogger.Log.Append("Live kernel Process capture enabled before snapshot/replay", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append(
+                    "Failed to enable live kernel Process capture before snapshot/replay; continuing with degraded bootstrap coverage: " + ex.Message,
+                    LogLevel.Error);
+            }
 
             // start unified process sensor first for process attribution
             WindowsProcessSensor pc = new WindowsProcessSensor();
@@ -49,10 +77,13 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
             {
                 pc.ReplayBootTrace(bootReplayPath);
             }
-            kernelFlags = KernelTraceEventParser.Keywords.Process;
+            pc.TryLogExplorerProcessLineageValidation();
             baseSensors.Add(pc);
 
-            // start modelled collectors
+            var sharedKernelSensors = new List<(string Name, BaseWindowsSensor Sensor, KernelTraceEventParser.Keywords Flags)>();
+            var independentSensors = new List<(string Name, BaseWindowsSensor Sensor)>();
+
+            // Construct configured modeled sensors once and partition them by their existing kernel flags.
             string nameSpace = "gov.llnl.wintap.platform.windows.collect.etw";
             foreach (SettingsProperty sp in Properties.Settings.Default.Properties)
             {
@@ -64,28 +95,21 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                     try
                     {
                         Type type = Type.GetType(sensorName);
-                        object instance = Activator.CreateInstance(type, null);
-                        MethodInfo method = type.GetMethod("Start");
-                        if ((bool)method.Invoke(instance, null))
+                        BaseWindowsSensor instance = (BaseWindowsSensor)Activator.CreateInstance(type, null);
+                        KernelTraceEventParser.Keywords flags = KernelTraceEventParser.Keywords.None;
+                        PropertyInfo flagsProperty = type.GetProperty("KernelTraceEventFlags");
+                        if (flagsProperty != null)
                         {
-                            baseSensors.Add((BaseWindowsSensor)instance); // save the collectors so we can call thier Stop() methods on shutdown.
+                            flags = (KernelTraceEventParser.Keywords)flagsProperty.GetValue(instance, null);
                         }
-                        try
+
+                        if (flags != KernelTraceEventParser.Keywords.None)
                         {
-                            // there can only be one kernel logger.  collectors that want to consume from NT Kernel Logger will declare this via kernel trace flags which we append to the global list.
-                            WintapLogger.Log.Append("Inspecting collector for Kernel trace flags: " + sensorName, LogLevel.Info);
-                            PropertyInfo pi = type.GetProperty("KernelTraceEventFlags");
-                            PropertyInfo pinfo = instance.GetType().GetProperty("KernelTraceEventFlags");
-                            if (pinfo != null)  // only true for nt kernel logger collectors
-                            {
-                                KernelTraceEventParser.Keywords newFlags = (KernelTraceEventParser.Keywords)pinfo.GetValue(instance, null);
-                                kernelFlags = kernelFlags | newFlags;
-                                WintapLogger.Log.Append("Found Kernel trace flags on " + sensorName + " flags: " + newFlags.ToString(), LogLevel.Info);
-                            }
+                            sharedKernelSensors.Add((sensorName, instance, flags));
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            WintapLogger.Log.Append("Error looking for Kernel trace flags on " + sensorName + ", error: " + ex.Message, LogLevel.Debug);
+                            independentSensors.Add((sensorName, instance));
                         }
                     }
                     catch (Exception ex)
@@ -95,43 +119,147 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
 
                 }
             }
-            WintapLogger.Log.Append("Done loading modelled sensors", LogLevel.Info);
 
-            // Start unmodelled (aka generic) collectors
-            WintapLogger.Log.Append("loading unmodelled sensors", LogLevel.Info);
-            int genericCounter = 0;
-            foreach (string genericProvider in Properties.Settings.Default.GenericProviders)
+            foreach ((string sensorName, BaseWindowsSensor sensor, KernelTraceEventParser.Keywords flags) in sharedKernelSensors)
             {
-                genericCounter++;
-                string etwCollectorName = genericProvider;
-                WintapLogger.Log.Append("Found generic etw provider in config: " + etwCollectorName, LogLevel.Info);
-                System.Threading.Thread.Sleep(1000);
-                GenericSensor gc = new GenericSensor() { SensorName = etwCollectorName, EtwProviderId = genericProvider };
-                if (gc.Start())
+                kernelFlags |= flags;
+                WintapLogger.Log.Append("Found Kernel trace flags on " + sensorName + " flags: " + flags, LogLevel.Info);
+                TryStartSensor(sensorName, sensor, baseSensors);
+            }
+
+            // Finalize provider enablement, then start the single shared consumer.
+            kernelConsumerReady.Reset();
+            kernelConsumerFailed.Reset();
+            kernelConsumerFailure = null;
+            KernelEnableDecision enableDecision = DecideFinalKernelEnable(
+                kernelEnableSucceeded,
+                enabledKernelFlags,
+                kernelFlags);
+            if (enableDecision == KernelEnableDecision.FinalFlagsAlreadyEnabled)
+            {
+                WintapLogger.Log.Append(
+                    "Shared kernel provider already enabled with final flags: " + kernelFlags,
+                    LogLevel.Info);
+            }
+            else if (enableDecision == KernelEnableDecision.EnableFinalFlags)
+            {
+                try
                 {
-                    baseSensors.Add((BaseWindowsSensor)gc);
+                    kernelSession = KernelSession.Instance;
+                    kernelSession.EtwSession.EnableKernelProvider(kernelFlags);
+                    enabledKernelFlags = kernelFlags;
+                    kernelEnableSucceeded = true;
+                }
+                catch (Exception ex)
+                {
+                    kernelConsumerFailure = ex.Message;
+                    kernelConsumerFailed.Set();
                 }
             }
-            WintapLogger.Log.Append("Done loading unmodelled sensors", LogLevel.Info);
+            else
+            {
+                kernelConsumerFailure =
+                    "Shared kernel provider final flags cannot be enabled without a second provider call; enabled flags: " +
+                    enabledKernelFlags + "; required flags: " + kernelFlags;
+                kernelConsumerFailed.Set();
+            }
 
-            // Create the shared Kernel logger session with the required event flags
-            WintapLogger.Log.Append("Creating Kernel event listening thread (ETW)...", LogLevel.Info);
-            BackgroundWorker etwKernelModeListeningThread = new BackgroundWorker();
-            etwKernelModeListeningThread.WorkerSupportsCancellation = true;
-            etwKernelModeListeningThread.DoWork += new DoWorkEventHandler(etwKernelModeListeningThread_DoWork);
-            etwKernelModeListeningThread.RunWorkerAsync();
+            if (!kernelConsumerFailed.IsSet)
+            {
+                WintapLogger.Log.Append("Creating Kernel event listening thread (ETW)...", LogLevel.Info);
+                try
+                {
+                    BackgroundWorker etwKernelModeListeningThread = new BackgroundWorker();
+                    etwKernelModeListeningThread.WorkerSupportsCancellation = true;
+                    etwKernelModeListeningThread.DoWork += new DoWorkEventHandler(etwKernelModeListeningThread_DoWork);
+                    etwKernelModeListeningThread.RunWorkerAsync();
+                }
+                catch (Exception ex)
+                {
+                    kernelConsumerFailure = ex.Message;
+                    kernelConsumerFailed.Set();
+                }
+            }
+
+            int readinessResult = WaitHandle.WaitAny(
+                new[] { kernelConsumerFailed.WaitHandle, kernelConsumerReady.WaitHandle },
+                TimeSpan.FromSeconds(5));
+            if (readinessResult == 1)
+            {
+                foreach ((string sensorName, BaseWindowsSensor sensor) in independentSensors)
+                {
+                    TryStartSensor(sensorName, sensor, baseSensors);
+                }
+
+                WintapLogger.Log.Append("Done loading modelled sensors", LogLevel.Info);
+                WintapLogger.Log.Append("loading unmodelled sensors", LogLevel.Info);
+                foreach (string genericProvider in Properties.Settings.Default.GenericProviders)
+                {
+                    WintapLogger.Log.Append("Found generic etw provider in config: " + genericProvider, LogLevel.Info);
+                    System.Threading.Thread.Sleep(1000);
+                    GenericSensor genericSensor = new GenericSensor() { SensorName = genericProvider, EtwProviderId = genericProvider };
+                    TryStartSensor(genericProvider, genericSensor, baseSensors);
+                }
+                WintapLogger.Log.Append("Done loading unmodelled sensors", LogLevel.Info);
+            }
+            else
+            {
+                var skippedSensors = new List<string>();
+                foreach ((string sensorName, BaseWindowsSensor sensor) in independentSensors)
+                {
+                    skippedSensors.Add(sensorName);
+                }
+                foreach (string genericProvider in Properties.Settings.Default.GenericProviders)
+                {
+                    skippedSensors.Add(genericProvider);
+                }
+
+                string reason = readinessResult == 0
+                    ? kernelConsumerFailure ?? "kernel consumer startup failed"
+                    : "kernel consumer readiness timed out after five seconds";
+                WintapLogger.Log.Append(
+                    "Kernel Process consumer was not ready; skipped independent sensors [" +
+                    string.Join(", ", skippedSensors) + "]: " + reason,
+                    LogLevel.Error);
+            }
 
             return baseSensors;
         }
 
         internal void Stop()
         {
-            if (Properties.Settings.Default.EnableBootProcessTrace)
+            try
             {
-                BootProcessTraceHelper.ArmForNextBoot((message, level) => WintapLogger.Log.Append(message, level));
+                if (Properties.Settings.Default.EnableBootProcessTrace)
+                {
+                    BootProcessTraceHelper.ArmForNextBoot((message, level) => WintapLogger.Log.Append(message, level));
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error re-arming boot Process trace during shutdown: " + ex.Message, LogLevel.Error);
             }
 
-            KernelSession.Instance.EtwSession.Stop();
+            try
+            {
+                kernelSession?.EtwSession.Stop();
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error stopping shared kernel ETW session: " + ex.Message, LogLevel.Error);
+            }
+
+            try
+            {
+                if (kernelSource != null)
+                {
+                    WintapLogger.Log.Append("Shared kernel ETW EventsLost at shutdown: " + kernelSource.EventsLost, LogLevel.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append("Error reading shared kernel ETW EventsLost at shutdown: " + ex.Message, LogLevel.Error);
+            }
         }
 
         /// <summary>
@@ -150,17 +278,57 @@ namespace gov.llnl.wintap.platform.windows.infrastructure
                 //{
                 //    kernelSession.BufferSizeMB = 500;
                 //}
-                KernelSession.Instance.EtwSession.EnableKernelProvider(kernelFlags);
-                KernelSession.Instance.Start();
-                ETWTraceEventSource source = KernelSource.Instance.EtwSource;
-                source.Process();  // this is a blocking call! 
+                kernelSession.Start();
+                kernelSource = KernelSource.Instance.EtwSource;
+                kernelConsumerReady.Set();
+                kernelSource.Process();  // this is a blocking call!
+                kernelConsumerFailure = "kernel event processing returned unexpectedly";
+                kernelConsumerFailed.Set();
                 WintapLogger.Log.Append("CRITICAL ERROR: Kernel mode etw listening thread has stopped", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                WintapLogger.Log.Append("ERROR starting ETW kernel mode session: " + ex.Message, LogLevel.Info);
+                if (!kernelConsumerReady.IsSet)
+                {
+                    kernelConsumerFailure = ex.Message;
+                }
+                else
+                {
+                    WintapLogger.Log.Append("ERROR: Kernel mode ETW consumer stopped: " + ex.Message, LogLevel.Error);
+                }
+                kernelConsumerFailed.Set();
             }
 
+        }
+
+        private static void TryStartSensor(string sensorName, BaseWindowsSensor sensor, List<BaseWindowsSensor> baseSensors)
+        {
+            try
+            {
+                if (sensor.Start())
+                {
+                    baseSensors.Add(sensor);
+                }
+            }
+            catch (Exception ex)
+            {
+                WintapLogger.Log.Append(sensorName + " problem starting sensor: " + ex.Message, LogLevel.Warn);
+            }
+        }
+
+        internal static KernelEnableDecision DecideFinalKernelEnable(
+            bool earlierEnableSucceeded,
+            KernelTraceEventParser.Keywords enabledFlags,
+            KernelTraceEventParser.Keywords finalFlags)
+        {
+            if (!earlierEnableSucceeded)
+            {
+                return KernelEnableDecision.EnableFinalFlags;
+            }
+
+            return enabledFlags == finalFlags
+                ? KernelEnableDecision.FinalFlagsAlreadyEnabled
+                : KernelEnableDecision.FailMissingFlags;
         }
 
         // ═══════════════════════════════════════════════════════════════════════════

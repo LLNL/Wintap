@@ -279,10 +279,10 @@ namespace gov.llnl.wintap.core.etl.load
                 {
                     var cycleTimer = Stopwatch.StartNew();
                     doMerge();
+                    List<RawSensorCacheFile> rawSensorFiles = getRawSensorParquetFiles();
                     long mergeElapsedMs = cycleTimer.ElapsedMilliseconds;
-                    List<FileInfo> rawSensorFiles = getRawSensorParquetFiles();
                     int rawSensorFileCount = rawSensorFiles.Count;
-                    long rawSensorBytes = rawSensorFiles.Where(file => file.Exists).Sum(file => file.Length);
+                    long rawSensorBytes = rawSensorFiles.Sum(file => file.Length);
                     if (rawSensorFiles.Count > 0)
                     {
                         WintapLogger.Log.Append("upload worker is awake and processing: " + cacheDir.FullName, LogLevel.Info);
@@ -332,7 +332,7 @@ namespace gov.llnl.wintap.core.etl.load
             }
         }
 
-        private void upload(List<FileInfo> rawSensorFiles)
+        private void upload(List<RawSensorCacheFile> rawSensorFiles)
         {
             DirectoryInfo rawSensorDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "raw_sensor"));
             WintapLogger.Log.Append("CacheManager upload method is starting. raw_sensor directory: " + rawSensorDir.FullName, LogLevel.Info);
@@ -342,8 +342,9 @@ namespace gov.llnl.wintap.core.etl.load
                 return;
             }
 
-            foreach (FileInfo dataFile in rawSensorFiles)
+            foreach (RawSensorCacheFile rawSensorFile in rawSensorFiles)
             {
+                FileInfo dataFile = new FileInfo(rawSensorFile.FullPath);
                 if (!dataFile.Exists)
                 {
                     continue;
@@ -586,60 +587,72 @@ namespace gov.llnl.wintap.core.etl.load
         /// <summary>
         /// prevent infinite growth of store/forward parquet cache
         /// </summary>
-        private List<FileInfo> pruneCache(List<FileInfo> rawSensorFiles)
+        private List<RawSensorCacheFile> pruneCache(List<RawSensorCacheFile> rawSensorFiles)
         {
             long maxCacheSizeBytes = etlConfig.RawSensorMaxCacheSizeBytes > 0 ? etlConfig.RawSensorMaxCacheSizeBytes : 256000000;
+            TimeSpan protectionWindow = TimeSpan.FromSeconds(Math.Max(0, etlConfig.UploadIntervalSec));
+            RawSensorCachePruneResult result = RawSensorCachePruner.Prune(
+                rawSensorFiles,
+                maxCacheSizeBytes,
+                DateTime.UtcNow,
+                protectionWindow,
+                deletePrunedRawSensorFile);
 
-            // Get current cache size.
-            bytesOnDisk = rawSensorFiles.Where(f => f.Exists).Sum(f => f.Length);
-            WintapLogger.Log.Append("cache prune finds current size of cache: " + bytesOnDisk + " bytes, max size: " + maxCacheSizeBytes + " bytes", LogLevel.Info);
-
-            // If the current cache size exceeds the maximum allowed.
-            if (bytesOnDisk > maxCacheSizeBytes)
+            bytesOnDisk = result.RetainedBytes;
+            if (result.StartingBytes > maxCacheSizeBytes)
             {
-                WintapLogger.Log.Append("max cache size exceeded. Pruning oldest files.", LogLevel.Info);
-
-                // Set a running total of current size.
-                long currentSizeBytes = bytesOnDisk;
-                DateTime protectedWindowStartUtc = DateTime.UtcNow.AddSeconds(-etlConfig.UploadIntervalSec);
-
-                // Get the list of files in cache, ordered by creation time ascending (oldest first).
-                IOrderedEnumerable<FileInfo> cacheFiles = rawSensorFiles.Where(f => f.Exists).OrderBy(f => f.LastWriteTimeUtc);
-
-                // Iterate parquet files and delete them until the cache is below the maximum size.
-                foreach (FileInfo fi in cacheFiles.Where(f => f.Extension.ToLower().Contains("parquet")))
+                foreach (RawSensorCacheDeletionFailure failure in result.DeletionFailures)
                 {
-                    if (currentSizeBytes <= maxCacheSizeBytes)
-                    {
-                        break;
-                    }
-
-                    if (fi.LastWriteTimeUtc >= protectedWindowStartUtc)
-                    {
-                        WintapLogger.Log.Append($"Prune stopped before deleting current-window file: {fi.FullName}", LogLevel.Warn);
-                        break;
-                    }
-
-                    try
-                    {
-                        if (tryDeleteUploadedFile(fi, "prune cache"))
-                        {
-                            currentSizeBytes -= fi.Length;
-                            WintapLogger.Log.Append($"Deleted file: " + fi.FullName + " (" + fi.Length + $" bytes).  new size of raw_sensor: {currentSizeBytes}", LogLevel.Info);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        WintapLogger.Log.Append($"could not delete file {fi.Name}  reason: {ex.Message} ", LogLevel.Warn);
-                    }
+                    WintapLogger.Log.Append($"Could not delete file while pruning cache: {failure.File.FullPath}. Reason: {failure.Exception.Message}", LogLevel.Warn);
                 }
 
-                WintapLogger.Log.Append("Prune complete, new cache size (estimated): " + currentSizeBytes, LogLevel.Info);
+                string status = getPruneStatus(result);
+                WintapLogger.Log.Append(
+                    $"Raw-sensor cache prune: status={status}, limitBytes={maxCacheSizeBytes}, startingBytes={result.StartingBytes}, retainedBytes={result.RetainedBytes}, deletedFiles={result.DeletedFileCount}, deletedBytes={result.DeletedBytes}, alreadyAbsentFiles={result.AlreadyAbsentFileCount}, alreadyAbsentBytes={result.AlreadyAbsentBytes}, protectedFiles={result.ProtectedFileCount}, protectedBytes={result.ProtectedBytes}, deletionFailures={result.DeletionFailureCount}, limitReached={result.LimitReached}, survivingFiles={result.SurvivingFiles.Count}",
+                    result.LimitReached ? LogLevel.Info : LogLevel.Warn);
             }
 
-            // Recalculate the final cache size.
-            bytesOnDisk = getCurrentCacheDirSize();
-            return rawSensorFiles.Where(f => f.Exists).ToList();
+            return result.SurvivingFiles.ToList();
+        }
+
+        private RawSensorCacheDeleteOutcome deletePrunedRawSensorFile(string path)
+        {
+            try
+            {
+                File.GetAttributes(path);
+            }
+            catch (FileNotFoundException)
+            {
+                return RawSensorCacheDeleteOutcome.AlreadyAbsent;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return RawSensorCacheDeleteOutcome.AlreadyAbsent;
+            }
+
+            FileInfo file = new FileInfo(path);
+            DirectoryInfo parentDirectory = file.Directory;
+            file.Delete();
+            cleanupEmptyPartitionDirectories(parentDirectory, new DirectoryInfo(Path.Combine(cacheDir.FullName, "raw_sensor")));
+            return RawSensorCacheDeleteOutcome.Deleted;
+        }
+
+        private string getPruneStatus(RawSensorCachePruneResult result)
+        {
+            if (result.LimitReached)
+            {
+                return result.DeletionFailureCount > 0 ? "limit-satisfied-with-deletion-failures" : "limit-satisfied";
+            }
+            if (result.ProtectedFileCount > 0 && result.DeletionFailureCount > 0)
+            {
+                return "limit-not-reached-protected-and-deletion-failure";
+            }
+            if (result.ProtectedFileCount > 0)
+            {
+                return "limit-not-reached-protected";
+            }
+
+            return "limit-not-reached-deletion-failure";
         }
 
         private void deleteFile(FileInfo fi)
@@ -705,15 +718,10 @@ namespace gov.llnl.wintap.core.etl.load
             }
         }
 
-        private List<FileInfo> getRawSensorParquetFiles()
+        private List<RawSensorCacheFile> getRawSensorParquetFiles()
         {
             DirectoryInfo rawSensorDir = new DirectoryInfo(Path.Combine(cacheDir.FullName, "raw_sensor"));
-            if (!rawSensorDir.Exists)
-            {
-                return new List<FileInfo>();
-            }
-
-            return rawSensorDir.GetFiles("*.parquet", SearchOption.AllDirectories).ToList();
+            return RawSensorCachePruner.EnumerateFinalizedFiles(rawSensorDir.FullName).ToList();
         }
 
         private Dictionary<string, string> getUploaderParameters(IUpload uploader)

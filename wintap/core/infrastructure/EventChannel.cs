@@ -591,6 +591,11 @@ namespace gov.llnl.wintap.core.infrastructure
             return _processResolver?.ReconcileStartupOpenRows(livePidHashes, gapEndUtc) ?? 0;
         }
 
+        public static bool TryRepairParentLinkage(string pidHash, int parentPid, string parentPidHash)
+        {
+            return _processResolver?.TryRepairParentLinkage(pidHash, parentPid, parentPidHash) ?? false;
+        }
+
         public static void WriteCollectionGap(DateTime gapStartUtc, DateTime gapEndUtc, string priorSessionId, string reason)
         {
             _processResolver?.WriteCollectionGap(gapStartUtc, gapEndUtc, priorSessionId, reason);

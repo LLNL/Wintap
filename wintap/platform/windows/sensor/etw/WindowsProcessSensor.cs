@@ -39,6 +39,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         internal static readonly TimeSpan StopMetricCorrelationWindow = TimeSpan.FromSeconds(5);
         internal static readonly TimeSpan QaCounterLogInterval = TimeSpan.FromSeconds(60);
         private const int DefaultSidAccountCacheSize = 1024;
+        private const int LineageValidationMaxDepth = 32;
         private const string ManifestProcessProviderName = "Microsoft-Windows-Kernel-Process";
         private const string ManifestMetricSessionName = "Wintap.Collectors.WindowsProcess.Metrics";
         private const ulong ManifestProcessKeyword = 0x10;
@@ -65,6 +66,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private readonly Func<int, string> lookupPebCommandLineByPid;
         private readonly Func<int, string> lookupFullProcessImagePathByPid;
         private readonly Func<string, string> translateDevicePath;
+        private readonly Func<IReadOnlyList<ProcessRecord>> getProcessHistory;
+        private readonly Func<string, int, string, bool> repairParentLinkage;
         private readonly int sidAccountCacheMaxSize;
         private readonly Dictionary<string, string> sidAccountCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Queue<string> sidAccountCacheOrder = new Queue<string>();
@@ -77,7 +80,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private System.Timers.Timer qaCounterTimer;
         private readonly bool enableQaCounterTimer;
         private long stopWithoutStartCount;
-        private long snapshotDedupSuppressedCount;
+        private long dedupSuppressedCount;
         private long manifestMetricMissesCount;
         private long sidExtractedCount;
         private long sidNullCount;
@@ -87,6 +90,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         private long cmdlinePebRecoveredCount;
         private long snapshotCount;
         private long bootReplayCount;
+        private int lineageValidationLogged;
+        private int lineageValidationDeferredLogged;
 
         internal WindowsProcessSensor(
             Func<int, DateTime, ProcessRecord> resolveProcessAtTime = null,
@@ -109,6 +114,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             Func<int, string> lookupPebCommandLineByPid = null,
             Func<int, string> lookupFullProcessImagePathByPid = null,
             Func<string, string> translateDevicePath = null,
+            Func<IReadOnlyList<ProcessRecord>> getProcessHistory = null,
+            Func<string, int, string, bool> repairParentLinkage = null,
             int sidAccountCacheMaxSize = DefaultSidAccountCacheSize,
             bool enableQaCounterTimer = true) : base()
         {
@@ -135,6 +142,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             this.lookupPebCommandLineByPid = lookupPebCommandLineByPid ?? TryReadCommandLineByPid;
             this.lookupFullProcessImagePathByPid = lookupFullProcessImagePathByPid ?? TryGetProcessPathByPid;
             this.translateDevicePath = translateDevicePath ?? TryTranslateDevicePathToWin32Path;
+            this.getProcessHistory = getProcessHistory ?? (() => EventChannel.GetProcessHistory());
+            this.repairParentLinkage = repairParentLinkage ?? EventChannel.TryRepairParentLinkage;
             this.sidAccountCacheMaxSize = Math.Max(1, sidAccountCacheMaxSize);
             this.enableQaCounterTimer = enableQaCounterTimer;
             processHash = new ProcessHash();
@@ -147,7 +156,8 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         }
 
         internal long StopWithoutStartCount => Interlocked.Read(ref stopWithoutStartCount);
-        internal long SnapshotDedupSuppressedCount => Interlocked.Read(ref snapshotDedupSuppressedCount);
+        internal long SnapshotDedupSuppressedCount => Interlocked.Read(ref dedupSuppressedCount);
+        internal long DedupSuppressedCount => Interlocked.Read(ref dedupSuppressedCount);
         internal long ManifestMetricMissesCount => Interlocked.Read(ref manifestMetricMissesCount);
         internal long BootReplayCount => Interlocked.Read(ref bootReplayCount);
         internal int SidAccountCacheCount => sidAccountCache.Count;
@@ -386,6 +396,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 log("Windows process snapshot refresh starting", LogLevel.Info);
                 bool keepTree = false;
+                bool newBootSession = false;
                 string degradeReason;
                 long? liveSystemStart = null;
 
@@ -412,6 +423,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                             }
                             else
                             {
+                                newBootSession = true;
                                 degradeReason = "no open System row for this boot session";
                             }
                         }
@@ -430,7 +442,14 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 else
                 {
                     clearProcessDb();
-                    log($"Windows process snapshot refresh rebuilt from snapshot, lineage degraded ({degradeReason})", LogLevel.Info);
+                    if (newBootSession)
+                    {
+                        log("Windows process snapshot refresh rebuilt from snapshot: new boot session; early-boot lineage restored by boot ETL replay when armed", LogLevel.Info);
+                    }
+                    else
+                    {
+                        log($"Windows process snapshot refresh rebuilt from snapshot, lineage degraded ({degradeReason})", LogLevel.Info);
+                    }
                 }
 
                 LastRefreshRebuiltFromSnapshot = !keepTree;
@@ -449,7 +468,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                         out ProcessRecord existing))
                     {
                         livePidHashes.Add(existing.PidHash);
-                        Interlocked.Increment(ref snapshotDedupSuppressedCount);
+                        Interlocked.Increment(ref dedupSuppressedCount);
                         continue;
                     }
 
@@ -497,6 +516,205 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 log($"Windows process snapshot refresh stack trace: {ex.StackTrace}", LogLevel.Debug);
                 return false;
             }
+        }
+
+        internal bool TryLogExplorerProcessLineageValidation()
+        {
+            int pid = 0;
+            int hops = 0;
+            ProcessRecord stoppedAt = null;
+            try
+            {
+                IReadOnlyList<ProcessRecord> processHistory = getProcessHistory();
+                ProcessRecord explorer = SelectExplorerLineageSentinel(processHistory);
+                if (explorer == null)
+                {
+                    if (Interlocked.CompareExchange(ref lineageValidationDeferredLogged, 1, 0) == 0)
+                    {
+                        log("Process lineage validation deferred: no explorer record found; will retry on first live explorer Start", LogLevel.Info);
+                    }
+
+                    return false;
+                }
+
+                pid = explorer.ProcessId;
+                if (Interlocked.CompareExchange(ref lineageValidationLogged, 1, 0) != 0)
+                {
+                    return true;
+                }
+
+                if (ValidateProcessLineage(processHistory, explorer.PidHash, genPidHash, out hops, out string reason, out stoppedAt))
+                {
+                    log($"Process lineage validation PASS: pid={pid} root=ntoskrnl.exe hops={hops}", LogLevel.Info);
+                }
+                else
+                {
+                    log($"Process lineage validation FAIL: pid={pid} reason={reason} hops={hops} stopped_at={GetProcessDisplayName(stoppedAt)} pid={stoppedAt?.ProcessId ?? 0}", LogLevel.Warn);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (Interlocked.CompareExchange(ref lineageValidationLogged, 1, 0) == 0)
+                {
+                    log($"Process lineage validation FAIL: pid={pid} reason=validation error ({ex.GetType().Name}) hops={hops} stopped_at={GetProcessDisplayName(stoppedAt)} pid={stoppedAt?.ProcessId ?? 0}", LogLevel.Warn);
+                }
+
+                return true;
+            }
+        }
+
+        private static ProcessRecord SelectExplorerLineageSentinel(IReadOnlyList<ProcessRecord> processRecords)
+        {
+            return processRecords?
+                .Where(record => record != null &&
+                    (IsExplorerImage(record.ProcessName) || IsExplorerImage(record.ProcessPath)))
+                .OrderBy(record => record.ExitTime.HasValue)
+                .ThenByDescending(record => record.CreateTime)
+                .ThenBy(record => record.PidHash, StringComparer.Ordinal)
+                .FirstOrDefault();
+        }
+
+        private static bool IsExplorerImage(string image)
+        {
+            return string.Equals(Path.GetFileName(image), "explorer.exe", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static bool ValidateProcessLineage(
+            IReadOnlyList<ProcessRecord> processRecords,
+            string startingPidHash,
+            Func<int, long, string> genPidHash,
+            out int hops,
+            out string reason)
+        {
+            return ValidateProcessLineage(
+                processRecords,
+                startingPidHash,
+                genPidHash,
+                out hops,
+                out reason,
+                out _);
+        }
+
+        internal static bool ValidateProcessLineage(
+            IReadOnlyList<ProcessRecord> processRecords,
+            string startingPidHash,
+            Func<int, long, string> genPidHash,
+            out int hops,
+            out string reason,
+            out ProcessRecord stoppedAt)
+        {
+            hops = 0;
+            reason = null;
+            stoppedAt = null;
+
+            if (processRecords == null)
+            {
+                reason = "process history unavailable";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(startingPidHash))
+            {
+                reason = "starting pid hash missing";
+                return false;
+            }
+
+            string unknownParentPidHash = genPidHash(-1, 0);
+
+            var recordsByHash = new Dictionary<string, ProcessRecord>(StringComparer.Ordinal);
+            var duplicateHashes = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ProcessRecord record in processRecords)
+            {
+                if (record == null || string.IsNullOrWhiteSpace(record.PidHash))
+                {
+                    continue;
+                }
+
+                if (!recordsByHash.TryAdd(record.PidHash, record))
+                {
+                    duplicateHashes.Add(record.PidHash);
+                }
+            }
+
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            string currentPidHash = startingPidHash;
+            for (int depth = 0; depth <= LineageValidationMaxDepth; depth++)
+            {
+                if (!visited.Add(currentPidHash))
+                {
+                    reason = "cycle detected";
+                    return false;
+                }
+
+                if (duplicateHashes.Contains(currentPidHash))
+                {
+                    recordsByHash.TryGetValue(currentPidHash, out stoppedAt);
+                    reason = "duplicate pid hash";
+                    return false;
+                }
+
+                if (!recordsByHash.TryGetValue(currentPidHash, out ProcessRecord current))
+                {
+                    reason = "parent record missing";
+                    return false;
+                }
+
+                stoppedAt = current;
+
+                if (current.ProcessId == 4)
+                {
+                    if (string.Equals(Path.GetFileName(current.ProcessPath), "ntoskrnl.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+
+                    reason = "PID 4 image is not ntoskrnl.exe";
+                    return false;
+                }
+
+                if (current.ProcessId < 0)
+                {
+                    reason = "unknown parent hash";
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(current.ParentPidHash))
+                {
+                    reason = "parent pid hash missing";
+                    return false;
+                }
+
+                if (string.Equals(current.ParentPidHash, unknownParentPidHash, StringComparison.Ordinal))
+                {
+                    reason = "unknown parent hash";
+                    return false;
+                }
+
+                if (depth == LineageValidationMaxDepth)
+                {
+                    reason = "maximum lineage depth exceeded";
+                    return false;
+                }
+
+                currentPidHash = current.ParentPidHash;
+                hops++;
+            }
+
+            reason = "maximum lineage depth exceeded";
+            return false;
+        }
+
+        private static string GetProcessDisplayName(ProcessRecord process)
+        {
+            if (!string.IsNullOrWhiteSpace(process?.ProcessName))
+            {
+                return Path.GetFileName(process.ProcessName);
+            }
+
+            string pathName = Path.GetFileName(process?.ProcessPath);
+            return string.IsNullOrWhiteSpace(pathName) ? "<unknown>" : pathName;
         }
 
         private List<SnapshotProcessInfo> BuildSnapshotBatch(long? systemStartFileTimeUtc)
@@ -600,11 +818,6 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             return message;
         }
 
-        private bool IsDuplicateProcessInstance(int pid, DateTime createTime, TimeSpan tolerance)
-        {
-            return TryGetDuplicateProcessInstance(pid, createTime, tolerance, out _);
-        }
-
         private bool TryGetDuplicateProcessInstance(int pid, DateTime createTime, TimeSpan tolerance, out ProcessRecord existing)
         {
             DateTime createTimeUtc = createTime.ToUniversalTime();
@@ -616,8 +829,38 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                 return false;
             }
 
-            TimeSpan skew = existing.CreateTime.ToUniversalTime() - createTimeUtc;
+            DateTime existingCreateTimeUtc = existing.CreateTime.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(existing.CreateTime, DateTimeKind.Utc)
+                : existing.CreateTime.ToUniversalTime();
+            TimeSpan skew = existingCreateTimeUtc - createTimeUtc;
             return Math.Abs(skew.TotalSeconds) <= tolerance.TotalSeconds;
+        }
+
+        private bool TryRepairDuplicateParentLinkage(ProcessRecord existing, int parentPid, DateTime childCreateTimeUtc)
+        {
+            if (existing == null ||
+                string.IsNullOrWhiteSpace(existing.PidHash) ||
+                parentPid <= 0 ||
+                (!string.IsNullOrEmpty(existing.ParentPidHash) &&
+                 !string.Equals(existing.ParentPidHash, genPidHash(-1, 0), StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            try
+            {
+                ProcessRecord parent = resolveProcessAtTime(parentPid, childCreateTimeUtc);
+                if (parent != null && !string.IsNullOrWhiteSpace(parent.PidHash))
+                {
+                    return repairParentLinkage(existing.PidHash, parentPid, parent.PidHash);
+                }
+            }
+            catch (Exception ex)
+            {
+                log($"Windows process parent-linkage repair skipped for PID {existing.ProcessId}: {ex.Message}", LogLevel.Debug);
+            }
+
+            return false;
         }
 
         internal bool ReplayBootTrace(string etlPath)
@@ -631,12 +874,17 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             try
             {
                 log($"Windows process boot ETL replay starting from '{etlPath}'", LogLevel.Info);
+                var replayCounts = new BootReplayPassCounts();
                 using var source = new ETWTraceEventSource(etlPath, TraceEventSourceType.FileOnly);
                 var parser = new KernelTraceEventParser(source);
-                parser.ProcessStart += data => HandleReplayedProcessTraceData(data);
-                parser.ProcessDCStart += data => HandleReplayedProcessTraceData(data);
+                parser.ProcessStart += data => HandleReplayedProcessTraceData(data, replayCounts);
+                parser.ProcessDCStart += data => HandleReplayedProcessTraceData(data, replayCounts);
                 source.Process();
-                log($"Windows process boot ETL replay complete from '{etlPath}'", LogLevel.Info);
+                LogBootReplayComplete(
+                    etlPath,
+                    replayCounts.StartsEmitted,
+                    replayCounts.DuplicatesSuppressed,
+                    replayCounts.ParentLinksRepaired);
                 return true;
             }
             catch (Exception ex)
@@ -646,7 +894,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             }
         }
 
-        private void HandleReplayedProcessTraceData(ProcessTraceData data)
+        private void HandleReplayedProcessTraceData(ProcessTraceData data, BootReplayPassCounts replayCounts)
         {
             try
             {
@@ -666,7 +914,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     sidStatus = SidParseStatus.Malformed;
                 }
 
-                HandleReplayedStart(pid, parentPid, data.TimeStamp, imageFileName, commandLine, sid, sidStatus);
+                HandleReplayedStart(pid, parentPid, data.TimeStamp, imageFileName, commandLine, sid, sidStatus, replayCounts);
             }
             catch (Exception ex)
             {
@@ -683,20 +931,62 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             SecurityIdentifier sid = null,
             SidParseStatus sidStatus = SidParseStatus.NoSid)
         {
+            return HandleReplayedStart(
+                pid,
+                parentPid,
+                replayedStartTimestamp,
+                imageFileName,
+                commandLine,
+                sid,
+                sidStatus,
+                null);
+        }
+
+        private WintapMessage HandleReplayedStart(
+            int pid,
+            int parentPid,
+            DateTime replayedStartTimestamp,
+            string imageFileName,
+            string commandLine,
+            SecurityIdentifier sid,
+            SidParseStatus sidStatus,
+            BootReplayPassCounts replayCounts)
+        {
             if (pid == 4 || pid <= 0)
             {
                 return null;
             }
 
             DateTime createTimeUtc = replayedStartTimestamp.ToUniversalTime();
-            if (IsDuplicateProcessInstance(pid, createTimeUtc, BootReplayMatchTolerance))
+            if (TryGetDuplicateProcessInstance(pid, createTimeUtc, BootReplayMatchTolerance, out ProcessRecord existing))
             {
+                bool repaired = TryRepairDuplicateParentLinkage(existing, parentPid, createTimeUtc);
+                Interlocked.Increment(ref dedupSuppressedCount);
+                if (replayCounts != null)
+                {
+                    replayCounts.DuplicatesSuppressed++;
+                    if (repaired)
+                    {
+                        replayCounts.ParentLinksRepaired++;
+                    }
+                }
                 return null;
             }
 
             WintapMessage message = EmitStart(pid, parentPid, createTimeUtc, imageFileName, commandLine, sid, sidStatus);
             Interlocked.Increment(ref bootReplayCount);
+            if (replayCounts != null)
+            {
+                replayCounts.StartsEmitted++;
+            }
             return message;
+        }
+
+        internal void LogBootReplayComplete(string etlPath, long startsEmitted, long duplicatesSuppressed, long parentLinksRepaired)
+        {
+            log(
+                $"Windows process boot ETL replay complete from '{etlPath}': starts_emitted={startsEmitted} duplicates_suppressed={duplicatesSuppressed} parent_links_repaired={parentLinksRepaired}",
+                LogLevel.Info);
         }
 
         private void EtwParser_ProcessStart(ProcessTraceData data)
@@ -720,12 +1010,42 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
                     sidStatus = SidParseStatus.Malformed;
                 }
 
-                EmitStart(pid, parentPid, data.TimeStamp, imageFileName, commandLine, sid, sidStatus);
+                HandleLiveStart(pid, parentPid, data.TimeStamp, imageFileName, commandLine, sid, sidStatus);
             }
             catch (Exception ex)
             {
                 WintapLogger.Log.Append($"Error handling Windows process Start event: {ex.Message}", LogLevel.Debug);
             }
+        }
+
+        internal WintapMessage HandleLiveStart(
+            int pid,
+            int parentPid,
+            DateTime etwStartTimestamp,
+            string imageFileName,
+            string commandLine,
+            SecurityIdentifier sid = null,
+            SidParseStatus sidStatus = SidParseStatus.NoSid)
+        {
+            DateTime createTimeUtc = etwStartTimestamp.ToUniversalTime();
+            if (TryGetDuplicateProcessInstance(pid, createTimeUtc, SnapshotStartMatchTolerance, out ProcessRecord existing))
+            {
+                TryRepairDuplicateParentLinkage(existing, parentPid, createTimeUtc);
+                Interlocked.Increment(ref dedupSuppressedCount);
+                if (IsExplorerImage(imageFileName))
+                {
+                    TryLogExplorerProcessLineageValidation();
+                }
+                return null;
+            }
+
+            WintapMessage message = EmitStart(pid, parentPid, createTimeUtc, imageFileName, commandLine, sid, sidStatus);
+            if (IsExplorerImage(imageFileName))
+            {
+                TryLogExplorerProcessLineageValidation();
+            }
+
+            return message;
         }
 
         private void EtwParser_ProcessStop(ProcessTraceData data)
@@ -1663,6 +1983,13 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
             {
                 pinned.Free();
             }
+        }
+
+        private sealed class BootReplayPassCounts
+        {
+            public long StartsEmitted { get; set; }
+            public long DuplicatesSuppressed { get; set; }
+            public long ParentLinksRepaired { get; set; }
         }
 
         [Flags]

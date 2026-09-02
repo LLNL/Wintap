@@ -34,7 +34,8 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
         internal TraceEventSession EtwSession;
 
-        private static readonly KernelSession instance = new KernelSession();
+        private static readonly object instanceLock = new object();
+        private static KernelSession instance;
 
         static KernelSession()
         {
@@ -42,8 +43,6 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
         private KernelSession()
         {
-            //avoid a race condition on NT Kernel Logger
-            System.Threading.Thread.Sleep(2000);
             this.EtwSessionName = "NT Kernel Logger";
             EtwSession = new TraceEventSession(EtwSessionName, TraceEventSessionOptions.Create);
 
@@ -59,7 +58,10 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
         {
             get
             {
-                return instance;
+                lock (instanceLock)
+                {
+                    return instance ??= new KernelSession();
+                }
             }
         }
     }

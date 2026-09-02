@@ -50,6 +50,8 @@ namespace gov.llnl.wintap.core.infrastructure
 
         int ReconcileStartupOpenRows(IReadOnlyCollection<string> livePidHashes, DateTime gapEndUtc);
 
+        bool TryRepairParentLinkage(string pidHash, int parentPid, string parentPidHash);
+
         void WriteCollectionGap(DateTime gapStartUtc, DateTime gapEndUtc, string priorSessionId, string reason);
 
         /// <summary>
