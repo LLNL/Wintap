@@ -44,7 +44,7 @@ namespace gov.llnl.wintap.platform.windows.collect.shared
 
         }
 
-        public virtual bool Start()
+        public override bool Start()
         {
             EtwSessionName = "Wintap.Collectors." + SensorName;
 
