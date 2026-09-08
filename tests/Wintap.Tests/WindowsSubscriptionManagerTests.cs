@@ -19,12 +19,96 @@ namespace Wintap.Tests
 
         [Fact]
         [Trait("Category", "wpc-collector-combinations")]
-        public void ComputeFinalKernelFlags_ProcessAndFileIncludesFileIoInit()
+        public void ComputeFinalKernelFlags_ProcessAndFileIncludesFileIoInitAndDiskFileIo()
         {
             KernelTraceEventParser.Keywords flags = WindowsSubscriptionManager.ComputeFinalKernelFlags(
-                new[] { KernelTraceEventParser.Keywords.FileIOInit });
+                new[] { KernelTraceEventParser.Keywords.FileIOInit | KernelTraceEventParser.Keywords.DiskFileIO });
 
-            Assert.Equal(KernelTraceEventParser.Keywords.Process | KernelTraceEventParser.Keywords.FileIOInit, flags);
+            Assert.Equal(
+                KernelTraceEventParser.Keywords.Process |
+                KernelTraceEventParser.Keywords.FileIOInit |
+                KernelTraceEventParser.Keywords.DiskFileIO,
+                flags);
+        }
+
+        [Fact]
+        [Trait("Category", "fio-01")]
+        public void FileSensor_DeclaresFileIoInitAndDiskFileIoKernelFlags()
+        {
+            KernelTraceEventParser.Keywords flags = WindowsSubscriptionManager.GetKernelTraceFlags(new FileSensor());
+
+            Assert.True(flags.HasFlag(KernelTraceEventParser.Keywords.FileIOInit));
+            Assert.True(flags.HasFlag(KernelTraceEventParser.Keywords.DiskFileIO));
+        }
+
+        [Fact]
+        [Trait("Category", "fio-02")]
+        public void FileSensor_SubscriptionPlanSuppressesCloseAndPreservesDefaultHandlers()
+        {
+            FileSensor.FileIoSubscription[] plan = FileSensor.BuildSubscriptionPlan(collectFileRead: false);
+
+            Assert.Contains(FileSensor.FileIoSubscription.Write, plan);
+            Assert.Contains(FileSensor.FileIoSubscription.Delete, plan);
+            Assert.Contains(FileSensor.FileIoSubscription.Name, plan);
+            Assert.Contains(FileSensor.FileIoSubscription.Create, plan);
+            Assert.DoesNotContain(FileSensor.FileIoSubscription.Read, plan);
+            Assert.DoesNotContain(FileSensor.FileIoSubscription.Close, plan);
+        }
+
+        [Fact]
+        [Trait("Category", "fio-02")]
+        public void FileSensor_SubscriptionPlanKeepsReadSettingGateAndStillSuppressesClose()
+        {
+            FileSensor.FileIoSubscription[] plan = FileSensor.BuildSubscriptionPlan(collectFileRead: true);
+
+            Assert.Contains(FileSensor.FileIoSubscription.Write, plan);
+            Assert.Contains(FileSensor.FileIoSubscription.Delete, plan);
+            Assert.Contains(FileSensor.FileIoSubscription.Name, plan);
+            Assert.Contains(FileSensor.FileIoSubscription.Create, plan);
+            Assert.Contains(FileSensor.FileIoSubscription.Read, plan);
+            Assert.DoesNotContain(FileSensor.FileIoSubscription.Close, plan);
+        }
+
+        [Fact]
+        [Trait("Category", "fio-02")]
+        public void FileSensor_CloseSuppressionPreservesFileIoInitAndDiskFileIoKernelFlags()
+        {
+            KernelTraceEventParser.Keywords flags = WindowsSubscriptionManager.GetKernelTraceFlags(new FileSensor());
+
+            Assert.True(flags.HasFlag(KernelTraceEventParser.Keywords.FileIOInit));
+            Assert.True(flags.HasFlag(KernelTraceEventParser.Keywords.DiskFileIO));
+        }
+
+        [Fact]
+        [Trait("Category", "fio-03")]
+        public void FileSensor_TraceEventOnlyPathSelectionUsesProvidedFileName()
+        {
+            string path = FileSensor.SelectTraceEventFileNameOnly(@"c:\temp\traceevent-path.txt");
+
+            Assert.Equal(@"c:\temp\traceevent-path.txt", path);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [Trait("Category", "fio-03")]
+        public void FileSensor_TraceEventOnlyPathSelectionDoesNotReplaceMissingFileName(string traceEventFileName)
+        {
+            string path = FileSensor.SelectTraceEventFileNameOnly(traceEventFileName);
+
+            Assert.Equal(traceEventFileName, path);
+        }
+
+        [Fact]
+        [Trait("Category", "fio-03")]
+        public void FileSensor_DiagnosticFallbackDisablePreservesCloseSuppressionAndKernelFlags()
+        {
+            FileSensor.FileIoSubscription[] plan = FileSensor.BuildSubscriptionPlan(collectFileRead: true);
+            KernelTraceEventParser.Keywords flags = WindowsSubscriptionManager.GetKernelTraceFlags(new FileSensor());
+
+            Assert.DoesNotContain(FileSensor.FileIoSubscription.Close, plan);
+            Assert.True(flags.HasFlag(KernelTraceEventParser.Keywords.FileIOInit));
+            Assert.True(flags.HasFlag(KernelTraceEventParser.Keywords.DiskFileIO));
         }
 
         [Fact]
@@ -42,6 +126,7 @@ namespace Wintap.Tests
             KernelTraceEventParser.Keywords expected =
                 KernelTraceEventParser.Keywords.Process |
                 KernelTraceEventParser.Keywords.FileIOInit |
+                KernelTraceEventParser.Keywords.DiskFileIO |
                 KernelTraceEventParser.Keywords.NetworkTCPIP |
                 KernelTraceEventParser.Keywords.ImageLoad;
 
