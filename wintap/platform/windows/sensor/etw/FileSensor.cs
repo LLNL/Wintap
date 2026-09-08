@@ -30,11 +30,22 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
         private ConcurrentDictionary<ulong, string> fileKeyToPath;
 
+        internal enum FileIoSubscription
+        {
+            Write,
+            Delete,
+            Name,
+            Create,
+            Close,
+            Read
+        }
+
         public FileSensor() : base()
         {
             SensorName = "File";
             EtwProviderId = "SystemTraceControlGuid";
-            KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIOInit;
+            KernelTraceEventFlags = Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.FileIOInit
+                | Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.DiskFileIO;
             fileKeyToPath = new ConcurrentDictionary<ulong, string>();
         }
 
@@ -42,24 +53,70 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         /// Starts the file sensor and processes the ETW rundown trace.
         /// </summary>
         /// <returns>True if the sensor started successfully.</returns>
-        public bool Start()
+        public override bool Start()
         {
-            base.Start();
-
-            KernelParser.Instance.EtwParser.FileIOWrite += Kernel_FileIoWrite;
-            KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
-            KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
-            KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
-            KernelParser.Instance.EtwParser.FileIOClose += EtwParser_FileIOClose;
-            if (Properties.Settings.Default.CollectFileRead)
+            foreach (FileIoSubscription subscription in BuildSubscriptionPlan(Properties.Settings.Default.CollectFileRead))
             {
-                KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
+                SubscribeKernelFileIoEvent(subscription);
             }
 
             ProcessRundownTrace();
-            ExecuteEtwRundown();
+            WintapLogger.Log.Append(
+                "Skipping ETW file rundown execution while shared kernel session is active; relying on live FileIOName/FileIOCreate events for path mapping.",
+                LogLevel.Warn);
+            enabled = true;
 
             return true;
+        }
+
+        internal static FileIoSubscription[] BuildSubscriptionPlan(bool collectFileRead)
+        {
+            return collectFileRead
+                ? new[]
+                {
+                    FileIoSubscription.Write,
+                    FileIoSubscription.Delete,
+                    FileIoSubscription.Name,
+                    FileIoSubscription.Create,
+                    FileIoSubscription.Read
+                }
+                : new[]
+                {
+                    FileIoSubscription.Write,
+                    FileIoSubscription.Delete,
+                    FileIoSubscription.Name,
+                    FileIoSubscription.Create
+                };
+        }
+
+        internal static string SelectTraceEventFileNameOnly(string traceEventFileName)
+        {
+            return traceEventFileName;
+        }
+
+        private void SubscribeKernelFileIoEvent(FileIoSubscription subscription)
+        {
+            switch (subscription)
+            {
+                case FileIoSubscription.Write:
+                    KernelParser.Instance.EtwParser.FileIOWrite += Kernel_FileIoWrite;
+                    break;
+                case FileIoSubscription.Delete:
+                    KernelParser.Instance.EtwParser.FileIODelete += Kernel_FileIoDelete;
+                    break;
+                case FileIoSubscription.Name:
+                    KernelParser.Instance.EtwParser.FileIOName += EtwParser_FileIOName;
+                    break;
+                case FileIoSubscription.Create:
+                    KernelParser.Instance.EtwParser.FileIOCreate += Kernel_FileIoCreate;
+                    break;
+                case FileIoSubscription.Read:
+                    KernelParser.Instance.EtwParser.FileIORead += Kernel_FileIoRead;
+                    break;
+                case FileIoSubscription.Close:
+                    // Intentionally suppressed: Close events dominated File volume and are not emitted by Wintap.
+                    break;
+            }
         }
 
         /// <summary>
@@ -183,7 +240,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
         {
             try
             {
-                string filePath = resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey);
+                string filePath = SelectTraceEventFileNameOnly(obj.FileName);
                 if (!string.IsNullOrEmpty(filePath))
                 {
                     string activityId = TryGetActivityId(obj);
@@ -209,9 +266,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
             try
             {
-                string filePath = string.IsNullOrEmpty(obj.FileName)
-                    ? resolveIoFilePath(obj.FileName, obj.FileObject, obj.FileKey)
-                    : obj.FileName;
+                string filePath = SelectTraceEventFileNameOnly(obj.FileName);
 
                 if (!string.IsNullOrEmpty(filePath))
                 {
@@ -323,9 +378,7 @@ namespace gov.llnl.wintap.platform.windows.collect.etw
 
             try
             {
-                string filePath = !string.IsNullOrEmpty(obj.FileName)
-                    ? obj.FileName
-                    : (fileKeyToPath.TryGetValue(obj.FileKey, out var path) ? path : null);
+                string filePath = SelectTraceEventFileNameOnly(obj.FileName);
 
                 if (!string.IsNullOrEmpty(filePath))
                 {

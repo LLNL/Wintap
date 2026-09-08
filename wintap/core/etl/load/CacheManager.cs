@@ -381,7 +381,7 @@ namespace gov.llnl.wintap.core.etl.load
                 }
                 else
                 {
-                    WintapLogger.Log.Append("All uploads failed for file; retaining for retry next cycle: " + dataFile.FullName, LogLevel.Warn);
+                    WintapLogger.Log.Append("All uploads failed for file; retaining for retry next cycle: " + dataFile.FullName, LogLevel.Debug);
                 }
 
                 System.Threading.Thread.Sleep(250);  // throttle the upload to prevent CPU/IO spike
